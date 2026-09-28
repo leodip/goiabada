@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -29,15 +29,15 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessi
 
 			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
 
-			sess, err := sessionStore.Get(r, constants.AuthServerSessionName)
+			sess, err := sessionStore.Get(r, sessionkeys.AuthServerSessionName)
 			if err != nil {
 				slog.ErrorContext(ctx, "unable to get the session store", "error", err)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
 			}
 
-			if sess.Values[constants.SessionKeySessionIdentifier] != nil {
-				sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
+			if sess.Values[sessionkeys.SessionKeySessionIdentifier] != nil {
+				sessionIdentifier := sess.Values[sessionkeys.SessionKeySessionIdentifier].(string)
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 				if err != nil {
@@ -49,7 +49,7 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessi
 					// session has been deleted from DB, clear only the session identifier
 					// but preserve other session data (like AuthContext for ongoing auth flows)
 					slog.WarnContext(ctx, "session not found in the database, clearing the session identifier")
-					delete(sess.Values, constants.SessionKeySessionIdentifier)
+					delete(sess.Values, sessionkeys.SessionKeySessionIdentifier)
 					err = sessionStore.Save(r, w, sess)
 					if err != nil {
 						slog.ErrorContext(ctx, "unable to save the session", "error", err)

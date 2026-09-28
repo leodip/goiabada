@@ -229,8 +229,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// else would leave the user unable to reset at all.
 		issuedCode, err := encryption.DecryptData(user.ForgotPasswordCodeEncrypted)
 		assert.NoError(t, err)
-		expectedHash, err := hashutil.HashString(issuedCode)
-		assert.NoError(t, err)
+		expectedHash := hashutil.HashString(issuedCode)
 		assert.Equal(t, expectedHash, user.ForgotPasswordCodeHash,
 			"the stored hash must be the hash of the code that was issued")
 

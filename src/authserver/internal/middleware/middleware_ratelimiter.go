@@ -24,23 +24,28 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-type AuthHelper interface {
+// authContextGetter reads the ceremony a browser is in, whose user keys the OTP budget.
+//
+// The limiter's three ports are unexported, like every other port in this module: the handler
+// helper, the renderer and the audit logger satisfy them structurally, and nothing outside this
+// package needs to name them (#386, #433).
+type authContextGetter interface {
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 }
 
-// ErrorRenderer renders an HTML error page. The middleware declares only the shape it
+// errorRenderer renders an HTML error page. The middleware declares only the shape it
 // needs rather than depending on the handler helper that satisfies it.
-type ErrorRenderer interface {
+type errorRenderer interface {
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
 }
 
-// AuditLogger records a security event. The middleware declares only the shape it needs
+// auditEventLogger records a security event. The middleware declares only the shape it needs
 // rather than depending on the audit implementation that satisfies it. The context is first and
 // carries the request's id, so the trip this audits joins the warning beside it and the request's
 // own log line; the shape is kept identical to handlers.AuditLogger, which the same concrete
 // logger satisfies (#328).
-type AuditLogger interface {
+type auditEventLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
@@ -273,9 +278,9 @@ func (m *RateLimiterMiddleware) RecordCredentialFailure(r *http.Request) {
 }
 
 type RateLimiterMiddleware struct {
-	authHelper  AuthHelper
-	renderer    ErrorRenderer
-	auditLogger AuditLogger
+	authHelper  authContextGetter
+	renderer    errorRenderer
+	auditLogger auditEventLogger
 	enabled     bool
 	// pwdAccount is shared with the ROPC grant: both are a password guessed against one
 	// account, so one budget covers them.
@@ -296,7 +301,7 @@ type RateLimiterMiddleware struct {
 	ropcIp          *tier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
-func NewRateLimiterMiddleware(authHelper AuthHelper, renderer ErrorRenderer, auditLogger AuditLogger,
+func NewRateLimiterMiddleware(authHelper authContextGetter, renderer errorRenderer, auditLogger auditEventLogger,
 	enabled bool) *RateLimiterMiddleware {
 
 	return &RateLimiterMiddleware{

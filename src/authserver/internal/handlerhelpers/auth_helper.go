@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -35,7 +35,7 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, err
 	if err != nil {
 		return nil, err
 	}
-	jsonData, ok := sess.Values[constants.SessionKeyAuthContext].(string)
+	jsonData, ok := sess.Values[sessionkeys.SessionKeyAuthContext].(string)
 	if !ok {
 		return nil, ErrNoAuthContext
 	}
@@ -59,7 +59,7 @@ func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, aut
 	if err != nil {
 		return err
 	}
-	sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
+	sess.Values[sessionkeys.SessionKeyAuthContext] = string(jsonData)
 	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) er
 	if err != nil {
 		return err
 	}
-	delete(sess.Values, constants.SessionKeyAuthContext)
+	delete(sess.Values, sessionkeys.SessionKeyAuthContext)
 	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err

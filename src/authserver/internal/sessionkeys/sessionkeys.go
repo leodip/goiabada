@@ -1,4 +1,8 @@
-package constants
+// Package sessionkeys names the auth server's browser session and the keys of its server-side
+// row. Every value here is stored data: a live session carries these spellings, so renaming one
+// signs every browser out at deploy. Request-scoped values are not session keys and live in
+// reqctx (#433).
+package sessionkeys
 
 // AuthServerSessionName is the name of the auth server's own browser session, and the row
 // set its server-side sessions are stored under.

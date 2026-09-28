@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/errs"
@@ -271,7 +271,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		return nil, nil, err
 	}
 
-	sess.Values[constants.SessionKeySessionIdentifier] = userSession.SessionIdentifier
+	sess.Values[sessionkeys.SessionKeySessionIdentifier] = userSession.SessionIdentifier
 
 	// The browser session's identifier is replaced as the user session is bound to it, so
 	// no identifier that existed before this ceremony can name the session the ceremony

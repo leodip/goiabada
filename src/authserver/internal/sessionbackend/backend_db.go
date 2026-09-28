@@ -1,17 +1,22 @@
+// Package sessionbackend is the database backend of core/sessionstore: the browser_sessions rows
+// both applications' server-side sessions live in, one owner apiece, keyed by a digest of the
+// identifier the cookie carries. A row's deadlines come from the settings row, so an administrator
+// changing the session lifetimes changes them for every browser at its next request (#266, #334).
+// It is not usersession, which holds the signed-in user's session, nor sessionstore, which holds
+// the codec and the cookie.
 package sessionbackend
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -32,6 +37,10 @@ type BrowserSessionDatabase interface {
 // dbBackend keeps browser sessions in the database this deployment already runs. It is
 // what the auth server uses directly, and it is also what the session endpoint runs on
 // behalf of the admin console.
+//
+// Every method keys the row by hashutil.HashString(id), and that digest is what reaches the
+// column. The identifier itself is never persisted: the model tags it db:"-", the shape migration
+// 000028 established for reset and activation codes (#112, #266).
 type dbBackend struct {
 	database BrowserSessionDatabase
 	owner    string
@@ -40,7 +49,7 @@ type dbBackend struct {
 
 // NewAuthServerBackend returns a database backend scoped to the auth server's rows.
 func NewAuthServerBackend(database BrowserSessionDatabase) sessionstore.Backend {
-	return newBackend(database, constants.AuthServerSessionName)
+	return newBackend(database, sessionkeys.AuthServerSessionName)
 }
 
 // NewAdminConsoleBackend returns a database backend scoped to the admin console's rows.
@@ -62,7 +71,7 @@ func newBackend(database BrowserSessionDatabase, owner string) *dbBackend {
 
 func (b *dbBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
 	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, b.owner,
-		hashSessionId(id), b.now())
+		hashutil.HashString(id), b.now())
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the browser session")
 	}
@@ -92,7 +101,7 @@ func (b *dbBackend) Create(ctx context.Context, id string, data []byte, authenti
 	browserSession := &models.BrowserSession{
 		Owner:         b.owner,
 		SessionId:     id,
-		SessionIdHash: hashSessionId(id),
+		SessionIdHash: hashutil.HashString(id),
 		Data:          string(data),
 		LastAccessed:  now,
 		ExpiresAt:     expiresAt,
@@ -107,7 +116,7 @@ func (b *dbBackend) Create(ctx context.Context, id string, data []byte, authenti
 
 func (b *dbBackend) Update(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
 	now := b.now()
-	hash := hashSessionId(id)
+	hash := hashutil.HashString(id)
 
 	expiresAt, err := b.expiryFor(ctx, hash, authenticated, now)
 	if err != nil {
@@ -127,7 +136,7 @@ func (b *dbBackend) Update(ctx context.Context, id string, data []byte, authenti
 
 func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (time.Time, error) {
 	now := b.now()
-	hash := hashSessionId(id)
+	hash := hashutil.HashString(id)
 
 	expiresAt, err := b.expiryFor(ctx, hash, authenticated, now)
 	if err != nil {
@@ -146,7 +155,7 @@ func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (t
 }
 
 func (b *dbBackend) Delete(ctx context.Context, id string) error {
-	if err := b.database.DeleteBrowserSession(ctx, nil, b.owner, hashSessionId(id)); err != nil {
+	if err := b.database.DeleteBrowserSession(ctx, nil, b.owner, hashutil.HashString(id)); err != nil {
 		return errs.Wrap(err, "unable to delete the browser session")
 	}
 	return nil
@@ -212,12 +221,4 @@ func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime tim
 
 	return time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second,
 		time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second, nil
-}
-
-// hashSessionId is what reaches the column. The identifier itself is never persisted:
-// the model tags it db:"-" and everything below this line works on the digest, the shape
-// migration 000028 established for reset and activation codes (#112, #266).
-func hashSessionId(id string) string {
-	sum := sha256.Sum256([]byte(id))
-	return hex.EncodeToString(sum[:])
 }

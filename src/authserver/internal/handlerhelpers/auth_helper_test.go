@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestGetAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		helper, store, _ := newRealStoreAuthHelper(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
 		})
 
 		result, err := helper.GetAuthContext(browserRequest(cookies))
@@ -35,7 +35,7 @@ func TestGetAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		helper, store, backend := newRealStoreAuthHelper(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
 		})
 		backend.failLoad = true
 
@@ -58,7 +58,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("UnmarshalError", func(t *testing.T) {
 		helper, store, _ := newRealStoreAuthHelper(t)
-		cookies := seedBrowserSession(t, store, map[string]any{constants.SessionKeyAuthContext: "invalid json"})
+		cookies := seedBrowserSession(t, store, map[string]any{sessionkeys.SessionKeyAuthContext: "invalid json"})
 
 		result, err := helper.GetAuthContext(browserRequest(cookies))
 
@@ -169,7 +169,7 @@ func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSide
 	encKey := []byte("0123456789abcdef0123456789abcdef")
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend,
-		constants.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
+		sessionkeys.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	if err != nil {
 		// The keys are literals above and the derivation cannot fail on them, so this is
@@ -292,7 +292,7 @@ func TestClearAuthContext(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		helper, store, _ := newRealStoreAuthHelper(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
 		})
 
 		err := helper.ClearAuthContext(httptest.NewRecorder(), browserRequest(cookies))
@@ -307,7 +307,7 @@ func TestClearAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		helper, store, backend := newRealStoreAuthHelper(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
 		})
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
@@ -468,7 +468,7 @@ func TestRegenerateSession(t *testing.T) {
 	seeded := func(t *testing.T, store *sessionstore.ServerSideStore) []*http.Cookie {
 		t.Helper()
 		return seedBrowserSession(t, store, map[string]any{
-			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+			sessionkeys.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
 		})
 	}
 
@@ -548,7 +548,7 @@ func TestUILocales(t *testing.T) {
 			helper, store, _ := newRealStoreAuthHelper(t)
 			values := map[string]any{"unrelated": "value"}
 			if tt.authContext != nil {
-				values[constants.SessionKeyAuthContext] = authContextJSON(t, tt.authContext)
+				values[sessionkeys.SessionKeyAuthContext] = authContextJSON(t, tt.authContext)
 			}
 			cookies := seedBrowserSession(t, store, values)
 

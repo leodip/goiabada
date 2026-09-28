@@ -261,8 +261,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 
 	// The sid comes off the codes row, not the token: an offline refresh token's own
 	// session_identifier column is empty.
-	codeHash, err := hashutil.HashString(code)
-	require.NoError(t, err)
+	codeHash := hashutil.HashString(code)
 	codeEntity, err := database.GetCodeByCodeHash(context.Background(), nil, codeHash, false)
 	require.NoError(t, err)
 	require.NotNil(t, codeEntity)
@@ -423,8 +422,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 
 	// The sid the ceremony established, read off the codes row: an offline refresh token does not
 	// carry it, which is the whole reason the sweep needs a sid-scoped query (finding 3).
-	codeHash, err := hashutil.HashString(code)
-	require.NoError(t, err)
+	codeHash := hashutil.HashString(code)
 	codeEntity, err := database.GetCodeByCodeHash(context.Background(), nil, codeHash, false)
 	require.NoError(t, err)
 	require.NotNil(t, codeEntity)
@@ -482,8 +480,7 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	code := fake.LetterN(32)
 	encrypted, err := encryption.EncryptData(code)
 	require.NoError(t, err)
-	codeHash, err := hashutil.HashString(code)
-	require.NoError(t, err)
+	codeHash := hashutil.HashString(code)
 
 	fresh, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)

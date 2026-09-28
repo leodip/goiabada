@@ -90,10 +90,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	scope = strings.TrimSpace(scope)
 
 	authCode := strings.ReplaceAll(uuidutil.New(), "-", "") + stringutil.GenerateSecurityRandomString(96)
-	authCodeHash, err := hashutil.HashString(authCode)
-	if err != nil {
-		return nil, err
-	}
+	authCodeHash := hashutil.HashString(authCode)
 	// Handle PKCE fields - store as NULL if not provided
 	var codeChallenge, codeChallengeMethod sql.NullString
 	if input.CodeChallenge != "" {

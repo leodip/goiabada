@@ -1267,10 +1267,7 @@ func TestUpdateUser_DoesNotClobberLastOTPStep(t *testing.T) {
 // exercise the same distinction (#112).
 func codeHashOf(t *testing.T, code string) string {
 	t.Helper()
-	hash, err := hashutil.HashString(code)
-	if err != nil {
-		t.Fatalf("HashString: %v", err)
-	}
+	hash := hashutil.HashString(code)
 	return hash
 }
 

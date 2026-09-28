@@ -86,11 +86,7 @@ func HandleForgotPasswordPost(
 			// The hash is how the reset link finds this row again, since the link carries
 			// the code and no email address (#112). The encryption above stays: it is what
 			// proves a submitted code matches, where the hash only locates the row.
-			verificationCodeHash, resetEmailErr := hashutil.HashString(verificationCode)
-			if resetEmailErr != nil {
-				httpHelper.InternalServerError(w, r, resetEmailErr)
-				return
-			}
+			verificationCodeHash := hashutil.HashString(verificationCode)
 
 			user.ForgotPasswordCodeEncrypted = verificationCodeEncrypted
 			user.ForgotPasswordCodeHash = verificationCodeHash

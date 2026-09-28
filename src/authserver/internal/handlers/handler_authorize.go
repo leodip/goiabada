@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -663,7 +662,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	}
 
 	if userSession == nil {
-		redirectWithError(constants.ErrorLoginRequired, "User authentication is required")
+		redirectWithError(oidc.ErrorLoginRequired, "User authentication is required")
 		return
 	}
 
@@ -683,11 +682,11 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 		if requestedMaxAge != nil {
 			// Check if session would be valid without max_age
 			if userSessionManager.HasValidUserSession(userSession, idleTimeout, maxLifetime, nil) {
-				redirectWithError(constants.ErrorLoginRequired, "Session age exceeds max_age")
+				redirectWithError(oidc.ErrorLoginRequired, "Session age exceeds max_age")
 				return
 			}
 		}
-		redirectWithError(constants.ErrorLoginRequired, "User session has expired")
+		redirectWithError(oidc.ErrorLoginRequired, "User session has expired")
 		return
 	}
 
@@ -704,7 +703,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// "MUST NOT reply with an ID Token for a different user"
 	if authContext.IdTokenHintSub != "" {
 		if userSession.User.Subject != authContext.IdTokenHintSub {
-			redirectWithError(constants.ErrorLoginRequired,
+			redirectWithError(oidc.ErrorLoginRequired,
 				"The current session user does not match the id_token_hint")
 			return
 		}
@@ -715,13 +714,13 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	sessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel.String())
 	if err != nil {
 		// Unknown session ACR, treat as insufficient
-		redirectWithError(constants.ErrorInteractionRequired, "Higher authentication level required")
+		redirectWithError(oidc.ErrorInteractionRequired, "Higher authentication level required")
 		return
 	}
 
 	// If target ACR is higher than session ACR, we need step-up (interaction required)
 	if targetAcrLevel.IsHigherThan(sessionAcrLevel) {
-		redirectWithError(constants.ErrorInteractionRequired, "Higher authentication level required")
+		redirectWithError(oidc.ErrorInteractionRequired, "Higher authentication level required")
 		return
 	}
 
@@ -730,7 +729,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// For level2_optional: if user has OTP but session doesn't have OTP method, need step-up
 	if targetAcrLevel == models.AcrLevel2Mandatory {
 		if !userSession.User.OTPEnabled {
-			redirectWithError(constants.ErrorInteractionRequired, "Additional authentication setup required")
+			redirectWithError(oidc.ErrorInteractionRequired, "Additional authentication setup required")
 			return
 		}
 	}
@@ -746,7 +745,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	if userSession.OtpConfigGeneration != userSession.User.OtpConfigGeneration {
 		// Only matters if target requires level2
 		if targetAcrLevel == models.AcrLevel2Optional || targetAcrLevel == models.AcrLevel2Mandatory {
-			redirectWithError(constants.ErrorInteractionRequired, "Authentication configuration has changed")
+			redirectWithError(oidc.ErrorInteractionRequired, "Authentication configuration has changed")
 			return
 		}
 	}
@@ -773,7 +772,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 		}
 
 		if consent == nil {
-			redirectWithError(constants.ErrorConsentRequired, "User consent is required")
+			redirectWithError(oidc.ErrorConsentRequired, "User consent is required")
 			return
 		}
 
@@ -781,7 +780,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 		effectiveScopes := strings.Fields(effectiveScope)
 		for _, scope := range effectiveScopes {
 			if !consent.HasScope(scope) {
-				redirectWithError(constants.ErrorConsentRequired, "Additional consent is required")
+				redirectWithError(oidc.ErrorConsentRequired, "Additional consent is required")
 				return
 			}
 		}

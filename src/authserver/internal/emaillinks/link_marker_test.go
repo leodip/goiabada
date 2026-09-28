@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 
@@ -31,7 +31,7 @@ import (
 func newMarkerTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		constants.SessionKeySessionIdentifier,
+		sessionkeys.SessionKeySessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
 		sessionstore.KeyPair{
@@ -66,9 +66,9 @@ func writeRawMarker(t *testing.T, store sessionstore.Store, value interface{}) *
 	req := httptest.NewRequest("GET", "/reset-password", nil)
 	rr := httptest.NewRecorder()
 
-	sess, err := store.Get(req, constants.AuthServerSessionName)
+	sess, err := store.Get(req, sessionkeys.AuthServerSessionName)
 	require.NoError(t, err)
-	sess.Values[constants.SessionKeyLinkMarker] = value
+	sess.Values[sessionkeys.SessionKeyLinkMarker] = value
 	require.NoError(t, store.Save(req, rr, sess))
 
 	return requestCarrying(t, rr)
@@ -498,7 +498,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 
 	t.Run("save", func(t *testing.T) {
 		store := mocks_sessionstore.NewStore(t)
-		store.On("Get", mock.Anything, constants.AuthServerSessionName).Return(nil, expectedError)
+		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
 
 		rejection, err := SaveLinkMarker(store, httptest.NewRecorder(),
 			httptest.NewRequest("GET", "/reset-password", nil),
@@ -510,7 +510,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 
 	t.Run("get", func(t *testing.T) {
 		store := mocks_sessionstore.NewStore(t)
-		store.On("Get", mock.Anything, constants.AuthServerSessionName).Return(nil, expectedError)
+		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
 
 		marker, rejection, err := GetLinkMarker(store,
 			httptest.NewRequest("GET", "/reset-password", nil), LinkMarkerFlowResetPassword)
@@ -522,7 +522,7 @@ func TestLinkMarkerStoreFailures(t *testing.T) {
 
 	t.Run("clear", func(t *testing.T) {
 		store := mocks_sessionstore.NewStore(t)
-		store.On("Get", mock.Anything, constants.AuthServerSessionName).Return(nil, expectedError)
+		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, expectedError)
 
 		err := ClearLinkMarker(store, httptest.NewRecorder(),
 			httptest.NewRequest("GET", "/reset-password", nil))

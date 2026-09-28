@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -957,7 +957,7 @@ func finishLogout(
 	location string,
 	targetSupplied bool,
 ) {
-	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
+	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return

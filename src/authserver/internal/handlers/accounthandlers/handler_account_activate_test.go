@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -25,6 +24,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -46,7 +46,7 @@ import (
 func newMarkerTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		constants.SessionKeySessionIdentifier,
+		sessionkeys.SessionKeySessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
 		sessionstore.KeyPair{
@@ -106,9 +106,9 @@ func withRawMarker(t *testing.T, store sessionstore.Store, req *http.Request, va
 
 	seed := cleanGetRequest()
 	rr := httptest.NewRecorder()
-	sess, err := store.Get(seed, constants.AuthServerSessionName)
+	sess, err := store.Get(seed, sessionkeys.AuthServerSessionName)
 	require.NoError(t, err)
-	sess.Values[constants.SessionKeyLinkMarker] = value
+	sess.Values[sessionkeys.SessionKeyLinkMarker] = value
 	require.NoError(t, store.Save(seed, rr, sess))
 
 	for _, c := range rr.Result().Cookies() {
@@ -172,8 +172,7 @@ func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedA
 
 	encrypted, err := encryption.EncryptData(code)
 	require.NoError(t, err)
-	codeHash, err := hashutil.HashString(code)
-	require.NoError(t, err)
+	codeHash := hashutil.HashString(code)
 
 	return &models.PreRegistration{
 		Id:                        id,
@@ -277,8 +276,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		store := newMarkerTestStore()
 		logs := logtest.CaptureSlog(t)
 
-		codeHash, err := hashutil.HashString(code)
-		require.NoError(t, err)
+		codeHash := hashutil.HashString(code)
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
 		expectRenderedLinkExpired(httpHelper)
 
@@ -304,8 +302,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		// Reachable only through a SHA-256 collision, and asserted so the comparison behind
 		// the index stays load-bearing rather than decorative.
 		preReg, _ := preRegistrationWithCode(t, 7, activateTestEmail, "a-different-code", time.Now().UTC())
-		codeHash, err := hashutil.HashString(code)
-		require.NoError(t, err)
+		codeHash := hashutil.HashString(code)
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		expectRenderedLinkExpired(httpHelper)
 
@@ -559,8 +556,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 	})
 
 	t.Run("every marker-attributable refusal renders the same page and creates nothing", func(t *testing.T) {
-		codeHash, err := hashutil.HashString(code)
-		require.NoError(t, err)
+		codeHash := hashutil.HashString(code)
 
 		for _, tc := range []struct {
 			name    string

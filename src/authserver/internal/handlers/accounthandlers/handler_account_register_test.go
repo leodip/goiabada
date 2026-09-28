@@ -590,8 +590,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			// address (#112). Derived from the code the handler actually issued rather
 			// than from a value the test chose: a hash of anything else would leave the
 			// registration unactivatable.
-			expectedHash, err := hashutil.HashString(decryptedCode)
-			assert.NoError(t, err)
+			expectedHash := hashutil.HashString(decryptedCode)
 			assert.Equal(t, expectedHash, preReg.VerificationCodeHash,
 				"the stored hash must be the hash of the code that was issued")
 		})

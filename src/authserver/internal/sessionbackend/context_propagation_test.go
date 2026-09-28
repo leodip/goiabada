@@ -9,6 +9,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -47,12 +48,12 @@ func TestDatabaseBackend_LoadReadsUnderTheCallersContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetBrowserSessionByOwnerAndSessionIdHash", theCallersContext(), (*sql.Tx)(nil),
-		owner, hashSessionId(id), fixedNow).
+		owner, hashutil.HashString(id), fixedNow).
 		Return(&models.BrowserSession{
 			Data:          "ciphertext",
 			LastAccessed:  fixedNow,
 			ExpiresAt:     fixedNow.Add(time.Hour),
-			SessionIdHash: hashSessionId(id),
+			SessionIdHash: hashutil.HashString(id),
 		}, nil).Once()
 
 	record, err := testBackend(database, owner).Load(markedSettingsContext(), id)
@@ -86,7 +87,7 @@ func TestDatabaseBackend_UpdateOfAnAbsentSessionReachesNoInsert(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("UpdateBrowserSessionData", theCallersContext(), (*sql.Tx)(nil),
-		owner, hashSessionId(id), "data", fixedNow, mock.Anything).
+		owner, hashutil.HashString(id), "data", fixedNow, mock.Anything).
 		Return(false, nil).Once()
 
 	_, err := testBackend(database, owner).Update(markedSettingsContext(), id, []byte("data"), false)

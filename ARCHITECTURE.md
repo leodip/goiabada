@@ -222,8 +222,9 @@ Notes on rows that are not self-evident:
   them — the OAuth client, the JWT session middleware and the console's renderer to
   `adminconsole/internal`, the bearer middleware and the auth server's renderer to
   `authserver/internal` — and every key went with its one writer, to that module's own
-  `internal/constants`. The auth server's have since moved on to `internal/reqctx`, as unexported
-  keys behind typed accessors (#433).
+  `internal/constants`. The auth server's have since moved on: its context keys to
+  `internal/reqctx`, as unexported keys behind typed accessors, and its session keys to
+  `internal/sessionkeys` (#433).
 - `ManageAccountPermissionIdentifier` dropped from `kernel` to `both-apps` in the same commit, for
   the same reason and with no change in the tree beyond it: `core/middleware/middleware_jwt.go`
   was its one core referrer, through `buildScopeString`. Both applications still name it, so it

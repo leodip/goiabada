@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
@@ -216,9 +216,9 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	}()
 
 	id := newTestSessionId(t)
-	createBrowserSessionFixture(t, constants.AuthServerSessionName, id, time.Now().UTC().Add(time.Hour))
+	createBrowserSessionFixture(t, sessionkeys.AuthServerSessionName, id, time.Now().UTC().Add(time.Hour))
 	defer func() {
-		_ = database.DeleteBrowserSession(context.Background(), nil, constants.AuthServerSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, sessionkeys.AuthServerSessionName, hashTestSessionId(id))
 	}()
 
 	// The row is live and the identifier is correct. Only the owner differs.
@@ -238,7 +238,7 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, deleted.StatusCode)
 
 	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil,
-		constants.AuthServerSessionName, hashTestSessionId(id), time.Now().UTC())
+		sessionkeys.AuthServerSessionName, hashTestSessionId(id), time.Now().UTC())
 	assert.NoError(t, err)
 	assert.NotNil(t, survivor, "deleting through the admin console's endpoint must not reach an auth server session")
 }

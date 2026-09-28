@@ -273,8 +273,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	verificationCode, err := encryption.DecryptData(preReg.VerificationCodeEncrypted)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, verificationCode)
-	expectedHash, err := hashutil.HashString(verificationCode)
-	assert.NoError(t, err)
+	expectedHash := hashutil.HashString(verificationCode)
 	assert.Equal(t, expectedHash, preReg.VerificationCodeHash)
 
 	cleanURL := followActivationLink(t, httpClient, latestActivationLink(t, email))
