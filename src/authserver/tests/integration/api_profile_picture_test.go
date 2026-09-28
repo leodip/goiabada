@@ -14,7 +14,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -85,7 +84,7 @@ func createTestUserForProfilePicture(t *testing.T) *models.User {
 func TestAPIAccountProfilePictureGet_Success_NoPicture(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -99,7 +98,7 @@ func TestAPIAccountProfilePictureGet_Success_NoPicture(t *testing.T) {
 }
 
 func TestAPIAccountProfilePictureGet_Unauthorized(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
@@ -112,7 +111,7 @@ func TestAPIAccountProfilePictureGet_Unauthorized(t *testing.T) {
 }
 
 func TestAPIAccountProfilePictureGet_InsufficientScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	// Token with a scope no route grants instead of manage-account
 	tok := createClientCredentialsTokenWithoutRouteScope(t)
@@ -124,7 +123,7 @@ func TestAPIAccountProfilePictureGet_InsufficientScope(t *testing.T) {
 func TestAPIAccountProfilePicturePost_Success(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	pictureData := createTestPNGImage(100, 100)
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -151,7 +150,7 @@ func TestAPIAccountProfilePicturePost_Success(t *testing.T) {
 func TestAPIAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	// Upload first picture
 	pictureData1 := createTestPNGImage(100, 100)
@@ -174,7 +173,7 @@ func TestAPIAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 func TestAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	invalidData := []byte("not a valid image")
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", invalidData, "invalid.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -188,7 +187,7 @@ func TestAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 }
 
 func TestAPIAccountProfilePicturePost_Unauthorized(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	pictureData := createTestPNGImage(100, 100)
 
 	var body bytes.Buffer
@@ -211,7 +210,7 @@ func TestAPIAccountProfilePicturePost_Unauthorized(t *testing.T) {
 func TestAPIAccountProfilePictureDelete_Success(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	// First upload a picture
 	pictureData := createTestPNGImage(100, 100)
@@ -247,7 +246,7 @@ func TestAPIAccountProfilePictureDelete_Success(t *testing.T) {
 func TestAPIAccountProfilePictureDelete_NoPicture(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	// Delete when no picture exists should still succeed
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
@@ -256,7 +255,7 @@ func TestAPIAccountProfilePictureDelete_NoPicture(t *testing.T) {
 }
 
 func TestAPIAccountProfilePictureDelete_Unauthorized(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	assert.NoError(t, err)
@@ -275,7 +274,7 @@ func TestAPIUserProfilePictureGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", config.GetAuthServer().BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -290,7 +289,7 @@ func TestAPIUserProfilePictureGet_Success(t *testing.T) {
 func TestAPIUserProfilePictureGet_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", config.GetAuthServer().BaseURL, 99999999)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, 99999999)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -300,7 +299,7 @@ func TestAPIUserProfilePictureGet_UserNotFound(t *testing.T) {
 func TestAPIUserProfilePictureGet_InvalidUserId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/invalid/profile-picture", config.GetAuthServer().BaseURL)
+	url := fmt.Sprintf("%s/api/v1/admin/users/invalid/profile-picture", appConfig.AuthServer.BaseURL)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -311,7 +310,7 @@ func TestAPIUserProfilePicturePost_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", config.GetAuthServer().BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
 	pictureData := createTestPNGImage(100, 100)
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -337,7 +336,7 @@ func TestAPIUserProfilePicturePost_Success(t *testing.T) {
 func TestAPIUserProfilePicturePost_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", config.GetAuthServer().BaseURL, 99999999)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, 99999999)
 	pictureData := createTestPNGImage(100, 100)
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -349,7 +348,7 @@ func TestAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", config.GetAuthServer().BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
 	invalidData := []byte("not a valid image")
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", invalidData, "invalid.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -366,7 +365,7 @@ func TestAPIUserProfilePictureDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", config.GetAuthServer().BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
 
 	// First upload a picture
 	pictureData := createTestPNGImage(100, 100)
@@ -395,7 +394,7 @@ func TestAPIUserProfilePictureDelete_Success(t *testing.T) {
 func TestAPIUserProfilePictureDelete_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", config.GetAuthServer().BaseURL, 99999999)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, 99999999)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -410,14 +409,14 @@ func TestUserinfoPicture_Success(t *testing.T) {
 	// Create a user and upload a profile picture using the account API
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	accountUrl := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	accountUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	pictureData := createTestPNGImage(100, 100)
 	uploadResp := makeMultipartRequest(t, "POST", accountUrl, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Now fetch the picture via the userinfo/picture endpoint (no auth required)
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
 	assert.NoError(t, err)
@@ -441,7 +440,7 @@ func TestUserinfoPicture_Success(t *testing.T) {
 func TestUserinfoPicture_NotFound(t *testing.T) {
 	// Use a random UUID that doesn't exist
 	randomUUID := fake.UUID()
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, randomUUID)
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, randomUUID)
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
@@ -455,7 +454,7 @@ func TestUserinfoPicture_NotFound(t *testing.T) {
 }
 
 func TestUserinfoPicture_InvalidSubject(t *testing.T) {
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/invalid-uuid", config.GetAuthServer().BaseURL)
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/invalid-uuid", appConfig.AuthServer.BaseURL)
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
@@ -473,7 +472,7 @@ func TestUserinfoPicture_UserHasNoPicture(t *testing.T) {
 	// Create a user without a profile picture
 	user := createTestUserForProfilePicture(t)
 
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
@@ -490,14 +489,14 @@ func TestUserinfoPicture_CacheHeaders(t *testing.T) {
 	// Create a user and upload a profile picture
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	accountUrl := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	accountUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	pictureData := createTestPNGImage(100, 100)
 	uploadResp := makeMultipartRequest(t, "POST", accountUrl, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Fetch the picture and check cache headers
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("GET", pictureUrl, nil)
 	assert.NoError(t, err)
@@ -522,7 +521,7 @@ func TestUserinfoPicture_CacheHeaders(t *testing.T) {
 func TestProfilePicture_FullWorkflow(t *testing.T) {
 	// 1. Create user and get access token
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
-	accountUrl := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
+	accountUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	// 2. Verify no picture initially
 	getResp1 := makeAPIRequest(t, "GET", accountUrl, accessToken, nil)
@@ -545,7 +544,7 @@ func TestProfilePicture_FullWorkflow(t *testing.T) {
 	assert.True(t, getResponse2["hasPicture"].(bool))
 
 	// 5. Fetch the actual picture via public endpoint
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", config.GetAuthServer().BaseURL, user.Subject)
+	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 	httpClient := createHttpClient(t)
 	pictureResp, err := httpClient.Get(pictureUrl)
 	assert.NoError(t, err)

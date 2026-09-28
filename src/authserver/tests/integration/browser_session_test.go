@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -142,11 +141,11 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 	// under that identifier and sends it to the account profile, instead of onward to
 	// /auth/completed where the session would have been minted for it.
 	replay := createHttpClient(t)
-	baseURL, err := url.Parse(config.GetAuthServer().BaseURL)
+	baseURL, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	replay.Jar.SetCookies(baseURL, []*http.Cookie{plantedCookie})
 
-	resp = loadPage(t, replay, config.GetAuthServer().BaseURL+"/auth/level1completed")
+	resp = loadPage(t, replay, appConfig.AuthServer.BaseURL+"/auth/level1completed")
 	defer func() { _ = resp.Body.Close() }()
 
 	assertRedirect(t, resp, "/account/profile")
@@ -249,7 +248,7 @@ func TestBrowserSession_LogoutLeavesNoUsableSession(t *testing.T) {
 	// The GET renders the consent page, because RP-Initiated Logout 1.0 section 2 makes the
 	// OP ask when no id_token_hint was supplied. The confirming POST is the logout, and it
 	// carries no fields: this browser asked for nothing to be redirected to.
-	resp := loadPage(t, httpClient, config.GetAuthServer().BaseURL+logoutPath)
+	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+logoutPath)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -279,7 +278,7 @@ func confirmLogout(t *testing.T, httpClient *http.Client) *http.Response {
 	t.Helper()
 
 	req, err := http.NewRequest(http.MethodPost,
-		config.GetAuthServer().BaseURL+logoutPath, strings.NewReader(""))
+		appConfig.AuthServer.BaseURL+logoutPath, strings.NewReader(""))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -293,7 +292,7 @@ func confirmLogout(t *testing.T, httpClient *http.Client) *http.Response {
 // browser rejects the prefixed form over plain http. Derived from the same config value the
 // store derives it from, so this test reads correctly in either kind of deployment.
 func browserSessionCookieName() string {
-	if config.GetAuthServer().IsCookieSecure() {
+	if appConfig.AuthServer.IsCookieSecure() {
 		return "__Host-" + sessionkeys.AuthServerSessionName
 	}
 	return sessionkeys.AuthServerSessionName
@@ -301,7 +300,7 @@ func browserSessionCookieName() string {
 
 func browserCookies(t *testing.T, httpClient *http.Client) []*http.Cookie {
 	t.Helper()
-	baseURL, err := url.Parse(config.GetAuthServer().BaseURL)
+	baseURL, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	return httpClient.Jar.Cookies(baseURL)
 }
@@ -330,9 +329,9 @@ func requireSessionCookie(t *testing.T, httpClient *http.Client) *http.Cookie {
 func decodeSessionIdentifier(t *testing.T, cookie *http.Cookie) string {
 	t.Helper()
 
-	authKey, err := hex.DecodeString(config.GetAuthServer().SessionAuthenticationKey)
+	authKey, err := hex.DecodeString(appConfig.AuthServer.SessionAuthenticationKey)
 	require.NoError(t, err)
-	encKey, err := hex.DecodeString(config.GetAuthServer().SessionEncryptionKey)
+	encKey, err := hex.DecodeString(appConfig.AuthServer.SessionEncryptionKey)
 	require.NoError(t, err)
 
 	opener, err := sessionstore.NewServerSideStore(nil, sessionkeys.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
@@ -353,7 +352,7 @@ func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
 	t.Helper()
 
 	replay := createHttpClient(t)
-	baseURL, err := url.Parse(config.GetAuthServer().BaseURL)
+	baseURL, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	replay.Jar.SetCookies(baseURL, []*http.Cookie{cookie})
 
@@ -411,7 +410,7 @@ func beginAuthorize(t *testing.T, httpClient *http.Client,
 	client *models.Client, redirectUri *models.RedirectURI) *http.Response {
 	t.Helper()
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

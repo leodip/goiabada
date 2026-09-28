@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
@@ -57,7 +56,7 @@ func TestAuthorize_PostRequest(t *testing.T) {
 			form.Set("state", fake.LetterN(8))
 			form.Set("nonce", fake.LetterN(8))
 
-			destURL := config.GetAuthServer().BaseURL + tc.path
+			destURL := appConfig.AuthServer.BaseURL + tc.path
 
 			req, err := http.NewRequest(http.MethodPost, destURL, strings.NewReader(form.Encode()))
 			if err != nil {

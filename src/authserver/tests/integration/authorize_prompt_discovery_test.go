@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +15,7 @@ import (
 func TestDiscovery_PromptValuesSupported(t *testing.T) {
 	httpClient := createHttpClient(t)
 
-	destUrl := config.GetAuthServer().BaseURL + "/.well-known/openid-configuration"
+	destUrl := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +53,7 @@ func TestDiscovery_PromptValuesSupported(t *testing.T) {
 func TestDiscovery_PromptValuesSupportedIsArray(t *testing.T) {
 	httpClient := createHttpClient(t)
 
-	destUrl := config.GetAuthServer().BaseURL + "/.well-known/openid-configuration"
+	destUrl := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
 		t.Fatal(err)

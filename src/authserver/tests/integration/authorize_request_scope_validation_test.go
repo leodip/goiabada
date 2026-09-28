@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +35,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -82,7 +81,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=invalid"
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -130,7 +129,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=code"
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -178,7 +177,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=invalid"
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -226,7 +225,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=S256"
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -285,7 +284,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 			"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=S256" +
 			"&code_challenge=" + testCase.codeChallenge
 
@@ -344,7 +343,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -403,7 +402,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -462,7 +461,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -512,7 +511,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -564,7 +563,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -617,7 +616,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -673,7 +672,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -724,7 +723,7 @@ func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	baseUrl := config.GetAuthServer().BaseURL + "/auth/authorize/"
+	baseUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/"
 	params := url.Values{}
 	params.Add("client_id", client.ClientIdentifier)
 	params.Add("redirect_uri", redirectUri.URI)
@@ -795,7 +794,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
@@ -851,7 +850,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 	nonExistentResource := "non_existent_resource"
 	scope := fmt.Sprintf("%s:read", nonExistentResource)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -915,7 +914,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 	nonExistentPermission := "non_existent_permission"
 	scope := fmt.Sprintf("%s:%s", resource.ResourceIdentifier, nonExistentPermission)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -965,7 +964,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 func TestAuthorize_ValidateScopes_EmojiScope_FormPostDescriptionIsConformed(t *testing.T) {
 	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

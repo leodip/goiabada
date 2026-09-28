@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -49,7 +48,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 		Locale:              "en-US",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -111,7 +110,7 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 		// Other fields left empty/default
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -156,7 +155,7 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 		Gender:     "invalid_gender", // Invalid gender value
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -201,7 +200,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 				Gender:     tc.genderValue,
 			}
 
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -243,7 +242,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 		DateOfBirth: "invalid-date", // Invalid date format
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -279,7 +278,7 @@ func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 		ZoneInfo:            "Europe/Berlin",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -307,7 +306,7 @@ func TestAPIUserProfilePut_UserNotFound(t *testing.T) {
 		FamilyName: "User",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -336,7 +335,7 @@ func TestAPIUserProfilePut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/profile"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/profile"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -364,7 +363,7 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	req, err := http.NewRequest("PUT", url, nil) // No body
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -395,7 +394,7 @@ func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 
@@ -438,7 +437,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 		AddressCountry:    "US",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -500,7 +499,7 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 		// Other fields left empty
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -547,7 +546,7 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 		// All fields empty
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -594,7 +593,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 		AddressCountry: "US",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -638,7 +637,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 		AddressCountry: "US",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -662,7 +661,7 @@ func TestAPIUserAddressPut_UserNotFound(t *testing.T) {
 		AddressLine1: "123 Test St",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -690,7 +689,7 @@ func TestAPIUserAddressPut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/address"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/address"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -718,7 +717,7 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	req, err := http.NewRequest("PUT", url, nil) // No body
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -749,7 +748,7 @@ func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 

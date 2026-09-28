@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -49,7 +48,7 @@ func TestAPIClientGet_ConfidentialIncludesSecretInDetailButNotList(t *testing.T)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Detail should include clientSecret
-	detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	detailURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "GET", detailURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -64,7 +63,7 @@ func TestAPIClientGet_ConfidentialIncludesSecretInDetailButNotList(t *testing.T)
 	assertNotStorable(t, resp, "the admin client detail carrying the decrypted client secret")
 
 	// List should not include clientSecret
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp2 := makeAPIRequest(t, "GET", listURL, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)

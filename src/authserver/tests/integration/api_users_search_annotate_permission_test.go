@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -41,7 +40,7 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 	assignPermissionToUser(t, u3.Id, perm.Id)
 
 	// Use query parameter to filter to our test users (search matches on email, username, given_name, etc.)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=annperm&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=annperm&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -73,7 +72,7 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 func TestAPIUsersSearch_AnnotatePermission_InvalidParam(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=abc"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=abc"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -86,7 +85,7 @@ func TestAPIUsersSearch_AnnotatePermission_InvalidParam(t *testing.T) {
 func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	missingId := int64(fake.Number(8_000_000, 8_999_999))
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -98,7 +97,7 @@ func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
 func TestAPIUsersSearch_AnnotatePermission_Unauthorized(t *testing.T) {
 	res := createResource(t)
 	perm := createPermission(t, res.Id)
-	u := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.Id, 10))
+	u := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.Id, 10))
 	httpClient := createHttpClient(t)
 	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := httpClient.Do(req)
@@ -117,7 +116,7 @@ func TestAPIUsersSearch_AnnotatePermission_ConflictWithGroupAnnotation(t *testin
 	grp := createTestGroup(t)
 	defer func() { _ = database.DeleteGroup(context.Background(), nil, grp.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&annotateGroupMembership=" + strconv.FormatInt(grp.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&annotateGroupMembership=" + strconv.FormatInt(grp.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -162,7 +161,7 @@ func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) 
 			})
 			assignPermissionToUser(t, holder.Id, perm.Id)
 
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=" + randSuffix + "&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=" + randSuffix + "&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, http.StatusOK, resp.StatusCode)

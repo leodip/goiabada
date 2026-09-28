@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -90,7 +89,7 @@ type offlineGrant struct {
 func (g *offlineGrant) codeFromSameSession(t *testing.T, scope string, codeVerifier string) string {
 	t.Helper()
 
-	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + g.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + g.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(g.redirectURI) +
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
@@ -132,7 +131,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 	scope := "openid " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 
-	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(grant.redirectURI) +
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
@@ -170,7 +169,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 	_ = resp.Body.Close()
 	require.NotEmpty(t, code)
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {grant.client.ClientIdentifier},
 		"client_secret": {grant.clientSecret},
@@ -211,7 +210,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 	scope := "openid offline_access " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 
-	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + base.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + base.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(base.redirectURI) +
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
@@ -266,7 +265,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 	require.NotNil(t, codeEntity)
 	require.NotEmpty(t, codeEntity.SessionIdentifier)
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {base.client.ClientIdentifier},
 		"client_secret": {base.clientSecret},
@@ -295,7 +294,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 // exchange redeems a code for tokens on this grant's client.
 func (g *offlineGrant) exchange(t *testing.T, code string, codeVerifier string) map[string]interface{} {
 	t.Helper()
-	return postToTokenEndpoint(t, g.httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	return postToTokenEndpoint(t, g.httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {g.client.ClientIdentifier},
 		"client_secret": {g.clientSecret},
@@ -370,7 +369,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	codeVerifier := "code-verifier"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 
-	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -428,7 +427,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	sessionIdentifier := codeEntity.SessionIdentifier
 	require.NotEmpty(t, sessionIdentifier)
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -457,7 +456,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 // refresh presents the grant's refresh token and returns the raw token endpoint response.
 func (g *offlineGrant) refresh(t *testing.T) map[string]interface{} {
 	t.Helper()
-	return postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {g.client.ClientIdentifier},
 		"client_secret": {g.clientSecret},
@@ -489,7 +488,7 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	require.NoError(t, database.UpdateUser(context.Background(), nil, fresh))
 
 	httpClient := createHttpClient(t)
-	cleanURL := followResetLink(t, httpClient, emaillinks.ResetPasswordLink(config.GetAuthServer().BaseURL, code))
+	cleanURL := followResetLink(t, httpClient, emaillinks.ResetPasswordLink(appConfig.AuthServer.BaseURL, code))
 
 	// The form is rendered first, because the submission has to carry the continuation id
 	// the form held, exactly as a browser does.
@@ -576,7 +575,7 @@ func TestCredentialChange_ROPCGrantStopsRefreshing(t *testing.T) {
 	require.True(t, ok)
 
 	refreshOnce := func(token string) map[string]interface{} {
-		return postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"refresh_token"},
 			"client_id":     {creds.clientIdentifier},
 			"client_secret": {creds.clientSecret},
@@ -649,14 +648,14 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 	require.Equal(t, grant.sessionIdentifier, extractSidClaim(t, callerToken),
 		"the caller's bearer must be bound to the ceremony's session")
 
-	profileURL := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	profileURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
 	// Both devices work before the change, so a later rejection is attributable to it.
 	pre := makeAPIRequest(t, "GET", profileURL, otherDeviceToken, nil)
 	_ = pre.Body.Close()
 	require.Equal(t, http.StatusOK, pre.StatusCode, "the other device should work before the change")
 
-	resp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/account/password",
+	resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/password",
 		callerToken, api.UpdateAccountPasswordRequest{
 			CurrentPassword: current,
 			NewPassword:     "N3wP4ss!word",
@@ -707,7 +706,7 @@ func TestCredentialChange_AnotherUserIsUnaffected(t *testing.T) {
 	resetPasswordFor(t, grant.user, "R3setP4ss!word")
 
 	resp := makeAPIRequest(t, "GET",
-		config.GetAuthServer().BaseURL+"/api/v1/account/profile", victimToken, nil)
+		appConfig.AuthServer.BaseURL+"/api/v1/account/profile", victimToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode,
 		"an unrelated user's session must be unaffected by this user's reset")
@@ -747,7 +746,7 @@ func TestCredentialChange_DisabledUserSidlessTokenIsRejectedImmediately(t *testi
 	accessToken, user, _ := userAccessTokenViaROPC(t)
 	require.Empty(t, extractSidClaim(t, accessToken), "a ROPC access token must carry no sid")
 
-	profileURL := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	profileURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
 	resp := makeAPIRequest(t, "GET", profileURL, accessToken, nil)
 	_ = resp.Body.Close()
@@ -782,7 +781,7 @@ func TestCredentialChange_OfflineTokenWorksAfterSessionDeletion(t *testing.T) {
 	require.NotNil(t, session)
 	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
 
-	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", grant.accessToken, nil)
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/userinfo", grant.accessToken, nil)
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode,
@@ -800,8 +799,8 @@ func TestCredentialChange_GenerationRoundTripsThroughTheToken(t *testing.T) {
 	grant := createOfflineGrant(t)
 	require.Empty(t, extractSidClaim(t, grant.accessToken))
 
-	userinfoURL := config.GetAuthServer().BaseURL + "/userinfo"
-	profileURL := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	userinfoURL := appConfig.AuthServer.BaseURL + "/userinfo"
+	profileURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
 	resp := makeAPIRequest(t, "GET", userinfoURL, grant.accessToken, nil)
 	_ = resp.Body.Close()
@@ -853,7 +852,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 	require.NoError(t, err)
 	setUserPassword(t, fresh, current)
 
-	resp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/account/password",
+	resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/password",
 		callerToken, api.UpdateAccountPasswordRequest{
 			CurrentPassword: current,
 			NewPassword:     "N3wP4ss!word",

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -21,7 +20,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get phone countries
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/phone-countries"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/phone-countries"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -67,7 +66,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 
 func TestAPIPhoneCountriesGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/phone-countries"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/phone-countries"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -82,7 +81,7 @@ func TestAPIPhoneCountriesGet_Unauthorized(t *testing.T) {
 
 func TestAPIPhoneCountriesGet_InvalidToken(t *testing.T) {
 	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/phone-countries"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/phone-countries"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -117,7 +116,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 		PhoneNumberVerified:  true,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -178,7 +177,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 		PhoneNumberVerified:  false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -287,7 +286,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.request)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -307,7 +306,7 @@ func TestAPIUserPhonePut_UserNotFound(t *testing.T) {
 		PhoneNumberVerified:  false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/phone"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -337,7 +336,7 @@ func TestAPIUserPhonePut_InvalidUserId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/phone"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/phone"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -366,7 +365,7 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -398,7 +397,7 @@ func TestAPIUserPhonePut_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 
@@ -438,7 +437,7 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 		PhoneNumberVerified:  true, // This should be ignored/overridden
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +24,7 @@ func TestAPISettingsEmailGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -62,7 +61,7 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 		SMTPFromEmail:  "qa@goiabada.dev",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -111,7 +110,7 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 		SMTPFromName:   "Goiabada",
 		SMTPFromEmail:  "noreply@goiabada.dev",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 	_ = makeAPIRequest(t, "PUT", url, accessToken, pre)
 
 	// Now disable
@@ -137,7 +136,7 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
 	// Missing host
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
@@ -241,7 +240,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
@@ -271,7 +270,7 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
 	req := api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
@@ -298,7 +297,7 @@ func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
 	// through whatever the settings row says.
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
 	tests := []struct {
 		name string
@@ -358,7 +357,7 @@ func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
 func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
 	// Set password
 	req1 := api.UpdateSettingsEmailRequest{
@@ -411,7 +410,7 @@ func TestAPISettingsEmailSendTest_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Ensure SMTP is enabled and pointing to mailpit
-	_ = makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/settings/email", accessToken, api.UpdateSettingsEmailRequest{
+	_ = makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/settings/email", accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
 		SMTPHost:       "mailpit",
 		SMTPPort:       1025,
@@ -419,7 +418,7 @@ func TestAPISettingsEmailSendTest_Success(t *testing.T) {
 		SMTPEncryption: "none",
 	})
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email/send-test"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email/send-test"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.SendTestEmailRequest{To: "someone@example.com"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -438,9 +437,9 @@ func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Disable SMTP
-	_ = makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/settings/email", accessToken, api.UpdateSettingsEmailRequest{SMTPEnabled: false})
+	_ = makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/settings/email", accessToken, api.UpdateSettingsEmailRequest{SMTPEnabled: false})
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email/send-test"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email/send-test"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.SendTestEmailRequest{To: "someone@example.com"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -451,7 +450,7 @@ func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {
 
 // Unauthorized scenarios
 func TestAPISettingsEmail_Unauthorized(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 	httpClient := createHttpClient(t)
 
 	// No token - GET
@@ -477,7 +476,7 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 func TestAPISettingsEmailPut_AngleBracketsRejected(t *testing.T) {
 	before := restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
@@ -502,7 +501,7 @@ func TestAPISettingsEmailPut_AngleBracketsRejected(t *testing.T) {
 func TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,

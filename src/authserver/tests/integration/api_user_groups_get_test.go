@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -69,7 +68,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get user groups
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -114,7 +113,7 @@ func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
 	}()
 
 	// Test: Get user groups for user with no groups
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -136,7 +135,7 @@ func TestAPIUserGroupsGet_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get groups for non-existent user
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -160,7 +159,7 @@ func TestAPIUserGroupsGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/groups"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/groups"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -185,7 +184,7 @@ func TestAPIUserGroupsGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 

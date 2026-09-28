@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,7 @@ import (
 
 // Helper to GET keys
 func getKeys(t *testing.T, accessToken string) []api.SettingsSigningKeyResponse {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -73,7 +72,7 @@ func TestAPISettingsKeysRotatePost_Success(t *testing.T) {
 	initialNextKid := before[0].KeyIdentifier
 
 	// Rotate
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/rotate"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/rotate"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]any{})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -99,7 +98,7 @@ func TestAPISettingsKeysRotatePost_DeletesPrevious(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// First rotate to create a previous
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/rotate"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/rotate"
 	_ = makeAPIRequest(t, "POST", url, accessToken, map[string]any{})
 	first := getKeys(t, accessToken)
 	assert.Equal(t, 3, len(first))
@@ -128,14 +127,14 @@ func TestAPISettingsKeysRotatePost_DeletesPrevious(t *testing.T) {
 func TestAPISettingsKeyDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	// Ensure we have a previous key
-	urlRotate := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/rotate"
+	urlRotate := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/rotate"
 	_ = makeAPIRequest(t, "POST", urlRotate, accessToken, map[string]any{})
 	keys := getKeys(t, accessToken)
 	assert.Equal(t, 3, len(keys))
 	prevId := keys[2].Id
 
 	// Delete previous
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/" + itoa(prevId)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/" + itoa(prevId)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -158,7 +157,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	currId := keys[1].Id // current
 
 	// Attempt to delete current -> validation error
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/" + itoa(currId)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/" + itoa(currId)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -167,7 +166,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	assert.Equal(t, "Only a previous key can be revoked", errBody.ErrorDescription)
 
 	// Non-existent id
-	url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/99999999"
+	url2 := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/99999999"
 	resp2 := makeAPIRequest(t, "DELETE", url2, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -176,7 +175,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	assert.Equal(t, "Key not found", errBody2.ErrorDescription)
 
 	// Unauthorized - GET
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys"
+	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys"
 	req, err := http.NewRequest("GET", listURL, nil)
 	assert.NoError(t, err)
 	httpClient := createHttpClient(t)
@@ -189,7 +188,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	assert.Contains(t, string(body3), "Access token required.")
 
 	// Unauthorized - POST rotate
-	rotateURL := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/rotate"
+	rotateURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/rotate"
 	req4, _ := http.NewRequest("POST", rotateURL, strings.NewReader("{}"))
 	resp4, err := httpClient.Do(req4)
 	assert.NoError(t, err)
@@ -197,7 +196,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp4.StatusCode)
 
 	// Unauthorized - DELETE
-	delURL := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/keys/1"
+	delURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/1"
 	req5, _ := http.NewRequest("DELETE", delURL, nil)
 	resp5, err := httpClient.Do(req5)
 	assert.NoError(t, err)

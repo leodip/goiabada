@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -80,13 +79,13 @@ func createResetTestUser(t *testing.T, email string) (*models.User, string) {
 func requestPasswordReset(t *testing.T, client *http.Client, email string) {
 	t.Helper()
 
-	target := config.GetAuthServer().BaseURL + "/forgot-password"
+	target := appConfig.AuthServer.BaseURL + "/forgot-password"
 	form := url.Values{"email": {email}}
 	req, err := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", target)
-	req.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -184,7 +183,7 @@ func followResetLink(t *testing.T, client *http.Client, link string) string {
 	assert.Empty(t, location.RawQuery,
 		"the redirect target must carry no query, so the code cannot persist in history or a Referer")
 
-	return config.GetAuthServer().BaseURL + location.Path
+	return appConfig.AuthServer.BaseURL + location.Path
 }
 
 var continuationIdPattern = regexp.MustCompile(
@@ -230,7 +229,7 @@ func postCleanReset(t *testing.T, client *http.Client, cleanURL string, password
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", cleanURL)
-	req.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -242,7 +241,7 @@ func postCleanReset(t *testing.T, client *http.Client, cleanURL string, password
 func capturedSessionCookies(t *testing.T, client *http.Client) []*http.Cookie {
 	t.Helper()
 
-	base, err := url.Parse(config.GetAuthServer().BaseURL)
+	base, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	cookies := client.Jar.Cookies(base)
 	require.NotEmpty(t, cookies, "the first hop must have set a session cookie")
@@ -253,7 +252,7 @@ func clientCarrying(t *testing.T, cookies []*http.Cookie) *http.Client {
 	t.Helper()
 
 	client := createHttpClient(t)
-	base, err := url.Parse(config.GetAuthServer().BaseURL)
+	base, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	client.Jar.SetCookies(base, cookies)
 	return client

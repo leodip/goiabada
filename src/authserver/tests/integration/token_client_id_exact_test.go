@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +56,7 @@ func assertClientIdResolves(t *testing.T, destUrl, clientIdentifier string) {
 // collation, so on those two engines this case is the conformance fix itself being observed, and
 // their result is the check suite's rather than the local sqlite run's (#283).
 func TestToken_ClientIdCaseVariantIsRefused(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	client := createClientForClientIdComparison(t)
 
 	assertClientIdResolves(t, destUrl, client.ClientIdentifier)
@@ -85,7 +84,7 @@ func TestToken_ClientIdCaseVariantIsRefused(t *testing.T) {
 // SQL Server is the only engine on which this case could fail, so its result is the check suite's.
 // Here it holds because SQLite compares the bytes.
 func TestToken_ClientIdTrailingSpaceIsRefused(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	client := createClientForClientIdComparison(t)
 
 	assertClientIdResolves(t, destUrl, client.ClientIdentifier)

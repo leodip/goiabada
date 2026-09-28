@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -95,7 +94,7 @@ func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 		LastAccessed:  now.Add(-5 * time.Minute),
 	}))
 
-	base := config.GetAuthServer().BaseURL
+	base := appConfig.AuthServer.BaseURL
 	for _, tc := range []struct {
 		name string
 		url  string
@@ -160,7 +159,7 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 		LastAccessed:  now.Add(-5 * time.Minute),
 	}))
 
-	base := config.GetAuthServer().BaseURL
+	base := appConfig.AuthServer.BaseURL
 	for _, tc := range []struct {
 		name string
 		url  string
@@ -218,7 +217,7 @@ func TestAPIUserSessionsGet_AClientCredentialsTokenMarksNothingCurrent(t *testin
 		_ = database.DeleteUserSession(context.Background(), nil, s2.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

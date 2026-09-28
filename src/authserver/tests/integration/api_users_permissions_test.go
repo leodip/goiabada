@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -57,7 +56,7 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get user permissions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -103,7 +102,7 @@ func TestAPIUserPermissionsGet_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get permissions for non-existent user
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -116,7 +115,7 @@ func TestAPIUserPermissionsGet_InvalidUserId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get permissions with invalid user ID
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/invalid/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/invalid/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -143,7 +142,7 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 	}()
 
 	// Test: Get user permissions for user with no permissions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -176,7 +175,7 @@ func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -236,7 +235,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 		ExpectedPermissionIds: getUserPermissionIds(t, accessToken, testUser.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -305,7 +304,7 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 		ExpectedPermissionIds: getUserPermissionIds(t, accessToken, testUser.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -339,7 +338,7 @@ func TestAPIUserPermissionsPut_UserNotFound(t *testing.T) {
 		ExpectedPermissionIds: []int64{},
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -371,7 +370,7 @@ func TestAPIUserPermissionsPut_PermissionNotFound(t *testing.T) {
 		ExpectedPermissionIds: getUserPermissionIds(t, accessToken, testUser.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -398,7 +397,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -429,7 +428,7 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 
@@ -457,7 +456,7 @@ func createTestUserPermission(t *testing.T, userId, permissionId int64) *models.
 // and returns their ids: the loaded set a save carries (#428).
 func getUserPermissionIds(t *testing.T, accessToken string, userId int64) []int64 {
 	t.Helper()
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -493,7 +492,7 @@ func TestAPIUserPermissionsPut_TheLoadedListIsRequired(t *testing.T) {
 	resource := createTestResource(t, "user-perm-expected-"+fake.UUID()[:8], "User permission expected resource")
 	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
 	perm := createTestPermission(t, resource.Id, "read", "Read permission")
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/permissions"
 
 	bodies := map[string]interface{}{
 		"absent": map[string]interface{}{"permissionIds": []int64{perm.Id}},
@@ -527,7 +526,7 @@ func TestAPIUserPermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	permC := createTestPermission(t, resource.Id, "delete", "Delete permission")
 	createTestUserPermission(t, user.Id, permA.Id)
 	createTestUserPermission(t, user.Id, permB.Id)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/permissions"
 
 	loadedByBoth := getUserPermissionIds(t, accessToken, user.Id)
 
@@ -557,7 +556,7 @@ func TestAPIUserPermissionsPut_ARepeatedIdIsGrantedOnceAndRevokedWhole(t *testin
 	resource := createTestResource(t, "user-perm-repeat-"+fake.UUID()[:8], "User permission repeat resource")
 	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
 	perm := createTestPermission(t, resource.Id, "read", "Read permission")
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/permissions"
 
 	grant := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserPermissionsRequest{
 		PermissionIds: []int64{perm.Id, perm.Id}, ExpectedPermissionIds: []int64{}})

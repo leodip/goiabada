@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -89,7 +88,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	requestNonceA := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrlA := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrlA := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -136,7 +135,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	assert.Equal(t, requestStateA, stateA)
 
 	// Exchange code for tokens to get User A's ID token
-	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formDataA := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -165,7 +164,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	requestStateB := fake.LetterN(8)
 	requestNonceB := fake.LetterN(8)
 
-	destUrlB := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrlB := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -239,7 +238,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	assert.Equal(t, 302, respB.StatusCode)
-	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/profile", respB.Header.Get("Location"),
+	assert.Equal(t, appConfig.AdminConsole.BaseURL+"/account/profile", respB.Header.Get("Location"),
 		"replaying the refused ceremony must not reach the auth context again")
 }
 
@@ -298,7 +297,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	requestNonce1 := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl1 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl1 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -338,7 +337,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	assert.Equal(t, requestState1, state1)
 
 	// Exchange code for tokens
-	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formData1 := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -366,7 +365,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -497,7 +496,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	requestNonceA := fake.LetterN(8)
 	requestScope := "openid profile"
 
-	destUrlA := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrlA := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -536,7 +535,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	codeA, _ := getCodeAndStateFromUrl(t, respA)
 
 	// Exchange for ID token
-	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formDataA := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -557,7 +556,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	requestNonceB := fake.LetterN(8)
 
 	// Note: NO prompt=login parameter here
-	destUrlB := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrlB := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

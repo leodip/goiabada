@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,6 +16,10 @@ import (
 
 var database data.Database
 
+// appConfig is the configuration the server under test was started with, loaded from the same
+// environment in TestMain; no package-level configuration is left to read (#434).
+var appConfig *config.Config
+
 // dataCipher is the cipher under the configured data key, the one the server under test holds, built
 // once in TestMain and used by every test that seals or opens a stored secret (#434).
 var dataCipher *encryption.DataCipher
@@ -22,29 +27,39 @@ var dataCipher *encryption.DataCipher
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
 
-	config.Init()
+	var loadErr error
+	appConfig, loadErr = config.Load(flag.NewFlagSet("integration", flag.ContinueOnError), nil)
+	if loadErr != nil {
+		slog.Error("unable to load the configuration", "error", loadErr)
+		os.Exit(1)
+	}
+	dataKey, previousDataKey, keysErr := appConfig.DataKeys()
+	if keysErr != nil {
+		slog.Error("unable to decode the data keys", "error", keysErr)
+		os.Exit(1)
+	}
 
 	// The data cipher, under the same key the database is opened with below, for every test that
 	// seals or opens a stored secret.
 	var cipherErr error
-	dataCipher, cipherErr = encryption.NewDataCipher(config.GetAESEncryptionKey())
+	dataCipher, cipherErr = encryption.NewDataCipher(dataKey)
 	if cipherErr != nil {
 		slog.Error("unable to initialize the data cipher", "error", cipherErr)
 		os.Exit(1)
 	}
 
-	if config.GetDatabase().Type == "mysql" {
-		slog.Info("config.DBUsername=" + config.GetDatabase().Username)
-		slog.Info("config.DBHost=" + config.GetDatabase().Host)
-		slog.Info("config.DBPort=" + fmt.Sprintf("%d", config.GetDatabase().Port))
-		slog.Info("config.DBName=" + config.GetDatabase().Name)
-	} else if config.GetDatabase().Type == "sqlite" {
-		slog.Info("config.DBDSN=" + config.GetDatabase().DSN)
+	if appConfig.Database.Type == "mysql" {
+		slog.Info("config.DBUsername=" + appConfig.Database.Username)
+		slog.Info("config.DBHost=" + appConfig.Database.Host)
+		slog.Info("config.DBPort=" + fmt.Sprintf("%d", appConfig.Database.Port))
+		slog.Info("config.DBName=" + appConfig.Database.Name)
+	} else if appConfig.Database.Type == "sqlite" {
+		slog.Info("config.DBDSN=" + appConfig.Database.DSN)
 	}
 
 	var err error
-	database, err = datafactory.NewDatabase(context.Background(), config.GetDatabase(),
-		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
+	database, err = datafactory.NewDatabase(context.Background(), &appConfig.Database,
+		dataKey, previousDataKey, false)
 	if err != nil {
 		panic(err)
 	}

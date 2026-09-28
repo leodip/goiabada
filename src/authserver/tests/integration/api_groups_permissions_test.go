@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +46,7 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get group permissions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -93,7 +92,7 @@ func TestAPIGroupPermissionsGet_GroupNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get permissions for non-existent group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -106,7 +105,7 @@ func TestAPIGroupPermissionsGet_InvalidGroupId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get permissions with invalid group ID
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/invalid/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/invalid/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -125,7 +124,7 @@ func TestAPIGroupPermissionsGet_NoPermissions(t *testing.T) {
 	}()
 
 	// Test: Get group permissions for group with no permissions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -150,7 +149,7 @@ func TestAPIGroupPermissionsGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -201,7 +200,7 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -259,7 +258,7 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -312,7 +311,7 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -354,7 +353,7 @@ func TestAPIGroupPermissionsPut_GroupNotFound(t *testing.T) {
 		ExpectedPermissionIds: []int64{},
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -378,7 +377,7 @@ func TestAPIGroupPermissionsPut_PermissionNotFound(t *testing.T) {
 		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -397,7 +396,7 @@ func TestAPIGroupPermissionsPut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON request body
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -433,7 +432,7 @@ func TestAPIGroupPermissionsPut_InvalidGroupId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/permissions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/permissions"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -469,7 +468,7 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -496,7 +495,7 @@ func TestAPIGroupPermissionsPut_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 
@@ -556,7 +555,7 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -599,7 +598,7 @@ func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *model
 // and returns their ids: the loaded set a save carries (#428).
 func getGroupPermissionIds(t *testing.T, accessToken string, groupId int64) []int64 {
 	t.Helper()
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(groupId, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(groupId, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -621,7 +620,7 @@ func TestAPIGroupPermissionsPut_TheLoadedListIsRequired(t *testing.T) {
 	resource := createTestResource(t, "group-perm-expected-"+group.GroupIdentifier, "Group permission expected resource")
 	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
 	perm := createTestPermission(t, resource.Id, "read", "Read permission")
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(group.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(group.Id, 10) + "/permissions"
 
 	bodies := map[string]interface{}{
 		"absent": map[string]interface{}{"permissionIds": []int64{perm.Id}},
@@ -655,7 +654,7 @@ func TestAPIGroupPermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	permC := createTestPermission(t, resource.Id, "delete", "Delete permission")
 	createTestGroupPermission(t, group.Id, permA.Id)
 	createTestGroupPermission(t, group.Id, permB.Id)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(group.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(group.Id, 10) + "/permissions"
 
 	loadedByBoth := getGroupPermissionIds(t, accessToken, group.Id)
 

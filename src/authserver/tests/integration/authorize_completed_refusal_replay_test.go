@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -73,7 +72,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	}
 
 	requestState := fake.LetterN(8)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -134,7 +133,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/profile", resp.Header.Get("Location"),
+	assert.Equal(t, appConfig.AdminConsole.BaseURL+"/account/profile", resp.Header.Get("Location"),
 		"replaying the refused ceremony must not reach the auth context again")
 }
 
@@ -191,7 +190,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	requestScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 
 	requestState := fake.LetterN(8)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -240,6 +239,6 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, config.GetAdminConsole().BaseURL+"/account/profile", resp.Header.Get("Location"),
+	assert.Equal(t, appConfig.AdminConsole.BaseURL+"/account/profile", resp.Header.Get("Location"),
 		"replaying the refused ceremony must not reach the auth context again")
 }

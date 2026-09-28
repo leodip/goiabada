@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -46,7 +45,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get all groups
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -101,7 +100,7 @@ func TestAPIGroupsGet_EmptyGroups(t *testing.T) {
 	// but this test verifies the endpoint works even with minimal data
 
 	// Test: Get all groups
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -136,7 +135,7 @@ func TestAPIGroupsGet_EmptyGroups(t *testing.T) {
 
 func TestAPIGroupsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -151,7 +150,7 @@ func TestAPIGroupsGet_Unauthorized(t *testing.T) {
 
 func TestAPIGroupsGet_InvalidToken(t *testing.T) {
 	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -177,7 +176,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	}()
 
 	// Test: Get all groups
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -263,7 +262,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	}()
 
 	// Test: Get all groups
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -352,7 +351,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	}()
 
 	// Test: Get all groups
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

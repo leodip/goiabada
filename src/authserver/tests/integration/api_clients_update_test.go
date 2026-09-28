@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -32,7 +31,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 		DefaultAcrLevel:  "urn:goiabada:level1",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -82,7 +81,7 @@ func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.req)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
@@ -105,7 +104,7 @@ func TestAPIClientUpdatePut_DuplicateIdentifier(t *testing.T) {
 
 	// Try to update B to use A's identifier
 	updateReq := api.UpdateClientSettingsRequest{ClientIdentifier: a.ClientIdentifier, Description: "upd"}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(b.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(b.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -128,7 +127,7 @@ func TestAPIClientUpdatePut_SameIdentifierAllowed(t *testing.T) {
 		Enabled:          client.Enabled,
 		ConsentRequired:  client.ConsentRequired,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -138,7 +137,7 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/99999"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientSettingsRequest{ClientIdentifier: "valid-ident", Description: "x"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -161,7 +160,7 @@ func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + tc.id
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.id
 			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientSettingsRequest{ClientIdentifier: "valid-ident", Description: "x"})
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.status, resp.StatusCode)
@@ -192,7 +191,7 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Invalid body
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -233,7 +232,7 @@ func TestAPIClientUpdatePut_ACRRuleEnforcement(t *testing.T) {
 		ConsentRequired:  client.ConsentRequired,
 		DefaultAcrLevel:  "urn:goiabada:level2_mandatory",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -256,7 +255,7 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
 		ClientIdentifier: "  " + client.ClientIdentifier + "  ",
 		Description:      "  Spaced desc  ",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, badReq)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -285,7 +284,7 @@ func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find admin-console-client id via list
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -305,7 +304,7 @@ func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 	}
 
 	// Update with same identifier (should succeed)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "admin-console-client", Description: "Updated description", Enabled: true}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
@@ -322,7 +321,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find admin-console-client id via list
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -342,7 +341,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 	}
 
 	// Attempt to change identifier (should fail)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "different-identifier", Description: "test"}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
@@ -367,7 +366,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testi
 	client := registerDCRClient(t, "Renameable Portal", "https://dcr-rename.example.com/callback")
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "looks-administrator-created", Description: "renamed"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -411,7 +410,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable(t *testing.T) {
 	assert.Greater(t, len(client.ClientIdentifier), 38,
 		"a generated identifier is longer than ValidateIdentifier accepts, which is what makes this the regression guard")
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{
 		ClientIdentifier: client.ClientIdentifier, // unchanged, which is all the guard asks
 		Description:      "an administrator reviewed this one",
@@ -437,7 +436,7 @@ func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
 	client := createTestClientUnique(t, true)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 
 	cases := []struct {
 		name           string
@@ -493,7 +492,7 @@ func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
 	client := createTestClientUnique(t, true)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: client.Description, DefaultAcrLevel: "invalid-acr"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -514,7 +513,7 @@ func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 	target := createTestClientUnique(t, true)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: target.ClientIdentifier, Description: "x"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -549,7 +548,7 @@ func TestAPIClientUpdatePut_AngleBracketsRejected(t *testing.T) {
 	client := createTestClientUnique(t, true)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	endpoint := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	endpoint := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 
 	cases := []struct {
 		name     string
@@ -601,7 +600,7 @@ func TestAPIClientUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 		DefaultAcrLevel:  "urn:goiabada:level1",
 	}
 
-	endpoint := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	endpoint := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", endpoint, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 

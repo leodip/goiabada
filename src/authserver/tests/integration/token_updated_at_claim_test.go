@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -52,7 +51,7 @@ func TestToken_UpdatedAt_RidesWithTheProfileScope(t *testing.T) {
 			clientSecret := fake.LetterN(32)
 			httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, test.scope)
 
-			data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/",
+			data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/",
 				url.Values{
 					"grant_type":    {"authorization_code"},
 					"client_id":     {code.Client.ClientIdentifier},

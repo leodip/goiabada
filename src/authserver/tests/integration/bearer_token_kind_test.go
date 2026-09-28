@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -69,14 +68,14 @@ func sendBearer(t *testing.T, route bearerRoute, token string) bearerKindRespons
 
 	var resp *http.Response
 	if route.form {
-		req, err := http.NewRequest(route.method, config.GetAuthServer().BaseURL+route.path,
+		req, err := http.NewRequest(route.method, appConfig.AuthServer.BaseURL+route.path,
 			strings.NewReader(url.Values{"access_token": {token}}.Encode()))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		resp, err = createHttpClient(t).Do(req)
 		require.NoError(t, err)
 	} else {
-		resp = makeAPIRequest(t, route.method, config.GetAuthServer().BaseURL+route.path, token, route.body)
+		resp = makeAPIRequest(t, route.method, appConfig.AuthServer.BaseURL+route.path, token, route.body)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -244,7 +243,7 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 			&models.ClientPermission{ClientId: client.Id, PermissionId: secondPermission.Id}))
 
 		scope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier + " " + secondScope
-		data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"client_credentials"},
 			"client_id":     {client.ClientIdentifier},
 			"client_secret": {clientSecret},
@@ -268,7 +267,7 @@ func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
 
 	authorizeWithHint := func(t *testing.T, hint string) (string, string) {
 		t.Helper()
-		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + code.Client.ClientIdentifier +
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + code.Client.ClientIdentifier +
 			"&redirect_uri=" + url.QueryEscape(code.RedirectURI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +

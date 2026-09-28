@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -31,7 +30,7 @@ func TestDropDatabase_DropsTheDatabaseAndToleratesAnAbsentOne(t *testing.T) {
 		t.Skip("sqlite has no server to drop a database from, only a file")
 	}
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := "Goiabada_Drop_" + strings.TrimPrefix(isolatedDBName(), "goiabada_mig_")
 	t.Cleanup(func() { dropServerDatabase(t, cfg, name) })
 

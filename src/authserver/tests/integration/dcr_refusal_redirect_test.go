@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,7 +65,7 @@ func TestDCR_Refusal_DeclinedConsentIsNotDeliveredByRedirect(t *testing.T) {
 
 	httpClient, _, _, _ := walkDCRClientToConsentScreen(t, "Refusing Portal")
 
-	consentURL := config.GetAuthServer().BaseURL + "/auth/consent"
+	consentURL := appConfig.AuthServer.BaseURL + "/auth/consent"
 	consentPage := loadPage(t, httpClient, consentURL)
 
 	// No consents selected sends btnCancel, which is the user declining.
@@ -93,7 +92,7 @@ func TestDCR_Refusal_AdministratorClientStillRedirects(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	consentPage := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
-	consentURL := config.GetAuthServer().BaseURL + "/auth/consent"
+	consentURL := appConfig.AuthServer.BaseURL + "/auth/consent"
 
 	resp := postConsent(t, httpClient, consentURL, consentPage, []int{})
 	_ = consentPage.Body.Close()
@@ -148,7 +147,7 @@ func TestDCR_Refusal_UnresolvedClientIsNotRedirectedEither(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	consentPage := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
-	consentURL := config.GetAuthServer().BaseURL + "/auth/consent"
+	consentURL := appConfig.AuthServer.BaseURL + "/auth/consent"
 
 	// The ceremony still holds the redirect URI, the state and everything else the redirect would
 	// be built from. Only the client row is gone, which is all provenance is read from.
@@ -226,7 +225,7 @@ func authorizeURLWithScope(clientIdentifier string, redirectURI string, scope st
 	if state == "" {
 		state = fake.LetterN(8)
 	}
-	return config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

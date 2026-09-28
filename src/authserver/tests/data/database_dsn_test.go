@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -33,7 +32,7 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 		t.Skip("sqlite's DSN is a file path the operator supplies; no builder assembles one")
 	}
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := isolatedDBName() + " dsn"
 	username := restrictedLoginName()
 	ctx := context.Background()

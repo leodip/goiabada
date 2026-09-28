@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -32,7 +31,7 @@ func setRegSettings(t *testing.T, selfRegEnabled, requiresVerify, smtpEnabled bo
 // (#155) and the page load stayed: a POST test whose form does not render is testing nothing, and
 // this is the only assertion in this file that the GET binding works at all.
 func loadRegisterPage(t *testing.T, client *http.Client) {
-	destUrl := config.GetAuthServer().BaseURL + "/account/register"
+	destUrl := appConfig.AuthServer.BaseURL + "/account/register"
 	resp := loadPage(t, client, destUrl)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -41,7 +40,7 @@ func loadRegisterPage(t *testing.T, client *http.Client) {
 }
 
 func postRegister(t *testing.T, client *http.Client, email, password, confirm string) *http.Response {
-	destUrl := config.GetAuthServer().BaseURL + "/account/register"
+	destUrl := appConfig.AuthServer.BaseURL + "/account/register"
 	formData := url.Values{
 		"email":                {email},
 		"password":             {password},
@@ -53,7 +52,7 @@ func postRegister(t *testing.T, client *http.Client, email, password, confirm st
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", destUrl)
-	req.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	resp, err := client.Do(req)
 	require.NoError(t, err)
 	return resp
@@ -71,7 +70,7 @@ func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 	setRegSettings(t, false, false, true)
 
 	httpClient := createHttpClient(t)
-	resp := loadPage(t, httpClient, config.GetAuthServer().BaseURL+"/account/register")
+	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -87,7 +86,7 @@ func TestSelfRegister_GetPage_Enabled(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)
-	resp := loadPage(t, httpClient, config.GetAuthServer().BaseURL+"/account/register")
+	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -110,7 +109,7 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := bodyString(t, resp)
 	assert.Contains(t, body, "Your account has been created.")
-	assert.Contains(t, body, config.GetAdminConsole().BaseURL+"/account/profile")
+	assert.Contains(t, body, appConfig.AdminConsole.BaseURL+"/account/profile")
 	// Regression guard: the old broken behavior was a 302 to /auth/pwd.
 	assert.NotEqual(t, http.StatusFound, resp.StatusCode)
 	assert.NotContains(t, body, "/auth/pwd")
@@ -143,7 +142,7 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := bodyString(t, resp)
 	assert.Contains(t, body, "Your account has been created.")
-	assert.Contains(t, body, config.GetAdminConsole().BaseURL+"/account/profile")
+	assert.Contains(t, body, appConfig.AdminConsole.BaseURL+"/account/profile")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
@@ -204,7 +203,7 @@ func followActivationLink(t *testing.T, client *http.Client, link string) string
 	assert.Empty(t, location.RawQuery,
 		"the redirect target must carry no query, so the code cannot persist in history or a Referer")
 
-	return config.GetAuthServer().BaseURL + location.Path
+	return appConfig.AuthServer.BaseURL + location.Path
 }
 
 const activationSucceededText = "Congratulations! Your account has been activated."
@@ -256,7 +255,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.Equal(t, http.StatusOK, activateResp.StatusCode)
 	activationBody := bodyString(t, activateResp)
 	assert.Contains(t, activationBody, activationSucceededText)
-	assert.Contains(t, activationBody, config.GetAdminConsole().BaseURL+"/account/profile")
+	assert.Contains(t, activationBody, appConfig.AdminConsole.BaseURL+"/account/profile")
 
 	user, err = database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)

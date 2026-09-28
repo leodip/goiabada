@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -31,7 +30,7 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -80,7 +79,7 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 
 	// But OIDC scope-based claims SHOULD be available via /userinfo
 	accessToken := data["access_token"].(string)
-	userinfoUrl := config.GetAuthServer().BaseURL + "/userinfo"
+	userinfoUrl := appConfig.AuthServer.BaseURL + "/userinfo"
 	req, err := http.NewRequest("GET", userinfoUrl, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -107,7 +106,7 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -161,7 +160,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -206,7 +205,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -321,7 +320,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

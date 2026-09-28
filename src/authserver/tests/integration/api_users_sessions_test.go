@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -81,7 +80,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test: Get user sessions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -135,7 +134,7 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 	}()
 
 	// Test: Get user sessions for user with no sessions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -156,7 +155,7 @@ func TestAPIUserSessionsGet_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get sessions for non-existent user
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -180,7 +179,7 @@ func TestAPIUserSessionsGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/sessions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/sessions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -205,7 +204,7 @@ func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -244,7 +243,7 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 	}()
 
 	// Test: Get user sessions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -285,7 +284,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	session := createTestUserSession(t, testUser.Id, fake.UUID())
 
 	// Test: Delete user session
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -343,7 +342,7 @@ func TestAPIUserSessionDelete_TerminatesTheOfflineGrantsOfThatSession(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
-	deleteURL := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", deleteURL, adminToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -363,7 +362,7 @@ func TestAPIUserSessionDelete_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Delete non-existent session
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -387,7 +386,7 @@ func TestAPIUserSessionDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + tc.sessionId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + tc.sessionId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -417,7 +416,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	assert.NoError(t, err)
 
@@ -456,7 +455,7 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 	}()
 
 	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -530,7 +529,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	}()
 
 	// Test: Get user sessions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

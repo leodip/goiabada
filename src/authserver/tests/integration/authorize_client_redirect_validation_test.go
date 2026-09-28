@@ -8,14 +8,13 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientIdIsMissing(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/"
 
 	httpClient := createHttpClient(t)
 
@@ -37,7 +36,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIdIsMissing(t *testing.T) 
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotExist(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=does_not_exist"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=does_not_exist"
 
 	httpClient := createHttpClient(t)
 
@@ -69,7 +68,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
 
 	httpClient := createHttpClient(t)
 
@@ -102,7 +101,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthoriza
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
 
 	httpClient := createHttpClient(t)
 
@@ -135,7 +134,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsMissing(t *testing.
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
 
 	httpClient := createHttpClient(t)
 
@@ -168,7 +167,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotHaveRedirectURI(t *
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier + "&redirect_uri=" + fake.URL()
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier + "&redirect_uri=" + fake.URL()
 
 	httpClient := createHttpClient(t)
 
@@ -223,7 +222,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 		t.Fatal(err)
 	}
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(nonAbsoluteURI)
 
 	httpClient := createHttpClient(t)
@@ -262,7 +261,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 // Go literal comes back, and the message regresses if the handler renders EnglishFallback() instead
 // of Localize(), which no English assertion in this file can see.
 func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=does_not_exist&ui_locales=pt-BR"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=does_not_exist&ui_locales=pt-BR"
 
 	httpClient := createHttpClient(t)
 

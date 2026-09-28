@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ func TestAPIGroupDelete_Success(t *testing.T) {
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Test: Delete group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -68,7 +67,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 	// Note: UserGroup should be automatically deleted when group is deleted
 
 	// Test: Delete group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -94,7 +93,7 @@ func TestAPIGroupDelete_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Delete non-existent group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -118,7 +117,7 @@ func TestAPIGroupDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -135,7 +134,7 @@ func TestAPIGroupDelete_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	assert.NoError(t, err)
 
@@ -161,7 +160,7 @@ func TestAPIGroupDelete_InvalidToken(t *testing.T) {
 	}()
 
 	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -203,7 +202,7 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 	// Note: GroupPermission should be automatically deleted when group is deleted
 
 	// Test: Delete group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -230,7 +229,7 @@ func TestAPIGroupDelete_ResponseStructure(t *testing.T) {
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Test: Delete group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

@@ -9,14 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestToken_ClientIdIsMissing(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	httpClient := createHttpClient(t)
 
@@ -28,7 +27,7 @@ func TestToken_ClientIdIsMissing(t *testing.T) {
 }
 
 func TestToken_ClientDoesNotExist(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	httpClient := createHttpClient(t)
 
@@ -42,7 +41,7 @@ func TestToken_ClientDoesNotExist(t *testing.T) {
 }
 
 func TestToken_InvalidGrantType(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -78,7 +77,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 // TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte, since no request from outside reaches
 // it through this path any more.
 func TestToken_UnparseableForm_IsInvalidRequest(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	httpClient := createHttpClient(t)
 

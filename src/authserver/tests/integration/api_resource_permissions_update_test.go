@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -33,7 +32,7 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 	}()
 
 	// Build request: update p1 description, remove p2 (not included), add new p3
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{
 		Permissions: []api.ResourcePermissionUpsert{
 			{Id: p1.Id, PermissionIdentifier: "read", Description: "Read updated"},
@@ -80,7 +79,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 	resource := createTestResource(t, "perm-put-val-"+fake.LetterN(6), "Val Test")
 	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
 
-	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 
 	cases := []struct {
 		name       string
@@ -139,7 +138,7 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 		_ = database.DeletePermission(context.Background(), nil, p2.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	// Try to change p1 identifier to "bbb" which already exists in DB (do not include p2 in request)
 	// This should fail before deletion phase due to identifier conflict with existing permission p2
 	req := api.UpdateResourcePermissionsRequest{
@@ -197,7 +196,7 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 		}
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -244,7 +243,7 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 		})
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -284,7 +283,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 		// Omit manage-account permission
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -342,7 +341,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 		Description:          "Recreated manage",
 	})
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -406,7 +405,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 		})
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -466,7 +465,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 		Description:          "Bypass attempt",
 	})
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -489,7 +488,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 	defer func() { _ = database.DeletePermission(context.Background(), nil, p1.Id) }()
 
 	// Two entries with the same existing ID
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{
 		{Id: p1.Id, PermissionIdentifier: "read", Description: "Read"},
 		{Id: p1.Id, PermissionIdentifier: "read-changed", Description: "Changed"},
@@ -509,7 +508,7 @@ func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 	res := createTestResource(t, "perm-put-unauth-"+fake.LetterN(6), "Unauth Test")
 	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10) + "/permissions"
 
 	// No token
 	req, _ := http.NewRequest("PUT", url, strings.NewReader(`{"permissions":[]}`))
@@ -560,7 +559,7 @@ func TestAPIResourcePermissionsPut_TheLoadedListIsRequired(t *testing.T) {
 	p1 := createTestPermission(t, resource.Id, "read", "Read")
 	defer func() { _ = database.DeletePermission(context.Background(), nil, p1.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	for name, body := range map[string]string{
 		"absent": `{"permissions":[]}`,
 		"null":   `{"permissions":[],"expectedPermissions":null}`,
@@ -596,7 +595,7 @@ func TestAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 		_ = database.DeletePermission(context.Background(), nil, p2.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	loaded := storedPermissionEntries(t, resource.Id)
 
 	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{
@@ -644,7 +643,7 @@ func TestAPIResourcePermissionsPut_SavedWithTheListTheAPIRead(t *testing.T) {
 		_ = database.DeletePermission(context.Background(), nil, p2.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	read := readResourcePermissions(t, url, accessToken)
 	require.Len(t, read, 2)
 	loaded := make([]api.ResourcePermissionUpsert, 0, len(read))
@@ -697,7 +696,7 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 		}
 	})
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	entriesAsRead := func() []api.ResourcePermissionUpsert {
 		read := readResourcePermissions(t, url, accessToken)
 		entries := make([]api.ResourcePermissionUpsert, 0, len(read))
@@ -740,7 +739,7 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, sysRes, "the seed creates the authserver resource")
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
 	require.Len(t, constants.BuiltInAuthServerPermissionIdentifiers, 7)
 
 	for _, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {

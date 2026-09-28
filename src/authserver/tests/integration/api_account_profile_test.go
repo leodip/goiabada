@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -24,7 +23,7 @@ func getUserAccessTokenWithAccountScope(t *testing.T) (string, *models.User) {
 func TestAPIAccountProfileGet_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -39,7 +38,7 @@ func TestAPIAccountProfileGet_Success(t *testing.T) {
 }
 
 func TestAPIAccountProfileGet_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
@@ -88,7 +87,7 @@ func TestAPIAccountProfilePut_Success(t *testing.T) {
 		Locale:              "en-US",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -112,7 +111,7 @@ func TestAPIAccountProfilePut_Success(t *testing.T) {
 
 func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
 	// Invalid gender
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", Gender: "invalid"})
@@ -157,7 +156,7 @@ func TestAPIAccountProfilePut_ZonePairNamingNoRow(t *testing.T) {
 	u.ZoneInfo = "America/New_York"
 	assert.NoError(t, database.UpdateUser(context.Background(), nil, u))
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{
 		GivenName:           "Changed",
 		FamilyName:          "Bbb",
@@ -181,7 +180,7 @@ func TestAPIAccountProfilePut_ZonePairNamingNoRow(t *testing.T) {
 }
 
 func TestAPIAccountProfilePut_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)

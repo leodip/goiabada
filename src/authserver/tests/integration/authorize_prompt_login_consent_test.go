@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -80,7 +79,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -127,7 +126,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := fake.LetterN(43)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -162,7 +161,7 @@ func TestPromptConsent_NoSession_RequiresLoginFirst(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -202,7 +201,7 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 	requestCodeChallenge := fake.LetterN(43)
 
 	// Use both prompt=login and prompt=consent
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -252,7 +251,7 @@ func TestPromptLogin_NoSession(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -278,7 +277,7 @@ func TestPromptLogin_MaxAgeIrrelevant(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// Even with max_age=600 (which would normally allow SSO), prompt=login forces re-auth
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -321,7 +320,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 	requestCodeChallenge := fake.LetterN(43)
 
 	// Request level2_optional with prompt=login
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -365,7 +364,7 @@ func TestPromptLogin_PreservesNonce(t *testing.T) {
 	requestNonce := "test-nonce-" + fake.LetterN(16)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -460,7 +459,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -522,7 +521,7 @@ func TestPromptLogin_WrongPassword(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -577,7 +576,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -670,7 +669,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	requestState := fake.LetterN(8)
 
 	// Login at T1 to establish session
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -711,7 +710,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	codeVal1, _ := getCodeAndStateFromUrl(t, resp)
 
 	// Exchange first code for tokens to get T1 auth_time
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form1 := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -735,7 +734,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

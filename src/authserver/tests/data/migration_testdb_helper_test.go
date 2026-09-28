@@ -46,14 +46,14 @@ func isolatedDBName() string {
 }
 
 func dbType() string {
-	return strings.Trim(strings.TrimSpace(config.GetDatabase().Type), `"'`)
+	return strings.Trim(strings.TrimSpace(appConfig.Database.Type), `"'`)
 }
 
 // newIsolatedDB creates a fresh, empty database of the configured dialect and a
 // migrator bound to it (at version 0). Cleanup (close + drop) is registered on t.
 func newIsolatedDB(t *testing.T) *isolatedDB {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 
 	switch dbType() {
 	case "", "sqlite":
@@ -206,7 +206,7 @@ type (
 // generator connects to all four engines in one process.
 func dumpDialect(t *testing.T) schemadump.Dialect {
 	t.Helper()
-	d, err := schemadump.ParseDialect(config.GetDatabase().Type)
+	d, err := schemadump.ParseDialect(appConfig.Database.Type)
 	require.NoErrorf(t, err, "the configured database type %q is not one of the four dialects", dbType())
 	return d
 }
@@ -323,7 +323,7 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	t.Helper()
 	require.Equal(t, "mssql", dbType(), "newPreCreatedMsSQLDB is SQL Server only")
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := isolatedDBName()
 
 	master, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
@@ -440,7 +440,7 @@ func postgresMaintenanceDSN(username, password string, cfg *config.DatabaseConfi
 // would have used, so nothing downstream reads a different one.
 func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	r := &restrictedLoginDB{
 		name:     isolatedDBName(),
 		username: restrictedLoginName(),
@@ -543,7 +543,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 // anything that opened a connection in between would make the number unreadable.
 func (r *restrictedLoginDB) constructRestricted(t *testing.T) (migratable, *sql.DB) {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 
 	switch dbType() {
 	case "mysql":

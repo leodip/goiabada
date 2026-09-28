@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -46,7 +45,7 @@ func refreshWithScope(t *testing.T, httpClient *http.Client, clientIdentifier, c
 	if scope != "" {
 		form.Set("scope", scope)
 	}
-	status, body, err := concurrentTokenPost(httpClient, config.GetAuthServer().BaseURL+"/auth/token/", form)
+	status, body, err := concurrentTokenPost(httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", form)
 	require.NoError(t, err, "refresh request failed at the transport level")
 	return status, body
 }
@@ -78,7 +77,7 @@ func TestAuthorize_OfflineAccessIsCaseSensitive(t *testing.T) {
 			httpClient := createHttpClient(t)
 			requestState := fake.LetterN(8)
 
-			destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
@@ -113,7 +112,7 @@ func TestROPC_OfflineAccessIsCaseSensitive(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	request := func(scope string) (int, map[string]interface{}) {
-		status, body, err := concurrentTokenPost(httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		status, body, err := concurrentTokenPost(httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type": {"password"},
 			"client_id":  {client.ClientIdentifier},
 			"username":   {user.Email},
@@ -183,7 +182,7 @@ func TestClientCredentials_OfflineAccessIsCaseSensitive(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			status, body, postErr := concurrentTokenPost(httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+			status, body, postErr := concurrentTokenPost(httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 				"grant_type":    {"client_credentials"},
 				"client_id":     {client.ClientIdentifier},
 				"client_secret": {clientSecret},
@@ -293,7 +292,7 @@ func TestROPC_RefreshToken_StoredUppercaseOfflineAccess(t *testing.T) {
 	user := createROPCUser(t, password)
 	httpClient := createHttpClient(t)
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},

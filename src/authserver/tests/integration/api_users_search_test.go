@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -35,7 +34,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 	// Test: Search using query parameter to find our specific test users
 	// This is more reliable than paginating through all users
 	url := fmt.Sprintf("%s/api/v1/admin/users/search?query=%s&size=50",
-		config.GetAuthServer().BaseURL, uniqueSuffix)
+		appConfig.AuthServer.BaseURL, uniqueSuffix)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 
 	// Assert: Response should be successful
@@ -101,7 +100,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 
 	// Test: Search with specific query that should match our user
 	searchQuery := "uniquejohn" + uniqueSuffix
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=" + searchQuery
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=" + searchQuery
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -149,7 +148,7 @@ func TestAPIUsersSearch_WithPagination(t *testing.T) {
 	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: Search with pagination
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?page=1&size=2"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?page=1&size=2"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -170,7 +169,7 @@ func TestAPIUsersSearch_WithPagination(t *testing.T) {
 
 func TestAPIUsersSearch_Unauthorized(t *testing.T) {
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -185,7 +184,7 @@ func TestAPIUsersSearch_Unauthorized(t *testing.T) {
 
 func TestAPIUsersSearch_InvalidToken(t *testing.T) {
 	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -219,7 +218,7 @@ func TestAPIUsersSearch_InvalidParameters(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + tc.url
+			url := appConfig.AuthServer.BaseURL + tc.url
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -247,7 +246,7 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: Maximum allowed size (200)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=200"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?size=200"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -261,7 +260,7 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 	assert.Equal(t, 200, searchResponse.Size, "Should accept size=200")
 
 	// Test: Over maximum size (201) should fallback to default
-	url = config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=201"
+	url = appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?size=201"
 	resp = makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -283,7 +282,7 @@ func TestAPIUsersSearch_NoResults(t *testing.T) {
 	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: Query that returns no users
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=nonexistent-user-12345"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=nonexistent-user-12345"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -325,7 +324,7 @@ func TestAPIUsersSearch_SpecialCharacters(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?" + tc.queryParam
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?" + tc.queryParam
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -372,7 +371,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	defer func() { deleteTestUsers(t, testUsers) }()
 
 	// Test: First page
-	url1 := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=5&page=1"
+	url1 := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?size=5&page=1"
 	resp1 := makeAPIRequest(t, "GET", url1, accessToken, nil)
 	defer func() { _ = resp1.Body.Close() }()
 
@@ -383,7 +382,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test: Second page
-	url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?size=5&page=2"
+	url2 := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?size=5&page=2"
 	resp2 := makeAPIRequest(t, "GET", url2, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 

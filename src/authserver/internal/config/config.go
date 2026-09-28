@@ -14,7 +14,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/middleware"
@@ -52,15 +51,6 @@ type AuthServerConfig struct {
 	// catalogs, or empty for none. It has no flag, like the admin console's, so the one variable
 	// configures both servers the same way (#431).
 	I18nOverridesDir string
-}
-
-// GetEffectiveBaseURL returns the InternalBaseURL if set, otherwise returns BaseURL.
-// Use InternalBaseURL for server-to-server communication to prefer internal network routes.
-func (c *AuthServerConfig) GetEffectiveBaseURL() string {
-	if ib := strings.TrimSpace(c.InternalBaseURL); ib != "" {
-		return ib
-	}
-	return c.BaseURL
 }
 
 // IsCookieSecure reports whether cookies should carry the Secure flag. It is
@@ -140,24 +130,6 @@ type Config struct {
 	// not a flag, so the first of these selects the command and the rest belong to it; none means
 	// the server runs (#424).
 	Args []string
-}
-
-var (
-	cfg  Config
-	once sync.Once
-)
-
-// Init fills the package configuration the getters read, for the data and integration tiers,
-// which are the last readers of it: the binaries call Load and hand what it returns to whatever
-// needs it (#434). A refusal panics, because a tier's TestMain has nothing better to do with it.
-func Init() {
-	once.Do(func() {
-		loaded, err := Load(flag.CommandLine, os.Args[1:])
-		if err != nil {
-			panic(err)
-		}
-		cfg = *loaded
-	})
 }
 
 // Load reads the configuration from the environment, registers a flag over each value that has
@@ -310,57 +282,6 @@ func RegisterDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) {
 	fs.StringVar(&c.Name, "db-name", c.Name, "Database name")
 	fs.StringVar(&c.DSN, "db-dsn", c.DSN, "Database DSN (only for sqlite)")
 	fs.BoolVar(&c.Create, "db-create", c.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
-}
-
-// The getters below read the configuration Init filled, and the data and integration tiers are
-// their last callers (#434).
-
-func GetAuthServer() *AuthServerConfig {
-	return &cfg.AuthServer
-}
-
-func GetAdminConsole() *AdminConsoleConfig {
-	return &cfg.AdminConsole
-}
-
-func GetDatabase() *DatabaseConfig {
-	return &cfg.Database
-}
-
-func GetAdminEmail() string {
-	return cfg.AdminEmail
-}
-
-func GetAdminPassword() string {
-	return cfg.AdminPassword
-}
-
-func GetAppName() string {
-	return cfg.AppName
-}
-
-// GetAESEncryptionKey returns the decoded 32-byte data-encryption key, or nil if the key is
-// absent or malformed; DataKeys is what refuses such a key.
-func GetAESEncryptionKey() []byte {
-	b, err := hex.DecodeString(strings.TrimSpace(cfg.AESEncryptionKey))
-	if err != nil {
-		return nil
-	}
-	return b
-}
-
-// GetAESEncryptionKeyPrevious returns the decoded previous data-encryption key used during
-// rotation, or nil if it is not set or malformed.
-func GetAESEncryptionKeyPrevious() []byte {
-	raw := strings.TrimSpace(cfg.AESEncryptionKeyPrevious)
-	if raw == "" {
-		return nil
-	}
-	b, err := hex.DecodeString(raw)
-	if err != nil {
-		return nil
-	}
-	return b
 }
 
 // DataKeys decodes the data-encryption keys: the current one, which must be present,

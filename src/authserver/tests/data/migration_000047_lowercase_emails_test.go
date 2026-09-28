@@ -321,7 +321,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	require.NoError(t, seed.DB.Close(), "close the seeding handle before the server opens its own")
 
 	opened, err := datafactory.NewDatabase(context.Background(), cfg,
-		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
+		dataKey, previousDataKey, false)
 
 	require.Error(t, err, "startup must refuse a database holding a collision rather than migrate it")
 	assert.Nil(t, opened, "a refused startup must hand back no database")

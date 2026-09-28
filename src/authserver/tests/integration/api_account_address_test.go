@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -23,7 +22,7 @@ func getUserAccessTokenWithAccountScope_Address(t *testing.T) (string, *models.U
 func TestAPIAccountAddressPut_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_Address(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 	reqBody := api.UpdateUserAddressRequest{
 		AddressLine1:      "123 Main Street",
 		AddressLine2:      "Apt 4B",
@@ -68,7 +67,7 @@ func TestAPIAccountAddressPut_PartialAddress(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
 
 	// Update only some fields; unspecified fields should be cleared to empty
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 	reqBody := api.UpdateUserAddressRequest{
 		AddressLine1:    "New Address",
 		AddressLocality: "New City",
@@ -93,7 +92,7 @@ func TestAPIAccountAddressPut_ClearAllFields(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
 
 	// Clear all address fields by sending empty values
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 	reqBody := api.UpdateUserAddressRequest{}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -112,7 +111,7 @@ func TestAPIAccountAddressPut_ClearAllFields(t *testing.T) {
 
 func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	// AddressLine1 too long (>60)
 	long60 := strings.Repeat("a", 61)
@@ -169,7 +168,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 // 400 with the address validator's code, and nothing reaches the row.
 func TestAPIAccountAddressPut_AngleBracketsRefused(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{
 		AddressLine1:   "<b>x</b>",
@@ -189,7 +188,7 @@ func TestAPIAccountAddressPut_AngleBracketsRefused(t *testing.T) {
 // which is the property that replaces the sanitizer's rewriting.
 func TestAPIAccountAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	line1 := `O'Brien & Sons, "The Mews"`
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{
@@ -206,7 +205,7 @@ func TestAPIAccountAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 }
 
 func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
@@ -238,7 +237,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 
 func TestAPIAccountAddressPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	// Invalid JSON (no body)
 	req, err := http.NewRequest("PUT", url, nil)

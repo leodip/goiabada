@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
@@ -16,7 +15,7 @@ import (
 )
 
 func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -60,7 +59,7 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -93,7 +92,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 // ============================================================================
 
 func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -119,7 +118,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -147,7 +146,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -179,7 +178,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 }
 
 func TestToken_ClientCred_InvalidScope(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
@@ -265,7 +264,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 }
 
 func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
@@ -331,7 +330,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 }
 
 func TestToken_ClientCred_SpecificScope(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
@@ -407,7 +406,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 // Both resources deliberately define the SAME permission identifier. The client is
 // granted resource A's permission only.
 func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -489,7 +488,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 // resource, and authserver:manage is full Admin API access. Before the fix, a client
 // holding <custom>:manage received a token carrying authserver:manage.
 func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -580,7 +579,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 // and the bug could share the same expectation. So this drives the real HasScope, the same matcher
 // the Admin API middleware uses, over the claim as decoded from the issued token.
 func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -654,7 +653,7 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 // Thin on purpose. The character set itself is owned by TestConformErrorDescription in
 // src/core/customerrors; what is left for this tier is only that the filter is on the path.
 func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)

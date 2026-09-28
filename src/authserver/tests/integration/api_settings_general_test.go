@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ func TestAPISettingsGeneralGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -55,7 +54,7 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 		PasswordPolicy: "low",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -95,7 +94,7 @@ func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.
 		SelfRegistrationRequiresEmailVerification: true,
 		PasswordPolicy: "low",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, preReq)
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
@@ -126,7 +125,7 @@ func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.
 func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	// App name too long (>30)
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
@@ -219,7 +218,7 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 
 	settings := restoreSettings(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	// Enable implicit flow
 	req := api.UpdateSettingsGeneralRequest{
@@ -267,7 +266,7 @@ func TestAPISettingsGeneralGet_IncludesImplicitFlowEnabled(t *testing.T) {
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -288,7 +287,7 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 
 	settings := restoreSettings(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	// Enable ROPC
 	req := api.UpdateSettingsGeneralRequest{
@@ -337,7 +336,7 @@ func TestAPISettingsGeneralGet_IncludesROPCEnabled(t *testing.T) {
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -351,7 +350,7 @@ func TestAPISettingsGeneralGet_IncludesROPCEnabled(t *testing.T) {
 }
 
 func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
@@ -397,7 +396,7 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 	before := restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	cases := []struct {
 		name     string
@@ -438,7 +437,7 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	req := api.UpdateSettingsGeneralRequest{
 		AppName:        `  R&D "labs"  `,

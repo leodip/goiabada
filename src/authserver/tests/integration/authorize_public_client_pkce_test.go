@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -79,7 +78,7 @@ func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, stri
 // authorizeURLWithoutChallenge is the request the attack in RFC 9700 4.8.1 produces: a
 // well-formed authorization request with code_challenge and code_challenge_method stripped out.
 func authorizeURLWithoutChallenge(clientIdentifier, redirectURI string) string {
-	return config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&scope=" + url.QueryEscape("openid profile email") +
@@ -158,7 +157,7 @@ func TestAuthorize_PublicClient_WithPKCE_CompletesAndIssuesTokens(t *testing.T) 
 	assert.True(t, code.Client.IsPublic, "the fixture must be a public client")
 	assert.NotEmpty(t, code.CodeChallenge.String, "the ceremony must have bound a challenge")
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/",
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/",
 		url.Values{
 			"grant_type":    {"authorization_code"},
 			"client_id":     {code.Client.ClientIdentifier},

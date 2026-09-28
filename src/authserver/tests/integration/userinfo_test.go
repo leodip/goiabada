@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -29,7 +28,7 @@ import (
 // userinfoGet calls GET /userinfo with the token in the Authorization header.
 func userinfoGet(t *testing.T, accessToken string) *http.Response {
 	t.Helper()
-	return makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", accessToken, nil)
+	return makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/userinfo", accessToken, nil)
 }
 
 // userinfoPost calls POST /userinfo with the token as a form-body access_token, which OIDC Core 1.0
@@ -37,7 +36,7 @@ func userinfoGet(t *testing.T, accessToken string) *http.Response {
 func userinfoPost(t *testing.T, accessToken string) *http.Response {
 	t.Helper()
 	form := url.Values{"access_token": {accessToken}}
-	req, err := http.NewRequest("POST", config.GetAuthServer().BaseURL+"/userinfo", strings.NewReader(form.Encode()))
+	req, err := http.NewRequest("POST", appConfig.AuthServer.BaseURL+"/userinfo", strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := createHttpClient(t).Do(req)

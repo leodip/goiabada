@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -70,7 +69,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	codeVerifier := "code-verifier"
 	requestState := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(requestedURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -127,7 +126,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	code := loadCodeFromDatabase(t, codeVal)
 	assert.Equal(t, requestedURI, code.RedirectURI)
 
-	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// The token endpoint compares the code's stored URI against the one presented here,
 	// which is requested against requested, and gets no port flexibility (decision 8).

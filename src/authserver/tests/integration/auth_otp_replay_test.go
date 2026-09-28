@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -136,7 +135,7 @@ func startOtpCeremonyOn(t *testing.T, httpClient *http.Client, client *models.Cl
 	redirectUri *models.RedirectURI, user *models.User, password string,
 	extra string) (*http.Client, *http.Response, string) {
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -368,7 +367,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// prompt below can be driven against it (#247).
 	installPendingEnrollmentForTest(t, user.Id, key.URL(), time.Now().UTC())
 
-	enableUrl := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	enableUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", enableUrl, accessToken, api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "Correct1!",

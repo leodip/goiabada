@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -115,7 +114,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	httpClient := createHttpClient(t)
 
 	state := fake.LetterN(8)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -256,7 +255,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 	assert.Equal(t, parked.state, stateVal)
 
-	data := postToTokenEndpoint(t, parked.httpClient, config.GetAuthServer().BaseURL+"/auth/token/",
+	data := postToTokenEndpoint(t, parked.httpClient, appConfig.AuthServer.BaseURL+"/auth/token/",
 		url.Values{
 			"grant_type":    {"authorization_code"},
 			"code":          {codeVal},
@@ -438,7 +437,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
 	assert.Equal(t, parked.state, stateVal)
 
-	data := postToTokenEndpoint(t, parked.httpClient, config.GetAuthServer().BaseURL+"/auth/token/",
+	data := postToTokenEndpoint(t, parked.httpClient, appConfig.AuthServer.BaseURL+"/auth/token/",
 		url.Values{
 			"grant_type":    {"authorization_code"},
 			"code":          {codeVal},

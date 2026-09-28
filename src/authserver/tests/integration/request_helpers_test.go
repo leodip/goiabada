@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
@@ -41,7 +40,7 @@ func userTokenResponseWithScope(t *testing.T, scope string, beforeExchange func(
 	}
 
 	// Exchange code for tokens
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token/"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
@@ -63,7 +62,7 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", url)
-	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -99,7 +98,7 @@ func postToTokenEndpointWithBasicAuth(t *testing.T, client *http.Client, url str
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", url)
-	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	request.SetBasicAuth(clientId, clientSecret)
 
 	resp, err := client.Do(request)
@@ -176,7 +175,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 
 	// Get access token using client credentials flow
 	httpClient := createHttpClient(t)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},

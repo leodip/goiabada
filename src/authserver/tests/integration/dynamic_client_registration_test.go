@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -521,7 +520,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 		enableDCR(t)
 
 		httpClient := createHttpClient(t)
-		wellKnownURL := config.GetAuthServer().BaseURL + "/.well-known/openid-configuration"
+		wellKnownURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 
 		resp, fetchErr := httpClient.Get(wellKnownURL)
 		assert.NoError(t, fetchErr)
@@ -535,14 +534,14 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 
 		registrationEndpoint, ok := metadata["registration_endpoint"].(string)
 		assert.True(t, ok, "registration_endpoint should be present")
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/connect/register", registrationEndpoint)
+		assert.Equal(t, appConfig.AuthServer.BaseURL+"/connect/register", registrationEndpoint)
 	})
 
 	t.Run("DCR disabled - registration_endpoint absent", func(t *testing.T) {
 		changeSettings(t, func(settings *models.Settings) { settings.DynamicClientRegistrationEnabled = false })
 
 		httpClient := createHttpClient(t)
-		wellKnownURL := config.GetAuthServer().BaseURL + "/.well-known/openid-configuration"
+		wellKnownURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 
 		resp, err := httpClient.Get(wellKnownURL)
 		assert.NoError(t, err)
@@ -643,7 +642,7 @@ func makeDCRRequest(t *testing.T, body oidc.DynamicClientRegistrationRequest) *h
 	jsonBody, err := json.Marshal(body)
 	require.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/connect/register"
+	url := appConfig.AuthServer.BaseURL + "/connect/register"
 	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
 	require.NoError(t, err)
 
@@ -725,7 +724,7 @@ func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 		require.NotNil(t, client)
 		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
 
-		detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" +
+		detailURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
 			strconv.FormatInt(client.Id, 10)
 		detail := makeAPIRequest(t, "GET", detailURL, adminToken, nil)
 		defer func() { _ = detail.Body.Close() }()
@@ -761,7 +760,7 @@ func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 // registration is shown to have created nothing without reading a row behind the endpoint's back.
 func countClientsThroughTheAdminAPI(t *testing.T, adminToken string) int {
 	t.Helper()
-	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/admin/clients", adminToken, nil)
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients", adminToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -858,7 +857,7 @@ func TestDCR_ARegistrationAtTheBoundsIsStoredWhole(t *testing.T) {
 	require.NotNil(t, client)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
 
-	detail := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/admin/clients/"+
+	detail := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+
 		strconv.FormatInt(client.Id, 10), adminToken, nil)
 	defer func() { _ = detail.Body.Close() }()
 	require.Equal(t, http.StatusOK, detail.StatusCode)
@@ -904,7 +903,7 @@ func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *
 
 	codeVerifier := fake.LetterN(64)
 	state := fake.LetterN(8)
-	authorizeURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + registered.ClientID +
+	authorizeURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + registered.ClientID +
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -960,7 +959,7 @@ func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *
 	assert.Equal(t, redirectURI, loadCodeFromDatabase(t, codeVal).RedirectURI,
 		"the code row holds the whole redirect URI")
 
-	tokens := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	tokens := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {registered.ClientID},
 		"client_secret": {registered.ClientSecret},

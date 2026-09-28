@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +49,7 @@ func TestAuthorize_RequestParameter_RejectedAsUnsupported(t *testing.T) {
 	params.Set("state", state)
 	params.Set("request", "some.jwt.value")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
 	httpClient := createAuthenticatedHttpClient(t)
 
@@ -80,7 +79,7 @@ func TestAuthorize_RequestParameter_EmptyValue_RejectedAsUnsupported(t *testing.
 	params.Set("response_type", "code")
 	params.Set("scope", "openid")
 	// Encoded form drops the value but keeps the key, so request= still has the key present.
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode() + "&request="
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode() + "&request="
 
 	httpClient := createAuthenticatedHttpClient(t)
 
@@ -113,7 +112,7 @@ func TestAuthorize_RequestUriParameter_RejectedAsUnsupported(t *testing.T) {
 	params.Set("state", state)
 	params.Set("request_uri", "https://example.com/req.jwt")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
 	httpClient := createAuthenticatedHttpClient(t)
 
@@ -145,7 +144,7 @@ func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T)
 	form.Set("state", fake.LetterN(8))
 	form.Set("request", "some.jwt.value")
 
-	destURL := config.GetAuthServer().BaseURL + "/auth/authorize"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize"
 
 	req, err := http.NewRequest(http.MethodPost, destURL, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -179,7 +178,7 @@ func TestAuthorize_RequestParameter_InvalidClient_RendersErrorUi(t *testing.T) {
 	params.Set("scope", "openid")
 	params.Set("request", "some.jwt.value")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
 	httpClient := createHttpClient(t)
 
@@ -215,7 +214,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 		params.Set("response_mode", "query")
 		params.Set("request", "some.jwt.value")
 
-		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
 		httpClient := createAuthenticatedHttpClient(t)
 		resp, err := httpClient.Get(destUrl)
@@ -247,7 +246,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 		params.Set("response_mode", "fragment")
 		params.Set("request", "some.jwt.value")
 
-		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
 		httpClient := createAuthenticatedHttpClient(t)
 		resp, err := httpClient.Get(destUrl)
@@ -281,7 +280,7 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 		params.Set("response_mode", "form_post")
 		params.Set("request", "some.jwt.value")
 
-		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
 		httpClient := createAuthenticatedHttpClient(t)
 		resp, err := httpClient.Get(destUrl)
@@ -322,7 +321,7 @@ func TestAuthorize_RequestUriParameter_RejectedAcrossResponseModes(t *testing.T)
 	params.Set("response_mode", "fragment")
 	params.Set("request_uri", "https://example.com/req.jwt")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?" + params.Encode()
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
 	httpClient := createAuthenticatedHttpClient(t)
 	resp, err := httpClient.Get(destUrl)

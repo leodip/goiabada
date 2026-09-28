@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -26,7 +25,7 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get group by ID
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -55,7 +54,7 @@ func TestAPIGroupGet_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get non-existent group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -79,7 +78,7 @@ func TestAPIGroupGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -96,7 +95,7 @@ func TestAPIGroupGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -135,7 +134,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 	}()
 
 	// Test: Get group without members first
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

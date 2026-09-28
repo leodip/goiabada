@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -41,7 +40,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/consents"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -73,7 +72,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 }
 
 func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/consents"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents"
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
@@ -126,7 +125,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -182,7 +181,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
 	// Attempt to delete using user1 token
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -207,7 +206,7 @@ func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	// Not found
-	urlNF := config.GetAuthServer().BaseURL + "/api/v1/account/consents/999999999"
+	urlNF := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/999999999"
 	respNF := makeAPIRequest(t, "DELETE", urlNF, accessToken, nil)
 	defer func() { _ = respNF.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
@@ -217,7 +216,7 @@ func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
 	assert.Equal(t, "NOT_FOUND", errNF.ErrorCode)
 
 	// Bad id format
-	urlBad := config.GetAuthServer().BaseURL + "/api/v1/account/consents/abc"
+	urlBad := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/abc"
 	respBad := makeAPIRequest(t, "DELETE", urlBad, accessToken, nil)
 	defer func() { _ = respBad.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)

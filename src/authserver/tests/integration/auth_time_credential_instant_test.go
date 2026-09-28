@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -128,7 +127,7 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 	codeVerifier := "code-verifier-" + fake.LetterN(16)
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -179,7 +178,7 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 
 	code, _ := getCodeAndStateFromUrl(t, resp)
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token",
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token",
 		url.Values{
 			"grant_type":    {"authorization_code"},
 			"client_id":     {clientIdentifier},
@@ -308,7 +307,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 	silentAuthorize := func() (*http.Response, string) {
 		t.Helper()
 		codeVerifier := "code-verifier-" + fake.LetterN(16)
-		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
@@ -337,7 +336,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 			t.Fatalf("no code was issued; Location %q", resp.Header.Get("Location"))
 		}
 
-		data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token",
+		data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token",
 			url.Values{
 				"grant_type":    {"authorization_code"},
 				"client_id":     {client.ClientIdentifier},
@@ -402,7 +401,7 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	// authenticated two hours ago, so the request goes to the password page rather than reusing it.
 	const codeVerifier = "code-verifier-re-login"
 	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
-	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(grant.redirectURI) +
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
@@ -420,7 +419,7 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	require.NotEqual(t, grant.sessionIdentifier, newSid, "the sign-in must have created a new session")
 
 	t.Run("the account session list holds only the new session", func(t *testing.T) {
-		resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/account/sessions", accessToken, nil)
+		resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/account/sessions", accessToken, nil)
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -440,7 +439,7 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	})
 
 	t.Run("the refresh token bound to the replaced session stops", func(t *testing.T) {
-		refused := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		refused := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"refresh_token"},
 			"client_id":     {grant.client.ClientIdentifier},
 			"client_secret": {grant.clientSecret},

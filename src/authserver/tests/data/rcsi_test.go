@@ -107,7 +107,7 @@ func rcsiDatabase(t *testing.T) *rcsiFixture {
 // it then throws away, and only then opens the handles the tests run on. The order is the whole of
 // this function: every step is where it is because of what the step before it holds.
 func buildRCSIFixture() (*rcsiFixture, error) {
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := isolatedDBName()
 
 	// 1. Create the database through the constructor the migration fixtures use, so it lands at
@@ -304,7 +304,7 @@ func TestRCSI_TheFixtureIsTheDatabaseUnderTest(t *testing.T) {
 	}
 
 	// And the configuration under test is actually in force.
-	master, err := sql.Open("sqlserver", msSQLMasterDSN(config.GetDatabase()))
+	master, err := sql.Open("sqlserver", msSQLMasterDSN(&appConfig.Database))
 	require.NoError(t, err)
 	defer func() { _ = master.Close() }()
 	on, err := readRCSIFlag(master, f.name)

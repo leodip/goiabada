@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +37,7 @@ func challengelessCode(t *testing.T, clientSecret string) (*models.Code, string)
 	require.Empty(t, code.CodeChallenge.String,
 		"the fixture must carry no challenge, or none of these rows measures anything")
 
-	return code, config.GetAuthServer().BaseURL + "/auth/token/"
+	return code, appConfig.AuthServer.BaseURL + "/auth/token/"
 }
 
 // B1. The transition. The code was legitimate when it was minted, and the client's secret was

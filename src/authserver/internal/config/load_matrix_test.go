@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"errors"
 	"flag"
 	"io"
@@ -646,12 +645,8 @@ func TestLoad_ArgsAreWhatTheParseLeft(t *testing.T) {
 
 // TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven holds the one registration
 // both parses share: exactly the db- names of authServerFlags, defaulting to and writing into the
-// struct it was handed rather than the package's configuration.
+// struct it was handed.
 func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *testing.T) {
-	saved := cfg
-	t.Cleanup(func() { cfg = saved })
-	cfg.Database.Port = 3306
-
 	local := DatabaseConfig{
 		Type:     "postgres",
 		Username: "u1",
@@ -711,9 +706,6 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 	if local.Port != 1433 {
 		t.Errorf("db-port set to 1433 left the struct at %d", local.Port)
 	}
-	if cfg.Database.Port != 3306 {
-		t.Errorf("db-port set on a local struct reached the package configuration: %d", cfg.Database.Port)
-	}
 }
 
 // TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine: the help text named two of the four
@@ -731,34 +723,6 @@ func TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine(t *testing.T) {
 		if !strings.Contains(f.Usage, engine) {
 			t.Errorf("db-type's help %q does not name %s", f.Usage, engine)
 		}
-	}
-}
-
-// TestAESKeyAccessors_AnswerNilOnAMalformedKey covers the two getters the data and integration
-// tiers still read: both decode what Init filled, and both answer nil rather than an error when
-// the value is not hex, and the previous key when it is unset. DataKeys is what refuses such a
-// value at startup. It writes cfg directly, as TestSimpleAccessors does, because Init's once
-// cannot be run again (#434).
-func TestAESKeyAccessors_AnswerNilOnAMalformedKey(t *testing.T) {
-	saved := cfg
-	t.Cleanup(func() { cfg = saved })
-
-	cfg.AESEncryptionKey = strings.Repeat("ab", 32)
-	cfg.AESEncryptionKeyPrevious = ""
-	if got := GetAESEncryptionKey(); !bytes.Equal(got, bytes.Repeat([]byte{0xab}, 32)) {
-		t.Errorf("GetAESEncryptionKey() = %x, want the decoded key", got)
-	}
-	if got := GetAESEncryptionKeyPrevious(); got != nil {
-		t.Errorf("GetAESEncryptionKeyPrevious() unset = %#v, want nil", got)
-	}
-
-	cfg.AESEncryptionKey = "zz"
-	cfg.AESEncryptionKeyPrevious = "zz"
-	if got := GetAESEncryptionKey(); got != nil {
-		t.Errorf("GetAESEncryptionKey() malformed = %#v, want nil", got)
-	}
-	if got := GetAESEncryptionKeyPrevious(); got != nil {
-		t.Errorf("GetAESEncryptionKeyPrevious() malformed = %#v, want nil", got)
 	}
 }
 

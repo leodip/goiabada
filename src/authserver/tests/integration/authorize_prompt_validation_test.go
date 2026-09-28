@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +24,7 @@ func TestPromptNone_NoSession_ReturnsLoginRequired(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -68,7 +67,7 @@ func TestPromptNone_ValidSession_SilentCodeIssuance(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -133,7 +132,7 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -197,7 +196,7 @@ func TestPrompt_InvalidValue(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -227,7 +226,7 @@ func TestPrompt_ConflictNoneLogin(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -257,7 +256,7 @@ func TestPrompt_ConflictNoneConsent(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -287,7 +286,7 @@ func TestPrompt_ConflictNoneLoginConsent(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -316,7 +315,7 @@ func TestPrompt_CaseSensitivityUppercase(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -345,7 +344,7 @@ func TestPrompt_CaseSensitivityMixed(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -374,7 +373,7 @@ func TestPrompt_SelectAccountNotImplemented(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -404,7 +403,7 @@ func TestPrompt_EmptyParameter(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// Empty prompt parameter should be treated as absent (normal flow)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -431,7 +430,7 @@ func TestPrompt_WhitespaceOnlyParameter(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// Whitespace-only prompt parameter should be treated as absent
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -458,7 +457,7 @@ func TestPrompt_UrlEncodedSpaces(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// URL encoded "login consent" - this is valid and should trigger re-auth flow
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

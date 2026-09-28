@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +29,7 @@ func followAuthChain(t *testing.T, httpClient *http.Client, clientIdentifier str
 
 	t.Helper()
 
-	authorizeURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+	authorizeURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
@@ -255,7 +254,7 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails(t *te
 // lock rather than a pool that happened to have others.
 func precreateFaultPool(t *testing.T, name string) *sql.DB {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 
 	connector, err := mssql.NewConnector(msSQLDatabaseDSN(cfg.Username, cfg.Password, name, cfg))
 	require.NoErrorf(t, err, "build a real SQL Server connector to %s", name)
@@ -413,7 +412,7 @@ func requireMigrationLockIsFree(t *testing.T, h *isolatedDB, eng migrator.Engine
 // Every connection it makes is a session no other pool in this test can be holding.
 func freshPoolTo(t *testing.T, name string) *sql.DB {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 
 	switch dbType() {
 	case "mysql":

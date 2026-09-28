@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
@@ -38,7 +37,7 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 		NewPassword:     "NewPass2$",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -71,7 +70,7 @@ func TestAPIAccountPasswordPut_WrongCurrentPassword(t *testing.T) {
 		NewPassword:     "NewPass2$",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -86,7 +85,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope(t)
 	setUserPassword(t, u, "Correct1!")
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
 
 	// Missing current password
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "", NewPassword: "NewPass2$"})
@@ -114,7 +113,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 }
 
 func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
@@ -146,7 +145,7 @@ func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
 
 func TestAPIAccountPasswordPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
 
 	// No JSON body
 	req, err := http.NewRequest("PUT", url, nil)

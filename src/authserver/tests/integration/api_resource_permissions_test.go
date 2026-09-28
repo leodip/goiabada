@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -38,7 +37,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get permissions for resource
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -93,7 +92,7 @@ func TestAPIResourcePermissionsGet_NoPermissions(t *testing.T) {
 	}()
 
 	// Test: Get permissions for resource with no permissions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -115,7 +114,7 @@ func TestAPIResourcePermissionsGet_NonExistentResource(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get permissions for non-existent resource
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/99999/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/99999/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -148,7 +147,7 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + tc.resourceId + "/permissions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + tc.resourceId + "/permissions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -178,7 +177,7 @@ func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermis
 	userinfoNamed := createTestPermission(t, authServerResource.Id, "userinfo", "Created by an administrator")
 	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.Id) })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -224,7 +223,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	}()
 
 	// Test: Get permissions for AuthServer resource
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -268,7 +267,7 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	}()
 
 	// Test: Get permissions for non-AuthServer resource
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -306,7 +305,7 @@ func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -327,7 +326,7 @@ func TestAPIResourcePermissionsGet_InvalidAccessToken(t *testing.T) {
 	}()
 
 	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token-here", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -362,7 +361,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	}()
 
 	// Test: Get permissions for resource with many permissions
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

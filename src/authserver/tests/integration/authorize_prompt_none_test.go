@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -26,7 +25,7 @@ func TestPromptNone_MaxAge0_ReturnsLoginRequired(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// max_age=0 means authentication must have JUST happened, which it hasn't
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -62,7 +61,7 @@ func TestAuthorize_MalformedMaxAge_ReturnsInvalidRequest(t *testing.T) {
 		for _, maxAge := range []string{"abc", "-1", "+5"} {
 			t.Run("max_age="+maxAge+prompt, func(t *testing.T) {
 				requestState := fake.LetterN(8)
-				destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+				destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 					"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 					"&response_type=code" +
 					"&code_challenge_method=S256" +
@@ -111,7 +110,7 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// Request level2_optional with existing level1 session - requires step-up
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -149,7 +148,7 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// Request level2_mandatory - requires OTP enrollment (interaction)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -185,7 +184,7 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -255,7 +254,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -296,7 +295,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	// Now try prompt=none - should fail because no consent exists
 	requestState2 := fake.LetterN(8)
 	requestCodeChallenge2 := fake.LetterN(43)
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -371,7 +370,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 	}
 
 	httpClient := createHttpClient(t)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -435,7 +434,7 @@ func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 	httpClient, client, redirectUri, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
 	// The session exists and is valid; the only thing missing is a consent row.
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -474,7 +473,7 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	}
 
 	requestState := fake.LetterN(8)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -522,7 +521,7 @@ func TestPromptNone_MaxAgeSatisfied_Success(t *testing.T) {
 	requestCodeChallenge := fake.LetterN(43)
 
 	// max_age=600 (10 minutes) should be satisfied by a session created just now
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -580,7 +579,7 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 
 	// Request level2_optional with session at level1 - this is an ACR step-up
 	// Even though user has no OTP, prompt=none cannot silently step up ACR levels
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -648,7 +647,7 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// Request level2_optional - should require interaction because OTP config changed
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -712,7 +711,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 
 	silentRequest := func() string {
 		requestState := fake.LetterN(8)
-		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
@@ -767,7 +766,7 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 	requestCodeChallenge := fake.LetterN(43)
 
 	// Request level1 - the OTP config changed flag should be irrelevant
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -817,7 +816,7 @@ func TestPromptNone_ConsentExists_Success(t *testing.T) {
 	requestCodeChallenge := fake.LetterN(43)
 
 	// prompt=none with valid session and client that doesn't require consent
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -875,7 +874,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -980,7 +979,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1032,7 +1031,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := fake.LetterN(43)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1124,7 +1123,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1166,7 +1165,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestCodeChallenge2 := fake.LetterN(43)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1247,7 +1246,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1298,7 +1297,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestCodeChallenge2 := fake.LetterN(43)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1379,7 +1378,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1431,7 +1430,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := fake.LetterN(43)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1523,7 +1522,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1576,7 +1575,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := fake.LetterN(43)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1646,7 +1645,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	requestCodeChallenge := fake.LetterN(43)
 
 	// First, create a session by logging in with openid scope
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1691,7 +1690,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	customScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 	requestState2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1719,7 +1718,7 @@ func TestPromptNone_InvalidScope(t *testing.T) {
 	httpClient := createHttpClient(t)
 	requestState := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

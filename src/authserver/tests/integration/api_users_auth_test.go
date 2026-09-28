@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -43,7 +42,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	updateReq := api.UpdateUserPasswordRequest{
 		NewPassword: "newSecurePassword123!",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -101,7 +100,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 			updateReq := api.UpdateUserPasswordRequest{
 				NewPassword: tc.password,
 			}
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -119,7 +118,7 @@ func TestAPIUserPasswordPut_UserNotFound(t *testing.T) {
 	updateReq := api.UpdateUserPasswordRequest{
 		NewPassword: "newSecurePassword123!",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -135,7 +134,7 @@ func TestAPIUserPasswordPut_InvalidUserId(t *testing.T) {
 	updateReq := api.UpdateUserPasswordRequest{
 		NewPassword: "newSecurePassword123!",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/invalid/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/invalid/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -177,7 +176,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	updateReq := api.UpdateUserOTPRequest{
 		Enabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -243,7 +242,7 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 
 	// Disable through the admin endpoint, which is the site under test here.
 	adminToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, adminToken, api.UpdateUserOTPRequest{Enabled: false})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -283,7 +282,7 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 	updateReq := api.UpdateUserOTPRequest{
 		Enabled: true,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -299,7 +298,7 @@ func TestAPIUserOTPPut_UserNotFound(t *testing.T) {
 	updateReq := api.UpdateUserOTPRequest{
 		Enabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -331,7 +330,7 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 	updateReq := api.UpdateUserOTPRequest{
 		Enabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -380,7 +379,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get user session
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -407,7 +406,7 @@ func TestAPIUserSessionGet_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get non-existent session
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/nonexistent-session"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/nonexistent-session"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -424,7 +423,7 @@ func TestAPIUserSessionPut_MethodNotAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: PUT the session path, which no longer registers that method
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + fake.UUID()
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + fake.UUID()
 	resp := makeAPIRequest(t, "PUT", url, accessToken, map[string]interface{}{"level2AuthConfigHasChanged": true})
 	defer func() { _ = resp.Body.Close() }()
 

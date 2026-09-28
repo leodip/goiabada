@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -52,7 +51,7 @@ func seedAuditLogs(t *testing.T, count int) string {
 
 func getAuditLogs(t *testing.T, accessToken string, query string) (*api.GetAuditLogsResponse, *http.Response) {
 	t.Helper()
-	url := config.GetAuthServer().BaseURL + auditLogsURL
+	url := appConfig.AuthServer.BaseURL + auditLogsURL
 	if query != "" {
 		url += "?" + query
 	}
@@ -250,7 +249,7 @@ func TestAPIAuditLogsGet_EventFilter(t *testing.T) {
 }
 
 func TestAPIAuditLogs_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + auditLogsURL
+	url := appConfig.AuthServer.BaseURL + auditLogsURL
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
@@ -298,7 +297,7 @@ func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string)
 	})
 	assert.NoError(t, err)
 
-	req, err := http.NewRequest("PUT", config.GetAuthServer().BaseURL+settingsAuditLogsURL,
+	req, err := http.NewRequest("PUT", appConfig.AuthServer.BaseURL+settingsAuditLogsURL,
 		bytes.NewReader(body))
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)

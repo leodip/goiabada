@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -22,7 +21,7 @@ func TestAPIResourceDelete_Success(t *testing.T) {
 	res := createTestResource(t, "api-test-del-resource-"+fake.LetterN(6), "To be deleted")
 
 	// Delete the resource via API
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -44,7 +43,7 @@ func TestAPIResourceDelete_NotFoundAndInvalidId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/9999999"
+	urlNF := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/9999999"
 	respNF := makeAPIRequest(t, "DELETE", urlNF, accessToken, nil)
 	defer func() { _ = respNF.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
@@ -53,7 +52,7 @@ func TestAPIResourceDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, "Resource not found", errRespNF.ErrorDescription)
 
 	// Invalid id (non-numeric)
-	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/abc"
+	urlBad := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/abc"
 	respBad := makeAPIRequest(t, "DELETE", urlBad, accessToken, nil)
 	defer func() { _ = respBad.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
@@ -62,7 +61,7 @@ func TestAPIResourceDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, "Invalid resource ID", errRespBad.ErrorDescription)
 
 	// Negative id -> not found
-	urlNeg := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/-1"
+	urlNeg := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/-1"
 	respNeg := makeAPIRequest(t, "DELETE", urlNeg, accessToken, nil)
 	defer func() { _ = respNeg.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, respNeg.StatusCode)
@@ -76,7 +75,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -91,7 +90,7 @@ func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {
 	res := createTestResource(t, "api-test-del-unauth-"+fake.LetterN(6), "desc")
 	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 
 	// No token
 	req, err := http.NewRequest("DELETE", url, nil)

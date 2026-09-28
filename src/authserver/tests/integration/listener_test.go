@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +28,7 @@ const listenerHeaderTimeout = 10 * time.Second
 // dialAuthServer opens a raw TCP connection to the running auth server.
 func dialAuthServer(t *testing.T) net.Conn {
 	t.Helper()
-	base, err := url.Parse(config.GetAuthServer().BaseURL)
+	base, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	require.Equal(t, "http", base.Scheme, "these cases write a raw HTTP/1.1 request, so the base URL must be plain http")
 

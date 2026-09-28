@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -46,7 +45,7 @@ func newROPCAuthTimeFixture(t *testing.T) ropcAuthTimeFixture {
 		user:         createROPCUser(t, password),
 		password:     password,
 		httpClient:   createHttpClient(t),
-		tokenURL:     config.GetAuthServer().BaseURL + "/auth/token/",
+		tokenURL:     appConfig.AuthServer.BaseURL + "/auth/token/",
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -67,7 +66,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 		ExpectedGroupIds: getUserGroupIds(t, accessToken, testUser.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -153,7 +152,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		ExpectedGroupIds: getUserGroupIds(t, accessToken, testUser.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -201,7 +200,7 @@ func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
 		ExpectedGroupIds: getUserGroupIds(t, accessToken, testUser.Id),
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -219,7 +218,7 @@ func TestAPIUserGroupsPut_UserNotFound(t *testing.T) {
 		ExpectedGroupIds: []int64{},
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/groups"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -248,7 +247,7 @@ func TestAPIUserGroupsPut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/groups"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/groups"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -276,7 +275,7 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	req, err := http.NewRequest("PUT", url, nil) // No body
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -307,7 +306,7 @@ func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 
@@ -377,7 +376,7 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 				groupIds[i] = int64(1_000_000_000 + i)
 			}
 
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" +
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" +
 				strconv.FormatInt(testUser.Id, 10) + "/groups"
 			resp := makeAPIRequest(t, "PUT", url, accessToken,
 				api.UpdateUserGroupsRequest{GroupIds: groupIds, ExpectedGroupIds: []int64{}})
@@ -402,7 +401,7 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 // returns their ids: the loaded set a save carries (#428).
 func getUserGroupIds(t *testing.T, accessToken string, userId int64) []int64 {
 	t.Helper()
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/groups"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -437,7 +436,7 @@ func TestAPIUserGroupsPut_TheLoadedListIsRequired(t *testing.T) {
 	user := createUserForGroupsSave(t)
 	group := createTestGroup(t)
 	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
 
 	bodies := map[string]interface{}{
 		"absent": map[string]interface{}{"groupIds": []int64{group.Id}},
@@ -473,7 +472,7 @@ func TestAPIUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	for _, g := range []*models.Group{groupA, groupB} {
 		require.NoError(t, database.CreateUserGroup(context.Background(), nil, &models.UserGroup{UserId: user.Id, GroupId: g.Id}))
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
 
 	loadedByBoth := getUserGroupIds(t, accessToken, user.Id)
 
@@ -500,7 +499,7 @@ func TestAPIUserGroupsPut_ARepeatedGroupIdIsOneMembership(t *testing.T) {
 	user := createUserForGroupsSave(t)
 	group := createTestGroup(t)
 	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserGroupsRequest{
 		GroupIds: []int64{group.Id, group.Id}, ExpectedGroupIds: []int64{}})

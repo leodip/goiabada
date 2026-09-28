@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -26,7 +25,7 @@ func TestAPISettingsAuditLogsGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -52,7 +51,7 @@ func TestAPISettingsAuditLogsPut_Success(t *testing.T) {
 		AuditLogRetentionDays:      45,
 	}
 
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -87,7 +86,7 @@ func TestAPISettingsAuditLogsPut_CanDisableBothSinks(t *testing.T) {
 		AuditLogRetentionDays:      10,
 	}
 
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -103,7 +102,7 @@ func TestAPISettingsAuditLogsPut_CanDisableBothSinks(t *testing.T) {
 func TestAPISettingsAuditLogsPut_RetentionBoundaries(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 
 	accepted := []struct {
 		name string
@@ -136,7 +135,7 @@ func TestAPISettingsAuditLogsPut_RetentionBoundaries(t *testing.T) {
 func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 
 	testCases := []struct {
 		name    string
@@ -190,7 +189,7 @@ func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 func TestAPISettingsAuditLogsPut_InvalidBody(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
@@ -223,7 +222,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 		lastIdBefore = before[0].Id
 	}
 
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsAuditLogsRequest{
 		AuditLogsInConsoleEnabled:  true,
 		AuditLogsInDatabaseEnabled: true,
@@ -243,7 +242,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 }
 
 func TestAPISettingsAuditLogs_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 	httpClient := createHttpClient(t)
 
 	for _, method := range []string{"GET", "PUT"} {
@@ -282,7 +281,7 @@ func TestAPISettingsAuditLogs_UnauthorizedAndScope(t *testing.T) {
 // write scope. A read-only credential must therefore be able to GET but not PUT.
 func TestAPISettingsAuditLogs_ReadScopeCannotWrite(t *testing.T) {
 	restoreSettings(t)
-	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
+	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 
 	readOnlyToken := createClientCredentialsTokenWithScope(t,
 		constants.AuthServerResourceIdentifier, constants.AdminReadPermissionIdentifier)

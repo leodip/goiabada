@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -37,7 +36,7 @@ func TestAPIClientOAuth2FlowsPut_Success_PublicClient_ForcesNoClientCredentials(
 
 	// Try to enable both flows; client is public so client credentials must be forced to false
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true, ClientCredentialsEnabled: true}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -81,7 +80,7 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 
 	// Disable auth code, enable client credentials
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: false, ClientCredentialsEnabled: true}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -105,7 +104,7 @@ func TestAPIClientOAuth2FlowsPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get system-level client
-	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/admin/clients", accessToken, nil)
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients", accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
@@ -124,7 +123,7 @@ func TestAPIClientOAuth2FlowsPut_SystemLevelClientAllowed(t *testing.T) {
 
 	// Update OAuth2 flows (should succeed)
 	// Update OAuth2 flows (should succeed)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/oauth2-flows"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/oauth2-flows"
 	reqBody := api.UpdateClientOAuth2FlowsRequest{
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
@@ -138,7 +137,7 @@ func TestAPIClientOAuth2FlowsPut_NotFoundAndInvalidId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/oauth2-flows"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/999999/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -150,7 +149,7 @@ func TestAPIClientOAuth2FlowsPut_NotFoundAndInvalidId(t *testing.T) {
 	}
 
 	// Invalid id (non-numeric)
-	url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/oauth2-flows"
+	url2 := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc/oauth2-flows"
 	resp2 := makeAPIRequest(t, "PUT", url2, accessToken, api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -177,7 +176,7 @@ func TestAPIClientOAuth2FlowsPut_InvalidRequestBodyAndUnauthorized(t *testing.T)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
 	// Invalid body
 	req, err := http.NewRequest("PUT", url, nil)
@@ -221,7 +220,7 @@ func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/oauth2-flows"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/oauth2-flows"
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -250,7 +249,7 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
 
 	// Disable both flows
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: false, ClientCredentialsEnabled: false}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -290,7 +289,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_UseGlobalSetting(t *testin
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil, // Use global
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -326,7 +325,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitEnable(t *testing.
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     &implicitEnabled,
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -365,7 +364,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitDisable(t *testing
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     &implicitDisabled,
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -401,7 +400,7 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
 	// Test 1: Explicitly require PKCE
 	pkceRequired := true
@@ -475,7 +474,7 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_PublicClientIsAlwaysRequired(t *te
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
 	// Both ways in, per section 1: an explicit false, and a nil that would otherwise inherit a
 	// global that can be turned off later.
@@ -529,7 +528,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitOnly_NoAuthCode(t *testing.T) {
 		AuthorizationCodeEnabled: false,
 		ImplicitGrantEnabled:     &implicitEnabled,
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -569,7 +568,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_UseGlobalSetting(t *testing.T) {
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Use global
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -605,7 +604,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitEnable(t *testing.T) {
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -644,7 +643,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitDisable(t *testing.T) {
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled,
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -675,7 +674,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_TriState(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
 	// Test 1: Explicitly enable ROPC
 	ropcEnabled := true
@@ -744,7 +743,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCOnly_NoOtherFlows(t *testing.T) {
 		ClientCredentialsEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 	}
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -29,7 +28,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Delete via API
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -50,7 +49,7 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find admin-console-client id via list
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -70,7 +69,7 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 		t.Skip("system-level client not found")
 	}
 
-	delURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	delURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
 	resp2 := makeAPIRequest(t, "DELETE", delURL, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -87,20 +86,20 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/9999999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/9999999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
 	// Invalid id format
-	url = config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc"
+	url = appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc"
 	resp = makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 	// Unauthorized
 	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("DELETE", config.GetAuthServer().BaseURL+"/api/v1/admin/clients/1", nil)
+	req, err := http.NewRequest("DELETE", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/1", nil)
 	assert.NoError(t, err)
 	resp2, err := httpClient.Do(req)
 	assert.NoError(t, err)
@@ -128,7 +127,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Call GET client permissions by id
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -165,7 +164,7 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -199,7 +198,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Delete client via API
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/require"
@@ -57,7 +56,7 @@ func assertCorsPathPair(t *testing.T, origin string, path string, getStatus int)
 				name = method.name + "/trailing slash"
 			}
 			t.Run(name, func(t *testing.T) {
-				req, err := http.NewRequest(method.method, config.GetAuthServer().BaseURL+path+suffix, nil)
+				req, err := http.NewRequest(method.method, appConfig.AuthServer.BaseURL+path+suffix, nil)
 				require.NoError(t, err)
 				req.Header.Set("Origin", origin)
 				if method.method == http.MethodOptions {

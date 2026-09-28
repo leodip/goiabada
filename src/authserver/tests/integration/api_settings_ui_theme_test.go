@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +21,7 @@ func TestAPISettingsUIThemeGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/ui-theme"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -42,7 +41,7 @@ func TestAPISettingsUIThemeGet_Success(t *testing.T) {
 func TestAPISettingsUIThemePut_Success(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/ui-theme"
 
 	// Pick a valid theme from core list
 	themes := uithemes.Get()
@@ -84,7 +83,7 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 func TestAPISettingsUIThemePut_ValidationErrors(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/ui-theme"
 
 	// Invalid theme
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsUIThemeRequest{UITheme: "not-a-theme"})
@@ -98,7 +97,7 @@ func TestAPISettingsUIThemePut_ValidationErrors(t *testing.T) {
 func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/ui-theme"
 
 	// Invalid body (nil) - PUT
 	req, err := http.NewRequest("PUT", url, nil)
@@ -127,7 +126,7 @@ func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 }
 
 func TestAPISettingsUITheme_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/ui-theme"
 
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)

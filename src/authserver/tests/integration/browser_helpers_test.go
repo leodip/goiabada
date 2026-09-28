@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -89,7 +88,7 @@ func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", destUrl)
-	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -116,7 +115,7 @@ func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otpP
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", destUrl)
-	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -217,7 +216,7 @@ func postConsent(t *testing.T, client *http.Client, destUrl string, consentPage 
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", destUrl)
-	request.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err = client.Do(request)
 	if err != nil {
@@ -261,7 +260,7 @@ func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -300,7 +299,7 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.C
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -354,7 +353,7 @@ func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *mode
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

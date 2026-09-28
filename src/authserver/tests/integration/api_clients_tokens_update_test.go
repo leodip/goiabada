@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 		IncludeOpenIDConnectClaimsInIdToken:     "off",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -62,7 +61,7 @@ func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 	client := createTestClientUnique(t, true)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
 
 	// Too large values
 	tooLarge := 160000001
@@ -101,7 +100,7 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/999999/tokens"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -113,7 +112,7 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
 	}
 
 	// Invalid id format
-	badURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/tokens"
+	badURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc/tokens"
 	resp2 := makeAPIRequest(t, "PUT", badURL, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -129,7 +128,7 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find admin-console-client id via list
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -149,7 +148,7 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 	}
 
 	// Update token settings (should succeed)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/tokens"
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -161,7 +160,7 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	client := createTestClientUnique(t, true)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
 
 	// Invalid body (nil/empty)
 	req, err := http.NewRequest("PUT", url, nil)
@@ -197,7 +196,7 @@ func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 	target := createTestClientUnique(t, true)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/tokens"
 	reqBody := api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()

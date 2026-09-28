@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +18,7 @@ func TestToken_AuthCode_AMR_IsArray(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -69,7 +68,7 @@ func TestToken_Refresh_AMR_IsArray(t *testing.T) {
 	// The auth code flow still returns a refresh token with these scopes
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get initial tokens
 	formData := url.Values{

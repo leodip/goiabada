@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -26,7 +25,7 @@ import (
 // wire as [] (#428).
 func readRedirectURIs(t *testing.T, accessToken string, clientId int64) []string {
 	t.Helper()
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -70,7 +69,7 @@ func redirectURIOfBytes(t *testing.T, n int, tag string) string {
 func TestAPIClientRedirectURIsPut_TheBoundsAt60And2048(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "redir-bounds-")
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 
 	sixty := make([]string, 60)
 	for i := range sixty {
@@ -112,7 +111,7 @@ func TestAPIClientRedirectURIsPut_TheBoundsAt60And2048(t *testing.T) {
 func TestAPIClientRedirectURIsPut_TheLoadedListIsRequired(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "redir-expected-")
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 
 	bodies := map[string]interface{}{
 		"absent": map[string]interface{}{"redirectURIs": []string{"https://a.example.com/cb"}},
@@ -141,7 +140,7 @@ func TestAPIClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	client := newRedirectURIsClient(t, "redir-outdated-")
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
 		&models.RedirectURI{ClientId: client.Id, URI: "https://a.example.com/cb"}))
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 
 	loadedByBoth := readRedirectURIs(t, accessToken, client.Id)
 
@@ -198,7 +197,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"  " + uriA + "  ", uriC},
 		ExpectedRedirectURIs: readRedirectURIs(t, accessToken, client.Id)}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -258,7 +257,7 @@ func TestAPIClientRedirectURIsPut_NoRedirectFlowRejected(t *testing.T) {
 
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"},
 		ExpectedRedirectURIs: readRedirectURIs(t, accessToken, client.Id)}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -295,7 +294,7 @@ func TestAPIClientRedirectURIsPut_ImplicitOnlyClientAllowed(t *testing.T) {
 	uri := "https://implicit-app.example.com/cb"
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{uri},
 		ExpectedRedirectURIs: readRedirectURIs(t, accessToken, client.Id)}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -315,7 +314,7 @@ func TestAPIClientRedirectURIsPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level admin console client id
-	listURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	listURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", listURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -335,7 +334,7 @@ func TestAPIClientRedirectURIsPut_SystemLevelClientAllowed(t *testing.T) {
 	}
 
 	// Update redirect URIs (should succeed)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/redirect-uris"
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/callback", "https://localhost:3000/cb"},
 		ExpectedRedirectURIs: readRedirectURIs(t, accessToken, sysId)}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -359,7 +358,7 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 
 	// Duplicate
 	loaded := readRedirectURIs(t, accessToken, client.Id)
@@ -448,7 +447,7 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/redirect-uris"
+	urlNF := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/999999/redirect-uris"
 	resp := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"}, ExpectedRedirectURIs: []string{}})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -460,7 +459,7 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	}
 
 	// Invalid id (non-numeric)
-	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/redirect-uris"
+	urlBad := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc/redirect-uris"
 	resp2 := makeAPIRequest(t, "PUT", urlBad, accessToken, api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"}, ExpectedRedirectURIs: []string{}})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -484,7 +483,7 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.Id) }()
 
-	urlIB := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/redirect-uris"
+	urlIB := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/redirect-uris"
 	req, err := http.NewRequest("PUT", urlIB, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -526,7 +525,7 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/redirect-uris"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/redirect-uris"
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"}, ExpectedRedirectURIs: []string{}}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
