@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -58,17 +58,9 @@ type GenerateTokenForRefreshInput struct {
 	RefreshTokenInfo *oauth.JwtToken
 }
 
-// TokenGenerationInput contains all data needed to generate access/id tokens
+// tokenGenerationInput contains all data needed to generate access/id tokens
 // regardless of the OAuth flow being used (auth code, implicit, ROPC).
-// Refresh token types, as stored in refresh_tokens.refresh_token_type and emitted as the
-// refresh token's typ claim. Named so the branch that chooses the type and the branches
-// that later read it cannot drift apart.
-const (
-	offlineRefreshTokenType = "Offline"
-	sessionRefreshTokenType = "Refresh"
-)
-
-type TokenGenerationInput struct {
+type tokenGenerationInput struct {
 	// User and Client (always required)
 	User   *models.User
 	Client *models.Client
@@ -77,7 +69,7 @@ type TokenGenerationInput struct {
 	Scope string
 
 	// Authentication context
-	AcrLevel        string   // e.g., "urn:goiabada:pwd", "urn:goiabada:level1", etc.
+	AcrLevel        string   // e.g., "urn:goiabada:level1", "urn:goiabada:level2_optional"
 	AuthMethods     []string // e.g., ["pwd"], ["pwd", "otp"]
 	AuthenticatedAt time.Time
 
@@ -107,10 +99,8 @@ type GenerateTokenForRefreshROPCInput struct {
 	RefreshTokenInfo *oauth.JwtToken
 }
 
-func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
+func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context, settings *models.Settings,
 	code *models.Code) (*oauth.TokenResponse, error) {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
 	err := t.database.CodeLoadClient(ctx, nil, code)
 	if err != nil {
@@ -212,7 +202,7 @@ func (t *TokenIssuer) generateAccessToken(ctx context.Context, settings *models.
 		input.GrantIsOffline = grantIsOffline(code.Scope, code.SessionIdentifier)
 	} else {
 		input.AuthStateGeneration = parentRefreshToken.AuthStateGeneration
-		input.GrantIsOffline = parentRefreshToken.RefreshTokenType == offlineRefreshTokenType
+		input.GrantIsOffline = parentRefreshToken.RefreshTokenType == TokenTypeOffline.String()
 	}
 
 	return t.generateAccessTokenCore(ctx, settings, input, now, signingKey, keyIdentifier)
@@ -253,14 +243,14 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models
 	// grantIsOffline, so the two cannot disagree about what "offline" means.
 	if grantIsOffline(scope, code.SessionIdentifier) {
 		// offline refresh token (not related to user session)
-		claims["typ"] = offlineRefreshTokenType
+		claims["typ"] = TokenTypeOffline.String()
 
-		exp, err := t.getRefreshTokenExpiration("Offline", now, settings, &code.Client)
+		exp, err := t.getRefreshTokenExpiration(TokenTypeOffline, now, settings, &code.Client)
 		if err != nil {
 			return "", 0, err
 		}
 
-		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, "Offline", now, settings,
+		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, TokenTypeOffline, now, settings,
 			&code.Client, code.SessionIdentifier)
 		if err != nil {
 			return "", 0, err
@@ -279,15 +269,15 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models
 
 	} else {
 		// normal refresh token (associated with user session)
-		claims["typ"] = sessionRefreshTokenType
+		claims["typ"] = TokenTypeRefresh.String()
 		claims["sid"] = code.SessionIdentifier
 
-		exp, err := t.getRefreshTokenExpiration("Refresh", now, settings, &code.Client)
+		exp, err := t.getRefreshTokenExpiration(TokenTypeRefresh, now, settings, &code.Client)
 		if err != nil {
 			return "", 0, err
 		}
 
-		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, "Refresh", now, settings, &code.Client, code.SessionIdentifier)
+		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, TokenTypeRefresh, now, settings, &code.Client, code.SessionIdentifier)
 		if err != nil {
 			return "", 0, err
 		}
@@ -325,7 +315,7 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models
 	}
 
 	// Store either max lifetime (for Offline type) or session identifier (for Refresh type)
-	if claims["typ"].(string) == "Offline" {
+	if claims["typ"].(string) == TokenTypeOffline.String() {
 		t := time.Unix(claims["offline_access_max_lifetime"].(int64), 0)
 		refreshTokenEntity.MaxLifetime = sql.NullTime{Time: t, Valid: true}
 	} else {
@@ -347,17 +337,17 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models
 	return rt, refreshExpiresIn, nil
 }
 
-func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now time.Time, settings *models.Settings,
+func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now time.Time, settings *models.Settings,
 	client *models.Client) (int64, error) {
 	switch refreshTokenType {
-	case "Offline":
+	case TokenTypeOffline:
 		refreshTokenExpirationInSeconds := settings.RefreshTokenOfflineIdleTimeoutInSeconds
 		if client.RefreshTokenOfflineIdleTimeoutInSeconds > 0 {
 			refreshTokenExpirationInSeconds = client.RefreshTokenOfflineIdleTimeoutInSeconds
 		}
 		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		return exp, nil
-	case "Refresh":
+	case TokenTypeRefresh:
 		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
 		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
 		return exp, nil
@@ -365,17 +355,17 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now tim
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, refreshTokenType string, now time.Time, settings *models.Settings,
+func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, refreshTokenType TokenType, now time.Time, settings *models.Settings,
 	client *models.Client, sessionIdentifier string) (int64, error) {
 	switch refreshTokenType {
-	case "Offline":
+	case TokenTypeOffline:
 		maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
 		if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
 			maxLifetimeInSeconds = client.RefreshTokenOfflineMaxLifetimeInSeconds
 		}
 		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
-	case "Refresh":
+	case TokenTypeRefresh:
 		userSession, err := t.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
 		if err != nil {
 			return 0, err
@@ -392,13 +382,11 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, refreshTok
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client,
-	scope string) (*oauth.TokenResponse, error) {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, settings *models.Settings,
+	client *models.Client, scope string) (*oauth.TokenResponse, error) {
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: "Bearer",
+		TokenType: TokenTypeBearer.String(),
 		ExpiresIn: int64(settings.TokenExpirationInSeconds),
 		Scope:     scope,
 	}
@@ -460,9 +448,8 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	return &tokenResponse, nil
 }
 
-func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, settings *models.Settings,
+	input *GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
 
 	err := t.database.CodeLoadClient(ctx, nil, input.Code)
 	if err != nil {
@@ -553,9 +540,8 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 // GenerateTokenResponseForRefreshROPC generates new tokens for an ROPC refresh token.
 // Unlike auth code flow, ROPC tokens have UserId and ClientId directly on the RefreshToken.
-func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, input *GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, settings *models.Settings,
+	input *GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
 
 	// Load the User and Client from the refresh token
 	err := t.database.RefreshTokenLoadUser(ctx, nil, input.RefreshToken)
@@ -668,9 +654,9 @@ func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Map
 	}
 }
 
-// generateAccessTokenCore creates an access token using the unified TokenGenerationInput.
+// generateAccessTokenCore creates an access token using the unified tokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *models.Settings, input *TokenGenerationInput,
+func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *models.Settings, input *tokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -772,9 +758,9 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 	return accessToken, nil
 }
 
-// generateIdTokenCore creates an id_token using the unified TokenGenerationInput.
+// generateIdTokenCore creates an id_token using the unified tokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.Settings, input *TokenGenerationInput,
+func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.Settings, input *tokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -849,10 +835,10 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.
 	return idToken, nil
 }
 
-// createTokenInputFromCode creates a TokenGenerationInput from an authorization code.
+// createTokenInputFromCode creates a tokenGenerationInput from an authorization code.
 // Used by the authorization code flow.
-func (t *TokenIssuer) createTokenInputFromCode(code *models.Code) *TokenGenerationInput {
-	return &TokenGenerationInput{
+func (t *TokenIssuer) createTokenInputFromCode(code *models.Code) *tokenGenerationInput {
+	return &tokenGenerationInput{
 		User:              &code.User,
 		Client:            &code.Client,
 		Scope:             code.Scope,
@@ -864,10 +850,10 @@ func (t *TokenIssuer) createTokenInputFromCode(code *models.Code) *TokenGenerati
 	}
 }
 
-// createTokenInputFromImplicit creates a TokenGenerationInput from an ImplicitGrantInput.
+// createTokenInputFromImplicit creates a tokenGenerationInput from an ImplicitGrantInput.
 // Used by the implicit flow (deprecated in OAuth 2.1).
-func (t *TokenIssuer) createTokenInputFromImplicit(input *ImplicitGrantInput) *TokenGenerationInput {
-	return &TokenGenerationInput{
+func (t *TokenIssuer) createTokenInputFromImplicit(input *ImplicitGrantInput) *tokenGenerationInput {
+	return &tokenGenerationInput{
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
@@ -884,19 +870,24 @@ func (t *TokenIssuer) createTokenInputFromImplicit(input *ImplicitGrantInput) *T
 	}
 }
 
-// createTokenInputFromROPC creates a TokenGenerationInput from an ROPCGrantInput.
+// createTokenInputFromROPC creates a tokenGenerationInput from an ROPCGrantInput.
 // Used by the ROPC flow (deprecated in OAuth 2.1).
-// ROPC always uses password-only authentication (ACR: urn:goiabada:pwd, AMR: ["pwd"]).
-func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput, now time.Time) *TokenGenerationInput {
-	return &TokenGenerationInput{
+// ROPC always uses password-only authentication (ACR: urn:goiabada:level1, AMR: ["pwd"]).
+//
+// Level 1 because that is what password-only means in discovery's acr_values_supported and on the
+// docs site's ACR page. Until #433 this wrote urn:goiabada:pwd, a value outside both that nothing
+// reads back; OIDC Core 1.0 section 2 leaves acr values to the parties, so the published list is
+// the contract, and a value outside it tells a client nothing it can check.
+func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput, now time.Time) *tokenGenerationInput {
+	return &tokenGenerationInput{
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
-		AcrLevel:          "urn:goiabada:pwd", // ROPC is always password-only
-		AuthMethods:       []string{"pwd"},    // ROPC is always password method
-		AuthenticatedAt:   now,                // ROPC auth happens at token request time
-		SessionIdentifier: "",                 // ROPC is sessionless: see ROPCGrantInput
-		Nonce:             "",                 // ROPC doesn't use nonce
+		AcrLevel:          models.AcrLevel1.String(),
+		AuthMethods:       []string{ceremony.AuthMethodPassword.String()},
+		AuthenticatedAt:   now, // ROPC auth happens at token request time
+		SessionIdentifier: "",  // ROPC is sessionless: see ROPCGrantInput
+		Nonce:             "",  // ROPC doesn't use nonce
 	}
 }
 
@@ -929,10 +920,8 @@ type ImplicitGrantResponse struct {
 // GenerateTokenResponseForImplicit creates tokens for the OAuth2/OIDC implicit flow.
 // Per RFC 6749 4.2.2, NO refresh token is issued.
 // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
-func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
+func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings,
 	input *ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*ImplicitGrantResponse, error) {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
 	if input.Client.TokenExpirationInSeconds > 0 {
@@ -1059,10 +1048,8 @@ type ROPCGrantResponse struct {
 //
 // Unlike implicit flow, ROPC issues refresh tokens.
 // ROPC refresh tokens store UserId and ClientId directly (no Code entity needed).
-func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
+func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings,
 	input *ROPCGrantInput) (*ROPCGrantResponse, error) {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
 	if input.Client.TokenExpirationInSeconds > 0 {
@@ -1184,11 +1171,11 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, settings 
 	claims["aud"] = settings.Issuer
 	claims["sub"] = input.User.Subject
 
-	// ROPC tokens are always "Offline" type since there's no browser session
+	// ROPC tokens are always Offline type since there's no browser session
 	// (The user authenticates directly with username/password via API)
-	claims["typ"] = offlineRefreshTokenType
+	claims["typ"] = TokenTypeOffline.String()
 
-	exp, err := t.getRefreshTokenExpiration("Offline", now, settings, input.Client)
+	exp, err := t.getRefreshTokenExpiration(TokenTypeOffline, now, settings, input.Client)
 	if err != nil {
 		return "", 0, err
 	}

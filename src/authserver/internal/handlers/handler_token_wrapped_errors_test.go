@@ -52,10 +52,11 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 
 	formData := "grant_type=authorization_code&code=abc&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req = withSettings(req, &models.Settings{})
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
-	tokenValidator.On("ValidateTokenRequest", mock.Anything,
+	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, failure)
 
 	return httpHelper, auditLogger, database, rr, req, handler

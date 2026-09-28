@@ -13,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -118,9 +118,8 @@ const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resou
 	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
 	"or enable it globally in 'Settings > General'."
 
-func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *models.Settings,
+	input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
 
 	if len(input.ClientId) == 0 {
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
@@ -732,7 +731,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
 		switch refreshTokenType {
-		case "Refresh":
+		case issuance.TokenTypeRefresh.String():
 			// this is a normal refresh token
 			// check the associated user session to see if it's still valid
 
@@ -766,7 +765,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
 					http.StatusBadRequest)
 			}
-		case "Offline":
+		case issuance.TokenTypeOffline.String():
 			// this is an offline refresh token
 			// its lifetime is not linked to the user session
 
@@ -870,7 +869,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// scope list are loop-invariant, so fetch and split the consent once here instead of on every
 		// scope iteration.
 		var scopesFromConsent []string
-		consentCheckRequired := !isROPCToken && (client.ConsentRequired || refreshTokenType == "Offline")
+		consentCheckRequired := !isROPCToken && (client.ConsentRequired || refreshTokenType == issuance.TokenTypeOffline.String())
 		if consentCheckRequired {
 			consent, err := val.database.GetConsentByUserIdAndClientId(ctx, nil, tokenUserId, tokenClientId)
 			if err != nil {

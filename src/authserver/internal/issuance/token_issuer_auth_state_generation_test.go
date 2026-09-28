@@ -123,14 +123,14 @@ func TestAccessToken_SidEmission(t *testing.T) {
 			name:    "refresh of a session-bound token, emits sid",
 			code:    generationTestCode("openid profile", sid, 0, 0),
 			scope:   "openid profile",
-			parent:  &models.RefreshToken{RefreshTokenType: sessionRefreshTokenType},
+			parent:  &models.RefreshToken{RefreshTokenType: TokenTypeRefresh.String()},
 			wantSid: true,
 		},
 		{
 			name:    "refresh of an offline token, no sid",
 			code:    generationTestCode("openid offline_access", sid, 0, 0),
 			scope:   "openid offline_access",
-			parent:  &models.RefreshToken{RefreshTokenType: offlineRefreshTokenType},
+			parent:  &models.RefreshToken{RefreshTokenType: TokenTypeOffline.String()},
 			wantSid: false,
 		},
 		{
@@ -143,7 +143,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 			name:    "refresh of an offline grant, request down-scoped away offline_access, no sid",
 			code:    generationTestCode("openid offline_access", sid, 0, 0),
 			scope:   "openid",
-			parent:  &models.RefreshToken{RefreshTokenType: offlineRefreshTokenType},
+			parent:  &models.RefreshToken{RefreshTokenType: TokenTypeOffline.String()},
 			wantSid: false,
 		},
 	}
@@ -198,7 +198,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// read of either wrong source is visible: the preserved session's token was
 		// promoted to 7 while its code stayed at 3, and the user has since reached 9.
 		code := generationTestCode("openid", sid, 3, 9)
-		parent := &models.RefreshToken{RefreshTokenType: sessionRefreshTokenType, AuthStateGeneration: 7}
+		parent := &models.RefreshToken{RefreshTokenType: TokenTypeRefresh.String(), AuthStateGeneration: 7}
 		tokenStr, err := issuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
@@ -238,7 +238,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			User:   &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
 			Scope:  "openid",
 		}
-		parent := &models.RefreshToken{RefreshTokenType: offlineRefreshTokenType, AuthStateGeneration: 7}
+		parent := &models.RefreshToken{RefreshTokenType: TokenTypeOffline.String(), AuthStateGeneration: 7}
 		tokenStr, err := issuer.generateROPCAccessToken(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
@@ -347,7 +347,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		parent := &models.RefreshToken{
 			RefreshTokenJti:      "parent-jti",
 			FirstRefreshTokenJti: "first-jti",
-			RefreshTokenType:     offlineRefreshTokenType,
+			RefreshTokenType:     TokenTypeOffline.String(),
 			AuthStateGeneration:  7,
 			MaxLifetime:          sqlNullTime(now.Add(24 * time.Hour)),
 		}
@@ -398,7 +398,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		parent := &models.RefreshToken{
 			RefreshTokenJti:      "parent-jti",
 			FirstRefreshTokenJti: "first-jti",
-			RefreshTokenType:     offlineRefreshTokenType,
+			RefreshTokenType:     TokenTypeOffline.String(),
 			AuthStateGeneration:  7,
 			MaxLifetime:          sqlNullTime(now.Add(24 * time.Hour)),
 		}

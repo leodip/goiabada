@@ -1191,7 +1191,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "id_token=")
 			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
-				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
 
@@ -1273,7 +1273,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
-				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
 
@@ -1328,7 +1328,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 			Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.User.Id == int64(123) && input.SessionIdentifier == liveSessionIdentifier
 		}), true, false).Return(&issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -1425,7 +1425,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		// No owner to name, so this takes #129's line rather than decision 7's.
 		assertWarnedSessionGone(t, logs)
 
@@ -1482,7 +1482,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assert.NotContains(t, location, "id_token=")
 
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assertWarnedSessionGone(t, logs)
 
@@ -1506,7 +1506,7 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 	t.Helper()
 	req, err := http.NewRequest("GET", "/auth/issue", nil)
 	assert.NoError(t, err)
-	return req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+	return withSettings(req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)), &models.Settings{})
 }
 
 // stubLiveSession makes the ownership check pass, which is the precondition for reaching
@@ -1685,6 +1685,9 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		// The issuer is handed the request's own settings, matched by identity below.
+		requestSettings := &models.Settings{Issuer: "https://issuer.example"}
+		req = withSettings(req, requestSettings)
 
 		rr := httptest.NewRecorder()
 
@@ -1731,7 +1734,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ExpiresIn:   3600,
 			Scope:       "openid",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, theseSettings(requestSettings), mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Scope == "openid" &&
 				input.AuthStateGeneration == 7
 		}), true, false).Return(tokenResponse, nil)
@@ -1778,6 +1781,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		req = withSettings(req, &models.Settings{})
 
 		rr := httptest.NewRecorder()
 
@@ -1819,7 +1823,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			IdToken: "id-token-123",
 			Scope:   "openid",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Nonce == "test-nonce"
 		}), false, true).Return(tokenResponse, nil)
 
@@ -1862,6 +1866,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		req = withSettings(req, &models.Settings{})
 
 		rr := httptest.NewRecorder()
 
@@ -1906,7 +1911,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			IdToken:     "id-token-123",
 			Scope:       "openid",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123)
 		}), true, true).Return(tokenResponse, nil)
 
@@ -1951,6 +1956,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		req = withSettings(req, &models.Settings{})
 
 		rr := httptest.NewRecorder()
 
@@ -1978,7 +1984,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ExpiresIn:   3600,
 			Scope:       "openid profile",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Scope == "openid profile" // Should use consented scope
 		}), true, false).Return(tokenResponse, nil)
 
@@ -2049,7 +2055,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a withheld redirect must never become a Location")
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2116,6 +2122,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		req = withSettings(req, &models.Settings{})
 
 		rr := httptest.NewRecorder()
 
@@ -2136,7 +2143,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenError := errs.New("token generation failed")
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == tokenError
@@ -2489,6 +2496,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		req = withSettings(req, &models.Settings{})
 
 		rr := httptest.NewRecorder()
 
@@ -2513,7 +2521,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, true, false).Return(tokenResponse, nil)
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, true, false).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 
@@ -3946,7 +3954,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 					"a withheld redirect must never become a Location: %s", tc.why)
 				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 				tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
-					mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+					mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			}
 
 			httpHelper.AssertExpectations(t)
@@ -4486,7 +4494,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"a withheld redirect must never become a Location, least of all because the clear failed")
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
