@@ -35,18 +35,3 @@ func TestConstants_ErrorCodesAreWireValues(t *testing.T) {
 	assert.Equal(t, "consent_required", ErrorConsentRequired)
 	assert.Equal(t, "interaction_required", ErrorInteractionRequired)
 }
-
-// TestConstants_ContextKeysAreDistinct holds the three context keys apart. They are process-local
-// and their values reach nothing outside this binary, but two keys sharing a value are one key,
-// and a middleware writing settings under the validated token's key would be found only at the
-// panic in whichever handler read it back.
-func TestConstants_ContextKeysAreDistinct(t *testing.T) {
-	keys := []ctxKey{ContextKeySettings, ContextKeySessionIdentifier, ContextKeyValidatedToken}
-
-	seen := map[ctxKey]bool{}
-	for _, k := range keys {
-		assert.NotEmpty(t, string(k))
-		assert.False(t, seen[k], "two context keys share the value %q", string(k))
-		seen[k] = true
-	}
-}

@@ -3,7 +3,6 @@ package server
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"database/sql"
 	"fmt"
 	"image"
@@ -21,10 +20,10 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -76,7 +75,7 @@ func newPaddingTestServer(t *testing.T, database *mocks_data.Database) (*httptes
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		counter := &countingReadCloser{ReadCloser: r.Body}
 		r.Body = counter
-		r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeyBearerToken, accountAPIToken()))
+		r = r.WithContext(reqctx.WithBearerToken(r.Context(), accountAPIToken()))
 		s.router.ServeHTTP(w, r)
 		counts <- readCount{read: counter.read.Load(), contentLength: r.ContentLength}
 	}))

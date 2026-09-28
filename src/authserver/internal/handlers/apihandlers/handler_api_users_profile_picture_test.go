@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +32,7 @@ func setTokenContextWithClaims(req *http.Request, claims map[string]interface{})
 	jwtToken := oauth.JwtToken{
 		Claims: claims,
 	}
-	ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
+	ctx := reqctx.WithValidatedToken(req.Context(), jwtToken)
 	return req.WithContext(ctx)
 }
 

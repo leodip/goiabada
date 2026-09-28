@@ -10,9 +10,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/phonecountries"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -30,7 +30,7 @@ func HandleAPIAccountPhonePut(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
 			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
 			return

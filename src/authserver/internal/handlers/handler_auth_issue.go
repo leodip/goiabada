@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -222,10 +223,7 @@ func HandleIssueGet(
 			}
 		}
 
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
+		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 
 		// A ceremony must not bind a grant to a session that no longer exists (#129
 		// decision 6, second half). The session was alive at /auth/completed, which bumped

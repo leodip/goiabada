@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -34,7 +35,7 @@ func HandleUserInfoGetPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("unable to get validated token from context"))
 			return

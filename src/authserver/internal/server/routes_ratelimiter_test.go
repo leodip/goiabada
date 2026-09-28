@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -194,7 +195,7 @@ func browserForm(method string, target string, body string) *http.Request {
 func apiRequest(method string, target string, body string) *http.Request {
 	r := httptest.NewRequest(method, target, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
-	r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeyBearerToken, accountAPIToken()))
+	r = r.WithContext(reqctx.WithBearerToken(r.Context(), accountAPIToken()))
 	return withRoutesTestSettings(r)
 }
 

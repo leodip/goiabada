@@ -87,12 +87,11 @@ var apiErrorCodes = map[string]string{
 	"NO_FILE":              "400 on an upload: the multipart part is missing.",
 	"CONCURRENT_UPDATE":    "409 on a list save: the stored list changed after it was loaded, or another save added the same value at the same moment, so the caller reads the list again and retries.",
 
-	// Authentication and authorization. A caller distinguishes "send a token", "the token is
-	// malformed", "the token is not good enough" and "the session is gone", and retries differently
-	// for each. ACCESS_TOKEN_REQUIRED, INVALID_TOKEN_FORMAT and INSUFFICIENT_SCOPE are the bearer
-	// middleware's; the rest are handlers'.
+	// Authentication and authorization. A caller distinguishes "send a token", "the token is not
+	// good enough" and "the session is gone", and retries differently for each.
+	// ACCESS_TOKEN_REQUIRED and INSUFFICIENT_SCOPE are the bearer middleware's; the rest are
+	// handlers'.
 	"ACCESS_TOKEN_REQUIRED": "401: no bearer token, so the caller obtains one.",
-	"INVALID_TOKEN_FORMAT":  "401: the bearer token is not a JWT.",
 	"INVALID_TOKEN":         "401: the bearer token did not validate.",
 	"INVALID_SUBJECT":       "401: the token's subject is not a user this server knows.",
 	"INVALID_SESSION":       "401: the session behind the token is gone.",

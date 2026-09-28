@@ -28,7 +28,7 @@ func HandleAPIUsersSearchGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
-		// Token is available in context if needed via GetValidatedToken(r)
+		// Token is available in context if needed via reqctx.ValidatedTokenFrom(r.Context())
 
 		// Parse query parameters
 		pageStr := r.URL.Query().Get("page")

@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
@@ -2831,7 +2832,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-123")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-123")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2923,7 +2924,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-123")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-123")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3017,7 +3018,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-456")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-456")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3108,7 +3109,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-789")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-789")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3230,7 +3231,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-789")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-789")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3340,7 +3341,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3442,7 +3443,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3542,7 +3543,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3634,7 +3635,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-999")
+		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()

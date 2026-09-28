@@ -19,10 +19,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 type AuthHelper interface {
@@ -682,11 +681,10 @@ func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Han
 // value the handler resolves its user from, so the limiter and the handler cannot disagree
 // about whose budget is being spent.
 //
-// The token is stored as a value rather than a pointer, so the type assertion has to match
-// (see the authserver middleware's own GetValidatedToken). false means no bucket can be
-// derived, which is a request that has no business reaching a credential check anyway.
+// false means no bucket can be derived, which is a request that has no business reaching a
+// credential check anyway.
 func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
-	token, ok := r.Context().Value(constants.ContextKeyValidatedToken).(oauth.JwtToken)
+	token, ok := reqctx.ValidatedTokenFrom(r.Context())
 	if !ok {
 		return "", false
 	}

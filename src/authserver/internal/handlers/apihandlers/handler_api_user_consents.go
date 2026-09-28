@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -110,7 +111,7 @@ func HandleAPIUserConsentDelete(
 		auditLogger.Log(r.Context(), audit.AuditDeletedUserConsent, map[string]interface{}{
 			"userId":       consent.UserId,
 			"consentId":    consentId,
-			"loggedInUser": r.Context().Value("subject"),
+			"loggedInUser": callerSubject(r),
 		})
 
 		response := api.SuccessResponse{Success: true}

@@ -8,8 +8,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -55,7 +57,7 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessi
 						return
 					}
 				} else {
-					ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
+					ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
 				}
 			}
 

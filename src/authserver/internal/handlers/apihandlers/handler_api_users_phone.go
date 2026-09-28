@@ -9,12 +9,13 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/phonecountries"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -138,7 +139,7 @@ func HandleAPIUserPhonePut(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")

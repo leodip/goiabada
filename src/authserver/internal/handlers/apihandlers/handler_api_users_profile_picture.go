@@ -8,11 +8,12 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 )
 
 // usersProfilePictureDatabase is what the administrator's user picture endpoints need: the user
@@ -121,7 +122,7 @@ func HandleAPIUserProfilePicturePost(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")
@@ -182,7 +183,7 @@ func HandleAPIUserProfilePictureDelete(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")

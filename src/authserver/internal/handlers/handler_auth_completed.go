@@ -11,10 +11,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/errs"
@@ -67,10 +67,7 @@ func HandleAuthCompletedGet(
 			return
 		}
 
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
+		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 
 		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 		if err != nil {

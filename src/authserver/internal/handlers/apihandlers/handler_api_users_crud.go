@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -18,10 +19,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/api"
@@ -167,7 +168,7 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")
@@ -437,7 +438,7 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")
@@ -568,7 +569,7 @@ func HandleAPIUserEnabledPut(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")
@@ -703,7 +704,7 @@ func HandleAPIUserDelete(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")

@@ -9,8 +9,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -32,7 +32,7 @@ func HandleAPIAccountProfilePicturePost(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
 			writeJSONError(w, "Unauthorized", "UNAUTHORIZED", http.StatusUnauthorized)
 			return
@@ -141,7 +141,7 @@ func HandleAPIAccountProfilePictureDelete(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
 			writeJSONError(w, "Unauthorized", "UNAUTHORIZED", http.StatusUnauthorized)
 			return
@@ -192,7 +192,7 @@ func HandleAPIAccountProfilePictureGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
 			writeJSONError(w, "Unauthorized", "UNAUTHORIZED", http.StatusUnauthorized)
 			return

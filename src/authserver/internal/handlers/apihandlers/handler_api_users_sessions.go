@@ -7,10 +7,11 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -82,7 +83,7 @@ func HandleAPIUserSessionsGet(
 		// user-bound admin token gets true on its own row, which is the same answer the admin
 		// console used to compute for itself from the same claim (#373 decision 1).
 		currentSid := ""
-		if jwtToken, ok := middleware.GetValidatedToken(r); ok {
+		if jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context()); ok {
 			currentSid = jwtToken.GetStringClaim("sid")
 		}
 

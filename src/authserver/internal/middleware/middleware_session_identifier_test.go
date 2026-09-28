@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
@@ -44,12 +45,12 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
 
-		var contextSessionIdentifier interface{}
+		var present bool
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contextSessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier)
+			_, present = reqctx.SessionIdentifierFrom(r.Context())
 		})).ServeHTTP(rr, req)
 
-		assert.Nil(t, contextSessionIdentifier)
+		assert.False(t, present)
 	})
 
 	t.Run("Valid session identifier", func(t *testing.T) {
@@ -68,10 +69,12 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		var contextSessionIdentifier string
+		var present bool
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contextSessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
+			contextSessionIdentifier, present = reqctx.SessionIdentifierFrom(r.Context())
 		})).ServeHTTP(rr, req)
 
+		assert.True(t, present)
 		assert.Equal(t, "valid-session-id", contextSessionIdentifier)
 	})
 
@@ -91,12 +94,12 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
 
-		var contextSessionIdentifier interface{}
+		var present bool
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contextSessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier)
+			_, present = reqctx.SessionIdentifierFrom(r.Context())
 		})).ServeHTTP(rr, req)
 
-		assert.Nil(t, contextSessionIdentifier)
+		assert.False(t, present)
 	})
 
 	t.Run("Invalid session identifier preserves other session values", func(t *testing.T) {

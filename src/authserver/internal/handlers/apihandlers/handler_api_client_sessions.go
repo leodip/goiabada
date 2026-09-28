@@ -7,10 +7,11 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -101,7 +102,7 @@ func HandleAPIClientSessionsGet(
 		// handler_api_users_sessions.go: one mapper decides isCurrent for all three endpoints,
 		// so it means the same thing here as it does there (#373 decision 1).
 		currentSid := ""
-		if jwtToken, ok := middleware.GetValidatedToken(r); ok {
+		if jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context()); ok {
 			currentSid = jwtToken.GetStringClaim("sid")
 		}
 

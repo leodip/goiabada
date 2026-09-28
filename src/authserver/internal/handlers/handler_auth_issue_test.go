@@ -14,10 +14,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
@@ -1506,8 +1506,7 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 	t.Helper()
 	req, err := http.NewRequest("GET", "/auth/issue", nil)
 	assert.NoError(t, err)
-	return req.WithContext(context.WithValue(req.Context(),
-		constants.ContextKeySessionIdentifier, sessionIdentifier))
+	return req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 }
 
 // stubLiveSession makes the ownership check pass, which is the precondition for reaching

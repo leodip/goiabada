@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -95,7 +96,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		sessionIdentifier := "test-session"
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		userSession := &models.UserSession{

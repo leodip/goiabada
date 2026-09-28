@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -20,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
@@ -245,10 +247,7 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
+		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 
 		// The session row behind this browser, loaded at most once and only if somebody asks. The
 		// predicate below asks, and so does the ordinary path at the bottom of the handler, and

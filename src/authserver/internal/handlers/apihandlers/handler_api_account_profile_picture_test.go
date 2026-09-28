@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"image"
@@ -15,10 +14,10 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +67,7 @@ func setTokenContext(req *http.Request, sub string) *http.Request {
 			"sub": sub,
 		},
 	}
-	ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
+	ctx := reqctx.WithValidatedToken(req.Context(), jwtToken)
 	return req.WithContext(ctx)
 }
 
