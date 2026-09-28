@@ -1438,7 +1438,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1484,7 +1483,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1523,7 +1521,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1571,7 +1568,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1613,7 +1609,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1658,7 +1653,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1700,7 +1694,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1743,7 +1736,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1787,7 +1779,6 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		settings := &models.Settings{}
 		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
