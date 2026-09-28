@@ -46,71 +46,126 @@ const (
 	sealingKeyBytes = chacha20poly1305.KeySize
 )
 
+const (
+	// authenticationKeyBytes and encryptionKeyBytes are the only lengths ParseKeys accepts
+	// for the two halves of a configured pair.
+	authenticationKeyBytes = 64
+	encryptionKeyBytes     = 32
+)
+
 // KeyPair is one deployment's configured session keys: the 64 byte authentication key and
-// the 32 byte encryption key, exactly as they reach the two main.go files.
+// the 32 byte encryption key.
 //
-// Lengths are not checked here. Both are validated at startup, before anything constructs
-// a store, and repeating the rule in a second place would let the two disagree about what
-// a valid deployment looks like (#269).
+// It stays a plain pair, checking nothing, so a test can build one directly. ParseKeys is the
+// one place the length rule lives: both applications build their pairs through it, and a
+// second copy of the rule would let the two disagree about what a valid deployment looks like
+// (#269, #434).
 type KeyPair struct {
 	AuthenticationKey []byte
 	EncryptionKey     []byte
 }
 
-// DecodeKeyPair decodes one configured pair from the hex an environment variable carries.
-//
-// Both values are validated at startup, before anything calls this, so an error here means a
-// caller that skipped validation rather than a deployment that is misconfigured. It is
-// returned rather than dropped because the alternative is a store built from two empty byte
-// slices, which is the hazard DecodePreviousKeyPair describes below.
-func DecodeKeyPair(authenticationKey, encryptionKey string) (KeyPair, error) {
-	authKey, err := hex.DecodeString(strings.TrimSpace(authenticationKey))
-	if err != nil {
-		return KeyPair{}, errs.Wrap(err, "unable to decode the session authentication key")
-	}
-
-	encKey, err := hex.DecodeString(strings.TrimSpace(encryptionKey))
-	if err != nil {
-		return KeyPair{}, errs.Wrap(err, "unable to decode the session encryption key")
-	}
-
-	return KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil
+// ConfiguredKey is one session key as a deployment configured it: the hex it carries, and the
+// name it was configured under, which is what every refusal quotes so the operator reads the
+// variable to fix.
+type ConfiguredKey struct {
+	Name  string
+	Value string
 }
 
-// DecodePreviousKeyPair decodes the pair a rotating deployment configured as its previous one,
-// and returns nil when it configured none.
+// ConfiguredKeys is the four session keys one application is configured with: the current
+// pair, and the previous pair a deployment sets only while it rotates them.
+type ConfiguredKeys struct {
+	Authentication         ConfiguredKey
+	Encryption             ConfiguredKey
+	PreviousAuthentication ConfiguredKey
+	PreviousEncryption     ConfiguredKey
+}
+
+// ParseKeys applies the session-key rule both applications share and decodes the pairs it
+// accepts: the current pair is required, hex, and 64 and 32 bytes long; the previous pair is
+// optional, and when set it is set in full to the same lengths. Every value is trimmed first,
+// and every refusal names the variable it concerns. It returns a nil previous pair when the
+// deployment configured none.
 //
 // nil and a zero-value KeyPair are not the same thing here, and the difference is a security
-// one. That is why this is a function with a test on it rather than an `if` inside each
-// binary's main(): hkdf.Key accepts an empty secret and an empty salt and returns a valid 32
-// byte key, chacha20poly1305.NewX accepts that key, and a value seals and opens under it. A
-// caller that built a previous pair out of two empty strings would therefore hand the store a
-// second, permanently valid opening key derived from nothing but the two info constants above,
-// which anyone holding this source can recompute. Nothing would error and nothing would look
-// wrong. newSealer refuses an empty key too, so the state is unreachable from both sides
-// (#269).
+// one. hkdf.Key accepts an empty secret and an empty salt and returns a valid 32 byte key,
+// chacha20poly1305.NewX accepts that key, and a value seals and opens under it. A caller that
+// built a previous pair out of two empty strings would therefore hand the store a second,
+// permanently valid opening key derived from nothing but the two info constants above, which
+// anyone holding this source can recompute. Nothing would error and nothing would look wrong.
+// newSealer refuses an empty key too, so the state is unreachable from both sides (#269).
 //
 // Both halves or neither. One alone opens nothing, so it is an error rather than a silent
 // no-rotation: an operator who mistypes one variable name would otherwise be told a rotation
-// is in place while every session sealed under the old pair is being turned away. The startup
-// validators refuse it first, with the variable name in the message; this says the same thing
-// for any caller that has not run them.
-func DecodePreviousKeyPair(authenticationKey, encryptionKey string) (*KeyPair, error) {
-	auth := strings.TrimSpace(authenticationKey)
-	enc := strings.TrimSpace(encryptionKey)
+// is in place while every session sealed under the old pair is being turned away.
+func ParseKeys(keys ConfiguredKeys) (KeyPair, *KeyPair, error) {
+	authentication := strings.TrimSpace(keys.Authentication.Value)
+	encryption := strings.TrimSpace(keys.Encryption.Value)
 
-	if auth == "" && enc == "" {
-		return nil, nil
+	if authentication == "" {
+		return KeyPair{}, nil, errs.Errorf("%s is required", keys.Authentication.Name)
 	}
-	if auth == "" || enc == "" {
-		return nil, errs.New("the previous session key pair needs both the authentication key and the encryption key, or neither")
+	if encryption == "" {
+		return KeyPair{}, nil, errs.Errorf("%s is required", keys.Encryption.Name)
 	}
 
-	pair, err := DecodeKeyPair(auth, enc)
+	authenticationKey, err := hex.DecodeString(authentication)
 	if err != nil {
-		return nil, errs.Wrap(err, "invalid previous session key pair")
+		return KeyPair{}, nil, errs.Errorf("%s must be hex-encoded (error: %w). Generate with: openssl rand -hex 64",
+			keys.Authentication.Name, err)
 	}
-	return &pair, nil
+	if len(authenticationKey) != authenticationKeyBytes {
+		return KeyPair{}, nil, errs.Errorf("%s must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64",
+			keys.Authentication.Name, len(authenticationKey))
+	}
+
+	encryptionKey, err := hex.DecodeString(encryption)
+	if err != nil {
+		return KeyPair{}, nil, errs.Errorf("%s must be hex-encoded (error: %w). Generate with: openssl rand -hex 32",
+			keys.Encryption.Name, err)
+	}
+	if len(encryptionKey) != encryptionKeyBytes {
+		return KeyPair{}, nil, errs.Errorf("%s must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32",
+			keys.Encryption.Name, len(encryptionKey))
+	}
+
+	current := KeyPair{AuthenticationKey: authenticationKey, EncryptionKey: encryptionKey}
+
+	previousAuthentication := strings.TrimSpace(keys.PreviousAuthentication.Value)
+	previousEncryption := strings.TrimSpace(keys.PreviousEncryption.Value)
+
+	if previousAuthentication == "" && previousEncryption == "" {
+		return current, nil, nil
+	}
+	if previousAuthentication == "" {
+		return KeyPair{}, nil, errs.Errorf("%s is required when %s is set: both halves of the previous pair are needed to open a session sealed under it",
+			keys.PreviousAuthentication.Name, keys.PreviousEncryption.Name)
+	}
+	if previousEncryption == "" {
+		return KeyPair{}, nil, errs.Errorf("%s is required when %s is set: both halves of the previous pair are needed to open a session sealed under it",
+			keys.PreviousEncryption.Name, keys.PreviousAuthentication.Name)
+	}
+
+	previousAuthenticationKey, err := hex.DecodeString(previousAuthentication)
+	if err != nil {
+		return KeyPair{}, nil, errs.Errorf("%s must be hex-encoded (error: %w)", keys.PreviousAuthentication.Name, err)
+	}
+	if len(previousAuthenticationKey) != authenticationKeyBytes {
+		return KeyPair{}, nil, errs.Errorf("%s must be 64 bytes (128 hex chars), got %d bytes",
+			keys.PreviousAuthentication.Name, len(previousAuthenticationKey))
+	}
+
+	previousEncryptionKey, err := hex.DecodeString(previousEncryption)
+	if err != nil {
+		return KeyPair{}, nil, errs.Errorf("%s must be hex-encoded (error: %w)", keys.PreviousEncryption.Name, err)
+	}
+	if len(previousEncryptionKey) != encryptionKeyBytes {
+		return KeyPair{}, nil, errs.Errorf("%s must be 32 bytes (64 hex chars), got %d bytes",
+			keys.PreviousEncryption.Name, len(previousEncryptionKey))
+	}
+
+	return current, &KeyPair{AuthenticationKey: previousAuthenticationKey, EncryptionKey: previousEncryptionKey}, nil
 }
 
 // sealer holds one AEAD per purpose, both derived from one KeyPair.
@@ -142,9 +197,9 @@ func newSealer(pair KeyPair) (*sealer, error) {
 	// empty secret and an empty salt and derives a perfectly valid key from them, so a
 	// zero-value KeyPair arriving here would build a working sealer whose keys anyone can
 	// recompute from the two info constants above -- a permanent skeleton key, produced by
-	// a caller that merely forgot a branch. This is not the length rule: that one lives in
-	// the startup validators and stays there, and "not empty" cannot disagree with
-	// "exactly 64 and 32 bytes" (#269).
+	// a caller that merely forgot a branch. This is not the length rule: that one is
+	// ParseKeys' and stays there, and "not empty" cannot disagree with "exactly 64 and 32
+	// bytes" (#269, #434).
 	if len(pair.AuthenticationKey) == 0 || len(pair.EncryptionKey) == 0 {
 		return nil, errs.New("a session key pair needs a non-empty authentication key and a non-empty encryption key")
 	}

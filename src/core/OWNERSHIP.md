@@ -399,9 +399,9 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `TokenResponse` | both-apps | — |
 | `core/sessionstore` | `Backend` | kernel | — |
 | `core/sessionstore` | `BrowserSessionCookie` | reachable | — |
+| `core/sessionstore` | `ConfiguredKey` | both-apps | — |
+| `core/sessionstore` | `ConfiguredKeys` | both-apps | — |
 | `core/sessionstore` | `CookieLifetime` | reachable | — |
-| `core/sessionstore` | `DecodeKeyPair` | both-apps | — |
-| `core/sessionstore` | `DecodePreviousKeyPair` | both-apps | — |
 | `core/sessionstore` | `ErrNotFound` | kernel | — |
 | `core/sessionstore` | `ExpiresAt` | contract | The rule deciding when a browser session row stops being usable. The admin console's sessions live in rows the auth server's backend writes, so the rule is cross-process even though only the writing side calls it (#266). |
 | `core/sessionstore` | `KeyPair` | both-apps | — |
@@ -410,6 +410,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `NewServerSideStore` | both-apps | — |
 | `core/sessionstore` | `NewSession` | own-package | — |
 | `core/sessionstore` | `Options` | own-package | — |
+| `core/sessionstore` | `ParseKeys` | both-apps | — |
 | `core/sessionstore` | `PersistentCookie` | own-package | — |
 | `core/sessionstore` | `PreAuthLifetime` | contract | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
 | `core/sessionstore` | `Record` | kernel | — |

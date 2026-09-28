@@ -63,8 +63,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Validate session keys EARLY - fail fast if missing or invalid
-	if err := config.ValidateAdminConsoleSessionKeys(); err != nil {
+	// Validate and decode the session keys EARLY - fail fast if missing or invalid.
+	// previousKeys is nil unless an operator is rotating the session keys: the store seals
+	// with the current pair and opens with the current pair and then this one, so a rotation
+	// signs nobody out; the operator removes the two _PREVIOUS variables once the maximum
+	// session lifetime has passed (#269, #270, #434).
+	currentKeys, previousKeys, err := config.GetAdminConsole().SessionKeys()
+	if err != nil {
 		logSessionKeysNotConfigured(err)
 		os.Exit(1)
 	}
@@ -120,28 +125,6 @@ func main() {
 	slog.Info("cookie security derived from the base URL",
 		"cookie_secure", config.GetAdminConsole().IsCookieSecure())
 
-	// Decode the session keys from config, which validated them at startup. The decode
-	// errors are still checked: what they would otherwise become is a store keyed with two
-	// empty byte slices, which is a key anyone can recompute rather than a failure (#269).
-	currentKeys, err := sessionstore.DecodeKeyPair(
-		config.GetAdminConsole().SessionAuthenticationKey,
-		config.GetAdminConsole().SessionEncryptionKey)
-	if err != nil {
-		slog.Error("unable to decode the session keys", "error", err)
-		os.Exit(1)
-	}
-
-	// The previous pair, nil unless an operator is rotating the session keys. The store
-	// seals with the current pair and opens with the current pair and then this one, so a
-	// rotation signs nobody out; the operator removes the two _PREVIOUS variables once the
-	// maximum session lifetime has passed (#269, #270).
-	previousKeys, err := sessionstore.DecodePreviousKeyPair(
-		config.GetAdminConsole().SessionAuthenticationKeyPrevious,
-		config.GetAdminConsole().SessionEncryptionKeyPrevious)
-	if err != nil {
-		slog.Error("unable to decode the previous session keys", "error", err)
-		os.Exit(1)
-	}
 	if previousKeys != nil {
 		slog.Info("previous session keys configured: a session sealed under them still opens")
 	}
