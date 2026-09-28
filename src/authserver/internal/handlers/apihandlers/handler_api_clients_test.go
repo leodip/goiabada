@@ -252,7 +252,7 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -285,7 +285,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 		Return(false, errors.New("no client with that id")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -317,7 +317,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -354,7 +354,7 @@ func TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePubli
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())

@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
@@ -138,7 +137,7 @@ func dumpResponseBody(t *testing.T, response *http.Response) {
 func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	// Generate client secret
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	// Create client with admin permissions

@@ -36,6 +36,7 @@ func HandleDynamicClientRegistrationPost(
 	httpHelper HttpHelper,
 	database dynamicClientRegistrationDatabase,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +88,7 @@ func HandleDynamicClientRegistrationPost(
 		if !isPublic {
 			clientSecret = stringutil.GenerateSecurityRandomString(60)
 			var err error
-			clientSecretEncrypted, err = encryption.EncryptData(clientSecret)
+			clientSecretEncrypted, err = dataCipher.Encrypt(clientSecret)
 			if err != nil {
 				apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: failed to encrypt client secret"))
 				writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)

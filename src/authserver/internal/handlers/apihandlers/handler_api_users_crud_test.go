@@ -15,7 +15,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -330,7 +329,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
-		auditLogger, emailSender)
+		auditLogger, emailSender, testDataCipher)
 
 	body, err := json.Marshal(map[string]interface{}{
 		"email":           "newuser@example.com",
@@ -368,7 +367,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 
 	// Derived from the code the handler issued, decrypted out of the column it wrote,
 	// rather than from a value this test chose.
-	issuedCode, err := encryption.DecryptData(createdUser.ForgotPasswordCodeEncrypted)
+	issuedCode, err := testDataCipher.Decrypt(createdUser.ForgotPasswordCodeEncrypted)
 	require.NoError(t, err)
 	expectedHash := hashutil.HashString(issuedCode)
 	assert.Equal(t, expectedHash, createdUser.ForgotPasswordCodeHash,
@@ -411,7 +410,7 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
-		auditLogger, emailSender)
+		auditLogger, emailSender, testDataCipher)
 
 	body, err := json.Marshal(map[string]interface{}{
 		"email":           "taken@example.com",
@@ -465,7 +464,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
-		auditLogger, emailSender)
+		auditLogger, emailSender, testDataCipher)
 
 	body, err := json.Marshal(map[string]interface{}{
 		"email":           "fresh@example.com",
@@ -588,7 +587,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				accountvalidation.NewEmailValidator(database),
 				accountvalidation.NewProfileValidator(database),
 				accountvalidation.NewPasswordValidator(),
-				auditLogger, emailSender)
+				auditLogger, emailSender, testDataCipher)
 
 			payload := map[string]interface{}{"email": "newuser@example.com"}
 			if !tc.absent {

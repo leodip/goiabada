@@ -13,12 +13,11 @@ import (
 
 // NewKeyPair builds an RS256 signing key of the given size in the given state, as the unsaved row
 // the key set stores: a fresh key identifier, shared by the row and its JWK, and the private key
-// encrypted at rest with the process data cipher (#83), so encryption.InitDataCipher must have run.
-// It writes nothing.
+// encrypted at rest with the data cipher it is given (#83, #434). It writes nothing.
 //
 // It is the one path to a key pair: the rotator's replacement key and the seeder's first two are
 // all built here, where each used to assemble its own (#424).
-func NewKeyPair(state models.KeyState, bits int) (*models.KeyPair, error) {
+func NewKeyPair(dataCipher *encryption.DataCipher, state models.KeyState, bits int) (*models.KeyPair, error) {
 	kid := uuidutil.New()
 
 	material, err := rsakey.Generate(bits, kid)
@@ -26,7 +25,7 @@ func NewKeyPair(state models.KeyState, bits int) (*models.KeyPair, error) {
 		return nil, err
 	}
 
-	privateKeyPEMEncrypted, err := encryption.EncryptData(string(material.PrivateKeyPEM))
+	privateKeyPEMEncrypted, err := dataCipher.Encrypt(string(material.PrivateKeyPEM))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to encrypt the private key")
 	}

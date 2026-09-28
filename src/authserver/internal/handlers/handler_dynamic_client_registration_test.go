@@ -332,7 +332,7 @@ func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest, httpH
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
-	HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger).ServeHTTP(rr, req)
+	HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 	return rr
 }
 

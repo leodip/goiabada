@@ -34,7 +34,7 @@ var rotatorTx = &sql.Tx{}
 // The replacement key is generated on every path now, including every refusal, so at 4096
 // each of the cases below would pay about 300ms for material most of them never store.
 func newTestRotator(database *mocks_data.Database) *SigningKeyRotator {
-	rotator := NewSigningKeyRotator(database)
+	rotator := NewSigningKeyRotator(database, testDataCipher)
 	rotator.keySizeBits = 1024
 	return rotator
 }
@@ -117,8 +117,11 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 		"the replacement key's public PEM is not labelled PUBLIC KEY")
 	assert.NotEmpty(t, created.PublicKeyASN1_DER)
 	assert.NotEmpty(t, created.PublicKeyJWK)
-	// The private key is stored encrypted (#83), so the PEM header must not survive.
+	// The private key is stored encrypted (#83), so the PEM header must not survive, and it is
+	// sealed under the cipher the rotator was built with, so that cipher opens it (#434).
 	assert.NotContains(t, string(created.PrivateKeyPEM), "PRIVATE KEY")
+	_, err = ParsePrivateKey(testDataCipher, created)
+	assert.NoError(t, err, "the replacement key does not open under the rotator's cipher")
 }
 
 // TestSigningKeyRotator_Rotate_SucceedsWithNoPreviousKey covers the first rotation after
@@ -371,7 +374,7 @@ func TestSigningKeyRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testin
 func TestSigningKeyRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	rotator := NewSigningKeyRotator(database)
+	rotator := NewSigningKeyRotator(database, testDataCipher)
 	rotator.keySizeBits = 512 // crypto/rsa refuses anything under 1024
 
 	err := rotator.Rotate(context.Background())
@@ -385,5 +388,5 @@ func TestSigningKeyRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *
 // which no exported surface carries. The tests above all lower it, so without this nothing
 // would notice it changing.
 func TestNewSigningKeyRotator_UsesFourThousandNinetySixBits(t *testing.T) {
-	assert.Equal(t, 4096, NewSigningKeyRotator(mocks_data.NewDatabase(t)).keySizeBits)
+	assert.Equal(t, 4096, NewSigningKeyRotator(mocks_data.NewDatabase(t), testDataCipher).keySizeBits)
 }

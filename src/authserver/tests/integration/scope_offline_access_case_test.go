@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -152,7 +151,7 @@ func TestROPC_OfflineAccessIsCaseSensitive(t *testing.T) {
 // malformed. Before #425 both got the first answer.
 func TestClientCredentials_OfflineAccessIsCaseSensitive(t *testing.T) {
 	clientSecret := fake.Password(32)
-	encryptedSecret, err := encryption.EncryptData(clientSecret)
+	encryptedSecret, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "cc-offline-case-" + fake.LetterN(8),

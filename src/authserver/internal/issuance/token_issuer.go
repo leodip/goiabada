@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -40,14 +41,16 @@ type tokenIssuerDatabase interface {
 }
 
 type TokenIssuer struct {
-	database tokenIssuerDatabase
-	baseURL  string
+	database   tokenIssuerDatabase
+	baseURL    string
+	dataCipher *encryption.DataCipher
 }
 
-func NewTokenIssuer(database tokenIssuerDatabase, baseURL string) *TokenIssuer {
+func NewTokenIssuer(database tokenIssuerDatabase, baseURL string, dataCipher *encryption.DataCipher) *TokenIssuer {
 	return &TokenIssuer{
-		database: database,
-		baseURL:  baseURL,
+		database:   database,
+		baseURL:    baseURL,
+		dataCipher: dataCipher,
 	}
 }
 
@@ -122,7 +125,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context, sett
 		return nil, err
 	}
 
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(t.dataCipher, keyPair)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -396,7 +399,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, se
 		return nil, err
 	}
 
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(t.dataCipher, keyPair)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -476,7 +479,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, setti
 		return nil, err
 	}
 
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(t.dataCipher, keyPair)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -580,7 +583,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, s
 		return nil, err
 	}
 
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(t.dataCipher, keyPair)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -946,7 +949,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context, sett
 		return nil, err
 	}
 
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(t.dataCipher, keyPair)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}
@@ -1079,7 +1082,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, settings
 		return nil, err
 	}
 
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(t.dataCipher, keyPair)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to parse private key from PEM")
 	}

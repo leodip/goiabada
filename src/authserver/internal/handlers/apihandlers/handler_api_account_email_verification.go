@@ -34,6 +34,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 	database accountEmailVerificationDatabase,
 	emailSender EmailSender,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
@@ -89,7 +90,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 
 		// Generate code and store encrypted
 		verificationCode := generateEmailVerificationCode()
-		encrypted, err := encryption.EncryptData(verificationCode)
+		encrypted, err := dataCipher.Encrypt(verificationCode)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "Failed to encrypt verification code"))
 			return
@@ -145,6 +146,7 @@ func HandleAPIAccountEmailVerificationPost(
 	database accountEmailVerificationDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
@@ -194,7 +196,7 @@ func HandleAPIAccountEmailVerificationPost(
 			return
 		}
 
-		storedCode, err := encryption.DecryptData(user.EmailVerificationCodeEncrypted)
+		storedCode, err := dataCipher.Decrypt(user.EmailVerificationCodeEncrypted)
 		if err != nil {
 			// Treat as mismatch
 			storedCode = ""

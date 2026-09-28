@@ -53,7 +53,7 @@ const discardedErrorModuleParent = "github.com/leodip/goiabada/"
 var discardedErrorFuncs = map[string][]string{
 	"github.com/leodip/goiabada/authserver/internal/passwordhash": {"Hash"},
 	"github.com/leodip/goiabada/authserver/internal/encryption": {
-		"EncryptData", "DecryptData", "EncryptText", "DecryptText", "RandomKey",
+		"EncryptText", "DecryptText", "RandomKey",
 	},
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint": {"Encrypt", "Decrypt"},
 	"github.com/leodip/goiabada/authserver/internal/rsakey":      {"Generate"},
@@ -533,8 +533,8 @@ func seed(p string) {
 	hash, _ := ph.Hash(p)
 	_ = hash
 	var ct []byte
-	ct, _ = (encryption.EncryptData)(p)
-	_, _ = encryption.DecryptData(ct)
+	ct, _ = (encryption.EncryptText)(p, key)
+	_, _ = encryption.DecryptText(ct, key)
 }
 `)
 	writeDiscardedErrorFixture(t, root, "authserver/internal/bootstrap/keys.go", `package bootstrap
@@ -549,7 +549,7 @@ func keys() {
 	writeDiscardedErrorFixture(t, root, "authserver/internal/signingkeys/rotator.go", `package signingkeys
 
 func rotate() {
-	kp, _ := NewKeyPair(1, 1024)
+	kp, _ := NewKeyPair(nil, 1, 1024)
 	_ = kp
 }
 `)
@@ -629,7 +629,7 @@ func register(p string) error {
 		return err
 	}
 	_ = hash
-	_, err = signingkeys.ParsePrivateKey(nil)
+	_, err = signingkeys.ParsePrivateKey(nil, nil)
 	if err != nil {
 		return err
 	}
@@ -682,8 +682,8 @@ func helper() {
 	assert.ElementsMatch(t, []string{
 		"authserver/internal/data/seeder.go:8: encryption.RandomKey",
 		"authserver/internal/data/seeder.go:11: passwordhash.Hash",
-		"authserver/internal/data/seeder.go:14: encryption.EncryptData",
-		"authserver/internal/data/seeder.go:15: encryption.DecryptData",
+		"authserver/internal/data/seeder.go:14: encryption.EncryptText",
+		"authserver/internal/data/seeder.go:15: encryption.DecryptText",
 		"authserver/internal/bootstrap/keys.go:6: rsakey.Generate",
 		"authserver/internal/signingkeys/rotator.go:4: signingkeys.NewKeyPair",
 		"authserver/internal/otpcredential/seed.go:14: (*encryption.DataCipher).Decrypt",

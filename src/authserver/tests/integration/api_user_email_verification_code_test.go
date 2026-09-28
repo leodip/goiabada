@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -56,7 +55,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	assert.False(t, updatedUser.EmailVerified)
 	assert.WithinDuration(t, time.Now().UTC(), updatedUser.EmailVerificationCodeIssuedAt.Time, 3*time.Second)
 
-	decrypted, err := encryption.DecryptData(updatedUser.EmailVerificationCodeEncrypted)
+	decrypted, err := dataCipher.Decrypt(updatedUser.EmailVerificationCodeEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, body.VerificationCode, decrypted)
 }
@@ -97,7 +96,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
 	assert.False(t, updatedUser.EmailVerified)
 
-	decrypted, err := encryption.DecryptData(updatedUser.EmailVerificationCodeEncrypted)
+	decrypted, err := dataCipher.Decrypt(updatedUser.EmailVerificationCodeEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, body.VerificationCode, decrypted)
 }

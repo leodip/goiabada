@@ -300,7 +300,7 @@ func TestUserinfo_LegacyAccessTokenCarryingTheAppendedScope(t *testing.T) {
 
 	keyPair, err := database.GetCurrentSigningKey(context.Background(), nil)
 	require.NoError(t, err)
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(dataCipher, keyPair)
 	require.NoError(t, err)
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = keyPair.KeyIdentifier

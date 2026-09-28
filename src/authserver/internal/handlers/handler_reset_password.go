@@ -280,12 +280,13 @@ func HandleResetPasswordGet(
 	httpSession sessionstore.Store,
 	database resetPasswordDatabase,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if code := r.URL.Query().Get("code"); len(code) > 0 {
-			handleResetPasswordLinkFollowed(httpHelper, httpSession, database, auditLogger, w, r, code)
+			handleResetPasswordLinkFollowed(httpHelper, httpSession, database, auditLogger, dataCipher, w, r, code)
 			return
 		}
 
@@ -315,8 +316,8 @@ func HandleResetPasswordGet(
 // jar and leaves the code usable for the real user; consuming here would let any prefetching
 // gateway burn the code before the user ever saw the message.
 func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessionstore.Store,
-	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
-	code string) {
+	database resetPasswordDatabase, auditLogger AuditLogger, dataCipher *encryption.DataCipher,
+	w http.ResponseWriter, r *http.Request, code string) {
 
 	codeHash := hashutil.HashString(code)
 
@@ -333,7 +334,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 		return
 	}
 
-	storedCode, err := encryption.DecryptData(user.ForgotPasswordCodeEncrypted)
+	storedCode, err := dataCipher.Decrypt(user.ForgotPasswordCodeEncrypted)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt forgot password code"))
 		return

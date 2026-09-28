@@ -295,6 +295,7 @@ func HandleAPIUserCreatePost(
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	emailSender EmailSender,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -461,7 +462,7 @@ func HandleAPIUserCreatePost(
 		// Handle email flow if needed
 		if sendSetupEmail {
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
-			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
+			verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return

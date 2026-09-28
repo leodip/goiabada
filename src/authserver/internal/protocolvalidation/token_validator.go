@@ -61,14 +61,16 @@ type TokenValidator struct {
 	database          tokenValidatorDatabase
 	tokenParser       TokenParser
 	permissionChecker PermissionChecker
+	dataCipher        *encryption.DataCipher
 }
 
 func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
-	permissionChecker PermissionChecker) *TokenValidator {
+	permissionChecker PermissionChecker, dataCipher *encryption.DataCipher) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
 		tokenParser:       tokenParser,
 		permissionChecker: permissionChecker,
+		dataCipher:        dataCipher,
 	}
 }
 
@@ -257,7 +259,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
-			clientSecretDecrypted, decryptDataErr := encryption.DecryptData(client.ClientSecretEncrypted)
+			clientSecretDecrypted, decryptDataErr := val.dataCipher.Decrypt(client.ClientSecretEncrypted)
 			if decryptDataErr != nil {
 				return nil, decryptDataErr
 			}
@@ -458,7 +460,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 				clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 		}
 
-		clientSecretDescrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
+		clientSecretDescrypted, err := val.dataCipher.Decrypt(client.ClientSecretEncrypted)
 		if err != nil {
 			return nil, err
 		}
@@ -551,7 +553,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
-			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
+			clientSecretDecrypted, err := val.dataCipher.Decrypt(client.ClientSecretEncrypted)
 			if err != nil {
 				return nil, err
 			}
@@ -1007,7 +1009,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
-			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
+			clientSecretDecrypted, err := val.dataCipher.Decrypt(client.ClientSecretEncrypted)
 			if err != nil {
 				return nil, err
 			}

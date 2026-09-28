@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -150,7 +149,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	// Load user and decrypt code
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
-	code, err := encryption.DecryptData(user.EmailVerificationCodeEncrypted)
+	code, err := dataCipher.Decrypt(user.EmailVerificationCodeEncrypted)
 	assert.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
@@ -196,7 +195,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	codePlain := "ABC123"
-	encrypted, err := encryption.EncryptData(codePlain)
+	encrypted, err := dataCipher.Encrypt(codePlain)
 	assert.NoError(t, err)
 	user.EmailVerificationCodeEncrypted = encrypted
 	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Add(-6 * time.Minute), Valid: true}

@@ -16,6 +16,10 @@ import (
 
 var database data.Database
 
+// dataCipher is the cipher under the configured data key, the key the database is opened with, built
+// once in TestMain and used by every test that seals or opens a stored secret (#434).
+var dataCipher *encryption.DataCipher
+
 // timestampTick separates two writes so their timestamps are guaranteed to
 // differ: update tests assert UpdatedAt is strictly after CreatedAt, and the
 // audit-log tests need distinct created_at values for a DESC sort to be
@@ -34,10 +38,12 @@ func TestMain(m *testing.M) {
 
 	config.Init()
 
-	// The data cipher must be initialized before opening the database (its
-	// re-encryption migration) and before any test encrypts secrets.
-	if err := encryption.InitDataCipher(config.GetAESEncryptionKey()); err != nil {
-		slog.Error("unable to initialize the data cipher", "error", err)
+	// The data cipher, under the same key the database is opened with below, for every test that
+	// seals or opens a stored secret.
+	var cipherErr error
+	dataCipher, cipherErr = encryption.NewDataCipher(config.GetAESEncryptionKey())
+	if cipherErr != nil {
+		slog.Error("unable to initialize the data cipher", "error", cipherErr)
 		os.Exit(1)
 	}
 

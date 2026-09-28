@@ -55,6 +55,7 @@ func HandleAPISettingsEmailPut(
 	database settingsEmailDatabase,
 	emailValidator EmailValidator,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings, ok := reqctx.SettingsFrom(r.Context())
@@ -190,7 +191,7 @@ func HandleAPISettingsEmailPut(
 		currentSettings.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
 
 		if len(req.SMTPPassword) > 0 {
-			encrypted, err := encryption.EncryptData(req.SMTPPassword)
+			encrypted, err := dataCipher.Encrypt(req.SMTPPassword)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return

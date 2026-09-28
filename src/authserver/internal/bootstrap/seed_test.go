@@ -11,9 +11,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +73,7 @@ func (d *seedDB) counts(t *testing.T) map[string]int {
 // testRunner is newRunner at the key size the rotator's tests use: 4096-bit keys cost about 300ms
 // each, and nothing here depends on the size.
 func testRunner(db runDatabase, cfg Config) *runner {
-	r := newRunner(db, cfg)
+	r := newRunner(db, testDataCipher, cfg)
 	r.keySizeBits = 1024
 	return r
 }
@@ -125,6 +125,9 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	states := []string{}
 	for _, key := range keys {
 		states = append(states, key.State)
+		// Sealed under the cipher Run was given, so that cipher opens it (#434).
+		_, parseErr := signingkeys.ParsePrivateKey(testDataCipher, &key)
+		require.NoError(t, parseErr, "the %s key does not open under the seed's cipher", key.State)
 	}
 	assert.ElementsMatch(t, []string{models.KeyStateCurrent.String(), models.KeyStateNext.String()}, states,
 		"one current key and one next key")
@@ -132,7 +135,7 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	client, err := db.GetClientByClientIdentifier(ctx, nil, constants.AdminConsoleClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	secret, err := encryption.DecryptData(client.ClientSecretEncrypted)
+	secret, err := testDataCipher.Decrypt(client.ClientSecretEncrypted)
 	require.NoError(t, err)
 
 	counts := db.counts(t)

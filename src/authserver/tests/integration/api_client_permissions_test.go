@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -86,7 +85,7 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
 
 	// Create confidential client with client-credentials enabled
 	secret := fake.Password(32)
-	enc, err := encryption.EncryptData(secret)
+	enc, err := dataCipher.Encrypt(secret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -140,7 +139,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 
 	// Create confidential client with client-credentials enabled
 	secret := fake.Password(32)
-	enc, err := encryption.EncryptData(secret)
+	enc, err := dataCipher.Encrypt(secret)
 	assert.NoError(t, err)
 
 	client := &models.Client{ClientIdentifier: "api-perm-put-same-" + strings.ToLower(fake.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
@@ -389,7 +388,7 @@ func getClientPermissionIds(t *testing.T, accessToken string, clientId int64) []
 // enabled, which is what its permissions are configurable for, and removes it afterwards.
 func createClientForPermissionsSave(t *testing.T) *models.Client {
 	t.Helper()
-	enc, err := encryption.EncryptData(fake.Password(32))
+	enc, err := dataCipher.Encrypt(fake.Password(32))
 	require.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "api-perm-expected-" + strings.ToLower(fake.LetterN(6)),

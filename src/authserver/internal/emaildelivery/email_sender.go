@@ -42,6 +42,8 @@ const (
 )
 
 type Sender struct {
+	// dataCipher opens the relay password the settings row stores encrypted.
+	dataCipher *encryption.DataCipher
 	// rootCAs is nil in production, meaning the system roots. The in-package tests point it at
 	// their fake server's certificate so the TLS paths can be exercised with verification left on.
 	rootCAs *x509.CertPool
@@ -53,8 +55,8 @@ type Sender struct {
 	randReader io.Reader
 }
 
-func NewSender() *Sender {
-	return &Sender{}
+func NewSender(dataCipher *encryption.DataCipher) *Sender {
+	return &Sender{dataCipher: dataCipher}
 }
 
 // SMTPConfig is the relay a message is sent through, as the settings row stores it. The password
@@ -94,7 +96,7 @@ func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *Se
 
 	var password string
 	if len(smtpConfig.PasswordEncrypted) > 0 {
-		decryptedPassword, err := encryption.DecryptData(smtpConfig.PasswordEncrypted)
+		decryptedPassword, err := e.dataCipher.Decrypt(smtpConfig.PasswordEncrypted)
 		if err != nil {
 			return errs.Wrap(err, "unable to decrypt the SMTP password")
 		}

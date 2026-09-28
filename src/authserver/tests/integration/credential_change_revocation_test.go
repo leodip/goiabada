@@ -13,7 +13,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -316,7 +315,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	t.Helper()
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
 	client := &models.Client{
@@ -478,7 +477,7 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	t.Helper()
 
 	code := fake.LetterN(32)
-	encrypted, err := encryption.EncryptData(code)
+	encrypted, err := dataCipher.Encrypt(code)
 	require.NoError(t, err)
 	codeHash := hashutil.HashString(code)
 

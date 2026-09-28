@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -118,9 +117,9 @@ func TestValidateTokenRequest_RefreshToken_ScopeWhitespace(t *testing.T) {
 func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *ValidateTokenRequestInput) {
 	t.Helper()
 	mockDB := mocks_data.NewDatabase(t)
-	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
+	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
-	clientSecretEncrypted, err := encryption.EncryptData("valid_secret")
+	clientSecretEncrypted, err := testDataCipher.Encrypt("valid_secret")
 	require.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "cc_client",
@@ -171,7 +170,7 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data
 	t.Helper()
 	mockDB := mocks_data.NewDatabase(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mockPermissionChecker, testDataCipher)
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}

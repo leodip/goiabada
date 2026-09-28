@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -26,7 +25,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 
 	// Create a confidential client with auth code enabled
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	enc, err := encryption.EncryptData(clientSecret)
+	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "weborig-succ-" + strings.ToLower(fake.LetterN(8)),

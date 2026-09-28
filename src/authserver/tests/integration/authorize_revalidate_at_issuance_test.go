@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -57,7 +56,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 
 	t.Helper()
 
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

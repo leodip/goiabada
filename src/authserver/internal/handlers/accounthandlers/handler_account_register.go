@@ -78,6 +78,7 @@ func HandleAccountRegisterPost(
 	passwordValidator PasswordValidator,
 	emailSender EmailSender,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +200,7 @@ func HandleAccountRegisterPost(
 			}
 
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
-			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
+			verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

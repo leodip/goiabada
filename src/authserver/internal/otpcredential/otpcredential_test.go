@@ -41,7 +41,7 @@ func enrolledUser(t *testing.T) *models.User {
 	t.Helper()
 
 	u := &models.User{Id: otpUserId, Enabled: true, OTPEnabled: true}
-	require.NoError(t, setSecret(u, otpSeed))
+	require.NoError(t, setSecret(testDataCipher, u, otpSeed))
 	return u
 }
 
@@ -75,7 +75,7 @@ func TestEstablish_WritesTheUserTheGenerationAndTheClearInOneTransaction(t *test
 		if bytes.Contains(u.OTPSecretEncrypted, []byte(otpSeed)) {
 			return false
 		}
-		stored, err := storedSecret(u)
+		stored, err := storedSecret(testDataCipher, u)
 		return err == nil && stored == otpSeed
 	})).RunAndReturn(func(context.Context, *sql.Tx, *models.User) error {
 		calls = append(calls, "update")
@@ -94,7 +94,7 @@ func TestEstablish_WritesTheUserTheGenerationAndTheClearInOneTransaction(t *test
 			return nil
 		}).Once()
 
-	generation, err := Establish(context.Background(), database, user, otpSeed)
+	generation, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.NoError(t, err)
 	assert.EqualValues(t, 9, generation,
@@ -115,7 +115,7 @@ func TestEstablish_AFailedWriteRollsTheWholeTransactionBack(t *testing.T) {
 	stub := mocks_data.ExpectRunInTransaction(database, otpTx)
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.Anything).Return(writeErr).Once()
 
-	generation, err := Establish(context.Background(), database, enrollableUser(), otpSeed)
+	generation, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
 
 	require.ErrorIs(t, err, writeErr)
 	assert.Zero(t, generation)
@@ -137,7 +137,7 @@ func TestEstablish_ACommitFailureYieldsNoGeneration(t *testing.T) {
 	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).Return(11, nil).Once()
 	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).Return(nil).Once()
 
-	generation, err := Establish(context.Background(), database, enrollableUser(), otpSeed)
+	generation, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
 
 	require.ErrorIs(t, err, commitErr)
 	assert.Zero(t, generation, "a generation from an attempt that did not commit must not reach the ceremony")
@@ -151,7 +151,7 @@ func TestEstablish_ARefusedTransactionWritesNothing(t *testing.T) {
 
 	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
 
-	generation, err := Establish(context.Background(), database, enrollableUser(), otpSeed)
+	generation, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
 
 	require.ErrorIs(t, err, beginErr)
 	assert.Zero(t, generation)
@@ -226,7 +226,7 @@ func TestVerifyStored(t *testing.T) {
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
 			Return(true, nil).Once()
 
-		result, err := VerifyStored(context.Background(), database, enrolledUser(t), codeFor(t, otpSeed, now), now)
+		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
 
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeMatched, result.Outcome)
@@ -237,7 +237,7 @@ func TestVerifyStored(t *testing.T) {
 	t.Run("a wrong code is refused without claiming anything", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		result, err := VerifyStored(context.Background(), database, enrolledUser(t), "000000", now)
+		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), "000000", now)
 
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeWrong, result.Outcome)
@@ -254,7 +254,7 @@ func TestVerifyStored(t *testing.T) {
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
 			Return(false, nil).Once()
 
-		result, err := VerifyStored(context.Background(), database, enrolledUser(t), codeFor(t, otpSeed, now), now)
+		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
 
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeReplayed, result.Outcome,
@@ -270,7 +270,7 @@ func TestVerifyStored(t *testing.T) {
 			TryConsumeUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, true).
 			Return(false, claimErr).Once()
 
-		result, err := VerifyStored(context.Background(), database, enrolledUser(t), codeFor(t, otpSeed, now), now)
+		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
 
 		require.ErrorIs(t, err, claimErr)
 		assert.Equal(t, OutcomeWrong, result.Outcome,
@@ -283,7 +283,7 @@ func TestVerifyStored(t *testing.T) {
 		user := enrolledUser(t)
 		user.OTPSecretEncrypted = []byte("not ciphertext this cipher produced")
 
-		_, err := VerifyStored(context.Background(), database, user, codeFor(t, otpSeed, now), now)
+		_, err := VerifyStored(context.Background(), database, testDataCipher, user, codeFor(t, otpSeed, now), now)
 
 		require.Error(t, err, "a seed this server cannot read is a 500, not a wrong passcode")
 	})
@@ -342,11 +342,10 @@ func TestVerifySupplied(t *testing.T) {
 // The seed's encryption at rest, which was models.User's TestUser_OTPSecret until #387 took the
 // three methods off the persistence record. Same four claims (#82).
 func TestSeedAtRest(t *testing.T) {
-	key := []byte("0123456789abcdef0123456789abcdef") // the key TestMain installed
 	const secret = "JBSWY3DPEHPK3PXP"
 
 	u := &models.User{}
-	require.NoError(t, setSecret(u, secret))
+	require.NoError(t, setSecret(testDataCipher, u, secret))
 
 	// The encrypted value must be populated without containing the seed verbatim. There is no
 	// plaintext column to check: migration 000048 dropped users.otp_secret (#98).
@@ -354,25 +353,26 @@ func TestSeedAtRest(t *testing.T) {
 	assert.False(t, bytes.Contains(u.OTPSecretEncrypted, []byte(secret)),
 		"the encrypted OTP secret contains the plaintext seed")
 
-	got, err := storedSecret(u)
+	got, err := storedSecret(testDataCipher, u)
 	require.NoError(t, err)
 	assert.Equal(t, secret, got)
 
-	// With a different cipher key the stored value must not decrypt.
-	require.NoError(t, encryption.InitDataCipher([]byte("fedcba9876543210fedcba9876543210")))
-	_, err = storedSecret(u)
+	// Under a second cipher with another key the stored value must not decrypt. A cipher of its
+	// own, where this used to swap the process-wide key and restore it after (#434).
+	otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
+	require.NoError(t, err)
+	_, err = storedSecret(otherCipher, u)
 	assert.Error(t, err, "storedSecret with a different cipher key: expected an error")
-	require.NoError(t, encryption.InitDataCipher(key)) // restore, for every other case in this package
 
 	// A user with no encrypted secret returns an empty string, no error.
-	got, err = storedSecret(&models.User{})
+	got, err = storedSecret(testDataCipher, &models.User{})
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
 	// clearSecret removes the stored seed.
 	clearSecret(u)
 	assert.Empty(t, u.OTPSecretEncrypted, "clearSecret left data behind")
-	got, err = storedSecret(u)
+	got, err = storedSecret(testDataCipher, u)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }

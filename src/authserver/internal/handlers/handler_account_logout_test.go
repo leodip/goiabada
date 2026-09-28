@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -43,7 +42,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req, _ := http.NewRequest("GET", "/logout", nil)
 		rr := httptest.NewRecorder()
@@ -79,7 +78,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req, _ := http.NewRequest("GET", "/auth/logout", nil)
 		rr := httptest.NewRecorder()
@@ -133,7 +132,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
-				handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 				req, _ := http.NewRequest("GET", "/auth/logout", nil)
 				rr := httptest.NewRecorder()
@@ -167,7 +166,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req, _ := http.NewRequest("GET", "/auth/logout?ui_locales=pt-BR", nil)
 		rr := httptest.NewRecorder()
@@ -196,7 +195,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -234,7 +233,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -274,7 +273,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -312,7 +311,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, "")
 		rr := httptest.NewRecorder()
@@ -342,7 +341,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -378,7 +377,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -421,7 +420,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -483,7 +482,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
 		clientSecret := "test_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
@@ -491,7 +490,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		jwe, err := idtokenhint.Encrypt(innerToken, clientSecret)
 		require.NoError(t, err)
 
-		result, err := decryptIDTokenHint(context.Background(), jwe, "test_client", database)
+		result, err := decryptIDTokenHint(context.Background(), jwe, "test_client", database, testDataCipher)
 
 		assert.Nil(t, err)
 		assert.Equal(t, innerToken, result)
@@ -503,7 +502,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "invalid_client").Return(nil, nil)
 
-		_, err := decryptIDTokenHint(context.Background(), "a.b.c.d.e", "invalid_client", database)
+		_, err := decryptIDTokenHint(context.Background(), "a.b.c.d.e", "invalid_client", database, testDataCipher)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "client_id names no client")
@@ -522,13 +521,13 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
 		clientSecret := "test_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		logs := logtest.CaptureSlog(t)
 
-		_, err := decryptIDTokenHint(context.Background(), "not.a.valid.jwe.token", "test_client", database)
+		_, err := decryptIDTokenHint(context.Background(), "not.a.valid.jwe.token", "test_client", database, testDataCipher)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
@@ -546,7 +545,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
 		clientSecret := "test_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
@@ -554,7 +553,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		jwe, err := idtokenhint.Encrypt("test_token", "a-different-secret")
 		require.NoError(t, err)
 
-		_, err = decryptIDTokenHint(context.Background(), jwe, "test_client", database)
+		_, err = decryptIDTokenHint(context.Background(), jwe, "test_client", database, testDataCipher)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the id_token_hint")
@@ -945,7 +944,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
@@ -993,7 +992,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
@@ -1292,7 +1291,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 				rr := httptest.NewRecorder()
@@ -1374,7 +1373,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 				rr := httptest.NewRecorder()
@@ -1429,7 +1428,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 				req := logoutPostRequest(t, url.Values{})
 				if tc.sessionIdentifier != "" {
@@ -1471,7 +1470,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := logoutPostRequest(t, url.Values{"ui_locales": {"pt-BR"}})
 		rr := httptest.NewRecorder()
@@ -1505,7 +1504,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodPost, url.Values{
 			"id_token_hint": {hintedToken},
@@ -1551,7 +1550,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := hintedRequest(t, http.MethodPost, url.Values{
 			"id_token_hint": {hintedToken},
@@ -1615,7 +1614,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 				req := hintedRequest(t, http.MethodPost, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 				rr := httptest.NewRecorder()
@@ -1649,7 +1648,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
@@ -1682,7 +1681,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger, testDataCipher)
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
@@ -2121,7 +2120,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			name: "an encrypted hint that will not decrypt", gate: "JWE decryption",
 			hintValue: strPtr("a.b.c.d.e"),
 			stubDB: func(database *mocks_data.Database) {
-				secret, err := encryption.EncryptData("some_client_secret")
+				secret, err := testDataCipher.Encrypt("some_client_secret")
 				assert.NoError(t, err)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
 					Return(&models.Client{ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
@@ -2136,7 +2135,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			hintValue:  strPtr(confirmedEncryptedHint),
 			innerToken: strPtr("inner.signed.token"),
 			stubDB: func(database *mocks_data.Database) {
-				secret, err := encryption.EncryptData("some_client_secret")
+				secret, err := testDataCipher.Encrypt("some_client_secret")
 				assert.NoError(t, err)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
 					Return(&models.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
@@ -2488,7 +2487,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			}
 			stubDB(database)
 
-			got, err := classifyIdTokenHint(req, theIssuer, httpHelper, database, tokenParser)
+			got, err := classifyIdTokenHint(req, theIssuer, httpHelper, database, tokenParser, testDataCipher)
 
 			if tc.wantErr {
 				assert.Error(t, err, "a database failure in either lookup that decides whether the hint's session may be trusted must propagate")

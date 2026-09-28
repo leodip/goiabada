@@ -27,6 +27,7 @@ type userEmailVerificationCodeDatabase interface {
 func HandleAPIUserEmailVerificationCodePost(
 	database userEmailVerificationCodeDatabase,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -54,7 +55,7 @@ func HandleAPIUserEmailVerificationCodePost(
 		}
 
 		verificationCode := generateEmailVerificationCode()
-		encrypted, err := encryption.EncryptData(verificationCode)
+		encrypted, err := dataCipher.Encrypt(verificationCode)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

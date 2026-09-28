@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -62,14 +63,16 @@ type runDatabase interface {
 // caller can change either, as with the rotator's key size.
 type runner struct {
 	db          runDatabase
+	dataCipher  *encryption.DataCipher
 	cfg         Config
 	keySizeBits int
 	rename      func(oldPath, newPath string) error
 }
 
-func newRunner(db runDatabase, cfg Config) *runner {
+func newRunner(db runDatabase, dataCipher *encryption.DataCipher, cfg Config) *runner {
 	return &runner{
 		db:          db,
+		dataCipher:  dataCipher,
 		cfg:         cfg,
 		keySizeBits: 4096,
 		rename:      os.Rename,
@@ -82,8 +85,8 @@ func newRunner(db runDatabase, cfg Config) *runner {
 // fixed, seeds from the beginning. The exception is a bootstrap file that could not be moved into
 // place after the commit: the database is seeded, a restart regenerates nothing, and the error
 // names the staged file holding the only copy of the credentials, which the operator moves.
-func Run(ctx context.Context, db runDatabase, cfg Config) (Outcome, error) {
-	return newRunner(db, cfg).run(ctx)
+func Run(ctx context.Context, db runDatabase, dataCipher *encryption.DataCipher, cfg Config) (Outcome, error) {
+	return newRunner(db, dataCipher, cfg).run(ctx)
 }
 
 func (r *runner) run(ctx context.Context) (Outcome, error) {

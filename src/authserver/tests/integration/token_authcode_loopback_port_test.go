@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -26,7 +25,7 @@ import (
 // callback actually completing. This does (#41).
 func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	clientSecret := fake.LetterN(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
 	client := &models.Client{

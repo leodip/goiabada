@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -35,7 +34,7 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 	}
 
 	if !isPublic && clientSecret != "" {
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 		client.ClientSecretEncrypted = clientSecretEncrypted
 	}

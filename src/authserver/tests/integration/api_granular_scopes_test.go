@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
@@ -20,7 +19,7 @@ import (
 // and returns an access token for that client
 func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (string, *models.Client) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

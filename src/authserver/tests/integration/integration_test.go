@@ -15,15 +15,21 @@ import (
 
 var database data.Database
 
+// dataCipher is the cipher under the configured data key, the one the server under test holds, built
+// once in TestMain and used by every test that seals or opens a stored secret (#434).
+var dataCipher *encryption.DataCipher
+
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
 
 	config.Init()
 
-	// The data cipher must be initialized before opening the database (its
-	// re-encryption migration) and before any test helper encrypts secrets.
-	if err := encryption.InitDataCipher(config.GetAESEncryptionKey()); err != nil {
-		slog.Error("unable to initialize the data cipher", "error", err)
+	// The data cipher, under the same key the database is opened with below, for every test that
+	// seals or opens a stored secret.
+	var cipherErr error
+	dataCipher, cipherErr = encryption.NewDataCipher(config.GetAESEncryptionKey())
+	if cipherErr != nil {
+		slog.Error("unable to initialize the data cipher", "error", cipherErr)
 		os.Exit(1)
 	}
 

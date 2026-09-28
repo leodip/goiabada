@@ -41,11 +41,12 @@ func HandleAccountLogoutGet(
 	database accountLogoutDatabase,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		r = refineLogoutLocale(r)
-		doLogout(w, r, httpHelper, httpSession, database, tokenParser, auditLogger)
+		doLogout(w, r, httpHelper, httpSession, database, tokenParser, auditLogger, dataCipher)
 	}
 }
 
@@ -145,7 +146,8 @@ func isEncryptedIDTokenHint(hint string) bool {
 // The returned error is for the server log and never for the End-User. Every failure here means the
 // hint cannot be confirmed, and the spec's answer to a hint the OP cannot confirm is to ask the
 // End-User rather than to show them a diagnostic about a request their relying party built (#109).
-func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, database accountLogoutDatabase) (string, error) {
+func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, database accountLogoutDatabase,
+	dataCipher *encryption.DataCipher) (string, error) {
 	client, err := database.GetClientByClientIdentifier(ctx, nil, clientID)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to look up the client an id_token_hint names, so the hint cannot be decrypted",
@@ -161,7 +163,7 @@ func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, datab
 		return "", errs.New("client_id names no client")
 	}
 
-	clientSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
+	clientSecret, err := dataCipher.Decrypt(client.ClientSecretEncrypted)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to decrypt the client secret, so an id_token_hint cannot be decrypted",
 			"error", err)
@@ -289,6 +291,7 @@ func classifyIdTokenHint(
 	httpHelper HttpHelper,
 	database accountLogoutDatabase,
 	tokenParser TokenParser,
+	dataCipher *encryption.DataCipher,
 ) (hintClassification, error) {
 
 	hint, present := httpHelper.LookupFromUrlQueryOrFormPost(r, "id_token_hint")
@@ -312,7 +315,7 @@ func classifyIdTokenHint(
 		if len(clientId) == 0 {
 			return rejectIdTokenHint(r.Context(), "JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
 		}
-		decrypted, err := decryptIDTokenHint(r.Context(), hint, clientId, database)
+		decrypted, err := decryptIDTokenHint(r.Context(), hint, clientId, database, dataCipher)
 		if err != nil {
 			// decryptIDTokenHint has already logged which half failed.
 			return rejectIdTokenHint(r.Context(), "JWE decryption")
@@ -589,10 +592,11 @@ func HandleAccountLogoutPost(
 	database accountLogoutDatabase,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r = refineLogoutLocale(r)
-		doLogout(w, r, httpHelper, httpSession, database, tokenParser, auditLogger)
+		doLogout(w, r, httpHelper, httpSession, database, tokenParser, auditLogger, dataCipher)
 	}
 }
 
@@ -617,6 +621,7 @@ func doLogout(
 	database accountLogoutDatabase,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) {
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {
@@ -625,7 +630,7 @@ func doLogout(
 	}
 
 	// 1. Classify.
-	hint, err := classifyIdTokenHint(r, settings.Issuer, httpHelper, database, tokenParser)
+	hint, err := classifyIdTokenHint(r, settings.Issuer, httpHelper, database, tokenParser, dataCipher)
 	if err != nil {
 		// Classification propagates a failure instead of rejecting for one narrow reason: a database
 		// fault in either of the two lookups that decide whether the hint's session may be trusted,

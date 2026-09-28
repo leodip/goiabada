@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -38,6 +39,7 @@ type accountLogoutDatabase interface {
 // for api.AccountLogoutResponseModeFormPost, and a ready-to-follow redirect URL otherwise.
 func HandleAPIAccountLogoutRequestPost(
 	database accountLogoutDatabase,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Access token + required scope enforced by middleware
@@ -174,7 +176,7 @@ func HandleAPIAccountLogoutRequestPost(
 			writeInternalServerError(w, r, err)
 			return
 		}
-		privKey, err := signingkeys.ParsePrivateKey(privKeyPair)
+		privKey, err := signingkeys.ParsePrivateKey(dataCipher, privKeyPair)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

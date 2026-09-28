@@ -116,7 +116,7 @@ func TestHandleTokenPost(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
 			handler := HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), database,
-				mocks_handlers.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil),
+				mocks_handlers.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
 				mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
 
 			rr := httptest.NewRecorder()

@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -123,7 +122,7 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel models.AcrLevel,
 		"the client's level is a floor under A's ceremony too, so A's session cannot end up below it")
 
 	clientSecret := fake.LetterN(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
 	client := &models.Client{

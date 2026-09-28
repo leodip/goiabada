@@ -117,6 +117,7 @@ func HandleAccountActivateGet(
 	database accountActivateDatabase,
 	userCreator UserCreator,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +133,7 @@ func HandleAccountActivateGet(
 		}
 
 		if code := r.URL.Query().Get("code"); len(code) > 0 {
-			handleActivationLinkFollowed(httpHelper, httpSession, database, w, r, code)
+			handleActivationLinkFollowed(httpHelper, httpSession, database, dataCipher, w, r, code)
 			return
 		}
 
@@ -146,7 +147,8 @@ func HandleAccountActivateGet(
 // the URL writes a marker into its own throwaway cookie jar and leaves the code usable for the
 // real user.
 func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstore.Store,
-	database accountActivateDatabase, w http.ResponseWriter, r *http.Request, code string) {
+	database accountActivateDatabase, dataCipher *encryption.DataCipher, w http.ResponseWriter, r *http.Request,
+	code string) {
 
 	codeHash := hashutil.HashString(code)
 
@@ -163,7 +165,7 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 		return
 	}
 
-	verificationCode, err := encryption.DecryptData(preRegistration.VerificationCodeEncrypted)
+	verificationCode, err := dataCipher.Decrypt(preRegistration.VerificationCodeEncrypted)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt verification code"))
 		return

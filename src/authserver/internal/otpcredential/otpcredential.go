@@ -113,8 +113,8 @@ type VerifyResult struct {
 // The browser caller needs the returned value: it captured the pre-enrollment generation at
 // /auth/level2, and promoting that at /auth/completed would leave a session that just enrolled
 // and verified owing another second-factor prompt at once.
-func Establish(ctx context.Context, db Database, user *models.User, seed string) (int64, error) {
-	if err := setSecret(user, seed); err != nil {
+func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *models.User, seed string) (int64, error) {
+	if err := setSecret(dataCipher, user, seed); err != nil {
 		return 0, err
 	}
 	user.OTPEnabled = true
@@ -223,8 +223,8 @@ func Remove(ctx context.Context, db Database, user *models.User) error {
 // not leaving the minimum is about.
 //
 // One caller today, HandleAuthOtpPost's already-enrolled arm.
-func VerifyStored(ctx context.Context, db Database, user *models.User, code string, now time.Time) (VerifyResult, error) {
-	secret, err := storedSecret(user)
+func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *models.User, code string, now time.Time) (VerifyResult, error) {
+	secret, err := storedSecret(dataCipher, user)
 	if err != nil {
 		return VerifyResult{}, err
 	}
@@ -270,15 +270,14 @@ func verify(ctx context.Context, db Database, user *models.User, secret string, 
 	return VerifyResult{Outcome: OutcomeMatched, Step: step}, nil
 }
 
-// setSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process data cipher) into
-// OTPSecretEncrypted. See issue #82: TOTP secrets must not be stored in plaintext. The data cipher
-// must be initialized at startup (encryption.InitDataCipher, issue #83).
+// setSecret encrypts the TOTP seed at rest (AES-256-GCM, under the data cipher it is given) into
+// OTPSecretEncrypted. See issue #82: TOTP secrets must not be stored in plaintext.
 //
 // Unexported, where this was models.User.SetOTPSecret: the only way to store a seed is to establish
 // an authenticator with it, which is what keeps the cipher and the generation advance from coming
 // apart (#387).
-func setSecret(u *models.User, secret string) error {
-	encrypted, err := encryption.EncryptData(secret)
+func setSecret(dataCipher *encryption.DataCipher, u *models.User, secret string) error {
+	encrypted, err := dataCipher.Encrypt(secret)
 	if err != nil {
 		return err
 	}
@@ -292,11 +291,11 @@ func setSecret(u *models.User, secret string) error {
 //
 // Unexported, where this was models.User.GetOTPSecret, and that is decision 4's point: a plaintext
 // seed now leaves this package only on the enrolment render path, where the QR code needs it.
-func storedSecret(u *models.User) (string, error) {
+func storedSecret(dataCipher *encryption.DataCipher, u *models.User) (string, error) {
 	if len(u.OTPSecretEncrypted) == 0 {
 		return "", nil
 	}
-	return encryption.DecryptData(u.OTPSecretEncrypted)
+	return dataCipher.Decrypt(u.OTPSecretEncrypted)
 }
 
 // clearSecret removes any stored TOTP seed.

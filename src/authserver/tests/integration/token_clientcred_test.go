@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
@@ -20,7 +19,7 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
@@ -64,7 +63,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -151,7 +150,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -184,7 +183,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -270,7 +269,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -336,7 +335,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -411,7 +410,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -493,7 +492,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -584,7 +583,7 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -658,7 +657,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

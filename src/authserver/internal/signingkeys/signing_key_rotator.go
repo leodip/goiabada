@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -58,7 +59,8 @@ type RotationDatabase interface {
 // deadlock victim is rerun; the rerun reads the key set afresh, and if it lost the race
 // meanwhile its own compare-and-set refuses it (#301).
 type SigningKeyRotator struct {
-	database RotationDatabase
+	database   RotationDatabase
+	dataCipher *encryption.DataCipher
 	// keySizeBits is unexported and has no setter, so no production caller can lower it.
 	// It exists as a field only because the replacement key is now generated on every
 	// path, including every refusal, and a 4096-bit generation costs about 300ms against
@@ -66,9 +68,10 @@ type SigningKeyRotator struct {
 	keySizeBits int
 }
 
-func NewSigningKeyRotator(database RotationDatabase) *SigningKeyRotator {
+func NewSigningKeyRotator(database RotationDatabase, dataCipher *encryption.DataCipher) *SigningKeyRotator {
 	return &SigningKeyRotator{
 		database:    database,
+		dataCipher:  dataCipher,
 		keySizeBits: 4096,
 	}
 }
@@ -83,7 +86,7 @@ func NewSigningKeyRotator(database RotationDatabase) *SigningKeyRotator {
 // across it is what made the window wide enough to hit.
 func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 
-	newNextKey, err := NewKeyPair(models.KeyStateNext, r.keySizeBits)
+	newNextKey, err := NewKeyPair(r.dataCipher, models.KeyStateNext, r.keySizeBits)
 	if err != nil {
 		return err
 	}

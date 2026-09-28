@@ -22,7 +22,7 @@ import (
 
 func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -128,7 +128,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 
 func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -213,7 +213,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 
 func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -278,7 +278,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 
 func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -341,7 +341,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 
 func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributesAlwaysIncluded(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -413,7 +413,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 
 func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_FullFlow(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -522,7 +522,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 
 func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideFullFlow(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -619,7 +619,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	// When scope is just "openid" with no profile/email/etc, setting should have no effect
 	// since there are no OIDC claims to include anyway
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -679,7 +679,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	// When scope is just "openid" with no profile/email/etc, setting should have no effect
 	// even when global setting is enabled
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -737,7 +737,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	// Test with only email scope (not profile, address, phone)
 	// Should only include email claims, not other OIDC claims
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -813,7 +813,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(t *testing.T) {
 	// Test that picture claim is included when user has profile picture
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -881,7 +881,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	// Test with user having empty/null optional fields
 	// Should only include non-empty claims
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",

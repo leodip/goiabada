@@ -6,7 +6,6 @@ import (
 	encodingpem "encoding/pem"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/rsakey"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,7 @@ import (
 )
 
 // storedKeyPair builds the private half of the row NewKeyPair builds: a real RSA key, PEM
-// encoded, then encrypted at rest with the process data cipher (#83). The reference key is parsed
+// encoded, then encrypted at rest with the test data cipher (#83). The reference key is parsed
 // from the plaintext PEM here, independently of ParsePrivateKey, so the round trip below compares
 // against something the function under test did not produce.
 func storedKeyPair(t *testing.T) (*models.KeyPair, *rsa.PrivateKey, []byte) {
@@ -29,7 +28,7 @@ func storedKeyPair(t *testing.T) (*models.KeyPair, *rsa.PrivateKey, []byte) {
 	require.NoError(t, err)
 
 	pem := material.PrivateKeyPEM
-	encrypted, err := encryption.EncryptData(string(pem))
+	encrypted, err := testDataCipher.Encrypt(string(pem))
 	require.NoError(t, err)
 
 	return &models.KeyPair{PrivateKeyPEM: encrypted}, privateKey, pem
@@ -47,7 +46,7 @@ func TestParsePrivateKey_ReturnsTheStoredKey(t *testing.T) {
 	assert.NotContains(t, string(keyPair.PrivateKeyPEM), "PRIVATE KEY")
 	assert.Contains(t, string(pem), "PRIVATE KEY")
 
-	parsed, err := ParsePrivateKey(keyPair)
+	parsed, err := ParsePrivateKey(testDataCipher, keyPair)
 	require.NoError(t, err)
 	require.NotNil(t, parsed)
 
@@ -60,7 +59,7 @@ func TestParsePrivateKey_ReturnsTheStoredKey(t *testing.T) {
 // bytes this process's cipher did not write, which is what a key pair seeded under a different
 // GOIABADA_AUTHSERVER_KEY looks like. It must refuse rather than hand back a nil key with no error.
 func TestParsePrivateKey_RefusesACiphertextItCannotDecrypt(t *testing.T) {
-	parsed, err := ParsePrivateKey(&models.KeyPair{PrivateKeyPEM: []byte("not something the cipher wrote")})
+	parsed, err := ParsePrivateKey(testDataCipher, &models.KeyPair{PrivateKeyPEM: []byte("not something the cipher wrote")})
 
 	require.Error(t, err)
 	assert.Nil(t, parsed)
@@ -70,10 +69,10 @@ func TestParsePrivateKey_RefusesACiphertextItCannotDecrypt(t *testing.T) {
 // cannot reach: the cipher is happy and the parser is not. Both halves are needed because the two
 // errors come from different libraries and only one of them is ours.
 func TestParsePrivateKey_RefusesPlaintextThatIsNotAPEM(t *testing.T) {
-	encrypted, err := encryption.EncryptData("-----BEGIN RSA PRIVATE KEY-----\nnot base64 at all\n-----END RSA PRIVATE KEY-----\n")
+	encrypted, err := testDataCipher.Encrypt("-----BEGIN RSA PRIVATE KEY-----\nnot base64 at all\n-----END RSA PRIVATE KEY-----\n")
 	require.NoError(t, err)
 
-	parsed, err := ParsePrivateKey(&models.KeyPair{PrivateKeyPEM: encrypted})
+	parsed, err := ParsePrivateKey(testDataCipher, &models.KeyPair{PrivateKeyPEM: encrypted})
 
 	require.Error(t, err)
 	assert.Nil(t, parsed)

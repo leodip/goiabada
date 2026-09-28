@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -134,7 +133,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 	assert.NotNil(t, client.ClientSecretEncrypted)
 
 	// Verify secret can be decrypted and matches
-	decryptedSecret, err := encryption.DecryptData(client.ClientSecretEncrypted)
+	decryptedSecret, err := dataCipher.Decrypt(client.ClientSecretEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, response.ClientSecret, decryptedSecret)
 }

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -237,7 +236,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 
 // createAuthCodeWithUserProfile creates a user with full profile data and completes auth code flow
 func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

@@ -28,7 +28,7 @@ const mailpitURL = "http://mailpit:8025"
 
 func TestSendEmail(t *testing.T) {
 
-	emailSender := NewSender()
+	emailSender := NewSender(testDataCipher)
 
 	smtpConfig := SMTPConfig{
 		Host:       "mailpit",
@@ -90,7 +90,7 @@ func relayConfig(t *testing.T, host string, port int, smtpEncryption string, use
 	}
 
 	if password != "" {
-		encrypted, err := encryption.EncryptData(password)
+		encrypted, err := testDataCipher.Encrypt(password)
 		require.NoError(t, err)
 		smtpConfig.PasswordEncrypted = encrypted
 	}
@@ -102,7 +102,7 @@ func relayConfig(t *testing.T, host string, port int, smtpEncryption string, use
 // two same-typed fields fails. The password is copied still encrypted: SendEmail decrypts it at
 // send time, so the struct a handler builds never holds the plaintext (#433 decision 10).
 func TestSMTPConfigFromSettings(t *testing.T) {
-	encrypted, err := encryption.EncryptData(fixturePassword)
+	encrypted, err := testDataCipher.Encrypt(fixturePassword)
 	require.NoError(t, err)
 
 	got := SMTPConfigFromSettings(&models.Settings{
@@ -177,7 +177,7 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 			// 127.0.0.1 is a SAN on the fake's certificate and is one of the three hosts
 			// decision 1 treats as local, so this row is about the mode and nothing else.
 			smtpConfig := relayConfig(t, "127.0.0.1", port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
-			sender := &Sender{rootCAs: cert.pool}
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
 			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
@@ -244,7 +244,7 @@ func TestSendEmail_IPv6Host(t *testing.T) {
 			port := f.start(t)
 
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
-			sender := &Sender{rootCAs: cert.pool}
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
 			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
@@ -324,7 +324,7 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -369,7 +369,7 @@ func TestSendEmail_LoginOverProtectedConnection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&Sender{rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -400,7 +400,7 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -411,6 +411,39 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 	assert.Equal(t, fixtureUser, user, "the first challenge is answered with the username whatever it says")
 	assert.Equal(t, fixturePassword, password, "and the second with the password")
 	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+}
+
+// TestSendEmail_DecryptsWithTheCipherItWasGiven holds the relay password to the cipher NewSender
+// was handed, where it used to be opened with a process-wide key: the sender built with the
+// sealing cipher logs in with the plaintext, and one built with a cipher under another key refuses
+// before it dials, so nothing reaches the relay (#434).
+func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
+	input := &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: "<p>hello</p>"}
+
+	t.Run("the sealing cipher", func(t *testing.T) {
+		f := &fakeSMTP{ext: []string{"AUTH LOGIN", "8BITMIME"}}
+		port := f.start(t)
+		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
+
+		require.NoError(t, NewSender(testDataCipher).SendEmail(context.Background(), smtpConfig, input))
+
+		_, password := f.credentials()
+		assert.Equal(t, fixturePassword, password)
+	})
+
+	t.Run("a cipher under another key", func(t *testing.T) {
+		f := &fakeSMTP{ext: []string{"AUTH LOGIN", "8BITMIME"}}
+		port := f.start(t)
+		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
+
+		otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
+		require.NoError(t, err)
+
+		err = NewSender(otherCipher).SendEmail(context.Background(), smtpConfig, input)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decrypt the SMTP password")
+		assert.False(t, f.hasLinePrefix("EHLO"), "the relay was reached with a password that did not open")
+	})
 }
 
 // TestSendEmail_PlainInitialResponseBoundary holds RFC 4954 section 4's MUST at the octet where it
@@ -453,7 +486,7 @@ func TestSendEmail_PlainInitialResponseBoundary(t *testing.T) {
 
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, password, "Goiabada")
 
-			err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -497,7 +530,7 @@ func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, longPassword, "Goiabada")
 
-	err := (&Sender{rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -534,7 +567,7 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
 
-	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -636,7 +669,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			port := f.start(t)
 
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
-			sender := &Sender{rootCAs: cert.pool}
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
 			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
@@ -741,7 +774,7 @@ func TestSendEmail_CertificateVerification(t *testing.T) {
 
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&Sender{rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			err := (&Sender{dataCipher: testDataCipher, rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -812,7 +845,7 @@ func send(t *testing.T, fromName string, input *SendEmailInput) sentMessage {
 	port := f.start(t)
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", fromName)
-	require.NoError(t, (&Sender{}).SendEmail(context.Background(), smtpConfig, input))
+	require.NoError(t, (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, input))
 
 	return parseMessage(t, f.data())
 }
@@ -994,7 +1027,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-		err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+		err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  strings.Repeat("s", longest+1),
 			HtmlBody: "<p>hello</p>",
@@ -1015,7 +1048,7 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1042,7 +1075,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 	})
 
 	t.Run("two sends through one sender differ", func(t *testing.T) {
-		sender := &Sender{}
+		sender := &Sender{dataCipher: testDataCipher}
 		seen := make([]string, 0, 2)
 
 		for i := 0; i < 2; i++ {
@@ -1066,7 +1099,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 		port := f.start(t)
 
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-		sender := &Sender{randReader: iotest.ErrReader(io.ErrUnexpectedEOF)}
+		sender := &Sender{dataCipher: testDataCipher, randReader: iotest.ErrReader(io.ErrUnexpectedEOF)}
 
 		err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
@@ -1155,7 +1188,7 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       "not an address",
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1178,7 +1211,7 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	err := (&Sender{dataCipher: testDataCipher, dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1196,7 +1229,7 @@ func TestSendEmail_ConversationTimeout(t *testing.T) {
 	port := f.start(t)
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-	sender := &Sender{convTimeout: time.Second}
+	sender := &Sender{dataCipher: testDataCipher, convTimeout: time.Second}
 
 	started := time.Now()
 	err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{

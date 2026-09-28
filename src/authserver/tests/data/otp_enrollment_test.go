@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/stretchr/testify/assert"
@@ -49,9 +48,9 @@ func reloadUser(t *testing.T, userId int64) *models.User {
 // survives the round trip byte for byte, and decrypts back to what went in, does.
 func encryptedKeyURL(t *testing.T, secret string) []byte {
 	t.Helper()
-	ct, err := encryption.EncryptData(
+	ct, err := dataCipher.Encrypt(
 		"otpauth://totp/Goiabada:user@example.com?algorithm=SHA1&digits=6&issuer=Goiabada&period=30&secret=" + secret)
-	require.NoError(t, err, "EncryptData")
+	require.NoError(t, err, "Encrypt")
 	return ct
 }
 
@@ -80,7 +79,7 @@ func TestTryInstallPendingOTPEnrollment_RoundTrip(t *testing.T) {
 	assert.WithinDuration(t, issuedAt, after.OtpEnrollmentIssuedAt.Time.UTC(), time.Millisecond,
 		"issued_at must survive the engine's datetime column")
 
-	decrypted, err := encryption.DecryptData(after.OtpEnrollmentSecretEncrypted)
+	decrypted, err := dataCipher.Decrypt(after.OtpEnrollmentSecretEncrypted)
 	require.NoError(t, err, "the stored ciphertext must decrypt under the process data cipher")
 	assert.Contains(t, decrypted, "otpauth://totp/",
 		"what is stored is the whole key URL, which is the only form the QR image can be rendered from")
@@ -276,7 +275,7 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 	// including the clear must roll back with it.
 	broken := reloadUser(t, user.Id)
 	broken.Id = 0
-	_, err = otpcredential.Establish(context.Background(), database, broken, enrolledSeed)
+	_, err = otpcredential.Establish(context.Background(), database, dataCipher, broken, enrolledSeed)
 	require.Error(t, err, "Establish must fail on a user with id 0")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
@@ -284,7 +283,7 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 			"code and is about to retry with the next passcode")
 
 	enrolling := reloadUser(t, user.Id)
-	generation, err := otpcredential.Establish(context.Background(), database, enrolling, enrolledSeed)
+	generation, err := otpcredential.Establish(context.Background(), database, dataCipher, enrolling, enrolledSeed)
 	require.NoError(t, err, "Establish")
 	assert.EqualValues(t, 1, generation, "the counter advance still happens")
 
