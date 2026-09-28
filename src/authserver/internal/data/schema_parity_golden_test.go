@@ -89,8 +89,8 @@ func parityAllowlist() []parityRule {
 				"stored as whatever the driver writes, which is the same microsecond text the " +
 				"other three keep in datetime(6). Declaring a precision there would be a lie " +
 				"about a type SQLite does not enforce.",
-			Count:  66,
-			Digest: "34ea9de54fca616e",
+			Count:  67,
+			Digest: "90c5f26f48ba433d",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
 					d.Says[schemadump.SQLite] == "datetime(no declared precision)" &&

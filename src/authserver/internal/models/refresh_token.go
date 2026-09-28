@@ -42,4 +42,13 @@ type RefreshToken struct {
 	// preserved session's promoted tokens keep working. Tagged dont-update so an
 	// ordinary full-row UpdateRefreshToken cannot regress it (#106).
 	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
+	// AuthenticatedAt is when the user behind an ROPC grant authenticated: the moment the
+	// password was checked, written on the grant's first token and copied from the PARENT on
+	// every rotation, as AuthStateGeneration is. A refresh issues it as auth_time, because OpenID
+	// Connect Core 1.0 section 12.2 and RFC 9068 section 2.2.1 require the time of the original
+	// authentication there, not the time of the refresh (#125). NULL on an authorization-code
+	// token, whose instant is its code's AuthenticatedAt, and on an ROPC token issued before
+	// migration 000051, which the token endpoint refuses to refresh. Tagged dont-update for the
+	// reason AuthStateGeneration is.
+	AuthenticatedAt sql.NullTime `db:"authenticated_at" fieldtag:"dont-update"`
 }

@@ -298,6 +298,10 @@ func compareRefreshTokens(t *testing.T, expected, actual *models.RefreshToken) {
 	if actual.Revoked != expected.Revoked {
 		t.Errorf("Expected Revoked %v, got %v", expected.Revoked, actual.Revoked)
 	}
+	if actual.AuthenticatedAt.Valid != expected.AuthenticatedAt.Valid ||
+		!actual.AuthenticatedAt.Time.Equal(expected.AuthenticatedAt.Time) {
+		t.Errorf("Expected AuthenticatedAt %v, got %v", expected.AuthenticatedAt, actual.AuthenticatedAt)
+	}
 }
 
 func TestGetRefreshTokensByCodeId(t *testing.T) {

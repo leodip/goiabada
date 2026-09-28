@@ -107,6 +107,12 @@ type ValidateTokenRequestResult struct {
 // happened (#106).
 const invalidGenerationMessage = "The refresh token is invalid because it was superseded."
 
+// invalidRefreshTokenMessage is the refusal that says nothing about why: a validly signed token
+// with no row, and an ROPC token issued before its grant's authentication instant was recorded
+// (#128, #125). Neither reason is something a client acts on differently, and naming the first
+// would confirm which JTIs were ever issued.
+const invalidRefreshTokenMessage = "The refresh token is invalid."
+
 // ROPCNotAuthorizedErrorMsg is the refusal for a client that may not use the resource owner
 // password credentials grant. Two places emit it: the password grant below, which refuses a
 // new login, and the token handler's refresh arm, which refuses to refresh a token ROPC
@@ -605,7 +611,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			// cannot be told apart from an attacker here, and distinguishing "no such row"
 			// from "revoked" would confirm which JTIs were ever issued.
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"The refresh token is invalid.", http.StatusBadRequest)
+				invalidRefreshTokenMessage, http.StatusBadRequest)
 		}
 
 		// Determine if this is an auth code flow token (with CodeId) or ROPC token (with UserId/ClientId)
@@ -677,6 +683,17 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 		if tokenClientId != client.Id {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 				"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
+		}
+
+		// An ROPC token issued before migration 000051 records no authentication instant, so no
+		// refresh of it can issue the auth_time OpenID Connect Core 1.0 section 12.2 requires, the
+		// time of the original authentication, and RFC 6749 section 5.2 answers a refresh token
+		// that cannot be used as invalid_grant. Its client makes one password grant again, and the
+		// new family records the instant (#125). After the ownership check, so another client
+		// presenting it learns nothing about the token beyond that it is not theirs.
+		if isROPCToken && !refreshToken.AuthenticatedAt.Valid {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				invalidRefreshTokenMessage, http.StatusBadRequest)
 		}
 
 		// One message for both ways a grant's session can stop backing it, so the two
