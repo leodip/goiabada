@@ -222,7 +222,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 		}
 		return db, db.DB, func() {
 			_ = db.DB.Close()
-			dropDatabase("mysql", mysqldb.MaintenanceDSN(cfg), "DROP DATABASE IF EXISTS "+name, name)
+			reportDrop(name, mysqldb.DropDatabase(context.Background(), cfg))
 		}, nil
 
 	case schemadump.Postgres:
@@ -233,9 +233,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 		}
 		return db, db.DB, func() {
 			_ = db.DB.Close()
-			// FORCE terminates lingering connections (PostgreSQL 13+).
-			dropDatabase("pgx", postgresdb.MaintenanceDSN(cfg),
-				fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", name), name)
+			reportDrop(name, postgresdb.DropDatabase(context.Background(), cfg))
 		}, nil
 
 	case schemadump.MSSQL:
@@ -246,40 +244,31 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 		}
 		return db, db.DB, func() {
 			_ = db.DB.Close()
-			dropDatabase("sqlserver", mssqldb.MaintenanceDSN(cfg),
-				fmt.Sprintf("IF DB_ID(N'%s') IS NOT NULL BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%s]; END",
-					name, name, name), name)
+			reportDrop(name, mssqldb.DropDatabase(context.Background(), cfg))
 		}, nil
 	}
 	return nil, nil, nil, errs.Errorf("unrecognised dialect %q", t.dialect)
 }
 
-// dropDatabase removes a scratch database, reporting a failure rather than returning it: it
-// runs from a deferred cleanup, where the interesting error is the one that got us there. A
-// leftover scratch database is harmless to the next run, which picks a new name, but it is
-// worth saying so out loud.
+// reportDrop reports a scratch database's drop failing rather than returning it: the drop runs
+// from a deferred cleanup, where the interesting error is the one that got us there. A leftover
+// scratch database is harmless to the next run, which picks a new name, but it is worth saying
+// so out loud. The drop itself is the engine package's DropDatabase, the one spelling every tool
+// that discards a database shares (#433).
 //
-// It owns a root context of its own rather than taking dumpOne's, because it runs from a cleanup
-// closure built before that context exists and outlives the call that made it. The rule is the
+// Each cleanup owns a root context of its own rather than taking dumpOne's, because it runs from
+// a closure built before that context exists and outlives the call that made it. The rule is the
 // same one the rest of this command follows: a driver call takes a context, and a command with no
 // request above it declares the root (#386).
-func dropDatabase(driver, dsn, stmt, name string) {
-	ctx := context.Background()
-
-	sqlDB, err := sql.Open(driver, dsn)
+func reportDrop(name string, err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "schemadump: could not connect to drop the scratch database %s: %v\n", name, err)
-		return
-	}
-	defer func() { _ = sqlDB.Close() }()
-	if _, err := sqlDB.ExecContext(ctx, stmt); err != nil {
 		fmt.Fprintf(os.Stderr, "schemadump: could not drop the scratch database %s: %v\n", name, err)
 	}
 }
 
 // scratchName is unique to this process, so two runs against one server cannot collide and
-// a leftover from a previous run is never reused. Lowercase, because PostgreSQL folds an
-// unquoted identifier and the drop above spells it unquoted.
+// a leftover from a previous run is never reused. Lowercase, so the name is the same whether
+// or not a statement quotes it: PostgreSQL folds an unquoted identifier.
 func scratchName(d schemadump.Dialect) string {
 	return fmt.Sprintf("goiabada_golden_%s_%d", d, os.Getpid())
 }

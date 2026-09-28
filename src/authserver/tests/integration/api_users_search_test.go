@@ -427,9 +427,10 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 // left rows behind that every later caller then collided with -- and, because
 // the inserts were asserted rather than required, each collision returned three
 // users that had never been created, so the failure surfaced in a test far from
-// whichever one first went wrong. run-tests.sh drops the sqlite file on exit but
-// never drops goiabada_integration on mysql, postgres or mssql, so there the
-// leftovers outlived the run that made them.
+// whichever one first went wrong. Until #433 run-tests.sh never dropped
+// goiabada_integration on mysql, postgres or mssql, so there the leftovers also
+// outlived the run that made them; it drops it before every run now, but a
+// leftover still reaches every later test of the run that left it.
 //
 // The inserts are require.NoError for the same reason: a fixture that was not
 // built must stop its test rather than hand it phantom users.

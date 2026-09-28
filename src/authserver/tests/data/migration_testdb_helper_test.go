@@ -281,34 +281,24 @@ func (s tableShape) foreignKey(t *testing.T, column string) foreignKeyShape {
 	return fk
 }
 
+// dropMySQL, dropPostgres and dropMsSQL drop a fixture database through the engine package's
+// DropDatabase, the one spelling every tool that discards a database shares, quoted the way the
+// constructor's CREATE DATABASE is so a fixture at a mixed-case or otherwise quote-needing name is
+// dropped at the spelling it was created at (#293, #433). A failure is logged rather than raised:
+// they run from cleanups, where the interesting error is the one that got there.
 func dropMySQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
-	sqlDB, err := sql.Open("mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg))
-	if err != nil {
-		t.Logf("dropMySQL open: %v", err)
-		return
-	}
-	defer func() { _ = sqlDB.Close() }()
-	// Backticked, like the constructor's own CREATE DATABASE: a fixture at a mixed-case or
-	// otherwise quote-needing name has to be droppable by the same spelling it was created at
-	// (#293).
-	if _, err := sqlDB.Exec("DROP DATABASE IF EXISTS `" + strings.ReplaceAll(name, "`", "``") + "`"); err != nil {
-		t.Logf("dropMySQL exec: %v", err)
+	if err := mysqldb.DropDatabase(context.Background(), &mysqldb.DatabaseConfig{
+		Username: cfg.Username, Password: cfg.Password, Host: cfg.Host, Port: cfg.Port, Name: name,
+	}); err != nil {
+		t.Logf("dropMySQL: %v", err)
 	}
 }
 
 func dropPostgres(t *testing.T, cfg *config.DatabaseConfig, name string) {
-	sqlDB, err := sql.Open("pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg))
-	if err != nil {
-		t.Logf("dropPostgres open: %v", err)
-		return
-	}
-	defer func() { _ = sqlDB.Close() }()
-	// FORCE terminates lingering connections (PostgreSQL 13+). Quoted, like the constructor's
-	// own CREATE DATABASE: unquoted, this folds the name and would silently drop nothing for a
-	// mixed-case fixture, leaving it on the server for every later run (#293).
-	if _, err := sqlDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)",
-		postgresdb.QuoteIdentifier(name))); err != nil {
-		t.Logf("dropPostgres exec: %v", err)
+	if err := postgresdb.DropDatabase(context.Background(), &postgresdb.DatabaseConfig{
+		Username: cfg.Username, Password: cfg.Password, Host: cfg.Host, Port: cfg.Port, Name: name,
+	}); err != nil {
+		t.Logf("dropPostgres: %v", err)
 	}
 }
 
@@ -379,17 +369,10 @@ func msSQLMasterDSN(cfg *config.DatabaseConfig) string {
 }
 
 func dropMsSQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
-	sqlDB, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
-	if err != nil {
-		t.Logf("dropMsSQL open: %v", err)
-		return
-	}
-	defer func() { _ = sqlDB.Close() }()
-	stmt := fmt.Sprintf(
-		"IF DB_ID(N'%s') IS NOT NULL BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%s]; END",
-		name, name, name)
-	if _, err := sqlDB.Exec(stmt); err != nil {
-		t.Logf("dropMsSQL exec: %v", err)
+	if err := mssqldb.DropDatabase(context.Background(), &mssqldb.DatabaseConfig{
+		Username: cfg.Username, Password: cfg.Password, Host: cfg.Host, Port: cfg.Port, Name: name,
+	}); err != nil {
+		t.Logf("dropMsSQL: %v", err)
 	}
 }
 
@@ -482,7 +465,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 		mustExec(t, admin, "FLUSH PRIVILEGES")
 
 		t.Cleanup(func() {
-			_, _ = admin.Exec("DROP DATABASE IF EXISTS " + r.name)
+			dropMySQL(t, cfg, r.name)
 			_, _ = admin.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", r.username))
 			_ = admin.Close()
 		})
@@ -500,7 +483,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 		mustExec(t, admin, fmt.Sprintf("CREATE DATABASE %s OWNER %s", r.name, r.username))
 
 		t.Cleanup(func() {
-			_, _ = admin.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", r.name))
+			dropPostgres(t, cfg, r.name)
 			_, _ = admin.Exec("DROP ROLE IF EXISTS " + r.username)
 			_ = admin.Close()
 		})

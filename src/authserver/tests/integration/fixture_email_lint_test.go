@@ -15,14 +15,15 @@ import (
 // models.User fixture anywhere in this tier.
 //
 // users.email is UNIQUE, and a fixture address is only safe while every row
-// carrying it is deleted again. Two things make that assumption fail. Within a
-// run, two fixtures sharing one address collide the moment either one's cleanup
-// is missed -- which is how api_users_search_test.go's helper used to fail, three
-// fixed addresses shared by five tests, where one missed cleanup cascaded into
-// every later caller. Across runs, run-tests.sh drops the sqlite file on its EXIT
-// trap but never drops goiabada_integration on mysql, postgres or mssql, so a row
-// leaked there fails the same test on every run afterwards, with a UNIQUE
-// violation raised from a fixture rather than from the behaviour under test.
+// carrying it is deleted again. Within a run, two fixtures sharing one address
+// collide the moment either one's cleanup is missed -- which is how
+// api_users_search_test.go's helper used to fail, three fixed addresses shared by
+// five tests, where one missed cleanup cascaded into every later caller, with a
+// UNIQUE violation raised from a fixture rather than from the behaviour under
+// test. Across runs the same leak used to fail the same test on every run
+// afterwards, because run-tests.sh never dropped goiabada_integration on mysql,
+// postgres or mssql; since #433 it drops it before each run, so a leaked row now
+// lasts the run that leaked it, and that run is what this guard is for.
 //
 // A cleanup can always be missed -- a t.FailNow between the insert and the defer,
 // a panic, a killed run -- so the guard is on the address rather than on the

@@ -263,17 +263,11 @@ func readRCSIFlag(master *sql.DB, name string) (bool, error) {
 }
 
 func dropRCSIDatabase(cfg *config.DatabaseConfig, name string) {
-	master, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
-	if err != nil {
-		return
-	}
-	defer func() { _ = master.Close() }()
-
 	ctx, cancel := context.WithTimeout(context.Background(), rcsiStatementTimeout)
 	defer cancel()
-	_, _ = master.ExecContext(ctx, fmt.Sprintf(
-		"IF DB_ID(N'%s') IS NOT NULL BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%s]; END",
-		name, name, name))
+	_ = mssqldb.DropDatabase(ctx, &mssqldb.DatabaseConfig{
+		Username: cfg.Username, Password: cfg.Password, Host: cfg.Host, Port: cfg.Port, Name: name,
+	})
 }
 
 // TestRCSI_TheFixtureIsTheDatabaseUnderTest is the check that catches the mistake the handle
