@@ -148,11 +148,7 @@ func HandleAccountActivateGet(
 func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstore.Store,
 	database accountActivateDatabase, w http.ResponseWriter, r *http.Request, code string) {
 
-	codeHash, err := hashutil.HashString(code)
-	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
-		return
-	}
+	codeHash := hashutil.HashString(code)
 
 	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(r.Context(), nil, codeHash)
 	if err != nil {

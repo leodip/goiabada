@@ -21,7 +21,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
@@ -144,7 +144,7 @@ func (m *LinkMarker) expired(now time.Time) bool {
 func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
 	flow LinkMarkerFlow, id int64, codeHash string) (LinkMarkerRejection, error) {
 
-	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
+	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
 	if err != nil {
 		return "", err
 	}
@@ -183,7 +183,7 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 		return "", errs.Wrap(err, "unable to marshal link marker")
 	}
 
-	sess.Values[constants.SessionKeyLinkMarker] = string(jsonData)
+	sess.Values[sessionkeys.SessionKeyLinkMarker] = string(jsonData)
 	return "", httpSession.Save(r, w, sess)
 }
 
@@ -198,7 +198,7 @@ func SaveLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *ht
 func GetLinkMarker(httpSession sessionstore.Store, r *http.Request,
 	want LinkMarkerFlow) (*LinkMarker, LinkMarkerRejection, error) {
 
-	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
+	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
 	if err != nil {
 		return nil, "", err
 	}
@@ -218,7 +218,7 @@ func GetLinkMarker(httpSession sessionstore.Store, r *http.Request,
 // A value that will not unmarshal is a fault rather than an empty slot: the session
 // cookie is encrypted and signed, so nobody outside this process can put one there.
 func decodeLinkMarker(sess *sessionstore.Session) (*LinkMarker, error) {
-	jsonData, ok := sess.Values[constants.SessionKeyLinkMarker].(string)
+	jsonData, ok := sess.Values[sessionkeys.SessionKeyLinkMarker].(string)
 	if !ok {
 		return nil, nil
 	}
@@ -269,11 +269,11 @@ func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 // or reissued, which clearing at the end of a flow says nothing about. Defence in depth
 // now rather than the boundary itself.
 func ClearLinkMarker(httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request) error {
-	sess, err := httpSession.Get(r, constants.AuthServerSessionName)
+	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
 	if err != nil {
 		return err
 	}
 
-	delete(sess.Values, constants.SessionKeyLinkMarker)
+	delete(sess.Values, sessionkeys.SessionKeyLinkMarker)
 	return httpSession.Save(r, w, sess)
 }

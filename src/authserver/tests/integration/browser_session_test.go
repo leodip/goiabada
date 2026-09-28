@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pquerna/otp/totp"
@@ -294,9 +294,9 @@ func confirmLogout(t *testing.T, httpClient *http.Client) *http.Response {
 // store derives it from, so this test reads correctly in either kind of deployment.
 func browserSessionCookieName() string {
 	if config.GetAuthServer().IsCookieSecure() {
-		return "__Host-" + constants.AuthServerSessionName
+		return "__Host-" + sessionkeys.AuthServerSessionName
 	}
-	return constants.AuthServerSessionName
+	return sessionkeys.AuthServerSessionName
 }
 
 func browserCookies(t *testing.T, httpClient *http.Client) []*http.Cookie {
@@ -335,11 +335,11 @@ func decodeSessionIdentifier(t *testing.T, cookie *http.Cookie) string {
 	encKey, err := hex.DecodeString(config.GetAuthServer().SessionEncryptionKey)
 	require.NoError(t, err)
 
-	opener, err := sessionstore.NewServerSideStore(nil, constants.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
+	opener, err := sessionstore.NewServerSideStore(nil, sessionkeys.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	require.NoError(t, err)
 
-	id, err := opener.OpenCookie(constants.AuthServerSessionName, cookie.Value)
+	id, err := opener.OpenCookie(sessionkeys.AuthServerSessionName, cookie.Value)
 	require.NoError(t, err)
 	assert.Len(t, id, 64, "the identifier is 32 bytes of CSPRNG output, hex encoded")
 	return id

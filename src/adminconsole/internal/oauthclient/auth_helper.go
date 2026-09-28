@@ -65,11 +65,7 @@ func (s *AuthHelper) RedirToAuthorize(
 	values.Add("code_challenge_method", "S256")
 	values.Add("code_challenge", codeChallenge)
 	values.Add("state", state)
-	sentNonce, err := nonceHash(nonce)
-	if err != nil {
-		return err
-	}
-	values.Add("nonce", sentNonce)
+	values.Add("nonce", nonceHash(nonce))
 	values.Add("scope", scope)
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", s.authServerBaseURL, values.Encode())
@@ -83,7 +79,7 @@ func (s *AuthHelper) RedirToAuthorize(
 // the SHA-256 of the raw value the session keeps, the scheme OIDC Core 15.5.2 describes ("use a
 // cryptographic hash of the value as the nonce parameter"). RedirToAuthorize sends it and
 // DecodeAndValidateSignInResponse compares against it, so the scheme is written once (#427).
-func nonceHash(nonce string) (string, error) {
+func nonceHash(nonce string) string {
 	return hashutil.HashString(nonce)
 }
 

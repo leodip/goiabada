@@ -24,11 +24,11 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/bootstrap"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/server"
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -283,6 +283,6 @@ func dispatch(args []string) (migrateArgs []string, isMigrate bool, err error) {
 // (#431).
 func newSessionStore(backend sessionstore.Backend, secure bool,
 	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ServerSideStore, error) {
-	return sessionstore.NewServerSideStore(backend, constants.SessionKeySessionIdentifier, secure,
+	return sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeySessionIdentifier, secure,
 		sessionstore.PersistentCookie, current, previous)
 }

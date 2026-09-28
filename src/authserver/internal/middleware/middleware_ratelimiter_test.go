@@ -91,12 +91,12 @@ func (s *stubAuditLogger) count(name string) int {
 
 // newTestMiddleware builds the middleware with a real HttpHelper over testTemplateFS and a
 // throwaway audit logger, for the cases that do not look at what was audited.
-func newTestMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddleware {
+func newTestMiddleware(authHelper authContextGetter, enabled bool) *RateLimiterMiddleware {
 	m, _ := newAuditedTestMiddleware(authHelper, enabled)
 	return m
 }
 
-func newAuditedTestMiddleware(authHelper AuthHelper, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
+func newAuditedTestMiddleware(authHelper authContextGetter, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
 	return NewRateLimiterMiddleware(authHelper, handlerhelpers.NewHttpHelper(testTemplateFS), auditLog, enabled), auditLog
 }

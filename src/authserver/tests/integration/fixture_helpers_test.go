@@ -23,10 +23,7 @@ import (
 )
 
 func loadCodeFromDatabase(t *testing.T, codeVal string) *models.Code {
-	codeHash, err := hashutil.HashString(codeVal)
-	if err != nil {
-		t.Fatal(err)
-	}
+	codeHash := hashutil.HashString(codeVal)
 	code, err := database.GetCodeByCodeHash(context.Background(), nil, codeHash, false)
 	if err != nil {
 		t.Fatal(err)

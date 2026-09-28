@@ -6,19 +6,13 @@ package hashutil
 
 import (
 	"crypto/sha256"
-	"fmt"
-
-	"github.com/leodip/goiabada/core/errs"
+	"encoding/hex"
 )
 
-// HashString can hash strings of any length
-func HashString(s string) (string, error) {
-	h := sha256.New()
-	_, err := h.Write([]byte(s))
-	if err != nil {
-		return "", errs.Wrap(err, "unable to hash")
-	}
-	bs := h.Sum(nil)
-	hex := fmt.Sprintf("%x", bs)
-	return hex, nil
+// HashString is the lowercase hex SHA-256 of s. It returns no error because SHA-256 over a byte
+// slice has none to give: hash.Hash's Write never fails, and the error it used to wrap was one no
+// caller could reach (#433, #442).
+func HashString(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }

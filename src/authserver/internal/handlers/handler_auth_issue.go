@@ -16,10 +16,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
@@ -213,7 +213,7 @@ func HandleIssueGet(
 				}
 
 				refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
-					redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
+					redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 						"The authenticated user does not match the id_token_hint"))
 				if refusalErr != nil {
 					httpHelper.InternalServerError(w, r, refusalErr)
@@ -679,7 +679,7 @@ func refuseIssuanceUnusableSession(
 			return
 		}
 		err = redirToClientWithError(w, r, database, httpHelper, templateFS,
-			redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
+			redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 				"User authentication is required"))
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

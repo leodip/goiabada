@@ -13,12 +13,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/web"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -215,7 +215,7 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	t.Helper()
 
 	r := httptest.NewRequest(http.MethodGet, "/auth/otp", nil)
-	sess, err := s.sessionStore.Get(r, constants.AuthServerSessionName)
+	sess, err := s.sessionStore.Get(r, sessionkeys.AuthServerSessionName)
 	assert.NoError(t, err)
 
 	authContext, err := json.Marshal(ceremony.AuthContext{
@@ -227,7 +227,7 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	})
 	assert.NoError(t, err)
 
-	sess.Values[constants.SessionKeyAuthContext] = string(authContext)
+	sess.Values[sessionkeys.SessionKeyAuthContext] = string(authContext)
 
 	recorder := httptest.NewRecorder()
 	assert.NoError(t, s.sessionStore.Save(r, recorder, sess))

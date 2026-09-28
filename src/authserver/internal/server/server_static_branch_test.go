@@ -9,9 +9,9 @@ import (
 	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -104,7 +104,7 @@ func newStaticBranchTestServer(database *mocks_data.Database) *Server {
 func newTestSessionStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		constants.SessionKeySessionIdentifier,
+		sessionkeys.SessionKeySessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
 		sessionstore.KeyPair{

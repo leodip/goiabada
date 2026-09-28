@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -56,9 +57,9 @@ func TestDatabaseBackend_Load(t *testing.T) {
 			Data:          "ciphertext",
 			LastAccessed:  fixedNow.Add(-time.Minute),
 			ExpiresAt:     fixedNow.Add(time.Hour),
-			SessionIdHash: hashSessionId(id),
+			SessionIdHash: hashutil.HashString(id),
 		}
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashSessionId(id), fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(row, nil)
 
 		record, err := testBackend(database, owner).Load(context.Background(), id)
@@ -71,7 +72,7 @@ func TestDatabaseBackend_Load(t *testing.T) {
 
 	t.Run("maps an absent row to not found", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashSessionId(id), fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(nil, nil)
 
 		record, err := testBackend(database, owner).Load(context.Background(), id)
@@ -83,7 +84,7 @@ func TestDatabaseBackend_Load(t *testing.T) {
 	t.Run("wraps a failed read", func(t *testing.T) {
 		cause := errors.New("read failed")
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashSessionId(id), fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(nil, cause)
 
 		record, err := testBackend(database, owner).Load(context.Background(), id)
@@ -112,7 +113,7 @@ func TestDatabaseBackend_Create(t *testing.T) {
 			database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *models.BrowserSession) bool {
 				return row.Owner == owner &&
 					row.SessionId == id &&
-					row.SessionIdHash == hashSessionId(id) &&
+					row.SessionIdHash == hashutil.HashString(id) &&
 					row.Data == "ciphertext" &&
 					row.LastAccessed.Equal(fixedNow) &&
 					row.ExpiresAt.Equal(tc.wantExpiry)
@@ -142,7 +143,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 		owner = "owner"
 		id    = "update-id"
 	)
-	hash := hashSessionId(id)
+	hash := hashutil.HashString(id)
 	createdAt := fixedNow.Add(-time.Hour)
 	wantExpiry := fixedNow.Add(30 * time.Minute)
 
@@ -226,7 +227,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 		owner = "owner"
 		id    = "touch-id"
 	)
-	hash := hashSessionId(id)
+	hash := hashutil.HashString(id)
 	createdAt := fixedNow.Add(-time.Hour)
 	wantExpiry := fixedNow.Add(30 * time.Minute)
 
@@ -306,7 +307,7 @@ func TestDatabaseBackend_InvalidCreatedAtFallsBackToNow(t *testing.T) {
 		owner = "owner"
 		id    = "invalid-created-at"
 	)
-	hash := hashSessionId(id)
+	hash := hashutil.HashString(id)
 	wantExpiry := fixedNow.Add(90 * time.Minute)
 
 	for _, tc := range []struct {
@@ -399,7 +400,7 @@ func TestDatabaseBackend_Delete(t *testing.T) {
 
 	t.Run("passes owner and digest", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().DeleteBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hashSessionId(id)).Return(nil)
+		database.EXPECT().DeleteBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id)).Return(nil)
 
 		require.NoError(t, testBackend(database, owner).Delete(context.Background(), id))
 	})
@@ -407,7 +408,7 @@ func TestDatabaseBackend_Delete(t *testing.T) {
 	t.Run("wraps a failure", func(t *testing.T) {
 		cause := errors.New("delete failed")
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().DeleteBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hashSessionId(id)).Return(cause)
+		database.EXPECT().DeleteBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id)).Return(cause)
 
 		err := testBackend(database, owner).Delete(context.Background(), id)
 
@@ -415,6 +416,9 @@ func TestDatabaseBackend_Delete(t *testing.T) {
 	})
 }
 
+// TestDatabaseBackend_DigestVectorsReachTheDatabase pins the stored digest to literals. The
+// backend computes it with hashutil.HashString, which it shares with the code tables, so a change
+// to that function would sign every browser out at deploy; these rows fail first (#433).
 func TestDatabaseBackend_DigestVectorsReachTheDatabase(t *testing.T) {
 	for _, tc := range []struct {
 		id     string
@@ -487,7 +491,7 @@ func TestDatabaseBackend_ConstructorsFixEveryOperationOwner(t *testing.T) {
 	}{
 		{
 			name:  "auth server",
-			owner: constants.AuthServerSessionName,
+			owner: sessionkeys.AuthServerSessionName,
 			new:   func(database *mocks_data.Database) sessionstore.Backend { return NewAuthServerBackend(database) },
 		},
 		{

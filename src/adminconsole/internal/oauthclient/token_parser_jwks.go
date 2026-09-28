@@ -126,10 +126,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, 
 	if !ok {
 		return nil, errs.New("the id token carries no nonce")
 	}
-	expected, err := nonceHash(nonce)
-	if err != nil {
-		return nil, err
-	}
+	expected := nonceHash(nonce)
 	// The claim travels in the authorize URL before it comes back here, so it is no secret
 	// and plain equality is enough.
 	if claim != expected {

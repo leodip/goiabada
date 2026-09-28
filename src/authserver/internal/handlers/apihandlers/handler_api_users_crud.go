@@ -470,11 +470,7 @@ func HandleAPIUserCreatePost(
 			// The hash is how the reset link finds this row again, since the link carries
 			// the code and no email address (#112). The encryption above stays: it is what
 			// proves a submitted code matches, where the hash only locates the row.
-			verificationCodeHash, err := hashutil.HashString(verificationCode)
-			if err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
+			verificationCodeHash := hashutil.HashString(verificationCode)
 
 			// Update user with reset code
 			createdUser.ForgotPasswordCodeEncrypted = verificationCodeEncrypted

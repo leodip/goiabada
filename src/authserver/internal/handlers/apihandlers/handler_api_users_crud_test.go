@@ -370,8 +370,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	// rather than from a value this test chose.
 	issuedCode, err := encryption.DecryptData(createdUser.ForgotPasswordCodeEncrypted)
 	require.NoError(t, err)
-	expectedHash, err := hashutil.HashString(issuedCode)
-	require.NoError(t, err)
+	expectedHash := hashutil.HashString(issuedCode)
 	assert.Equal(t, expectedHash, createdUser.ForgotPasswordCodeHash,
 		"the stored hash must be the hash of the code that was issued")
 

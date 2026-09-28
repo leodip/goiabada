@@ -167,10 +167,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 		// Note: code_verifier validation is done later after loading the code entity
 		// to check if PKCE was used during authorization
 
-		codeHash, err := hashutil.HashString(input.Code)
-		if err != nil {
-			return nil, err
-		}
+		codeHash := hashutil.HashString(input.Code)
 		codeEntity, err := val.database.GetCodeByCodeHash(ctx, nil, codeHash, false)
 		if err != nil {
 			return nil, err

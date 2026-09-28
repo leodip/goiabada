@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
@@ -28,9 +28,9 @@ func TestNewSessionStore_TheEndUsersCookieFollowsTheRowsExpiry(t *testing.T) {
 
 			req := httptest.NewRequest("GET", "/", nil)
 			w := httptest.NewRecorder()
-			session, err := store.Get(req, constants.AuthServerSessionName)
+			session, err := store.Get(req, sessionkeys.AuthServerSessionName)
 			require.NoError(t, err)
-			session.Values[constants.SessionKeySessionIdentifier] = "a-user-session"
+			session.Values[sessionkeys.SessionKeySessionIdentifier] = "a-user-session"
 			require.NoError(t, store.Save(req, w, session))
 
 			setCookie := w.Result().Header.Values("Set-Cookie")

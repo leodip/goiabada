@@ -27,7 +27,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It reads nothing but the source tree, so unlike `schemadump` it needs no container, and it refuses to invent a justification rather than fill the one cell a human owes (#385)
 - `constants/` - Permission identifiers, the version stamp, and the one session name both processes
   must agree on. No context key and no other session key: each process declares its own, the auth
-  server its context keys in `internal/reqctx` and its session keys in `internal/constants`, the admin
+  server its context keys in `internal/reqctx` and its session keys in `internal/sessionkeys`, the admin
   console both in `internal/constants`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more (#351, #385, #433)
 - `countries/` - Self-maintained ISO 3166-1 reference data: names, alpha-2 and alpha-3 codes, flag emoji and ITU-T E.164 calling codes, generated into `data_generated.go` from the datahub dataset. It replaced `github.com/biter777/countries` and deliberately depends on nothing (#272)
 - `customerrors/` - The OAuth error payload both processes pass around: `ErrorDetail`, and `ConformErrorDescription`, which replaces every character RFC 6749 Appendix A.8 forbids in an `error_description` and bounds the result to 512 bytes, because a description interpolates request text and, since #213's deferral, is parked on an auth context every request of that ceremony then carries

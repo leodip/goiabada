@@ -21,13 +21,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/hashutil"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
@@ -288,9 +288,9 @@ func withRawMarker(t *testing.T, store sessionstore.Store, req *http.Request, va
 
 	seed := cleanGetRequest()
 	rr := httptest.NewRecorder()
-	sess, err := store.Get(seed, constants.AuthServerSessionName)
+	sess, err := store.Get(seed, sessionkeys.AuthServerSessionName)
 	require.NoError(t, err)
-	sess.Values[constants.SessionKeyLinkMarker] = value
+	sess.Values[sessionkeys.SessionKeyLinkMarker] = value
 	require.NoError(t, store.Save(seed, rr, sess))
 
 	for _, c := range rr.Result().Cookies() {
@@ -345,7 +345,7 @@ func nextBrowserRequest(t *testing.T, sent *http.Request, rr *httptest.ResponseR
 func newMarkerTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		constants.SessionKeySessionIdentifier,
+		sessionkeys.SessionKeySessionIdentifier,
 		false,
 		sessionstore.PersistentCookie,
 		sessionstore.KeyPair{
@@ -398,8 +398,7 @@ func userWithCode(t *testing.T, id int64, code string, issuedAt time.Time) (*mod
 
 	encrypted, err := encryption.EncryptData(code)
 	require.NoError(t, err)
-	codeHash, err := hashutil.HashString(code)
-	require.NoError(t, err)
+	codeHash := hashutil.HashString(code)
 
 	return &models.User{
 		Id:                          id,
@@ -460,8 +459,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 		{
 			name: "a code matching no outstanding reset",
 			arrange: func(t *testing.T, database *mocks_data.Database) {
-				codeHash, err := hashutil.HashString(code)
-				require.NoError(t, err)
+				codeHash := hashutil.HashString(code)
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 			},
@@ -474,8 +472,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			name: "a row found by hash whose stored code does not match",
 			arrange: func(t *testing.T, database *mocks_data.Database) {
 				other, _ := userWithCode(t, 1, "a-completely-different-code", time.Now().UTC())
-				codeHash, err := hashutil.HashString(code)
-				require.NoError(t, err)
+				codeHash := hashutil.HashString(code)
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(other, nil).Once()
 			},
@@ -484,8 +481,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 		{
 			name: "a row carrying a hash but no encrypted code",
 			arrange: func(t *testing.T, database *mocks_data.Database) {
-				codeHash, err := hashutil.HashString(code)
-				require.NoError(t, err)
+				codeHash := hashutil.HashString(code)
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1, ForgotPasswordCodeHash: codeHash}, nil).Once()
 			},
@@ -1363,8 +1359,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 	const codeHash = "the-code-hash"
 	const newPassword = "Str0ngP4ss!"
 
-	hashOfRequestCode, err := hashutil.HashString(requestCode)
-	require.NoError(t, err)
+	hashOfRequestCode := hashutil.HashString(requestCode)
 
 	// Every scenario below is a condition attributable to the link, across both
 	// handlers and across all three hops. All must yield byte-identical responses.
@@ -1566,8 +1561,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
-		codeHash, err := hashutil.HashString(code)
-		require.NoError(t, err)
+		codeHash := hashutil.HashString(code)
 		user := &models.User{
 			Id: 1, Email: "test@example.com",
 			ForgotPasswordCodeEncrypted: []byte("not-valid-ciphertext"),
@@ -1648,7 +1642,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 
 		user, codeHash := userWithCode(t, 1, code, time.Now().UTC())
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
-		store.On("Get", mock.Anything, constants.AuthServerSessionName).
+		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).
 			Return(nil, errors.New("session store is unavailable"))
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 

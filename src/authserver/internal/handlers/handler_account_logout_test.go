@@ -17,9 +17,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -911,7 +911,7 @@ func expectCookieWipedBeforeSave(t *testing.T, httpSession *mocks_sessionstore.S
 		Values:  map[string]any{"something": "here"},
 		Options: &sessionstore.Options{Path: "/"},
 	}
-	httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(sess, nil)
+	httpSession.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(sess, nil)
 	httpSession.On("Save", mock.Anything, mock.Anything, sess).
 		Run(func(args mock.Arguments) {
 			saved := args.Get(2).(*sessionstore.Session)
@@ -1658,7 +1658,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 
-		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).
+		httpSession.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).
 			Return(nil, errors.New("session store error"))
 
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything,
@@ -1695,7 +1695,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			Values:  make(map[string]any),
 			Options: &sessionstore.Options{Path: "/"},
 		}
-		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).Return(mockSession, nil)
+		httpSession.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(mockSession, nil)
 		httpSession.On("Save", mock.Anything, mock.Anything, mockSession).Return(errors.New("session save error"))
 
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything,

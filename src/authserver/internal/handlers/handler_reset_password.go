@@ -318,11 +318,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	code string) {
 
-	codeHash, err := hashutil.HashString(code)
-	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
-		return
-	}
+	codeHash := hashutil.HashString(code)
 
 	user, err := database.GetUserByForgotPasswordCodeHash(r.Context(), nil, codeHash)
 	if err != nil {
