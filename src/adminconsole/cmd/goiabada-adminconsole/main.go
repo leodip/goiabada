@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/gob"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -30,7 +31,14 @@ func main() {
 	// the install goes out in a shape the deployment did not choose, and a value
 	// the handler cannot read has to stop the server rather than be silently
 	// replaced by a default (#320).
-	config.Init()
+	//
+	// A numeric or boolean variable that does not parse stops the server here, all of them named
+	// at once. It goes to stderr as one line and exits 2, which is what a bad flag already gets
+	// from flag.CommandLine, because no log handler exists yet to write it through (#434).
+	if err := config.Init(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(2)
+	}
 	if err := logging.Install(config.GetAdminConsole().LogLevel, config.GetAdminConsole().LogFormat); err != nil {
 		slog.Error("unable to install the log handler", "error", err)
 		os.Exit(1)

@@ -96,6 +96,27 @@ func TestMain_HandsTheOverridesDirectoryToTheCatalogs(t *testing.T) {
 	assert.Contains(t, stderr, "active.en.toml")
 }
 
+// TestMain_RefusesAMalformedVariable is the wiring between config.Init's refusal and the process:
+// that main stops on it with exit 2, the code a bad flag gets, and writes it to stderr as the one
+// line an operator reads, before the log handler is installed (#434). Two variables are malformed,
+// so a main that printed only the first would fail.
+//
+// The exit code is what a main ignoring the error cannot fake here: it would go on and stop, 1, at
+// the listener this harness disables. stderr holding the refusal line and nothing else is what
+// shows the refusal came before anything was logged.
+func TestMain_RefusesAMalformedVariable(t *testing.T) {
+	code, stderr := runMainProcess(t, []string{
+		"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=94x4",
+		"GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=yes",
+		// Neither listener, so a child that got past the refusal stops rather than serves.
+		"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
+	})
+
+	require.Equal(t, 2, code, "stderr: %s", stderr)
+	assert.Equal(t, `malformed configuration: GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS is "94x4", not an integer; `+
+		`GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS is "yes", not a boolean (true or false)`+"\n", stderr)
+}
+
 // TestMain_RefusesAMalformedPreviousSessionKey is the wiring between the session-key rule
 // core/sessionstore's table covers and the process: that main calls SessionKeys and stops on its
 // refusal (#434). The previous authentication key is 32 bytes where 64 are required.

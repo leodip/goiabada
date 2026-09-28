@@ -103,17 +103,21 @@ type Config struct {
 }
 
 var (
-	cfg  Config
-	once sync.Once
+	cfg     Config
+	once    sync.Once
+	loadErr error
 )
 
-// Init initializes the configuration
-func Init() {
-	once.Do(load)
+// Init initializes the configuration and answers the load's refusal, a malformed numeric or
+// boolean variable. The once keeps the error as well as the load, so every call answers it and a
+// caller cannot read a refused configuration by calling twice (#434).
+func Init() error {
+	once.Do(func() { loadErr = load() })
+	return loadErr
 }
 
-func load() {
-	loadFrom(flag.CommandLine, os.Args[1:])
+func load() error {
+	return loadFrom(flag.CommandLine, os.Args[1:])
 }
 
 // loadFrom is load with the flag set and the arguments supplied.
@@ -122,17 +126,22 @@ func load() {
 // flag.CommandLine, which panics on the second registration of any name: load()
 // can therefore run exactly once per process, and no test could call it twice to
 // observe what a flag or a variable lands on the config (#320).
-func loadFrom(fs *flag.FlagSet, args []string) {
+//
+// It answers every numeric or boolean variable that is set and does not parse, in one error, and
+// fills cfg either way. A flag given for the same setting does not rescue the variable: the value
+// the operator wrote is wrong whichever of the two wins (#434).
+func loadFrom(fs *flag.FlagSet, args []string) error {
+	var malformed malformedValues
 	cfg = Config{
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:                          getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
 			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444, &malformed),
 			ListenHostHttp:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
-			TrustProxyHeaders:                getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091, &malformed),
+			TrustProxyHeaders:                getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
-			LogHttpRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
+			LogHttpRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", &malformed),
 			LogLevel:                         getEnv("GOIABADA_ADMINCONSOLE_LOG_LEVEL", "info"),
 			LogFormat:                        getEnv("GOIABADA_ADMINCONSOLE_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
@@ -202,6 +211,8 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 		slog.Warn("a removed setting is present in the environment and is ignored, because the secure cookie flag is now derived from an https base url",
 			"setting", k)
 	}
+
+	return malformed.err()
 }
 
 func GetAdminConsole() *AdminConsoleConfig {
@@ -219,20 +230,55 @@ func getEnv(key string, defaultVal string) string {
 	return strings.TrimSpace(defaultVal)
 }
 
-func getEnvAsInt(key string, defaultVal int) int {
-	valueStr := getEnv(key, "")
-	if value, err := strconv.Atoi(strings.TrimSpace(valueStr)); err == nil {
-		return value
-	}
-	return defaultVal
+// malformedValues collects every numeric or boolean variable loadFrom could not parse, so one
+// refusal names them all rather than costing the operator a restart per typo (#434).
+type malformedValues []string
+
+func (m *malformedValues) add(key, value, want string) {
+	*m = append(*m, key+" is "+strconv.Quote(value)+", not "+want)
 }
 
-func getEnvAsBool(key string) bool {
-	valueStr := getEnv(key, "")
-	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
-		return value
+// err is the refusal: one line, whatever the values hold, because main writes it to stderr
+// before any log handler exists and an operator reads it as the one reason the server stopped.
+// The values are quoted, so not even a value carrying a newline can break it.
+func (m malformedValues) err() error {
+	if len(m) == 0 {
+		return nil
 	}
-	return false
+	return errs.Errorf("malformed configuration: %s", strings.Join(m, "; "))
+}
+
+// getEnvAsInt answers the default when the variable is unset or empty after the trim, and the
+// number when it parses. Anything else is recorded as malformed rather than read as the default:
+// a mistyped port used to leave the server on the port it shipped with and say nothing (#434).
+// Empty stays the default because every shipped compose file and the setup wizard write
+// GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS= to mean no https listener.
+func getEnvAsInt(key string, defaultVal int, malformed *malformedValues) int {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return defaultVal
+	}
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		malformed.add(key, valueStr, "an integer")
+		return defaultVal
+	}
+	return value
+}
+
+// getEnvAsBool is getEnvAsInt's rule for a setting whose default is false: an operator writing
+// yes used to get the setting off, silently (#434).
+func getEnvAsBool(key string, malformed *malformedValues) bool {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return false
+	}
+	value, err := strconv.ParseBool(valueStr)
+	if err != nil {
+		malformed.add(key, valueStr, "a boolean (true or false)")
+		return false
+	}
+	return value
 }
 
 func getEnvAsStringSlice(key string) []string {
