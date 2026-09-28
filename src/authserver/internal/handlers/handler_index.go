@@ -1,16 +1,12 @@
 package handlers
 
-import (
-	"net/http"
-
-	"github.com/leodip/goiabada/authserver/internal/config"
-)
+import "net/http"
 
 func HandleIndexGet(
-	httpHelper HttpHelper,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// redirect to admin console
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL, http.StatusFound)
+		http.Redirect(w, r, adminConsoleBaseURL, http.StatusFound)
 	}
 }

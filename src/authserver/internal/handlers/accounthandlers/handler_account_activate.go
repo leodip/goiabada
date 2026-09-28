@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -118,6 +117,7 @@ func HandleAccountActivateGet(
 	userCreator UserCreator,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +137,7 @@ func HandleAccountActivateGet(
 			return
 		}
 
-		handleActivationCleanHop(httpHelper, httpSession, database, userCreator, auditLogger, w, r)
+		handleActivationCleanHop(httpHelper, httpSession, database, userCreator, auditLogger, adminConsoleBaseURL, w, r)
 	}
 }
 
@@ -237,7 +237,7 @@ func isVerificationCodeExpired(preRegistration *models.PreRegistration) bool {
 // the whole boundary it was written as (#112, #266).
 func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.Store,
 	database accountActivateDatabase, userCreator UserCreator, auditLogger AuditLogger,
-	w http.ResponseWriter, r *http.Request) {
+	adminConsoleBaseURL string, w http.ResponseWriter, r *http.Request) {
 
 	marker, rejection, err := emaillinks.GetLinkMarker(httpSession, r, emaillinks.LinkMarkerFlowAccountActivate)
 	if err != nil {
@@ -299,7 +299,7 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 	}
 
 	bind := map[string]interface{}{
-		"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
+		"adminConsoleBaseUrl": adminConsoleBaseURL,
 	}
 
 	err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind)

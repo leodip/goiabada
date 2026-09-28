@@ -489,7 +489,7 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	require.NoError(t, database.UpdateUser(context.Background(), nil, fresh))
 
 	httpClient := createHttpClient(t)
-	cleanURL := followResetLink(t, httpClient, emaillinks.ResetPasswordLink(code))
+	cleanURL := followResetLink(t, httpClient, emaillinks.ResetPasswordLink(config.GetAuthServer().BaseURL, code))
 
 	// The form is rendered first, because the submission has to carry the continuation id
 	// the form held, exactly as a browser does.

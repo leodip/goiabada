@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -36,6 +35,7 @@ func HandleAuthPwdGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	database authPwdDatabase,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +43,7 @@ func HandleAuthPwdGet(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -126,6 +126,8 @@ func HandleAuthPwdPost(
 	database authPwdDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +135,7 @@ func HandleAuthPwdPost(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -351,6 +353,6 @@ func HandleAuthPwdPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1completed", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/auth/level1completed", http.StatusFound)
 	}
 }

@@ -296,6 +296,7 @@ func HandleAPIUserCreatePost(
 	auditLogger AuditLogger,
 	emailSender EmailSender,
 	dataCipher *encryption.DataCipher,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -492,7 +493,7 @@ func HandleAPIUserCreatePost(
 
 			bind := map[string]interface{}{
 				"name": name,
-				"link": emaillinks.ResetPasswordLink(verificationCode),
+				"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
 			}
 
 			// Newly-created user has no stored Locale yet; render the

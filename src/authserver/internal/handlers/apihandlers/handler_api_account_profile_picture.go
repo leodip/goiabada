@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -29,6 +28,8 @@ type accountProfilePictureDatabase interface {
 func HandleAPIAccountProfilePicturePost(
 	database accountProfilePictureDatabase,
 	auditLogger AuditLogger,
+	baseURL string,
+	maxUploadBytes int64,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token
@@ -57,7 +58,7 @@ func HandleAPIAccountProfilePicturePost(
 		}
 
 		// Get max file size from config
-		maxFileSize := imaging.MaxFileSize(config.GetAuthServer().ProfilePictureMaxSizeBytes)
+		maxFileSize := imaging.MaxFileSize(maxUploadBytes)
 
 		// Limit request body size
 		r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+1024) // extra for multipart overhead
@@ -127,7 +128,7 @@ func HandleAPIAccountProfilePicturePost(
 		// Return success response
 		response := map[string]interface{}{
 			"success":    true,
-			"pictureUrl": config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject,
+			"pictureUrl": baseURL + "/userinfo/picture/" + user.Subject,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -189,6 +190,7 @@ func HandleAPIAccountProfilePictureDelete(
 // HandleAPIAccountProfilePictureGet - GET /api/v1/account/profile-picture
 func HandleAPIAccountProfilePictureGet(
 	database accountProfilePictureDatabase,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token
@@ -228,7 +230,7 @@ func HandleAPIAccountProfilePictureGet(
 		}
 
 		if hasPicture {
-			response["pictureUrl"] = config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject
+			response["pictureUrl"] = baseURL + "/userinfo/picture/" + user.Subject
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

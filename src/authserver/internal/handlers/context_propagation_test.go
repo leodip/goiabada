@@ -147,7 +147,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 	HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger,
-		userSessionManager, permissionChecker).ServeHTTP(rr, req)
+		userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
 	database.AssertExpectations(t)
@@ -189,7 +189,7 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 	HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger,
-		userSessionManager, permissionChecker).ServeHTTP(rr, req)
+		userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
 	assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")

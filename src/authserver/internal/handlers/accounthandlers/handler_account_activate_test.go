@@ -235,7 +235,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := linkFollowedRequest(code)
 		handler.ServeHTTP(rr, sent)
@@ -279,7 +279,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
 		expectRenderedLinkExpired(httpHelper)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -305,7 +305,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		expectRenderedLinkExpired(httpHelper)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := linkFollowedRequest(code)
 		handler.ServeHTTP(rr, sent)
@@ -341,7 +341,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			return strings.Contains(err.Error(), "unable to decrypt verification code")
 		})).Once()
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), linkFollowedRequest(code))
 
 		assert.Empty(t, logs.Records(), "a server fault must not be logged as a refused link")
@@ -370,7 +370,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			emaillinks.LinkMarkerFlowAccountActivate, 7, "the-first-hash")
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, sent)
 
@@ -413,7 +413,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			emaillinks.LinkMarkerFlowResetPassword, 42, "the-reset-hash")
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, sent)
 
@@ -447,7 +447,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		expectRenderedLinkExpired(httpHelper)
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -483,7 +483,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 					expectRenderedLinkExpired(httpHelper)
 				}
 
-				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 				rr := httptest.NewRecorder()
 				handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -537,7 +537,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				return !expired
 			})).Return(nil).Once()
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 		handler.ServeHTTP(rr, sent)
@@ -614,7 +614,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				sent := tc.request(t, store)
 				logs := logtest.CaptureSlog(t)
 
-				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 				rr := httptest.NewRecorder()
 				handler.ServeHTTP(rr, sent)
 
@@ -668,7 +668,7 @@ func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
 			logs := logtest.CaptureSlog(t)
 
-			handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher)
+			handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, sent)
 

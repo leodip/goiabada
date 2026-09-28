@@ -15,7 +15,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -51,12 +50,14 @@ func HandleIssueGet(
 	auditLogger AuditLogger,
 	userSessionManager UserSessionManager,
 	permissionChecker PermissionChecker,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -333,7 +334,7 @@ func HandleIssueGet(
 			}
 
 			refuseIssuanceUnusableSession(w, r, shape, authContext, issuingClient, ambientSession,
-				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger)
+				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger, baseURL)
 			return
 		}
 
@@ -517,7 +518,7 @@ func HandleIssueGet(
 		})
 		if errors.Is(err, errIssuanceRefused) {
 			refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
-				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger)
+				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger, baseURL)
 			return
 		}
 
@@ -608,6 +609,7 @@ func refuseIssuanceUnusableSession(
 	templateFS fs.FS,
 	database authIssueDatabase,
 	auditLogger AuditLogger,
+	baseURL string,
 ) {
 	// Only the expired shape audits. The foreign and gone shapes are #133's and #129's refusals,
 	// writing no audit row today; this event attests the check #241 added, which is the one an
@@ -708,7 +710,7 @@ func refuseIssuanceUnusableSession(
 		httpHelper.InternalServerError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+	http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
 }
 
 // handleImplicitFlow handles the implicit grant flow token issuance.

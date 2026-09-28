@@ -16,7 +16,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -101,6 +100,7 @@ func HandleAuthorizeGet(
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,
 	tokenParser TokenParser,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -428,7 +428,7 @@ func HandleAuthorizeGet(
 				httpHelper.InternalServerError(w, r, saveAuthContextErr)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
 		}
 
 		err = authorizeValidator.ValidateUnsupportedRequestParameters(&protocolvalidation.ValidateUnsupportedRequestParametersInput{
@@ -537,7 +537,7 @@ func HandleAuthorizeGet(
 
 		// Handle prompt=none: silent authentication without any UI
 		if authContext.HasPromptValue("none") {
-			handlePromptNone(w, r, httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings)
+			handlePromptNone(w, r, httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
 			return
 		}
 
@@ -549,7 +549,7 @@ func HandleAuthorizeGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
 			return
 		}
 
@@ -584,7 +584,7 @@ func HandleAuthorizeGet(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+				http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
 				return
 			}
 
@@ -621,7 +621,7 @@ func HandleAuthorizeGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1completed", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/level1completed", http.StatusFound)
 			return
 		}
 
@@ -632,7 +632,7 @@ func HandleAuthorizeGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
 	}
 }
 
@@ -640,7 +640,7 @@ func HandleAuthorizeGet(
 // It performs all necessary checks without displaying any UI and either:
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
-func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings, baseURL string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -833,7 +833,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 		return
 	}
 
-	http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/issue", http.StatusFound)
+	http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
 }
 
 // redirectErrorInput carries what an error response to a client is built from. It is a struct

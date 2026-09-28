@@ -13,7 +13,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -76,12 +75,14 @@ func HandleConsentGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	database consentDatabase,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -180,7 +181,7 @@ func HandleConsentGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/issue", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
 		}
 	}
 }
@@ -192,12 +193,14 @@ func HandleConsentPost(
 	templateFS fs.FS,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -427,7 +430,7 @@ func HandleConsentPost(
 					httpHelper.InternalServerError(w, r, consentErr)
 					return
 				}
-				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/issue", http.StatusFound)
+				http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
 			}
 		} else {
 

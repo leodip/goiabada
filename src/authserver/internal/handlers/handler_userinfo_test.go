@@ -14,7 +14,6 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -31,7 +30,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		rr := httptest.NewRecorder()
@@ -52,7 +51,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
@@ -82,7 +81,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
@@ -112,7 +111,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 
@@ -150,7 +149,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
@@ -272,7 +271,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "email")
@@ -325,7 +324,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "profile")
@@ -374,7 +373,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "groups attributes")
@@ -431,21 +430,15 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	// Divergence 2, userinfo's side: the base URL is read from the process configuration at
-	// the moment the claim is built, where issuance carries the value injected into
-	// NewTokenIssuer. The mapper takes it as an input rather than reading it back, so both
-	// callers keep the source they have.
-	t.Run("userinfo builds profile and picture from the configured base URL", func(t *testing.T) {
+	// Divergence 2, userinfo's side: the base URL is the one the handler was handed at
+	// construction, as issuance's is the one injected into NewTokenIssuer (#434). The mapper
+	// takes it as an input rather than reading it back, so each caller keeps the source it has.
+	t.Run("userinfo builds profile and picture from the base URL it was handed", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		authServerConfig := config.GetAuthServer()
-		originalBaseURL := authServerConfig.BaseURL
-		t.Cleanup(func() { authServerConfig.BaseURL = originalBaseURL })
-		authServerConfig.BaseURL = "https://configured.example"
-
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "profile")
@@ -466,8 +459,8 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
 
 		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
-			assert.Equal(t, "https://configured.example/account/profile", claims["profile"])
-			assert.Equal(t, "https://configured.example/userinfo/picture/"+sub, claims["picture"])
+			assert.Equal(t, "https://auth.test/account/profile", claims["profile"])
+			assert.Equal(t, "https://auth.test/userinfo/picture/"+sub, claims["picture"])
 			return true
 		})).Return()
 
@@ -548,7 +541,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 
 			// templateFS is nil because JsonError renders no template; a 500 through the
 			// page writer would panic here, which is the fail-loud direction.
-			handler := HandleUserInfoGetPost(handlerhelpers.NewHttpHelper(nil), database, auditLogger)
+			handler := HandleUserInfoGetPost(handlerhelpers.NewHttpHelper(nil), database, auditLogger, testBaseURL)
 
 			req, _ := http.NewRequest("GET", "/userinfo", nil)
 			jwtToken := oauth.JwtToken{

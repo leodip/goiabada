@@ -4,16 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
-// GetProfileURL builds the link the auth server points users at to manage their
+// profileURL builds the link the auth server points users at to manage their
 // own profile, which lives in the admin console rather than here.
-func TestGetProfileURL(t *testing.T) {
-	previous := config.GetAdminConsole().BaseURL
-	t.Cleanup(func() { config.GetAdminConsole().BaseURL = previous })
-
+func TestProfileURL(t *testing.T) {
 	testCases := []struct {
 		name    string
 		baseURL string
@@ -46,9 +42,7 @@ func TestGetProfileURL(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config.GetAdminConsole().BaseURL = tc.baseURL
-
-			got := GetProfileURL()
+			got := profileURL(tc.baseURL)
 
 			assert.Equal(t, tc.want, got)
 			assert.True(t, strings.HasSuffix(got, "/account/profile"))

@@ -48,6 +48,7 @@ func HandleForgotPasswordPost(
 	database forgotPasswordDatabase,
 	emailSender EmailSender,
 	dataCipher *encryption.DataCipher,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +102,7 @@ func HandleForgotPasswordPost(
 
 			bind := map[string]interface{}{
 				"name": user.FullName(),
-				"link": emaillinks.ResetPasswordLink(verificationCode),
+				"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
 			}
 			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, user.Locale, "en"))
 			buf, resetEmailErr := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)

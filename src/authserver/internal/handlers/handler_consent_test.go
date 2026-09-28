@@ -13,7 +13,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -135,7 +134,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -158,7 +157,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -181,7 +180,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -210,7 +209,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -243,7 +242,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -300,7 +299,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -337,7 +336,7 @@ func TestHandleConsentGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -349,7 +348,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -408,7 +407,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database)
+		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -455,7 +454,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -481,7 +480,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -575,7 +574,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				form := url.Values{}
 				if tc.btn == "btnSubmit" {
@@ -633,7 +632,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -682,7 +681,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -737,7 +736,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -788,7 +787,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -832,7 +831,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -878,7 +877,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -894,7 +893,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -946,7 +945,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -966,7 +965,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1018,7 +1017,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		if assert.NotNil(t, persisted) {
 			assert.Equal(t, "openid backend:read", persisted.Scope,
@@ -1053,7 +1052,7 @@ func TestHandleConsentPost(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1110,7 +1109,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1185,7 +1184,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1258,7 +1257,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1322,7 +1321,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1381,7 +1380,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1435,7 +1434,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1483,7 +1482,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1529,7 +1528,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1789,7 +1788,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				scopes := scopeList(tc.scopeCount)
 
@@ -1876,7 +1875,7 @@ func TestHandleConsentPost(t *testing.T) {
 					handler.ServeHTTP(rr, req)
 
 					assert.Equal(t, http.StatusFound, rr.Code)
-					assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+					assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 					if assert.NotNil(t, persisted) {
 						assert.Equal(t, expectedScope, persisted.Scope)
@@ -1907,7 +1906,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
+		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -1947,7 +1946,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -201,4 +203,38 @@ func TestHandleAPIAccountEmailVerificationPost_CodeComparison(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, env.post(t, "").Code)
 		assert.False(t, env.user.EmailVerified)
 	})
+}
+
+// The emailed verification link points at the admin console base URL the handler was handed,
+// not at the configured one (#434).
+func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHanded(t *testing.T) {
+	httpHelper := mocks_handlers.NewHttpHelper(t)
+	database := mocks_data.NewDatabase(t)
+	emailSender := mocks_handlers.NewEmailSender(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+
+	handler := HandleAPIAccountEmailVerificationSendPost(httpHelper, database, emailSender, auditLogger,
+		testDataCipher, testAdminConsoleBaseURL)
+
+	user := &models.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
+	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+	var emailedLink string
+	httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+		"/emails/email_verification.html", mock.Anything).
+		Run(func(args mock.Arguments) {
+			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
+		}).Return(&bytes.Buffer{}, nil)
+	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).Return(nil)
+	auditLogger.On("Log", mock.Anything, audit.AuditSentEmailVerificationMessage, mock.Anything).Return()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.Equal(t, "https://admin.test/account/email-verification", emailedLink)
 }

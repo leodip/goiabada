@@ -114,7 +114,7 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 		}, nil).Once()
 		prepare(httpHelper, auditLogger, database, rr, req)
 
-		HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}).ServeHTTP(rr, req)
+		HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 		httpHelper.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)

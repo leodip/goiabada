@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,12 +15,9 @@ import (
 // TestLinkCodeAlphabetIsUnreserved rather than trusted.
 const codeAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
 
-func setAuthServerBaseURL(t *testing.T, baseURL string) {
-	t.Helper()
-	previous := config.GetAuthServer().BaseURL
-	t.Cleanup(func() { config.GetAuthServer().BaseURL = previous })
-	config.GetAuthServer().BaseURL = baseURL
-}
+// testBaseURL is the auth server base URL the cases that are not about the base URL build
+// their links under.
+const testBaseURL = "https://auth.example.com"
 
 // ResetPasswordLink and AccountActivateLink own the shape of the two links Goiabada
 // emails. The link carries the verification code and nothing else, which is what
@@ -47,7 +43,7 @@ func TestResetPasswordLink(t *testing.T) {
 		},
 		{
 			// The base URL is concatenated as-is, the same way the handlers'
-			// GetProfileURL does it, so a trailing slash doubles up. Pinned
+			// profileURL does it, so a trailing slash doubles up. Pinned
 			// because it produces a subtly broken link rather than an obvious
 			// failure.
 			name:    "trailing slash is not normalized",
@@ -65,9 +61,7 @@ func TestResetPasswordLink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			setAuthServerBaseURL(t, tc.baseURL)
-
-			got := ResetPasswordLink(tc.code)
+			got := ResetPasswordLink(tc.baseURL, tc.code)
 
 			assert.Equal(t, tc.want, got)
 			// Section 2's checkable statement: no link Goiabada builds carries an
@@ -112,9 +106,7 @@ func TestAccountActivateLink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			setAuthServerBaseURL(t, tc.baseURL)
-
-			got := AccountActivateLink(tc.code)
+			got := AccountActivateLink(tc.baseURL, tc.code)
 
 			assert.Equal(t, tc.want, got)
 			assert.NotContains(t, got, "@")
@@ -127,15 +119,13 @@ func TestAccountActivateLink(t *testing.T) {
 // with no query, so a drift between the emailed path and the constant would break
 // the flow rather than fail visibly.
 func TestLinkPathsMatchTheSharedConstants(t *testing.T) {
-	setAuthServerBaseURL(t, "https://auth.example.com")
-
 	testCases := []struct {
 		name string
 		link string
 		want string
 	}{
-		{name: "reset", link: ResetPasswordLink("abc123"), want: ResetPasswordPath},
-		{name: "activate", link: AccountActivateLink("abc123"), want: AccountActivatePath},
+		{name: "reset", link: ResetPasswordLink(testBaseURL, "abc123"), want: ResetPasswordPath},
+		{name: "activate", link: AccountActivateLink(testBaseURL, "abc123"), want: AccountActivatePath},
 	}
 
 	for _, tc := range testCases {
@@ -167,8 +157,6 @@ func queryKeys(u *url.URL) []string {
 // produce; they are here because the helper is exported and a future caller could
 // pass anything.
 func TestLinkCodeSurvivesTheRoundTrip(t *testing.T) {
-	setAuthServerBaseURL(t, "https://auth.example.com")
-
 	codes := []string{
 		codeAlphabet, // every character the generator can emit, at once
 		stringutil.GenerateSecurityRandomString(32), // a real code, at the length both flows issue
@@ -184,13 +172,13 @@ func TestLinkCodeSurvivesTheRoundTrip(t *testing.T) {
 	for _, code := range codes {
 		for _, build := range []struct {
 			name string
-			fn   func(string) string
+			fn   func(baseURL, code string) string
 		}{
 			{name: "reset", fn: ResetPasswordLink},
 			{name: "activate", fn: AccountActivateLink},
 		} {
 			t.Run(build.name+"/"+code, func(t *testing.T) {
-				link := build.fn(code)
+				link := build.fn(testBaseURL, code)
 
 				// No link ever carries a literal '@', whatever it was handed.
 				assert.NotContains(t, link, "@")

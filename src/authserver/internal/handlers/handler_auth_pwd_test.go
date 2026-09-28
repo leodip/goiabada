@@ -11,7 +11,6 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -29,7 +28,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
+		handler := HandleAuthPwdGet(httpHelper, authHelper, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -54,7 +53,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
+		handler := HandleAuthPwdGet(httpHelper, authHelper, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -79,7 +78,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
+		handler := HandleAuthPwdGet(httpHelper, authHelper, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -142,7 +141,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
+		handler := HandleAuthPwdGet(httpHelper, authHelper, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -196,7 +195,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(httpHelper, authHelper, database)
+		handler := HandleAuthPwdGet(httpHelper, authHelper, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -242,7 +241,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/auth/pwd", nil)
 		rr := httptest.NewRecorder()
@@ -266,7 +265,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -355,7 +354,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
-				handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+				handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 				form := url.Values{}
 				form.Add("email", "test@example.com")
@@ -401,7 +400,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -451,7 +450,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -507,7 +506,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -554,7 +553,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -626,7 +625,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -680,7 +679,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -722,7 +721,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
@@ -815,7 +814,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the password was accepted")
 
 		httpHelper.AssertExpectations(t)
@@ -830,7 +829,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
@@ -942,7 +941,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			"/auth_pwd.html", mock.Anything).Return(nil).Maybe()
 
 		rateLimiter := newTestRateLimiter(authHelper)
-		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, rateLimiter)
+		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, rateLimiter, testBaseURL, testAdminConsoleBaseURL)
 		return rateLimiter.LimitPwd(handler), database, authContext
 	}
 

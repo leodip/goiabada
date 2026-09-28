@@ -6,6 +6,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
@@ -55,6 +56,9 @@ func (s *Server) initRoutes(root chi.Router) {
 	authHeaderToContext := middlewareBearerToken.JwtAuthorizationHeaderToContext()
 
 	authServerConfig := config.GetAuthServer()
+	baseURL := authServerConfig.BaseURL
+	adminConsoleBaseURL := config.GetAdminConsole().BaseURL
+	maxUploadBytes := authServerConfig.ProfilePictureMaxSizeBytes
 	rateLimiter := middleware.NewRateLimiterMiddleware(
 		authHelper,
 		httpHelper,
@@ -68,13 +72,15 @@ func (s *Server) initRoutes(root chi.Router) {
 	)
 
 	root.NotFound(handlers.HandleNotFoundGet(httpHelper))
-	root.Get("/", handlers.HandleIndexGet(httpHelper))
+	root.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
 	root.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	root.Get("/forgot-password", handlers.HandleForgotPasswordGet(httpHelper))
-	root.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, s.dataCipher))
-	root.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	root.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger))
-	root.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
+	root.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, s.dataCipher, baseURL))
+	// The two endpoints an emailed link points at register from the constants the links are
+	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
+	root.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
+	root.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL))
+	root.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper, baseURL))
 	root.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
 	// /userinfo takes a user's access token whose scope carries openid, which is what OIDC Core 1.0
 	// section 5.3 says the endpoint exists for (#449). The scope check comes first, as on every
@@ -84,8 +90,8 @@ func (s *Server) initRoutes(root chi.Router) {
 	// Refresh and ID tokens never get this far: authHeaderToContext admits only an access token
 	// for authserver (#401). GET and POST are separate registrations: a guard added to only one of
 	// them leaves the other reachable.
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
 	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	root.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	root.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
@@ -101,20 +107,20 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	root.Route("/auth", func(r chi.Router) {
-		authorizeHandler := handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		authorizeHandler := handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, baseURL)
 		r.Get("/authorize", authorizeHandler)
 		r.Post("/authorize", authorizeHandler)
-		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, authHelper))
-		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS))
-		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, authHelper, s.database))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker))
-		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker))
-		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database))
-		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter))
-		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, authHelper, s.database, otpSecretGenerator))
-		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter, s.dataCipher))
-		r.Get("/consent", handlers.HandleConsentGet(httpHelper, authHelper, s.database))
-		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger, permissionChecker))
+		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, authHelper, baseURL, adminConsoleBaseURL))
+		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, baseURL, adminConsoleBaseURL))
+		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, authHelper, s.database, baseURL, adminConsoleBaseURL))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
+		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker, baseURL, adminConsoleBaseURL))
+		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database, adminConsoleBaseURL))
+		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter, baseURL, adminConsoleBaseURL))
+		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, authHelper, s.database, otpSecretGenerator, adminConsoleBaseURL))
+		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter, s.dataCipher, baseURL, adminConsoleBaseURL))
+		r.Get("/consent", handlers.HandleConsentGet(httpHelper, authHelper, s.database, baseURL, adminConsoleBaseURL))
+		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
 		// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force)
 		r.With(rateLimiter.LimitROPC).Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
 		r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
@@ -125,9 +131,10 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Get("/register", accounthandlers.HandleAccountRegisterGet(httpHelper))
 		// The POST alone is limited: the GET renders a static form, while the POST probes
 		// whether an address already has an account, sends mail to it and writes a row.
-		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleAccountRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.dataCipher))
-		r.With(rateLimiter.LimitActivate).Get("/activate", accounthandlers.HandleAccountActivateGet(httpHelper, s.sessionStore, s.database, userCreator, auditLogger, s.dataCipher))
+		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleAccountRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
+	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
+	root.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleAccountActivateGet(httpHelper, s.sessionStore, s.database, userCreator, auditLogger, s.dataCipher, adminConsoleBaseURL))
 
 	// Admin API routes
 	root.Route("/api/v1/admin", func(r chi.Router) {
@@ -137,7 +144,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// commit their status themselves: anything mounted behind the guards would
 		// never write the pair on a refusal (#247).
 		r.Use(middleware.MiddlewareNoStore())
-		r.Use(middleware.APIDebugMiddleware())
+		r.Use(middleware.APIDebugMiddleware(authServerConfig.DebugAPIRequests))
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireValidSession(s.database))
 
@@ -197,10 +204,10 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleAPIUserPhonePut(s.database, phoneValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(s.database, passwordValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePicturePost(s.database, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureGet(s.database, baseURL))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher, baseURL))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleAPIUserDelete(s.database, auditLogger))
 
 		// User attributes routes
@@ -275,8 +282,8 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/permissions", apihandlers.HandleAPIClientPermissionsGet(s.database))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/permissions", apihandlers.HandleAPIClientPermissionsPut(s.database, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}", apihandlers.HandleAPIClientDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/logo", apihandlers.HandleAPIClientLogoGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients/{id}/logo", apihandlers.HandleAPIClientLogoPost(s.database, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/logo", apihandlers.HandleAPIClientLogoGet(s.database, baseURL))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients/{id}/logo", apihandlers.HandleAPIClientLogoPost(s.database, auditLogger, baseURL, maxUploadBytes))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}/logo", apihandlers.HandleAPIClientLogoDelete(s.database, auditLogger))
 
 		// Settings - General
@@ -324,7 +331,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// FIRST in the group, for the same reason as the admin group above. GET
 		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
 		r.Use(middleware.MiddlewareNoStore())
-		r.Use(middleware.APIDebugMiddleware())
+		r.Use(middleware.APIDebugMiddleware(authServerConfig.DebugAPIRequests))
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier))
 		// After the scope check, so an insufficient-scope caller still receives the 403 it
@@ -336,7 +343,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(s.database, profileValidator, auditLogger))
 		r.Put("/email", apihandlers.HandleAPIAccountEmailPut(s.database, emailValidator, auditLogger))
-		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher))
+		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher, adminConsoleBaseURL))
 		// The verification check is limited, the send beside it is not: sending checks no
 		// credential and already carries its own 60 second resend cooldown.
 		r.With(rateLimiter.LimitEmailVerification).Post("/email/verification",
@@ -359,11 +366,11 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Delete("/sessions/{id}", apihandlers.HandleAPIAccountSessionDelete(s.database, auditLogger))
 
 		// Logout request (self-service)
-		r.Post("/logout-request", apihandlers.HandleAPIAccountLogoutRequestPost(s.database, s.dataCipher))
+		r.Post("/logout-request", apihandlers.HandleAPIAccountLogoutRequestPost(s.database, s.dataCipher, baseURL))
 
 		// Profile picture (self-service)
-		r.Get("/profile-picture", apihandlers.HandleAPIAccountProfilePictureGet(s.database))
-		r.Post("/profile-picture", apihandlers.HandleAPIAccountProfilePicturePost(s.database, auditLogger))
+		r.Get("/profile-picture", apihandlers.HandleAPIAccountProfilePictureGet(s.database, baseURL))
+		r.Post("/profile-picture", apihandlers.HandleAPIAccountProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
 		r.Delete("/profile-picture", apihandlers.HandleAPIAccountProfilePictureDelete(s.database, auditLogger))
 	})
 

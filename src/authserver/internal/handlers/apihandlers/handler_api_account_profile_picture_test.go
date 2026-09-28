@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // createTestPNG creates a valid PNG image with the specified dimensions
@@ -74,7 +75,7 @@ func setTokenContext(req *http.Request, sub string) *http.Request {
 func TestHandleAPIAccountProfilePictureGet_NoToken(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIAccountProfilePictureGet(database)
+	handler := HandleAPIAccountProfilePictureGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/account/profile-picture", nil)
 	rr := httptest.NewRecorder()
@@ -92,7 +93,7 @@ func TestHandleAPIAccountProfilePictureGet_NoToken(t *testing.T) {
 func TestHandleAPIAccountProfilePictureGet_EmptySub(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIAccountProfilePictureGet(database)
+	handler := HandleAPIAccountProfilePictureGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/account/profile-picture", nil)
 	req = setTokenContext(req, "")
@@ -111,7 +112,7 @@ func TestHandleAPIAccountProfilePictureGet_EmptySub(t *testing.T) {
 func TestHandleAPIAccountProfilePictureGet_UserNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIAccountProfilePictureGet(database)
+	handler := HandleAPIAccountProfilePictureGet(database, testBaseURL)
 
 	sub := fake.UUID()
 	req, _ := http.NewRequest("GET", "/api/v1/account/profile-picture", nil)
@@ -129,7 +130,7 @@ func TestHandleAPIAccountProfilePictureGet_UserNotFound(t *testing.T) {
 func TestHandleAPIAccountProfilePictureGet_HasPicture(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIAccountProfilePictureGet(database)
+	handler := HandleAPIAccountProfilePictureGet(database, testBaseURL)
 
 	sub := fake.UUID()
 	req, _ := http.NewRequest("GET", "/api/v1/account/profile-picture", nil)
@@ -148,7 +149,7 @@ func TestHandleAPIAccountProfilePictureGet_HasPicture(t *testing.T) {
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["hasPicture"].(bool))
-	assert.Contains(t, response["pictureUrl"].(string), sub)
+	assert.Equal(t, testBaseURL+"/userinfo/picture/"+sub, response["pictureUrl"])
 
 	database.AssertExpectations(t)
 }
@@ -156,7 +157,7 @@ func TestHandleAPIAccountProfilePictureGet_HasPicture(t *testing.T) {
 func TestHandleAPIAccountProfilePictureGet_NoPicture(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIAccountProfilePictureGet(database)
+	handler := HandleAPIAccountProfilePictureGet(database, testBaseURL)
 
 	sub := fake.UUID()
 	req, _ := http.NewRequest("GET", "/api/v1/account/profile-picture", nil)
@@ -184,7 +185,7 @@ func TestHandleAPIAccountProfilePicturePost_NoToken(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePicturePost(database, auditLogger)
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	req, _ := http.NewRequest("POST", "/api/v1/account/profile-picture", nil)
 	rr := httptest.NewRecorder()
@@ -198,7 +199,7 @@ func TestHandleAPIAccountProfilePicturePost_UserNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePicturePost(database, auditLogger)
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
 	pictureData := createTestPNG(100, 100)
@@ -219,7 +220,7 @@ func TestHandleAPIAccountProfilePicturePost_NoFile(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePicturePost(database, auditLogger)
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}
@@ -240,7 +241,7 @@ func TestHandleAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePicturePost(database, auditLogger)
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}
@@ -264,11 +265,41 @@ func TestHandleAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
+// The size cap is the one the handler was handed, not the configured default: an image the
+// default accepts is refused under a smaller injected cap, and the refusal names that cap (#434).
+func TestHandleAPIAccountProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
+
+	sub := fake.UUID()
+	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+
+	pictureData := createTestPNG(100, 100)
+	require.Greater(t, len(pictureData), 64)
+	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", pictureData)
+	require.NoError(t, err)
+	req = setTokenContext(req, sub)
+	rr := httptest.NewRecorder()
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
+	assert.Equal(t, "file size exceeds maximum allowed size of 64 bytes", response["error_description"])
+}
+
 func TestHandleAPIAccountProfilePicturePost_CreateNew(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePicturePost(database, auditLogger)
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}
@@ -297,7 +328,7 @@ func TestHandleAPIAccountProfilePicturePost_CreateNew(t *testing.T) {
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
-	assert.Contains(t, response["pictureUrl"].(string), sub)
+	assert.Equal(t, testBaseURL+"/userinfo/picture/"+sub, response["pictureUrl"])
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -307,7 +338,7 @@ func TestHandleAPIAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountProfilePicturePost(database, auditLogger)
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}

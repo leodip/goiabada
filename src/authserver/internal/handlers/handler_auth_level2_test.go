@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +21,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -45,7 +44,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -68,7 +67,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -97,7 +96,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -131,7 +130,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/otp", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/otp", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -143,7 +142,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -182,7 +181,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/completed", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -194,7 +193,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -227,7 +226,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/otp", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/otp", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -244,7 +243,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -286,7 +285,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database)
+		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()

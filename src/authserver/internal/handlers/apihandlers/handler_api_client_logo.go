@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -31,6 +30,8 @@ type clientLogoDatabase interface {
 func HandleAPIClientLogoPost(
 	database clientLogoDatabase,
 	auditLogger AuditLogger,
+	baseURL string,
+	maxUploadBytes int64,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse client ID from URL
@@ -59,7 +60,7 @@ func HandleAPIClientLogoPost(
 		}
 
 		// Get max file size from config
-		maxFileSize := imaging.MaxFileSize(config.GetAuthServer().ProfilePictureMaxSizeBytes)
+		maxFileSize := imaging.MaxFileSize(maxUploadBytes)
 
 		// Limit request body size
 		r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+1024) // extra for multipart overhead
@@ -137,7 +138,7 @@ func HandleAPIClientLogoPost(
 		// Return success response
 		response := map[string]interface{}{
 			"success":    true,
-			"pictureUrl": config.GetAuthServer().BaseURL + "/client/logo/" + client.ClientIdentifier,
+			"pictureUrl": baseURL + "/client/logo/" + client.ClientIdentifier,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -207,6 +208,7 @@ func HandleAPIClientLogoDelete(
 // HandleAPIClientLogoGet - GET /api/v1/admin/clients/{id}/logo
 func HandleAPIClientLogoGet(
 	database clientLogoDatabase,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse client ID from URL
@@ -246,7 +248,7 @@ func HandleAPIClientLogoGet(
 		}
 
 		if hasLogo {
-			response["logoUrl"] = config.GetAuthServer().BaseURL + "/client/logo/" + client.ClientIdentifier
+			response["logoUrl"] = baseURL + "/client/logo/" + client.ClientIdentifier
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

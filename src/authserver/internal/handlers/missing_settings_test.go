@@ -45,7 +45,7 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	}, nil)
 	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	HandleAuthPwdGet(httpHelper, authHelper, database).ServeHTTP(rr, req)
+	HandleAuthPwdGet(httpHelper, authHelper, database, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	httpHelper.AssertExpectations(t)
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)

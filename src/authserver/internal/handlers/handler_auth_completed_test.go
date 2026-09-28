@@ -14,7 +14,6 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +33,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		// The reuse bump records the browser's address, read as the rest of the server reads
@@ -103,7 +102,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		// Ordinary single sign-on raises nothing: the ceremony recorded no methods and the
 		// target ACR is the one the session already holds. Rotating here would replace the
@@ -180,7 +179,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -304,7 +303,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		// The event exists to name both parties: without previousUserId an operator cannot tell
 		// a browser changing hands from an administrator ending a session.
@@ -369,7 +368,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -452,7 +451,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -475,7 +474,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req.RemoteAddr = "203.0.113.7:4444"
@@ -565,7 +564,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		assertNotAttempted(t, database, "RunInTransaction", "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "DeleteUserSession")
@@ -609,7 +608,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker)
+			handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req, _ := http.NewRequest("GET", "/auth/completed", nil)
 			req.RemoteAddr = "203.0.113.7:4444"
@@ -687,7 +686,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -798,7 +797,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -908,7 +907,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -990,7 +989,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1016,7 +1015,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1087,7 +1086,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1106,7 +1105,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1187,7 +1186,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1216,7 +1215,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1290,7 +1289,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 		assert.EqualValues(t, 4, userSession.OtpConfigGeneration,
 			"the in-memory session must carry what was written, since the ACR below is taken against it")
 
@@ -1315,7 +1314,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1409,7 +1408,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1498,7 +1497,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1586,7 +1585,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1594,9 +1593,6 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		expectedError := errors.New("auth context error")
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
-
-		profileUrl := "http://example.com/account/profile"
-		config.GetAdminConsole().BaseURL = profileUrl
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == expectedError.Error()
@@ -1617,7 +1613,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1645,7 +1641,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1686,7 +1682,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1788,7 +1784,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1881,7 +1877,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1970,7 +1966,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2054,7 +2050,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2154,7 +2150,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2240,7 +2236,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2324,7 +2320,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2408,7 +2404,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2480,7 +2476,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/consent", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/consent", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -2499,7 +2495,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2570,7 +2566,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/consent", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/consent", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -2602,7 +2598,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2653,7 +2649,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -2672,7 +2668,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
+		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2724,7 +2720,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
