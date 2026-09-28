@@ -12,10 +12,10 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -108,7 +108,7 @@ func saveRedirectURIs(t *testing.T, db data.Database, auditLogger apihandlers.Au
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", id)
 	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-	ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{Id: 1})
+	ctx = reqctx.WithSettings(ctx, &models.Settings{Id: 1})
 
 	rr := httptest.NewRecorder()
 	apihandlers.HandleAPIClientRedirectURIsPut(db, auditLogger).ServeHTTP(rr, req.WithContext(ctx))

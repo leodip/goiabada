@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -549,7 +548,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 
 			// templateFS is nil because JsonError renders no template; a 500 through the
 			// page writer would panic here, which is the fail-loud direction.
-			handler := HandleUserInfoGetPost(handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}), database, auditLogger)
+			handler := HandleUserInfoGetPost(handlerhelpers.NewHttpHelper(nil), database, auditLogger)
 
 			req, _ := http.NewRequest("GET", "/userinfo", nil)
 			jwtToken := oauth.JwtToken{

@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -50,7 +49,11 @@ func HandleAPIAccountEmailVerificationSendPost(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		if !settings.SMTPEnabled {
 			writeJSONError(w, "SMTP is not enabled", "SMTP_NOT_ENABLED", http.StatusBadRequest)
 			return
@@ -157,7 +160,11 @@ func HandleAPIAccountEmailVerificationPost(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		if !settings.SMTPEnabled {
 			writeJSONError(w, "SMTP is not enabled", "SMTP_NOT_ENABLED", http.StatusBadRequest)
 			return

@@ -9,7 +9,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -96,7 +95,11 @@ func HandleAPIClientSessionsGet(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// The caller's own session, when its token names one. See the same read in
 		// handler_api_users_sessions.go: one mapper decides isCurrent for all three endpoints,

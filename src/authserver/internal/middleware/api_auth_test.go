@@ -14,7 +14,6 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -789,7 +788,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 
 func TestRequireValidSession(t *testing.T) {
 	settingsInCtx := func(req *http.Request) *http.Request {
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{
+		ctx := reqctx.WithSettings(req.Context(), &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		})
@@ -989,15 +988,22 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
+		capture := logtest.CaptureSlog(t)
 		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.False(t, nextCalled, "next handler should NOT be called when settings are missing")
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+		// The one sentinel every settings reader answers with (#433 decision 6).
+		records := capture.Records()
+		require.Len(t, records, 1)
+		logged, isError := records[0].Attrs["error"].(error)
+		require.True(t, isError, "the error attribute must carry the error value itself")
+		assert.ErrorIs(t, logged, reqctx.ErrNoSettings)
 		// 500 path uses http.Error, not the bearer-auth helper, so no WWW-Authenticate.
 		assert.Empty(t, rr.Header().Get("WWW-Authenticate"))
 	})
 
-	t.Run("returns 500 when settings is wrong type in context", func(t *testing.T) {
+	t.Run("returns 500 when the settings on the context are a nil pointer", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
@@ -1020,8 +1026,8 @@ func TestRequireValidSession(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
-		// Settings stored as a non-pointer struct, which fails the type assertion.
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, models.Settings{})
+		// A typed nil is the one wrong value the accessor can store, and it must read as absent.
+		ctx = reqctx.WithSettings(ctx, nil)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -1032,7 +1038,7 @@ func TestRequireValidSession(t *testing.T) {
 
 		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
-		assert.False(t, nextCalled, "next handler should NOT be called when settings type is wrong")
+		assert.False(t, nextCalled, "next handler should NOT be called when the settings are a nil pointer")
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	})
 
@@ -1466,11 +1472,10 @@ func TestRequireValidSession_Table(t *testing.T) {
 				req = req.WithContext(reqctx.WithBearerToken(req.Context(), oauth.JwtToken{Claims: tc.claims}))
 			}
 			if !tc.noSettings {
-				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-					&models.Settings{
-						UserSessionIdleTimeoutInSeconds: 3600,
-						UserSessionMaxLifetimeInSeconds: 86400,
-					}))
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{
+					UserSessionIdleTimeoutInSeconds: 3600,
+					UserSessionMaxLifetimeInSeconds: 86400,
+				}))
 			}
 
 			rr := httptest.NewRecorder()
@@ -1707,7 +1712,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 	requestWithId := func() *http.Request {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, requestId)
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{
+		ctx = reqctx.WithSettings(ctx, &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		})

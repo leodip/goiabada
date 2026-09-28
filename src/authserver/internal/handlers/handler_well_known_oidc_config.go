@@ -4,9 +4,8 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 )
 
 func HandleWellKnownOIDCConfigGet(
@@ -15,7 +14,11 @@ func HandleWellKnownOIDCConfigGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// Build grant types - always include base types
 		grantTypes := []string{"authorization_code", "refresh_token", "client_credentials"}

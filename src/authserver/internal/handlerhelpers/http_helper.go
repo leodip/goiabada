@@ -2,7 +2,6 @@ package handlerhelpers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
@@ -32,26 +32,12 @@ import (
 // exists to remove. Drift between the two copies is the accepted price; a change worth making in
 // one is worth reading the other for (#385).
 
-type LayoutSettings struct {
-	AppName     string
-	UITheme     string
-	SMTPEnabled bool
-}
-
-type SettingsReader interface {
-	LayoutSettings(ctx context.Context) LayoutSettings
-}
-
 type HttpHelper struct {
 	templateFS fs.FS
-	settings   SettingsReader
 }
 
-func NewHttpHelper(templateFS fs.FS, settings SettingsReader) *HttpHelper {
-	return &HttpHelper{
-		templateFS: templateFS,
-		settings:   settings,
-	}
+func NewHttpHelper(templateFS fs.FS) *HttpHelper {
+	return &HttpHelper{templateFS: templateFS}
 }
 
 // InternalServerError logs err once, with a stack and the request id the page shows, and renders
@@ -156,7 +142,14 @@ func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layo
 func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
-	settings := h.settings.LayoutSettings(r.Context())
+	// The layout reads the settings straight off the request. It used to take them through a port,
+	// because the renderer lived in core and core could not import the persistence models, and #385
+	// moved it here. A render without them is refused rather than drawn with a blank app name; when
+	// the refused render is the error page itself, InternalServerError answers in plain text (#433).
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		return nil, reqctx.ErrNoSettings
+	}
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path

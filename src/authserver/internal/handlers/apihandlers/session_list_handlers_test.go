@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,7 +29,7 @@ import (
 // non-empty, a validated token naming that session.
 func sessionListRequest(target string, sid string, claims map[string]interface{}) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, sessionSettings))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
 	if claims == nil {
 		claims = map[string]interface{}{}
 	}

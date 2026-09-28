@@ -287,7 +287,11 @@ func HandleIssueGet(
 		// consent screen. UserSession.IsValid measures it from the session's AuthTime, so
 		// max_age=0 is violated a nanosecond after the credential was accepted and every such
 		// ceremony would restart at level 1, mint a fresh session and fail again (#241).
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		sessionIsValid := userSessionManager.HasValidUserSession(ambientSession,
 			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
 

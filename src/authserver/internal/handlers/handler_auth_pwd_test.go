@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -120,7 +119,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -170,7 +169,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			SMTPEnabled: false,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -214,7 +213,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").
 			Return(&models.Client{ClientIdentifier: "my-app"}, nil)
 
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{})
+		ctx := reqctx.WithSettings(req.Context(), &models.Settings{})
 		req = req.WithContext(ctx)
 
 		var rendered map[string]interface{}
@@ -431,7 +430,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -476,7 +475,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		// The validation-error re-render is a path no happy-path case sees, and it has to carry the
@@ -533,7 +532,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -580,7 +579,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		// The request id chi's middleware would have put there, so the expectation below can
 		// assert which context the handler audited under (#328 seam 3).
 		ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, "goiabada/req-pwd-1")
@@ -652,7 +651,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "bob@example.com").Return(nil, nil)
@@ -704,7 +703,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{SMTPEnabled: true}
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 
 		// No GetUserByEmail expectation: the mock fails the test if the lookup is reached.
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -752,7 +751,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		user := &models.User{
@@ -860,7 +859,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		settings := &models.Settings{
 			SMTPEnabled: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		disabledUser := &models.User{
@@ -956,8 +955,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = "203.0.113.7:5000"
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-			&models.Settings{SMTPEnabled: true}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true}))
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
 		return rr.Code

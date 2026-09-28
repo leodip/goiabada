@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,7 @@ func testSettings() *models.Settings {
 }
 
 func settingsContext() context.Context {
-	return context.WithValue(context.Background(), constants.ContextKeySettings, testSettings())
+	return reqctx.WithSettings(context.Background(), testSettings())
 }
 
 func testBackend(database *mocks_data.Database, owner string) *dbBackend {

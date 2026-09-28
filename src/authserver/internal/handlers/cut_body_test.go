@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,11 +11,11 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -46,8 +45,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/connect/register", nil)
 		req.Body = cutBody(rr, string(body), limit)
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-			&models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
 		HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger).ServeHTTP(rr, req)
 		return rr
@@ -107,7 +105,7 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/auth/pwd", nil)
 		req.Body = cutBody(rr, body, limit)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Id: 1}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1}))
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,

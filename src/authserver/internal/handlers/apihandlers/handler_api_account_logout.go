@@ -13,7 +13,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -61,7 +60,11 @@ func HandleAPIAccountLogoutRequestPost(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// Resolve client
 		var client *models.Client

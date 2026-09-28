@@ -9,7 +9,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -92,7 +91,11 @@ func HandleAPIAccountPasswordPut(
 		}
 
 		// Validate new password against policy
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		if validatePasswordErr := passwordValidator.ValidatePassword(settings.PasswordPolicy, req.NewPassword); validatePasswordErr != nil {
 			writeValidationError(w, r, validatePasswordErr)
 			return

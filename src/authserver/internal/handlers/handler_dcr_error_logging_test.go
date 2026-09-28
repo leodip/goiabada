@@ -13,8 +13,8 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -46,8 +46,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{Id: 1, DynamicClientRegistrationEnabled: true})
+	ctx := reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true})
 	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, requestId)
 	req = req.WithContext(ctx)
 

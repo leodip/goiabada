@@ -2,16 +2,15 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -43,8 +42,7 @@ func logoutRequest(t *testing.T, clientIdentifier string) *http.Request {
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/logout-request", bytes.NewReader(body))
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": "the-user", "sid": logoutSid})
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{Issuer: "https://auth.example.com"}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Issuer: "https://auth.example.com"}))
 }
 
 // requireErrorOnTheRecord asserts one 500 whose record carries the failure the handler caught.

@@ -8,18 +8,17 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // HandleAPISettingsSessionsGet - GET /api/v1/admin/settings/sessions
 func HandleAPISettingsSessionsGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		if settings == nil {
-			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 
@@ -43,9 +42,9 @@ func HandleAPISettingsSessionsPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		if currentSettings == nil {
-			writeInternalServerError(w, r, errs.New("settings are missing from the request context"))
+		currentSettings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 

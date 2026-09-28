@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -139,7 +138,11 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Validate password
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		err = passwordValidator.ValidatePassword(settings.PasswordPolicy, req.NewPassword)
 		if err != nil {
 			writeValidationError(w, r, err)
@@ -304,7 +307,11 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Get settings from context
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// Validate required fields
 		if req.Email == "" {

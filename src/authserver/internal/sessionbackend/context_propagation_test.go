@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,7 +38,7 @@ func theCallersContext() interface{} {
 // lifetimes, which is what Create and Touch need before their first write.
 func markedSettingsContext() context.Context {
 	ctx := context.WithValue(context.Background(), backendCtxKey{}, "caller")
-	return context.WithValue(ctx, constants.ContextKeySettings, testSettings())
+	return reqctx.WithSettings(ctx, testSettings())
 }
 
 // The accept arm: the read Load makes is issued under the context Load was given.

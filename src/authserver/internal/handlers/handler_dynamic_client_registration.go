@@ -11,10 +11,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -39,7 +39,12 @@ func HandleDynamicClientRegistrationPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			apiresponse.LogInternalServerError(r, reqctx.ErrNoSettings)
+			writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)
+			return
+		}
 
 		// 1. Check if DCR is enabled (RFC 7591 §3)
 		if !settings.DynamicClientRegistrationEnabled {

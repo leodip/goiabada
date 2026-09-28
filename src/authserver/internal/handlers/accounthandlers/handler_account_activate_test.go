@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"log/slog"
@@ -25,6 +24,7 @@ import (
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -66,8 +66,7 @@ func newMarkerTestStore() *sessionstore.ServerSideStore {
 // withSelfRegistration attaches the settings MiddlewareSettings would have, with self-registration
 // on or off. The handler refuses both hops while it is off (#425 decision 6).
 func withSelfRegistration(req *http.Request, enabled bool) *http.Request {
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{SelfRegistrationEnabled: enabled}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: enabled}))
 }
 
 // linkFollowedRequest is the emailed link being followed: the code, and nothing else.

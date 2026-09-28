@@ -9,7 +9,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
@@ -74,7 +73,11 @@ func HandleAPIAccountSessionsGet(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// This endpoint is the one that always had isCurrent; the two admin ones now read the
 		// same claim through the same mapper (#373 decision 1).

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -14,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -113,7 +113,7 @@ var resetPasswordSettings = &models.Settings{PasswordPolicy: models.PasswordPoli
 // newResetPost is httptest.NewRequest for a reset submission, carrying resetPasswordSettings.
 func newResetPost(target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest("POST", target, body)
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, resetPasswordSettings))
+	return req.WithContext(reqctx.WithSettings(req.Context(), resetPasswordSettings))
 }
 
 // postResetRequest builds the form submission. It carries no query either: the template's

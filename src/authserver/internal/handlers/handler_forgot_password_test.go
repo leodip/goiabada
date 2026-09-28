@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,8 +10,8 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -130,7 +129,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		settings := &models.Settings{}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -176,7 +175,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 			SMTPFromEmail: "noreply@example.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()

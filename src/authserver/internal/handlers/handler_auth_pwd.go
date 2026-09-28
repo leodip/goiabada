@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -74,7 +73,11 @@ func HandleAuthPwdGet(
 			}
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// Fetch client to get display settings
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
@@ -173,7 +176,11 @@ func HandleAuthPwdPost(
 		// and the access log of every proxy in front of the deployment (#202).
 		password := r.PostFormValue("password")
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// Fetch client to get display settings
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)

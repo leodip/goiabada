@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -141,7 +140,11 @@ func HandleAPIAccountOTPEnrollmentGet(
 			// The generator hands back the otpauth:// URL alone, and the QR image and the
 			// base32 secret below are both derived from it, so there is one value to store
 			// and no second copy that could disagree with it.
-			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+			settings, ok := reqctx.SettingsFrom(r.Context())
+			if !ok {
+				writeInternalServerError(w, r, reqctx.ErrNoSettings)
+				return
+			}
 			keyURL, err = otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
 			if err != nil {
 				writeInternalServerError(w, r, err)

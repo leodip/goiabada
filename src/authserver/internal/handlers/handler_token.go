@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
@@ -178,7 +178,11 @@ func HandleTokenPost(
 			UsedBasicAuth: usedBasicAuth,
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, &input)
 		if err != nil {
 			// RFC 6749 §4.1.2: when an authorization code is reused by an

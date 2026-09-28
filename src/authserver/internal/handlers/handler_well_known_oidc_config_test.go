@@ -1,16 +1,15 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -28,7 +27,7 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 			Issuer: "https://example.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()

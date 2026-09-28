@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -281,15 +280,12 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 				return
 			}
 
-			settingsValue := r.Context().Value(constants.ContextKeySettings)
-			settings, ok := settingsValue.(*models.Settings)
-			if !ok || settings == nil {
+			settings, ok := reqctx.SettingsFrom(r.Context())
+			if !ok {
 				// Fail closed: without settings we cannot enforce idle/max-lifetime
 				// limits, and silently skipping the check would let an expired
 				// session ride a still-valid JWT past us.
-				apiresponse.WriteInternalServerError(w, r,
-					errs.New("missing or malformed settings in context; cannot validate session lifetime"),
-					"sid", sid)
+				apiresponse.WriteInternalServerError(w, r, reqctx.ErrNoSettings, "sid", sid)
 				return
 			}
 			if !session.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {

@@ -14,9 +14,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/api"
@@ -851,7 +851,11 @@ func HandleAPIClientRedirectURIsPut(
 		// These two flags are the complete enumeration of redirect-based flows here:
 		// protocolvalidation.ResponseTypeInfo.IsImplicitFlow treats any response type containing
 		// "code" as not implicit, so nothing outside the pair can produce a redirect.
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		if !client.AuthorizationCodeEnabled && !client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled) {
 			writeJSONError(w, "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
