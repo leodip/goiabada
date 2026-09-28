@@ -143,7 +143,7 @@ func Password(n int) string {
 
 // Email returns a 24-character address of the form "<12 lowercase letters>@example.com".
 // It satisfies the address regex in EmailValidator.ValidateEmailAddress and sits
-// well under the 60-character cap ValidateEmailUpdate applies.
+// well under the 60-character cap ValidateEmailChange applies.
 func Email() string {
 	return strings.ToLower(LetterN(12)) + "@example.com"
 }

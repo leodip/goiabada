@@ -57,6 +57,12 @@ var (
 	// nameHasLetter requires at least one letter, so a value made up entirely of
 	// spaces, apostrophes or hyphens is rejected.
 	nameHasLetter = regexp.MustCompile(`\p{L}`)
+	// usernameShape is a letter, then 1 to 23 letters, digits or underscores. The nickname is held
+	// to the same shape.
+	usernameShape = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{1,23}$`)
+	// websiteShape is an optional http or https scheme, a host of dot-separated labels ending in
+	// two or more letters, and an optional path.
+	websiteShape = regexp.MustCompile(`^(https?://)?(www\.)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(/\S*)?$`)
 )
 
 // ValidateName checks a name field against the shared name pattern.
@@ -119,13 +125,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileUsernameTaken, nil)
 		}
 
-		pattern := "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
-		regex, err := regexp.Compile(pattern)
-		if err != nil {
-			return err
-		}
-
-		if !regex.MatchString(input.Username) {
+		if !usernameShape.MatchString(input.Username) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileUsernameInvalid, nil)
 		}
 	}
@@ -142,26 +142,14 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		return err
 	}
 
-	pattern := "^[a-zA-Z][a-zA-Z0-9_]{1,23}$"
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return err
-	}
-
 	if len(input.Nickname) > 0 {
-		if !regex.MatchString(input.Nickname) {
+		if !usernameShape.MatchString(input.Nickname) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileNicknameInvalid, nil)
 		}
 	}
 
-	pattern = `^(https?://)?(www\.)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(/\S*)?$`
-	regex, err = regexp.Compile(pattern)
-	if err != nil {
-		return err
-	}
-
 	if len(input.Website) > 0 {
-		if !regex.MatchString(input.Website) {
+		if !websiteShape.MatchString(input.Website) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileWebsiteInvalid, nil)
 		}
 	}

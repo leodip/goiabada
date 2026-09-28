@@ -8,34 +8,47 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/logging"
 )
 
-// auditDatabase is what the audit logger needs: the settings that say whether auditing is
-// enabled, and the record it writes.
+// auditDatabase is what the audit logger writes: the record.
 type auditDatabase interface {
 	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 }
 
-// auditWriteTimeout bounds the settings read and the audit insert once Log has detached them from
+// Switches are the two settings that say where Log records an event.
+type Switches struct {
+	Console  bool
+	Database bool
+}
+
+// switchesSource answers the two switches for the request ctx belongs to. The production one,
+// middleware.AuditSwitches, answers from the settings the settings middleware put on the context
+// and reads the row only when there are none, so an audited request costs no second settings read
+// (#212 item 2) and this package reads nothing off a context itself (#433).
+type switchesSource interface {
+	AuditSwitches(ctx context.Context) (Switches, error)
+}
+
+// auditWriteTimeout bounds the switches read and the audit insert once Log has detached them from
 // the caller's cancellation. Ten seconds, matching every other bounded wait on a dependency in
 // this repository's request path rather than introducing a value nobody chose against the others.
 const auditWriteTimeout = 10 * time.Second
 
 type AuditLogger struct {
 	database auditDatabase
+	switches switchesSource
 }
 
-func NewAuditLogger(database auditDatabase) *AuditLogger {
+func NewAuditLogger(database auditDatabase, switches switchesSource) *AuditLogger {
 	return &AuditLogger{
 		database: database,
+		switches: switches,
 	}
 }
 
-// Log records one audit event on whichever of the two targets the settings row enables.
+// Log records one audit event on whichever of the two targets the switches enable.
 //
 // ctx is the request's, and every record written below carries it, which is the whole of #328:
 // the installed handler reads chi's request id off it, so an operator holding a request id from a
@@ -43,11 +56,10 @@ func NewAuditLogger(database auditDatabase) *AuditLogger {
 // Nothing here names request_id, and that is deliberate — core/logging owns the injection, so the
 // 126 call sites pass a context and nothing else.
 //
-// It never fails a request. Every failure path below logs and returns, as it did before, and the
-// two reads ctx brought cannot fail, only be absent: a context with no settings on it falls back
-// to the row read, and a context with no request id yields the empty string.
+// It never fails a request. Every failure path below logs and returns, as it did before, and a
+// context with no request id yields the empty string.
 func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[string]interface{}) {
-	if al.database == nil {
+	if al.database == nil || al.switches == nil {
 		return
 	}
 
@@ -59,10 +71,10 @@ func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[s
 	// disconnects, so passing it straight through would have made "hang up" a way to keep an
 	// event out of the audit trail, which is the opposite of what the trail is for.
 	//
-	// WithoutCancel and not context.Background(): the settings row and the request id are read
-	// off this context a few lines down, and a fresh root would lose both, costing every audit
-	// row written under a cancelled request its request_id and forcing a settings read the
-	// middleware had already done.
+	// WithoutCancel and not context.Background(): the switches and the request id are read off
+	// this context a few lines down, and a fresh root would lose both, costing every audit row
+	// written under a cancelled request its request_id and forcing a settings read the middleware
+	// had already done.
 	//
 	// The deadline is what the request's cancellation used to supply by accident, and it is not
 	// optional once the cancellation is gone: an unbounded detached context is how a database
@@ -72,31 +84,19 @@ func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[s
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), auditWriteTimeout)
 	defer cancel()
 
-	// Settings: taken off the request context when the settings middleware put them there, which
-	// is every route on the app branch, and read from the row when it did not (#212 item 2, folded
-	// in as decision 5). The five root registrations that audit, the rate limiter's three tiers and
-	// a Background context in a test all take the fallback, so the read is not gone, only skipped
-	// where the same row is already in hand. A type assertion cannot fail in a way worth reporting:
-	// absent means read it.
-	settings, ok := ctx.Value(constants.ContextKeySettings).(*models.Settings)
-	// The nil check is not defensive: the assertion succeeds on a typed nil pointer, and reaching
-	// the field reads below with one would panic in the audit path of every event.
-	if !ok || settings == nil {
-		var err error
-		settings, err = al.database.GetSettingsById(ctx, nil, 1)
-		if err != nil {
-			slog.ErrorContext(ctx, "unable to read the settings row for audit logging", "error", err, "event", auditEvent)
-			return
-		}
+	switches, err := al.switches.AuditSwitches(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to read the audit switches", "error", err, "event", auditEvent)
+		return
 	}
 
 	// Console logging
-	if settings.AuditLogsInConsoleEnabled {
+	if switches.Console {
 		LogToConsole(ctx, auditEvent, details)
 	}
 
 	// Database persistence
-	if settings.AuditLogsInDatabaseEnabled {
+	if switches.Database {
 		// Marshal details to JSON
 		detailsJSON, err := json.Marshal(details)
 		if err != nil {

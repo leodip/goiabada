@@ -1,9 +1,9 @@
-package audit
-
-// The audit event names, and the catalog of them the admin console's filter dropdown is
-// built from.
+// Package audit records the auth server's security events. AuditLogger writes each one to the
+// console, the audit_logs table or both, as the settings' two switches say, and never fails the
+// request that raised it. This file declares every event name and the catalog of them the admin
+// console's filter dropdown is built from.
 //
-// They live in the auth server because it is the only process that emits one: every call to
+// The names live in the auth server because it is the only process that emits one: every call to
 // AuditLogger.Log in this tree is made from this module, and the admin console names no event
 // at all. It reaches the catalog over GET /api/v1/admin/audit-logs/event-types instead of
 // compiling it in, so an event added here reaches the dropdown without that binary being
@@ -19,6 +19,9 @@ package audit
 // server's unit tier until both are made. That check is the whole of #209: before it, an
 // Audit* constant added to the declarations alone passed the suite and was then missing from
 // the operator's filter dropdown, with nothing going red.
+package audit
+
+import "slices"
 
 const (
 	AuditAuthFailedPwd                        = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
@@ -326,9 +329,15 @@ const (
 	AuditRedemptionRefusedRedirectURI = "redemption_refused_redirect_uri"
 )
 
-// AuditEventTypes is the canonical list of all audit event type strings.
-// Used by the admin UI filter dropdown.
-var AuditEventTypes = []string{
+// AuditEventTypes returns the canonical list of audit event names, which the admin console's
+// filter dropdown is built from. It returns a copy, so a caller changing the slice it got changes
+// no later answer (#433).
+func AuditEventTypes() []string {
+	return slices.Clone(auditEventTypes)
+}
+
+// auditEventTypes is the catalog AuditEventTypes copies.
+var auditEventTypes = []string{
 	AuditActivatedAccount,
 	AuditAddedGroupAttribute,
 	AuditAddedGroupPermission,

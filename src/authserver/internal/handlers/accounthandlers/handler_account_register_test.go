@@ -561,6 +561,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		settings := &models.Settings{
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             true,
+			SMTPHost:                "smtp.example.com",
 			SelfRegistrationRequiresEmailVerification: true,
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
@@ -612,9 +613,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return link == expectedLink
 		})).Return(bytes.NewBuffer([]byte("email content")), nil)
 
-		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
-			return input.To == "test@example.com" && input.Subject == "Activate your account"
-		})).Return(nil)
+		emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"},
+			mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
+				return input.To == "test@example.com" && input.Subject == "Activate your account"
+			})).Return(nil)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_activation.html", mock.Anything).Return(nil)
 
@@ -687,7 +689,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 
 		// Ensure that these methods were not called
-		emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything)
+		emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 		httpHelper.AssertNotCalled(t, "RenderTemplateToBuffer",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -716,6 +718,9 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		settings := &models.Settings{
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             true,
+			SMTPHost:                "smtp.example.com",
+			SMTPPort:                2525,
+			PasswordPolicy:          models.PasswordPolicyHigh,
 			SelfRegistrationRequiresEmailVerification: false,
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
@@ -724,7 +729,8 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
-		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
+		// The policy is the request's settings', passed by the handler (#433).
+		passwordValidator.On("ValidatePassword", models.PasswordPolicyHigh, "password123").Return(nil)
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
@@ -739,9 +745,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return ok && link == config.GetAdminConsole().BaseURL+"/account/profile"
 		})).Return(bytes.NewBuffer([]byte("email content")), nil)
 
-		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
-			return input.To == "test@example.com" && input.Subject == "Welcome!"
-		})).Return(nil)
+		emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
+			mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
+				return input.To == "test@example.com" && input.Subject == "Welcome!"
+			})).Return(nil)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)

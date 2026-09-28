@@ -23,7 +23,7 @@ func HandleAPIAuditEventTypesGet() http.HandlerFunc {
 		// Requires scopesSettingsRead, the same read scope GET /api/v1/admin/audit-logs carries.
 
 		response := api.GetAuditEventTypesResponse{
-			AuditEventTypes: audit.AuditEventTypes,
+			AuditEventTypes: audit.AuditEventTypes(),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

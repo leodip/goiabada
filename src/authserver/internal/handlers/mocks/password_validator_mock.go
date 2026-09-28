@@ -10,8 +10,7 @@
 package mocks_handlers
 
 import (
-	"context"
-
+	"github.com/leodip/goiabada/authserver/internal/models"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -52,16 +51,16 @@ func (_m *PasswordValidator) EXPECT() *PasswordValidator_Expecter {
 }
 
 // ValidatePassword provides a mock function for the type PasswordValidator
-func (_mock *PasswordValidator) ValidatePassword(ctx context.Context, password string) error {
-	ret := _mock.Called(ctx, password)
+func (_mock *PasswordValidator) ValidatePassword(policy models.PasswordPolicy, password string) error {
+	ret := _mock.Called(policy, password)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidatePassword")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = returnFunc(ctx, password)
+	if returnFunc, ok := ret.Get(0).(func(models.PasswordPolicy, string) error); ok {
+		r0 = returnFunc(policy, password)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -74,17 +73,17 @@ type PasswordValidator_ValidatePassword_Call struct {
 }
 
 // ValidatePassword is a helper method to define mock.On call
-//   - ctx context.Context
+//   - policy models.PasswordPolicy
 //   - password string
-func (_e *PasswordValidator_Expecter) ValidatePassword(ctx any, password any) *PasswordValidator_ValidatePassword_Call {
-	return &PasswordValidator_ValidatePassword_Call{Call: _e.mock.On("ValidatePassword", ctx, password)}
+func (_e *PasswordValidator_Expecter) ValidatePassword(policy any, password any) *PasswordValidator_ValidatePassword_Call {
+	return &PasswordValidator_ValidatePassword_Call{Call: _e.mock.On("ValidatePassword", policy, password)}
 }
 
-func (_c *PasswordValidator_ValidatePassword_Call) Run(run func(ctx context.Context, password string)) *PasswordValidator_ValidatePassword_Call {
+func (_c *PasswordValidator_ValidatePassword_Call) Run(run func(policy models.PasswordPolicy, password string)) *PasswordValidator_ValidatePassword_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
+		var arg0 models.PasswordPolicy
 		if args[0] != nil {
-			arg0 = args[0].(context.Context)
+			arg0 = args[0].(models.PasswordPolicy)
 		}
 		var arg1 string
 		if args[1] != nil {
@@ -103,7 +102,7 @@ func (_c *PasswordValidator_ValidatePassword_Call) Return(err error) *PasswordVa
 	return _c
 }
 
-func (_c *PasswordValidator_ValidatePassword_Call) RunAndReturn(run func(ctx context.Context, password string) error) *PasswordValidator_ValidatePassword_Call {
+func (_c *PasswordValidator_ValidatePassword_Call) RunAndReturn(run func(policy models.PasswordPolicy, password string) error) *PasswordValidator_ValidatePassword_Call {
 	_c.Call.Return(run)
 	return _c
 }

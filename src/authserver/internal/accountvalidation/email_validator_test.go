@@ -22,11 +22,10 @@ import (
 // the group, the 60-character cap, is fixed in the validator, so the rendered
 // sentence is constant.
 var emailErrorMessages = map[string]string{
-	i18n.ErrCodeEmailRequired:             "Please enter an email address.",
-	i18n.ErrCodeEmailInvalidFormat:        "Please enter a valid email address.",
-	i18n.ErrCodeEmailTooLong:              "The email address cannot exceed a maximum length of 60 characters.",
-	i18n.ErrCodeEmailConfirmationMismatch: "The email and email confirmation entries must be identical.",
-	i18n.ErrCodeEmailAlreadyRegistered:    "Apologies, but this email address is already registered.",
+	i18n.ErrCodeEmailRequired:          "Please enter an email address.",
+	i18n.ErrCodeEmailInvalidFormat:     "Please enter a valid email address.",
+	i18n.ErrCodeEmailTooLong:           "The email address cannot exceed a maximum length of 60 characters.",
+	i18n.ErrCodeEmailAlreadyRegistered: "Apologies, but this email address is already registered.",
 }
 
 func TestValidateEmailAddress(t *testing.T) {
@@ -88,100 +87,6 @@ func TestValidateEmailAddress_AcceptsEveryGeneratedAddress(t *testing.T) {
 		if err := validator.ValidateEmailAddress(got); err != nil {
 			t.Fatalf("fake.Email(): %q rejected by the validator: %v", got, err)
 		}
-	}
-}
-
-func TestValidateEmailUpdate(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewEmailValidator(mockDB)
-
-	subject1 := fake.UUID()
-	subject2 := fake.UUID()
-
-	tests := []struct {
-		name         string
-		input        ValidateEmailInput
-		mockSetup    func()
-		expectedCode string
-		expectedArgs map[string]any
-	}{
-		{
-			name: "Valid email update",
-			input: ValidateEmailInput{
-				Email:             "new@example.com",
-				EmailConfirmation: "new@example.com",
-				Subject:           subject1,
-			},
-			mockSetup: func() {
-				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
-				mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil)
-			},
-		},
-		{
-			name: "Empty email",
-			input: ValidateEmailInput{
-				Email:             "",
-				EmailConfirmation: "",
-				Subject:           subject1,
-			},
-			mockSetup:    func() {},
-			expectedCode: i18n.ErrCodeEmailRequired,
-		},
-		{
-			name: "Email too long",
-			input: ValidateEmailInput{
-				Email:             "thisemailaddressiswaytoolongandexceedsthemaximumlengthof60characters@example.com",
-				EmailConfirmation: "thisemailaddressiswaytoolongandexceedsthemaximumlengthof60characters@example.com",
-				Subject:           subject1,
-			},
-			mockSetup:    func() {},
-			expectedCode: i18n.ErrCodeEmailTooLong,
-			expectedArgs: map[string]any{"max": 60},
-		},
-		{
-			name: "Email mismatch",
-			input: ValidateEmailInput{
-				Email:             "new@example.com",
-				EmailConfirmation: "different@example.com",
-				Subject:           subject1,
-			},
-			mockSetup:    func() {},
-			expectedCode: i18n.ErrCodeEmailConfirmationMismatch,
-		},
-		{
-			name: "Email already registered",
-			input: ValidateEmailInput{
-				Email:             "existing@example.com",
-				EmailConfirmation: "existing@example.com",
-				Subject:           subject1,
-			},
-			mockSetup: func() {
-				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
-				mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&models.User{Subject: subject2}, nil)
-			},
-			expectedCode: i18n.ErrCodeEmailAlreadyRegistered,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.mockSetup()
-			err := validator.ValidateEmailUpdate(context.Background(), &tt.input)
-			if tt.expectedCode == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
-				locErr, ok := err.(*i18n.LocalizedError)
-				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
-				if ok {
-					assert.Equal(t, tt.expectedCode, locErr.Code)
-					assert.Equal(t, emailErrorMessages[tt.expectedCode], locErr.EnglishFallback())
-					if tt.expectedArgs != nil {
-						assert.Equal(t, tt.expectedArgs, locErr.Args)
-					}
-				}
-			}
-		})
 	}
 }
 
@@ -359,7 +264,7 @@ func TestValidateEmailChange_UnresolvableSubjectReturnsError(t *testing.T) {
 	assert.False(t, isLocalized, "an unresolvable subject is not a user-facing validation error")
 }
 
-// The three validators that resolve a subject before a uniqueness comparison all
+// The two validators that resolve a subject before a uniqueness comparison both
 // behave the same way on an unresolvable one. This guards against the guard being
 // reintroduced in only one of them.
 func TestSubjectResolutionIsConsistentAcrossValidators(t *testing.T) {
@@ -368,19 +273,6 @@ func TestSubjectResolutionIsConsistentAcrossValidators(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
 		err := NewEmailValidator(mockDB).ValidateEmailChange(context.Background(), "new@example.com", "unknown-subject")
-
-		assert.ErrorContains(t, err, "subject not found")
-	})
-
-	t.Run("ValidateEmailUpdate", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
-
-		err := NewEmailValidator(mockDB).ValidateEmailUpdate(context.Background(), &ValidateEmailInput{
-			Email:             "new@example.com",
-			EmailConfirmation: "new@example.com",
-			Subject:           "unknown-subject",
-		})
 
 		assert.ErrorContains(t, err, "subject not found")
 	})
@@ -396,43 +288,6 @@ func TestSubjectResolutionIsConsistentAcrossValidators(t *testing.T) {
 
 		assert.ErrorContains(t, err, "subject not found")
 	})
-}
-
-// Unlike ValidateEmailUpdate, this function takes no confirmation value and so
-// never emits ErrCodeEmailConfirmationMismatch.
-func TestValidateEmailChange_DoesNotCheckConfirmation(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewEmailValidator(mockDB)
-
-	subject := fake.UUID()
-	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
-		&models.User{Id: 1, Subject: subject}, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
-
-	err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
-
-	assert.NoError(t, err)
-}
-
-// ValidateEmailUpdate requires the subject to resolve to a real user. A stale or
-// forged subject is an error rather than a localized validation failure, and must
-// not panic on the nil comparison that follows.
-func TestValidateEmailUpdate_UnresolvableSubjectReturnsError(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewEmailValidator(mockDB)
-
-	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
-
-	err := validator.ValidateEmailUpdate(context.Background(), &ValidateEmailInput{
-		Email:             "new@example.com",
-		EmailConfirmation: "new@example.com",
-		Subject:           "unknown-subject",
-	})
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "subject not found: unknown-subject")
-	_, isLocalized := err.(*i18n.LocalizedError)
-	assert.False(t, isLocalized, "an unresolvable subject is not a user-facing validation error")
 }
 
 // TestValidateEmailChange_CarriesTheCallersContextToBothReads is the validator arm of #386's

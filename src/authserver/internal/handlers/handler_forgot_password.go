@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -117,7 +118,8 @@ func HandleForgotPasswordPost(
 				Subject:  i18n.T(emailReq.Context(), "email.forgot_password.subject"),
 				HtmlBody: buf.String(),
 			}
-			resetEmailErr = emailSender.SendEmail(r.Context(), input)
+			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+			resetEmailErr = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 			if resetEmailErr != nil {
 				httpHelper.InternalServerError(w, r, resetEmailErr)
 				return

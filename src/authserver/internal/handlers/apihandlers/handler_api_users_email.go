@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -24,10 +23,10 @@ type usersEmailDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// usersEmailValidator is the administrator's update check: the address rules, the confirmation,
-// and that no other account holds the address.
+// usersEmailValidator is the administrator's update check: the address rules, and that no other
+// account holds the address.
 type usersEmailValidator interface {
-	ValidateEmailUpdate(ctx context.Context, input *accountvalidation.ValidateEmailInput) error
+	ValidateEmailChange(ctx context.Context, email string, subject string) error
 }
 
 // HandleAPIUserEmailPut - PUT /api/v1/admin/users/{id}/email
@@ -72,20 +71,16 @@ func HandleAPIUserEmailPut(
 		}
 
 		// Validate email data
-		input := &accountvalidation.ValidateEmailInput{
-			Email:             strings.ToLower(strings.TrimSpace(req.Email)),
-			EmailConfirmation: strings.ToLower(strings.TrimSpace(req.Email)),
-			Subject:           user.Subject,
-		}
+		email := strings.ToLower(strings.TrimSpace(req.Email))
 
-		err = emailValidator.ValidateEmailUpdate(r.Context(), input)
+		err = emailValidator.ValidateEmailChange(r.Context(), email, user.Subject)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
 
 		// Update user email fields
-		user.Email = input.Email
+		user.Email = email
 		user.EmailVerified = req.EmailVerified
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}

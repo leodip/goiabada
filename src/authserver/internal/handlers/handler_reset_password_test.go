@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -103,6 +105,17 @@ func cleanGetRequest() *http.Request {
 	return httptest.NewRequest("GET", emaillinks.ResetPasswordPath, nil)
 }
 
+// resetPasswordSettings is what MiddlewareSettings puts on every request of the application
+// branch. The handler reads the password policy off it and passes it to the validator, which the
+// stubs below pin by matching the policy rather than anything.
+var resetPasswordSettings = &models.Settings{PasswordPolicy: models.PasswordPolicyMedium}
+
+// newResetPost is httptest.NewRequest for a reset submission, carrying resetPasswordSettings.
+func newResetPost(target string, body io.Reader) *http.Request {
+	req := httptest.NewRequest("POST", target, body)
+	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, resetPasswordSettings))
+}
+
 // postResetRequest builds the form submission. It carries no query either: the template's
 // empty action re-submits to whatever URL the GET was served from, which after the redirect
 // is the clean one.
@@ -116,7 +129,7 @@ func postResetRequest(password, passwordConfirmation, continuationId string) *ht
 		form.Set(continuationIdField, continuationId)
 	}
 
-	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath, strings.NewReader(form.Encode()))
+	req := newResetPost(emaillinks.ResetPasswordPath, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
 }
@@ -184,7 +197,7 @@ func postResetWithCredentialsInQuery(password, passwordConfirmation, continuatio
 	query.Set("password", password)
 	query.Set("passwordConfirmation", passwordConfirmation)
 
-	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
+	req := newResetPost(emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
@@ -220,7 +233,7 @@ func postWithMarkerContinuationInQuery(t *testing.T, store sessionstore.Store,
 	form.Set("passwordConfirmation", passwordConfirmation)
 
 	query := url.Values{continuationIdField: {marker.ContinuationId}}
-	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
+	req := newResetPost(emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for _, c := range rr.Result().Cookies() {
@@ -245,7 +258,7 @@ func postResetWithConfirmationInQuery(password, passwordConfirmation, continuati
 	query := url.Values{}
 	query.Set("passwordConfirmation", passwordConfirmation)
 
-	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
+	req := newResetPost(emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
@@ -262,7 +275,7 @@ func postResetWithContinuationInQuery(password, passwordConfirmation, continuati
 	form.Set("passwordConfirmation", passwordConfirmation)
 
 	query := url.Values{continuationIdField: {continuationId}}
-	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
+	req := newResetPost(emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
@@ -815,7 +828,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			password: "weak", passwordConfirmation: "weak",
 			wantEchoedContinuationId: continuationId,
 			arrange: func(passwordValidator *mocks_handlers.PasswordValidator) {
-				passwordValidator.On("ValidatePassword", mock.Anything, "weak").
+				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, "weak").
 					Return(errors.New("too weak")).Once()
 			},
 		},
@@ -1007,7 +1020,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
-			passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+			passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 			req := tc.arrange(t, store, database)
 			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserId)
 			expectRenderedCodeInvalid(httpHelper, http.StatusBadRequest)
@@ -1035,7 +1048,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 
 	user := &models.User{Id: 1, Email: "test@example.com", PasswordHash: "the-previous-hash"}
 
-	passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 
 	var savedHash string
@@ -1101,7 +1114,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	const codeHash = "the-code-hash"
 	const newPassword = "Str0ngP4ss!"
 
-	passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 		Return(&models.User{Id: 1}, nil).Once()
 	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
@@ -1142,7 +1155,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 
 	const codeHash = "the-code-hash"
 
-	passwordValidator.On("ValidatePassword", mock.Anything, "Str0ngP4ss!").Return(nil).Once()
+	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, "Str0ngP4ss!").Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 		Return(&models.User{Id: 1}, nil).Once()
 	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
@@ -1257,7 +1270,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
-			passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+			passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 				Return(&models.User{Id: 1}, nil).Once()
 			if tc.commitFails {
@@ -1440,7 +1453,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
-				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 				expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
@@ -1458,7 +1471,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
-				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
@@ -1479,7 +1492,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
-				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonContinuationMismatch, 1)
@@ -1501,7 +1514,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
-				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
+				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				mocks_data.ExpectRunInTransaction(database, revokeTx)

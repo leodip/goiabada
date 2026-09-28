@@ -8,8 +8,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // settingsDatabase is what the settings middleware needs: the settings row it puts on every
@@ -42,4 +44,36 @@ func MiddlewareSettings(database settingsDatabase) func(next http.Handler) http.
 		}
 		return http.HandlerFunc(fn)
 	}
+}
+
+// AuditSwitches answers audit.Log's two switches. It sits beside MiddlewareSettings because it
+// reads what that middleware wrote: on every route of the application branch the settings are
+// already on the context, and taking them from there is what spares each audited request a second
+// settings read (#212 item 2, #328 decision 5). The root registrations, the rate limiter's tiers
+// and the background workers audit with no settings on their context, and those read the row.
+type AuditSwitches struct {
+	database settingsDatabase
+}
+
+func NewAuditSwitches(database settingsDatabase) *AuditSwitches {
+	return &AuditSwitches{database: database}
+}
+
+func (a *AuditSwitches) AuditSwitches(ctx context.Context) (audit.Switches, error) {
+	// The nil check is not defensive: the assertion succeeds on a typed nil pointer.
+	settings, ok := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+	if !ok || settings == nil {
+		var err error
+		settings, err = a.database.GetSettingsById(ctx, nil, 1)
+		if err != nil {
+			return audit.Switches{}, errs.Wrap(err, "unable to read the settings row")
+		}
+		if settings == nil {
+			return audit.Switches{}, errs.New("the settings row does not exist")
+		}
+	}
+	return audit.Switches{
+		Console:  settings.AuditLogsInConsoleEnabled,
+		Database: settings.AuditLogsInDatabaseEnabled,
+	}, nil
 }

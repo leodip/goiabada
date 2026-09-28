@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // Seam 4 of #386 for the audit logger, and thin for the reason section 5 gives: what the insert
@@ -15,12 +15,12 @@ import (
 //
 // AssertAuditLogContext already holds every call site to passing the request's context INTO Log.
 // What this file adds is the other half, which no guard can see: that Log passes the context it
-// was given on to the two database calls it makes, rather than opening one of its own. Both took
-// a context only from this stage.
+// was given on to the switches read and the insert, rather than opening one of its own. Since
+// #433 the switches are read through a port, so what the fake recorded is asserted directly.
 
 type auditCtxKey struct{}
 
-// theCallersContext matches only the context handed to Log, so a read or an insert issued on
+// theCallersContext matches only the context handed to Log, so an insert issued on
 // context.Background() matches nothing and the strict mock reports an unexpected call.
 func theCallersContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
@@ -40,26 +40,25 @@ func aLiveContext() interface{} {
 	})
 }
 
-// The accept arm: the settings fallback read and the audit insert both go out on the caller's
-// context. The settings read is the one worth naming -- it happens only when the middleware did
-// not already put the row on the context, which is every root registration and every worker
-// event, so it is the read least likely to be exercised by accident.
+// The accept arm: the switches read and the audit insert both go out on the caller's context. The
+// switches read is the one worth naming -- it is what finds the request's settings, and on a
+// context of Log's own the adapter would read the settings row for every event.
 func TestAuditLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
+	switches := databaseOnly()
 
-	mockDB.On("GetSettingsById", theCallersContext(), mock.Anything, int64(1)).
-		Return(&models.Settings{AuditLogsInDatabaseEnabled: true}, nil).Once()
 	mockDB.On("CreateAuditLog", theCallersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
-	NewAuditLogger(mockDB).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewAuditLogger(mockDB, switches).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertExpectations(t)
+	require.Len(t, switches.asked, 1)
+	assert.Equal(t, "caller", switches.asked[0].Value(auditCtxKey{}))
 }
 
-// A live context is what both database calls get even when the caller's is already cancelled,
-// which is the one place Log does NOT simply pass its argument on (#386, final review round 1
-// finding 9).
+// A live context is what both reads get even when the caller's is already cancelled, which is the
+// one place Log does NOT simply pass its argument on (#386, final review round 1 finding 9).
 //
 // Every one of the 126 call sites logs its event AFTER the outcome it records is durable: the
 // token was issued, the password was changed, the user was deleted. Before this change the audit
@@ -71,41 +70,40 @@ func TestAuditLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
 // for ever, which is what the request's context used to prevent by accident.
 func TestAuditLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
+	switches := databaseOnly()
 
-	mockDB.On("GetSettingsById", aLiveContext(), mock.Anything, int64(1)).
-		Return(&models.Settings{AuditLogsInDatabaseEnabled: true}, nil).Once()
 	mockDB.On("CreateAuditLog", aLiveContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
 	ctx, cancel := context.WithCancel(auditCallersContext())
 	cancel()
 
-	NewAuditLogger(mockDB).Log(ctx, AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewAuditLogger(mockDB, switches).Log(ctx, AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertExpectations(t)
+	require.Len(t, switches.asked, 1)
+	assert.Equal(t, "caller", switches.asked[0].Value(auditCtxKey{}))
+	assert.Equal(t, []bool{true}, switches.liveWhenAsked, "the switches were asked on a live context")
 }
 
-// And the detached context is bounded rather than open-ended, asserted at the port because the
+// And the detached context is bounded rather than open-ended, asserted at both ports because the
 // bound is the whole reason the detachment is safe.
 func TestAuditLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
+	switches := databaseOnly()
 
-	deadlines := 0
 	bounded := mock.MatchedBy(func(ctx context.Context) bool {
-		if _, ok := ctx.Deadline(); ok {
-			deadlines++
-			return true
-		}
-		return false
+		_, ok := ctx.Deadline()
+		return ok
 	})
-	mockDB.On("GetSettingsById", bounded, mock.Anything, int64(1)).
-		Return(&models.Settings{AuditLogsInDatabaseEnabled: true}, nil).Once()
 	mockDB.On("CreateAuditLog", bounded, mock.Anything, mock.Anything).Return(nil).Once()
 
-	NewAuditLogger(mockDB).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewAuditLogger(mockDB, switches).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertExpectations(t)
-	assert.Positive(t, deadlines, "both database calls ran under a deadline of the logger's own")
+	require.Len(t, switches.asked, 1)
+	_, hasDeadline := switches.asked[0].Deadline()
+	assert.True(t, hasDeadline, "the switches read ran under a deadline of the logger's own")
 }
 
 // The reject arm: with database persistence off, the insert is never reached and there is no
@@ -114,10 +112,7 @@ func TestAuditLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 func TestAuditLogger_Log_DatabasePersistenceOffReachesNoInsertPort(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 
-	mockDB.On("GetSettingsById", theCallersContext(), mock.Anything, int64(1)).
-		Return(&models.Settings{AuditLogsInDatabaseEnabled: false}, nil).Once()
-
-	NewAuditLogger(mockDB).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewAuditLogger(mockDB, noTarget()).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }

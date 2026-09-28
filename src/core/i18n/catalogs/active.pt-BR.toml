@@ -1420,7 +1420,6 @@
 "validator.email.required" = "Informe um endereço de e-mail."
 "validator.email.invalid_format" = "Informe um endereço de e-mail válido."
 "validator.email.too_long" = "O endereço de e-mail não pode ter mais que {{.max}} caracteres."
-"validator.email.confirmation_mismatch" = "O e-mail e a confirmação de e-mail precisam ser idênticos."
 "validator.email.already_registered" = "Desculpe, este endereço de e-mail já está cadastrado."
 
 "handler.admin_user_groups.not_found" = "Um ou mais grupos não foram encontrados."

@@ -53,16 +53,16 @@ func (_m *EmailSender) EXPECT() *EmailSender_Expecter {
 }
 
 // SendEmail provides a mock function for the type EmailSender
-func (_mock *EmailSender) SendEmail(ctx context.Context, input *emaildelivery.SendEmailInput) error {
-	ret := _mock.Called(ctx, input)
+func (_mock *EmailSender) SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error {
+	ret := _mock.Called(ctx, smtpConfig, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendEmail")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *emaildelivery.SendEmailInput) error); ok {
-		r0 = returnFunc(ctx, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, emaildelivery.SMTPConfig, *emaildelivery.SendEmailInput) error); ok {
+		r0 = returnFunc(ctx, smtpConfig, input)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -76,24 +76,30 @@ type EmailSender_SendEmail_Call struct {
 
 // SendEmail is a helper method to define mock.On call
 //   - ctx context.Context
+//   - smtpConfig emaildelivery.SMTPConfig
 //   - input *emaildelivery.SendEmailInput
-func (_e *EmailSender_Expecter) SendEmail(ctx any, input any) *EmailSender_SendEmail_Call {
-	return &EmailSender_SendEmail_Call{Call: _e.mock.On("SendEmail", ctx, input)}
+func (_e *EmailSender_Expecter) SendEmail(ctx any, smtpConfig any, input any) *EmailSender_SendEmail_Call {
+	return &EmailSender_SendEmail_Call{Call: _e.mock.On("SendEmail", ctx, smtpConfig, input)}
 }
 
-func (_c *EmailSender_SendEmail_Call) Run(run func(ctx context.Context, input *emaildelivery.SendEmailInput)) *EmailSender_SendEmail_Call {
+func (_c *EmailSender_SendEmail_Call) Run(run func(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput)) *EmailSender_SendEmail_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *emaildelivery.SendEmailInput
+		var arg1 emaildelivery.SMTPConfig
 		if args[1] != nil {
-			arg1 = args[1].(*emaildelivery.SendEmailInput)
+			arg1 = args[1].(emaildelivery.SMTPConfig)
+		}
+		var arg2 *emaildelivery.SendEmailInput
+		if args[2] != nil {
+			arg2 = args[2].(*emaildelivery.SendEmailInput)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -104,7 +110,7 @@ func (_c *EmailSender_SendEmail_Call) Return(err error) *EmailSender_SendEmail_C
 	return _c
 }
 
-func (_c *EmailSender_SendEmail_Call) RunAndReturn(run func(ctx context.Context, input *emaildelivery.SendEmailInput) error) *EmailSender_SendEmail_Call {
+func (_c *EmailSender_SendEmail_Call) RunAndReturn(run func(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error) *EmailSender_SendEmail_Call {
 	_c.Call.Return(run)
 	return _c
 }

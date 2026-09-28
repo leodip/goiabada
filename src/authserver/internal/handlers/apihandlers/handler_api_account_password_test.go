@@ -17,6 +17,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -55,11 +56,38 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/account/password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	// The password validator reads the policy straight off the context, so settings must be
-	// there or it panics on the type assertion.
+	// The handler reads the password policy off the request's settings and passes it to the
+	// validator, so settings must be there or it panics on the type assertion.
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
 		&models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	return setTokenContextWithClaims(req.WithContext(ctx), claims)
+}
+
+// The new password is held to the request's policy: the handler passes settings.PasswordPolicy,
+// and a refusal answers the validator's localized message with nothing written (#433).
+func TestHandleAPIAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	passwordValidator := mocks_handlers.NewPasswordValidator(t)
+
+	const currentPassword = "0ldP4ss!word"
+	currentHash, err := passwordhash.Hash(currentPassword)
+	require.NoError(t, err)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
+		Return(&models.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+
+	// accountPasswordRequest carries PasswordPolicyLow; matching that value, not any, is the
+	// assertion.
+	passwordValidator.On("ValidatePassword", models.PasswordPolicyLow, "next").
+		Return(i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": 6})).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}).
+		ServeHTTP(rr, accountPasswordRequest(t, map[string]interface{}{"sub": "the-subject"}, currentPassword, "next"))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "The minimum length for the password is 6 characters")
+	database.AssertNotCalled(t, "SetUserPasswordHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAPIAccountPasswordPut_PreservesTheCallersSession is the wiring test for the one site

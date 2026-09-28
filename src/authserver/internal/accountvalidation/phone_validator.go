@@ -8,6 +8,9 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// phoneNumberShape is digits in groups separated by at most one space or hyphen.
+var phoneNumberShape = regexp.MustCompile(`^[0-9]+([- ]?[0-9]+)*$`)
+
 type PhoneValidator struct {
 }
 
@@ -47,12 +50,7 @@ func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneSimplePattern, nil)
 		}
 
-		pattern := `^[0-9]+([- ]?[0-9]+)*$`
-		regex, err := regexp.Compile(pattern)
-		if err != nil {
-			return err
-		}
-		if !regex.MatchString(input.PhoneNumber) {
+		if !phoneNumberShape.MatchString(input.PhoneNumber) {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneInvalidFormat, nil)
 		}
 		if len(input.PhoneNumber) > 30 {

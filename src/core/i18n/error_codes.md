@@ -25,7 +25,6 @@ SMTP settings, registration). Protocol token/authorize email errors stay in
 | `validator.email.required` | (none) | Please enter an email address. |
 | `validator.email.invalid_format` | (none) | Please enter a valid email address. |
 | `validator.email.too_long` | `max` (int) | The email address cannot exceed a maximum length of {{.max}} characters. |
-| `validator.email.confirmation_mismatch` | (none) | The email and email confirmation entries must be identical. |
 | `validator.email.already_registered` | (none) | Apologies, but this email address is already registered. |
 
 ## Admin user-groups handler

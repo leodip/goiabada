@@ -49,7 +49,7 @@ type HttpHelper interface {
 // EmailSender delivers one message. The context is the request's, so the SMTP dial and write are
 // bounded by the request that asked for them.
 type EmailSender interface {
-	SendEmail(ctx context.Context, input *emaildelivery.SendEmailInput) error
+	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error
 }
 
 // EmailValidator is the address check alone, which is the only validation self-registration
@@ -60,7 +60,7 @@ type EmailValidator interface {
 
 // PasswordValidator holds a chosen password to the configured policy.
 type PasswordValidator interface {
-	ValidatePassword(ctx context.Context, password string) error
+	ValidatePassword(policy models.PasswordPolicy, password string) error
 }
 
 // UserCreator creates the user row and its default permissions in one transaction.

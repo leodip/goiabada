@@ -94,11 +94,11 @@ type TokenParser interface {
 }
 
 type PasswordValidator interface {
-	ValidatePassword(ctx context.Context, password string) error
+	ValidatePassword(policy models.PasswordPolicy, password string) error
 }
 
 type EmailSender interface {
-	SendEmail(ctx context.Context, input *emaildelivery.SendEmailInput) error
+	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error
 }
 
 // AuditLogger records one security event. The context is first because every audit event raised

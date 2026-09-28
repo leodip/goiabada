@@ -40,7 +40,7 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 	// Every declared name, in the order the catalog declares them, and nothing else. Equality
 	// rather than containment: a catalog that had grown an extra entry would offer the operator
 	// a filter value no row can ever carry.
-	assert.Equal(t, audit.AuditEventTypes, body.AuditEventTypes)
+	assert.Equal(t, audit.AuditEventTypes(), body.AuditEventTypes)
 	assert.Len(t, body.AuditEventTypes, 100,
 		"the catalog is the 104 declared names less the four #351 decision 11 deleted")
 

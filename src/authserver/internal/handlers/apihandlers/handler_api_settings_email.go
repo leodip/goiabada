@@ -265,7 +265,7 @@ func HandleAPISettingsEmailSendTestPost(
 			Subject:  "Test email",
 			HtmlBody: simpleBody,
 		}
-		if err := emailSender.SendEmail(r.Context(), input); err != nil {
+		if err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
 			writeJSONError(w, "Unable to send email: "+err.Error(), "SEND_FAILED", http.StatusBadRequest)
 			return
 		}
