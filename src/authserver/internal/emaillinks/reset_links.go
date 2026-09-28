@@ -1,10 +1,6 @@
 package emaillinks
 
-import (
-	"net/url"
-
-	"github.com/leodip/goiabada/authserver/internal/config"
-)
+import "net/url"
 
 // ResetPasswordPath and AccountActivatePath are the paths of the two endpoints an
 // emailed link points at.
@@ -16,7 +12,8 @@ import (
 const ResetPasswordPath = "/reset-password"
 const AccountActivatePath = "/account/activate"
 
-// ResetPasswordLink builds the password reset link emailed to a user.
+// ResetPasswordLink builds the password reset link emailed to a user, under the auth
+// server's public base URL, which the caller is handed at construction (#434).
 //
 // The link carries the verification code and nothing else. It used to carry the
 // address too, as ?email=<address>&code=<code>, which broke every address holding a
@@ -25,14 +22,14 @@ const AccountActivatePath = "/account/activate"
 // space, so the address came back mangled and the lookup failed. Carrying only the
 // code removes the defect class rather than escaping around it, because the code's
 // alphabet is entirely RFC 3986 unreserved (#112).
-func ResetPasswordLink(code string) string {
-	return config.GetAuthServer().BaseURL + ResetPasswordPath + "?" + codeQuery(code)
+func ResetPasswordLink(baseURL, code string) string {
+	return baseURL + ResetPasswordPath + "?" + codeQuery(code)
 }
 
 // AccountActivateLink builds the account activation link emailed to someone who has
 // just self-registered. Same shape and same reasoning as ResetPasswordLink.
-func AccountActivateLink(code string) string {
-	return config.GetAuthServer().BaseURL + AccountActivatePath + "?" + codeQuery(code)
+func AccountActivateLink(baseURL, code string) string {
+	return baseURL + AccountActivatePath + "?" + codeQuery(code)
 }
 
 // codeQuery encodes the one query parameter both links carry.

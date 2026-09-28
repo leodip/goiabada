@@ -880,7 +880,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 				build = postResetRequest
 			}
 
-			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(),
 				build(tc.password, tc.passwordConfirmation, continuationId))
 
@@ -1020,7 +1020,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserId)
 			expectRenderedCodeInvalid(httpHelper, http.StatusBadRequest)
 
-			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
@@ -1068,7 +1068,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 		}),
 	).Return(nil).Once()
 
-	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 	rr := httptest.NewRecorder()
 	req := postWithMarker(t, store, newPassword, newPassword,
 		emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
@@ -1120,7 +1120,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	expectAuditFailedCode(auditLogger, auditReasonClaimLost, 1)
 	expectRenderedCodeInvalid(httpHelper, http.StatusBadRequest)
 
-	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 	handler.ServeHTTP(httptest.NewRecorder(),
 		postWithMarker(t, store, newPassword, newPassword,
 			emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
@@ -1158,7 +1158,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 		Return(false, errors.New("update failed")).Once()
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 	handler.ServeHTTP(httptest.NewRecorder(),
 		postWithMarker(t, store, "Str0ngP4ss!", "Str0ngP4ss!",
 			emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
@@ -1279,7 +1279,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 				Return().Once()
 
-			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(),
 				postWithMarker(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
@@ -1450,7 +1450,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 				expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
 				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := postResetRequest(newPassword, newPassword, "")
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
@@ -1470,7 +1470,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
 				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := postWithMarker(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
@@ -1491,7 +1491,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 					Return(&models.User{Id: 1}, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonContinuationMismatch, 1)
 				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := withMarker(t, store,
 					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
@@ -1516,7 +1516,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 					Return(false, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonClaimLost, 1)
 				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
+				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := postWithMarker(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }

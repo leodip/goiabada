@@ -15,7 +15,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging"
@@ -29,16 +28,6 @@ import (
 // on, which is why it had no coverage. It is worth testing anyway: it wraps the
 // response writer on every API request when enabled, and it is the one place that
 // deliberately logs request and response bodies, so it must not log credentials.
-
-// withDebugAPIRequests sets the flag for the duration of the test and restores it.
-func withDebugAPIRequests(t *testing.T, enabled bool) {
-	t.Helper()
-	previous := config.GetAuthServer().DebugAPIRequests
-	config.GetAuthServer().DebugAPIRequests = enabled
-	t.Cleanup(func() {
-		config.GetAuthServer().DebugAPIRequests = previous
-	})
-}
 
 // -----------------------------------------------------------------------------
 // The responseWriter wrapper
@@ -83,11 +72,23 @@ func TestDebugResponseWriter_MultipleWritesAccumulate(t *testing.T) {
 // The middleware
 // -----------------------------------------------------------------------------
 
-func TestAPIDebugMiddleware_DisabledPassesStraightThrough(t *testing.T) {
-	withDebugAPIRequests(t, false)
+// passThrough is a comparable handler, so a test can ask whether the middleware handed back
+// the very handler it was given.
+type passThrough struct{ serve http.HandlerFunc }
 
+func (p *passThrough) ServeHTTP(w http.ResponseWriter, r *http.Request) { p.serve(w, r) }
+
+// Off, the middleware is not in the chain at all: it returns the handler it wraps, so no
+// request pays for a switch that is off, and nothing it does can reach a request (#434).
+func TestAPIDebugMiddleware_DisabledReturnsTheHandlerItWraps(t *testing.T) {
+	next := &passThrough{serve: func(w http.ResponseWriter, r *http.Request) {}}
+
+	assert.Same(t, next, APIDebugMiddleware(false)(next))
+}
+
+func TestAPIDebugMiddleware_DisabledPassesStraightThrough(t *testing.T) {
 	called := false
-	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebugMiddleware(false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		// When disabled the handler must receive the original writer, not the wrapper.
 		_, wrapped := w.(*responseWriter)
@@ -103,9 +104,7 @@ func TestAPIDebugMiddleware_DisabledPassesStraightThrough(t *testing.T) {
 }
 
 func TestAPIDebugMiddleware_EnabledWrapsAndPreservesTheResponse(t *testing.T) {
-	withDebugAPIRequests(t, true)
-
-	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, wrapped := w.(*responseWriter)
 		assert.True(t, wrapped, "the response writer must be wrapped when debugging is on")
 		w.WriteHeader(http.StatusAccepted)
@@ -122,10 +121,8 @@ func TestAPIDebugMiddleware_EnabledWrapsAndPreservesTheResponse(t *testing.T) {
 // The middleware drains the request body to log it, so it has to put it back or
 // the handler downstream would read nothing.
 func TestAPIDebugMiddleware_RequestBodyIsStillReadableDownstream(t *testing.T) {
-	withDebugAPIRequests(t, true)
-
 	var seen string
-	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		_, err := buf.ReadFrom(r.Body)
 		assert.NoError(t, err)
@@ -140,9 +137,7 @@ func TestAPIDebugMiddleware_RequestBodyIsStillReadableDownstream(t *testing.T) {
 }
 
 func TestAPIDebugMiddleware_EnabledWithNoRequestBody(t *testing.T) {
-	withDebugAPIRequests(t, true)
-
-	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
@@ -188,12 +183,11 @@ func oversizedBody() string {
 // wrote, with what the handler read and the error its read ended in.
 func debugRecord(t *testing.T, req *http.Request, respond func(w http.ResponseWriter)) (logtest.CapturedRecord, string, error) {
 	t.Helper()
-	withDebugAPIRequests(t, true)
 	logged := logtest.CaptureSlog(t)
 
 	var read []byte
 	var readErr error
-	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		read, readErr = io.ReadAll(r.Body)
 		if respond != nil {
 			respond(w)
@@ -236,14 +230,12 @@ func TestAPIDebugMiddleware_AnOversizedChunkedRequestBodyIsSaidToBeLargerThanThe
 // The middleware must not buffer a body it will not log: before the handler reads
 // anything, exactly one byte past the cap has left the connection.
 func TestAPIDebugMiddleware_ReadsNoMoreThanOneBytePastTheCapBeforeTheHandler(t *testing.T) {
-	withDebugAPIRequests(t, true)
-
 	source := &countingBody{Reader: strings.NewReader(oversizedBody())}
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", nil)
 	req.Body = source
 
 	readBeforeHandler := -1
-	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		readBeforeHandler = source.read
 		require.NoError(t, r.Body.Close())
 	}))
@@ -293,14 +285,13 @@ func TestAPIDebugMiddleware_DoesNotLogACutBodyThatParses(t *testing.T) {
 }
 
 func TestAPIDebugMiddleware_AnOversizedResponseReachesTheClientWhole(t *testing.T) {
-	withDebugAPIRequests(t, true)
 	logged := logtest.CaptureSlog(t)
 
 	chunk := strings.Repeat("y", 100_000)
 	const writes = 6
 
 	var capture *responseWriter
-	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capture = w.(*responseWriter)
 		for range writes {
 			_, _ = w.Write([]byte(chunk))
@@ -932,14 +923,12 @@ func TestDebugLog_LogsBodiesFaithfully(t *testing.T) {
 
 // debugAPIRouter mounts handler behind APIDebugMiddleware on a chi router, with the
 // middleware as the first r.Use under /api/v1/account, which is how routes.go builds
-// the account API. Debug logging is turned on for the duration of the test.
+// the account API, with debug logging on.
 func debugAPIRouter(t *testing.T, method, pattern string, handler http.HandlerFunc) *chi.Mux {
 	t.Helper()
-	withDebugAPIRequests(t, true)
-
 	router := chi.NewRouter()
 	router.Route("/api/v1/account", func(r chi.Router) {
-		r.Use(APIDebugMiddleware())
+		r.Use(APIDebugMiddleware(true))
 		r.Method(method, pattern, handler)
 	})
 	return router

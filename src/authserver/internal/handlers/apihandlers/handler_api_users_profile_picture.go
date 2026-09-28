@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -31,6 +30,8 @@ type usersProfilePictureDatabase interface {
 func HandleAPIUserProfilePicturePost(
 	database usersProfilePictureDatabase,
 	auditLogger AuditLogger,
+	baseURL string,
+	maxUploadBytes int64,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL
@@ -59,7 +60,7 @@ func HandleAPIUserProfilePicturePost(
 		}
 
 		// Get max file size from config
-		maxFileSize := imaging.MaxFileSize(config.GetAuthServer().ProfilePictureMaxSizeBytes)
+		maxFileSize := imaging.MaxFileSize(maxUploadBytes)
 
 		// Limit request body size
 		r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+1024) // extra for multipart overhead
@@ -137,7 +138,7 @@ func HandleAPIUserProfilePicturePost(
 		// Return success response
 		response := map[string]interface{}{
 			"success":    true,
-			"pictureUrl": config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject,
+			"pictureUrl": baseURL + "/userinfo/picture/" + user.Subject,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -207,6 +208,7 @@ func HandleAPIUserProfilePictureDelete(
 // HandleAPIUserProfilePictureGet - GET /api/v1/admin/users/{id}/profile-picture (check if exists)
 func HandleAPIUserProfilePictureGet(
 	database usersProfilePictureDatabase,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL
@@ -246,7 +248,7 @@ func HandleAPIUserProfilePictureGet(
 		}
 
 		if hasPicture {
-			response["pictureUrl"] = config.GetAuthServer().BaseURL + "/userinfo/picture/" + user.Subject
+			response["pictureUrl"] = baseURL + "/userinfo/picture/" + user.Subject
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

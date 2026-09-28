@@ -12,7 +12,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -40,6 +39,7 @@ type accountLogoutDatabase interface {
 func HandleAPIAccountLogoutRequestPost(
 	database accountLogoutDatabase,
 	dataCipher *encryption.DataCipher,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Access token + required scope enforced by middleware
@@ -220,14 +220,14 @@ func HandleAPIAccountLogoutRequestPost(
 			}
 			writeJSON(w, r, http.StatusOK, api.AccountLogoutFormPostResponse{
 				Method:   http.MethodPost,
-				Endpoint: config.GetAuthServer().BaseURL + "/auth/logout",
+				Endpoint: baseURL + "/auth/logout",
 				Params:   params,
 			})
 			return
 		}
 
 		// Build logout redirect URL
-		logoutUrl := fmt.Sprintf("%s/auth/logout?id_token_hint=%s&post_logout_redirect_uri=%s", config.GetAuthServer().BaseURL, url.QueryEscape(idToken), url.QueryEscape(postLogout))
+		logoutUrl := fmt.Sprintf("%s/auth/logout?id_token_hint=%s&post_logout_redirect_uri=%s", baseURL, url.QueryEscape(idToken), url.QueryEscape(postLogout))
 		if req.State != "" {
 			logoutUrl += "&state=" + url.QueryEscape(req.State)
 		}

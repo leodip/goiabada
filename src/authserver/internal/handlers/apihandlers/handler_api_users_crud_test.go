@@ -329,7 +329,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
-		auditLogger, emailSender, testDataCipher)
+		auditLogger, emailSender, testDataCipher, testBaseURL)
 
 	body, err := json.Marshal(map[string]interface{}{
 		"email":           "newuser@example.com",
@@ -376,7 +376,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	// This site's only job is to hand the issued code to the shared builder; the link's shape
 	// and the absence of an address in it belong to ResetPasswordLink's own tests (#112
 	// decision 5).
-	assert.Equal(t, emaillinks.ResetPasswordLink(issuedCode), emailedLink,
+	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
 		"the emailed link must be the shared builder's output for the code that was issued")
 
 	httpHelper.AssertExpectations(t)
@@ -410,7 +410,7 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
-		auditLogger, emailSender, testDataCipher)
+		auditLogger, emailSender, testDataCipher, testBaseURL)
 
 	body, err := json.Marshal(map[string]interface{}{
 		"email":           "taken@example.com",
@@ -464,7 +464,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
-		auditLogger, emailSender, testDataCipher)
+		auditLogger, emailSender, testDataCipher, testBaseURL)
 
 	body, err := json.Marshal(map[string]interface{}{
 		"email":           "fresh@example.com",
@@ -587,7 +587,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				accountvalidation.NewEmailValidator(database),
 				accountvalidation.NewProfileValidator(database),
 				accountvalidation.NewPasswordValidator(),
-				auditLogger, emailSender, testDataCipher)
+				auditLogger, emailSender, testDataCipher, testBaseURL)
 
 			payload := map[string]interface{}{"email": "newuser@example.com"}
 			if !tc.absent {

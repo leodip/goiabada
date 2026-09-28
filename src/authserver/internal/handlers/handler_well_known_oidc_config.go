@@ -3,13 +3,13 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 )
 
 func HandleWellKnownOIDCConfigGet(
 	httpHelper HttpHelper,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -38,11 +38,11 @@ func HandleWellKnownOIDCConfigGet(
 
 		wellKnownConfig := oidc.WellKnownConfig{
 			Issuer:                           settings.Issuer,
-			AuthorizationEndpoint:            config.GetAuthServer().BaseURL + "/auth/authorize",
-			TokenEndpoint:                    config.GetAuthServer().BaseURL + "/auth/token",
-			UserInfoEndpoint:                 config.GetAuthServer().BaseURL + "/userinfo",
-			EndSessionEndpoint:               config.GetAuthServer().BaseURL + "/auth/logout",
-			JWKsURI:                          config.GetAuthServer().BaseURL + "/certs",
+			AuthorizationEndpoint:            baseURL + "/auth/authorize",
+			TokenEndpoint:                    baseURL + "/auth/token",
+			UserInfoEndpoint:                 baseURL + "/userinfo",
+			EndSessionEndpoint:               baseURL + "/auth/logout",
+			JWKsURI:                          baseURL + "/certs",
 			GrantTypesSupported:              grantTypes,
 			ResponseTypesSupported:           responseTypes,
 			ResponseModesSupported:           responseModes,
@@ -67,7 +67,7 @@ func HandleWellKnownOIDCConfigGet(
 
 		// Include registration endpoint if DCR is enabled (RFC 7591 §4)
 		if settings.DynamicClientRegistrationEnabled {
-			wellKnownConfig.RegistrationEndpoint = config.GetAuthServer().BaseURL + "/connect/register"
+			wellKnownConfig.RegistrationEndpoint = baseURL + "/connect/register"
 		}
 
 		httpHelper.EncodeJson(w, r, wellKnownConfig)

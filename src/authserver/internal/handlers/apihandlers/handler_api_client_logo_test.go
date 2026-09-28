@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // =============================================================================
@@ -22,7 +23,7 @@ import (
 func TestHandleAPIClientLogoGet_NoClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database)
+	handler := HandleAPIClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients//logo", nil)
 	rr := httptest.NewRecorder()
@@ -40,7 +41,7 @@ func TestHandleAPIClientLogoGet_NoClientId(t *testing.T) {
 func TestHandleAPIClientLogoGet_InvalidClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database)
+	handler := HandleAPIClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/invalid/logo", nil)
 	req = setChiURLParam(req, "id", "invalid")
@@ -59,7 +60,7 @@ func TestHandleAPIClientLogoGet_InvalidClientId(t *testing.T) {
 func TestHandleAPIClientLogoGet_ClientNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database)
+	handler := HandleAPIClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -82,7 +83,7 @@ func TestHandleAPIClientLogoGet_ClientNotFound(t *testing.T) {
 func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database)
+	handler := HandleAPIClientLogoGet(database, testBaseURL)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -101,7 +102,7 @@ func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["hasLogo"].(bool))
-	assert.Contains(t, response["logoUrl"].(string), "my-app")
+	assert.Equal(t, testBaseURL+"/client/logo/my-app", response["logoUrl"])
 
 	database.AssertExpectations(t)
 }
@@ -109,7 +110,7 @@ func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
 func TestHandleAPIClientLogoGet_NoLogo(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database)
+	handler := HandleAPIClientLogoGet(database, testBaseURL)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -141,7 +142,7 @@ func TestHandleAPIClientLogoPost_NoClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger)
+	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	req, _ := http.NewRequest("POST", "/api/v1/admin/clients//logo", nil)
 	rr := httptest.NewRecorder()
@@ -160,7 +161,7 @@ func TestHandleAPIClientLogoPost_InvalidClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger)
+	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	req, _ := http.NewRequest("POST", "/api/v1/admin/clients/invalid/logo", nil)
 	req = setChiURLParam(req, "id", "invalid")
@@ -180,7 +181,7 @@ func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger)
+	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
@@ -206,7 +207,7 @@ func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger)
+	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -228,11 +229,40 @@ func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
+// The size cap is the one the handler was handed, not the configured default: an image the
+// default accepts is refused under a smaller injected cap, and the refusal names that cap (#434).
+func TestHandleAPIClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+
+	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, 64)
+
+	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+
+	pictureData := createTestPNG(100, 100)
+	require.Greater(t, len(pictureData), 64)
+	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
+	require.NoError(t, err)
+	req = setChiURLParam(req, "id", "123")
+	rr := httptest.NewRecorder()
+
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
+	assert.Equal(t, "file size exceeds maximum allowed size of 64 bytes", response["error_description"])
+}
+
 func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger)
+	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 	adminSub := "admin-user-sub"
@@ -262,7 +292,7 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
-	assert.Contains(t, response["pictureUrl"].(string), "my-app")
+	assert.Equal(t, testBaseURL+"/client/logo/my-app", response["pictureUrl"])
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -272,7 +302,7 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger)
+	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 	existingLogo := &models.ClientLogo{

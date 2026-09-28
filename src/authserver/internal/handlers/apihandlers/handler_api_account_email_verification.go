@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -35,6 +34,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 	emailSender EmailSender,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
@@ -105,7 +105,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		// Render email content
 		bind := map[string]interface{}{
 			"name":             user.FullName(),
-			"link":             config.GetAdminConsole().BaseURL + "/account/email-verification",
+			"link":             adminConsoleBaseURL + "/account/email-verification",
 			"verificationCode": verificationCode,
 		}
 		emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, user.Locale, "en"))

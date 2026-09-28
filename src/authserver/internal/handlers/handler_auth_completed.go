@@ -10,7 +10,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -47,13 +46,15 @@ func HandleAuthCompletedGet(
 	templateFS fs.FS,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -250,7 +251,7 @@ func HandleAuthCompletedGet(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
+				http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
 				return
 			}
 
@@ -481,7 +482,7 @@ func HandleAuthCompletedGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/consent", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/consent", http.StatusFound)
 			return
 		}
 
@@ -494,7 +495,7 @@ func HandleAuthCompletedGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/consent", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/consent", http.StatusFound)
 			return
 		}
 
@@ -505,6 +506,6 @@ func HandleAuthCompletedGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/issue", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
 	}
 }

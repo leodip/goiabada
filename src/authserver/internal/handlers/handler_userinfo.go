@@ -10,7 +10,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
@@ -31,6 +30,7 @@ func HandleUserInfoGetPost(
 	httpHelper HttpHelper,
 	database userinfoDatabase,
 	auditLogger AuditLogger,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +115,7 @@ func HandleUserInfoGetPost(
 		// this endpoint already did.
 		mapper := userclaims.Mapper{
 			Database:  database,
-			BaseURL:   config.GetAuthServer().BaseURL,
+			BaseURL:   baseURL,
 			Inclusion: userclaims.InclusionIdToken,
 		}
 		mapper.AddOpenIdConnectClaims(r.Context(), claims, user, scopes)

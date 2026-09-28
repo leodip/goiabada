@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -388,6 +387,7 @@ func HandleResetPasswordPost(
 	database resetPasswordDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -528,7 +528,7 @@ func HandleResetPasswordPost(
 
 		bind := map[string]interface{}{
 			"passwordReset":       true,
-			"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
+			"adminConsoleBaseUrl": adminConsoleBaseURL,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)

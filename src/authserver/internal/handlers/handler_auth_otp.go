@@ -10,7 +10,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -40,6 +39,7 @@ func HandleAuthOtpGet(
 	authHelper AuthHelper,
 	database authOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +47,7 @@ func HandleAuthOtpGet(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -199,6 +199,8 @@ func HandleAuthOtpPost(
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 	dataCipher *encryption.DataCipher,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +208,7 @@ func HandleAuthOtpPost(
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -451,6 +453,6 @@ func HandleAuthOtpPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/completed", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)
 	}
 }

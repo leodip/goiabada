@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -18,7 +17,7 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 	t.Run("Returns correct OIDC configuration", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 
-		handler := HandleWellKnownOIDCConfigGet(httpHelper)
+		handler := HandleWellKnownOIDCConfigGet(httpHelper, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/.well-known/openid-configuration", nil)
 		assert.NoError(t, err)
@@ -36,11 +35,11 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 			wellKnownConfig := args.Get(2).(oidc.WellKnownConfig)
 
 			assert.Equal(t, "https://example.com", wellKnownConfig.Issuer)
-			assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/authorize", wellKnownConfig.AuthorizationEndpoint)
-			assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/token", wellKnownConfig.TokenEndpoint)
-			assert.Equal(t, config.GetAuthServer().BaseURL+"/userinfo", wellKnownConfig.UserInfoEndpoint)
-			assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/logout", wellKnownConfig.EndSessionEndpoint)
-			assert.Equal(t, config.GetAuthServer().BaseURL+"/certs", wellKnownConfig.JWKsURI)
+			assert.Equal(t, testBaseURL+"/auth/authorize", wellKnownConfig.AuthorizationEndpoint)
+			assert.Equal(t, testBaseURL+"/auth/token", wellKnownConfig.TokenEndpoint)
+			assert.Equal(t, testBaseURL+"/userinfo", wellKnownConfig.UserInfoEndpoint)
+			assert.Equal(t, testBaseURL+"/auth/logout", wellKnownConfig.EndSessionEndpoint)
+			assert.Equal(t, testBaseURL+"/certs", wellKnownConfig.JWKsURI)
 			assert.ElementsMatch(t, []string{"authorization_code", "refresh_token", "client_credentials"}, wellKnownConfig.GrantTypesSupported)
 			assert.ElementsMatch(t, []string{"code"}, wellKnownConfig.ResponseTypesSupported)
 			assert.ElementsMatch(t, []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"}, wellKnownConfig.ACRValuesSupported)

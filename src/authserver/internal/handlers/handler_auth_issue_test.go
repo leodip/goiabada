@@ -73,7 +73,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -106,7 +106,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -141,7 +141,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The positive control for the liveness check (#129 stage 6): the ordinary ceremony,
 		// with a session identifier in the context and a session row behind it. It fails
@@ -233,7 +233,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// An empty identifier is the shape the terminated ceremony actually arrives in:
 		// MiddlewareSessionIdentifier finds the row gone, deletes the identifier from the
@@ -291,7 +291,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The narrower half of the same predicate: the middleware saw the session alive on
 		// this very request and the termination committed immediately afterwards, so the
@@ -342,7 +342,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The same empty identifier as the row above, arriving from handlePromptNone rather
 		// than from the consent screen: it validated and bumped the session, redirected here,
@@ -417,7 +417,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -484,7 +484,7 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -541,7 +541,7 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -595,7 +595,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -642,7 +642,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -750,7 +750,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database,
-			auditLogger, userSessionManager, permissionChecker)
+			auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -807,7 +807,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -884,7 +884,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -949,7 +949,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -992,7 +992,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -1072,7 +1072,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				userSessionManager := mocks_handlers.NewUserSessionManager(t)
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+				handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 				rr := httptest.NewRecorder()
@@ -1159,7 +1159,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1247,7 +1247,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1315,7 +1315,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -1397,7 +1397,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1459,7 +1459,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1694,7 +1694,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1792,7 +1792,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1877,7 +1877,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1967,7 +1967,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2033,7 +2033,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2090,7 +2090,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2137,7 +2137,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2431,7 +2431,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2476,7 +2476,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2524,7 +2524,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3353,7 +3353,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3437,7 +3437,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3521,7 +3521,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3598,7 +3598,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3667,7 +3667,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3731,7 +3731,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3808,7 +3808,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3958,7 +3958,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4057,7 +4057,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-	handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+	handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
@@ -4136,7 +4136,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -4287,7 +4287,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
+			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4438,7 +4438,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
-				database, auditLogger, userSessionManager, permissionChecker)
+				database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4513,7 +4513,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker)
+			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4583,7 +4583,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker)
+			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4702,7 +4702,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker)
+			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4752,7 +4752,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker)
+			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4794,7 +4794,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker)
+			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()

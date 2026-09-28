@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
@@ -25,13 +24,15 @@ func HandleAuthLevel2Get(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	database authLevel2Database,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -103,7 +104,7 @@ func HandleAuthLevel2Get(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/otp", http.StatusFound)
+				http.Redirect(w, r, baseURL+"/auth/otp", http.StatusFound)
 			} else {
 				// user without OTP, we'll skip it
 				authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
@@ -112,7 +113,7 @@ func HandleAuthLevel2Get(
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/completed", http.StatusFound)
+				http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)
 			}
 		case models.AcrLevel2Mandatory:
 			// OTP is mandatory
@@ -122,7 +123,7 @@ func HandleAuthLevel2Get(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/otp", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/otp", http.StatusFound)
 		default:
 			// we should never reach this point
 			httpHelper.InternalServerError(w, r, errs.New("invalid targetAcrLevel: "+targetAcrLevel.String()))

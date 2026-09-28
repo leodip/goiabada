@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -56,7 +55,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		}
 		f.handler = HandleAuthorizeGet(f.httpHelper, f.authHelper, f.userSessionManager, f.database, nil,
 			f.authorizeValidator, mocks_handlers.NewAuditLogger(t), mocks_handlers.NewPermissionChecker(t),
-			mocks_handlers.NewTokenParser(t))
+			mocks_handlers.NewTokenParser(t), testBaseURL)
 
 		target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 			"&response_type=code&scope=openid&state=s1&" + query
@@ -137,7 +136,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.handler.ServeHTTP(f.rr, f.req)
 
 		require.Equal(t, http.StatusFound, f.rr.Code)
-		assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/level1", f.rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1", f.rr.Header().Get("Location"))
 		require.NotNil(t, f.saved)
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, f.saved.AuthState)
 		assert.Equal(t, "invalid_request", f.saved.DeferredErrorCode)

@@ -13,7 +13,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
@@ -5439,17 +5438,11 @@ func TestClaimCharacterization_GroupsAndAttributesFollowThePerTokenTypeFlag(t *t
 	}, accessClaims["attributes"])
 }
 
-// Divergence 2, issuance's side: the base URL is the one injected into NewTokenIssuer, and the
-// process configuration is never consulted. /userinfo does the opposite, reading
-// config.GetAuthServer().BaseURL at the moment it builds the claim. The configured value is set
-// to something else here, so a mapper that read it back would fail this case rather than pass
-// it silently.
+// Divergence 2, issuance's side: the base URL is the one injected into NewTokenIssuer, as
+// /userinfo's is the one its handler was handed (#434). Nothing in this package loads the
+// process configuration, so a mapper that read the base URL from anywhere but its input would
+// fail this case rather than pass it silently.
 func TestClaimCharacterization_ProfileAndPictureComeFromTheInjectedBaseURL(t *testing.T) {
-	authServerConfig := config.GetAuthServer()
-	originalBaseURL := authServerConfig.BaseURL
-	t.Cleanup(func() { authServerConfig.BaseURL = originalBaseURL })
-	authServerConfig.BaseURL = "https://configured.example"
-
 	sub := fake.UUID()
 	user := &models.User{
 		Id:         1,

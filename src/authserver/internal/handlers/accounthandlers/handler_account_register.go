@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -79,6 +78,8 @@ func HandleAccountRegisterPost(
 	emailSender EmailSender,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +236,7 @@ func HandleAccountRegisterPost(
 				// every '+' and '%xx' address under form-urlencoded query parsing (#112). The
 				// helper also owns the path the activation handler redirects back to, so the
 				// two cannot drift.
-				"link": emaillinks.AccountActivateLink(verificationCode),
+				"link": emaillinks.AccountActivateLink(baseURL, verificationCode),
 			}
 			// Pre-registration recipient has no stored locale yet; render in
 			// the originating request's locale so the activation email matches
@@ -289,7 +290,7 @@ func HandleAccountRegisterPost(
 
 			if settings.SMTPEnabled {
 				bind := map[string]interface{}{
-					"link": config.GetAdminConsole().BaseURL + "/account/profile",
+					"link": adminConsoleBaseURL + "/account/profile",
 				}
 				// Recipient is the freshly-created user; no stored Locale yet,
 				// so the welcome email uses the locale they registered in.
@@ -313,7 +314,7 @@ func HandleAccountRegisterPost(
 			}
 
 			bind := map[string]interface{}{
-				"adminConsoleBaseUrl": config.GetAdminConsole().BaseURL,
+				"adminConsoleBaseUrl": adminConsoleBaseURL,
 			}
 			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_success.html", bind)
 			if err != nil {

@@ -85,7 +85,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher)
+		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher, testBaseURL)
 
 		req, err := http.NewRequest("POST", "/forgot-password", strings.NewReader(""))
 		assert.NoError(t, err)
@@ -118,7 +118,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher)
+		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher, testBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "nonexistent@example.com")
@@ -159,7 +159,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher)
+		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher, testBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "existing@example.com")
@@ -236,7 +236,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// shape and the absence of an address in it belong to emaillinks.ResetPasswordLink's own tests
 		// (#112 decision 5). Asserting the exact string here would pin the shape in a
 		// second place and let the two disagree.
-		assert.Equal(t, emaillinks.ResetPasswordLink(issuedCode), emailedLink,
+		assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
 			"the emailed link must be the shared builder's output for the code that was issued")
 
 		httpHelper.AssertExpectations(t)

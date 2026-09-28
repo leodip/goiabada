@@ -5,28 +5,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHandleIndexGet(t *testing.T) {
 	t.Run("Redirects to AdminConsoleBaseUrl", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
-
-		handler := HandleIndexGet(httpHelper)
+		handler := HandleIndexGet(testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/", nil)
 		assert.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
-		config.GetAdminConsole().BaseURL = "http://admin.example.com"
-
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, "http://admin.example.com", rr.Header().Get("Location"))
+		assert.Equal(t, "https://admin.test", rr.Header().Get("Location"))
 	})
 }

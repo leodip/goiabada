@@ -11,7 +11,6 @@ import (
 	"slices"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -21,13 +20,15 @@ import (
 func HandleAuthLevel1Get(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -51,7 +52,7 @@ func HandleAuthLevel1Get(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/pwd", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/auth/pwd", http.StatusFound)
 	}
 }
 
@@ -74,13 +75,15 @@ func HandleAuthLevel1CompletedGet(
 	userSessionManager UserSessionManager,
 	database authLevel1Database,
 	templateFS fs.FS,
+	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
 			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
-				var profileUrl = GetProfileURL()
+				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
@@ -209,7 +212,7 @@ func HandleAuthLevel1CompletedGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level2", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/level2", http.StatusFound)
 			return
 		} else {
 			// Auth is completed
@@ -219,7 +222,7 @@ func HandleAuthLevel1CompletedGet(
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/completed", http.StatusFound)
+			http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)
 			return
 		}
 	}
