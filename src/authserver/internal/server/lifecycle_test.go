@@ -227,12 +227,10 @@ func TestServeAndDrain_AFailedListenerDrainsTheOtherFirst(t *testing.T) {
 func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	cfg := config.GetAuthServer()
-	previousHTTPS, previousHTTP := cfg.ListenHostHttps, cfg.ListenHostHttp
-	t.Cleanup(func() { cfg.ListenHostHttps, cfg.ListenHostHttp = previousHTTPS, previousHTTP })
-	cfg.ListenHostHttps, cfg.ListenHostHttp = "", ""
+	cfg := &config.Config{}
+	cfg.AuthServer.ListenHostHttps, cfg.AuthServer.ListenHostHttp = "", ""
 
-	s := &Server{}
+	s := &Server{cfg: cfg}
 	err := s.Start(context.Background())
 
 	require.Error(t, err)

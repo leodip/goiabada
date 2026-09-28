@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -246,8 +245,8 @@ func TestBodyLimitPadding_AnUpload(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
 
-	limit := bodyLimitPolicy(config.GetAuthServer().ProfilePictureMaxSizeBytes).Routes["POST /api/v1/account/profile-picture"]
-	require.Equal(t, imaging.MaxFileSize(config.GetAuthServer().ProfilePictureMaxSizeBytes)+uploadMultipartAllowance, limit)
+	limit := bodyLimitPolicy(testProfilePictureMaxSizeBytes).Routes["POST /api/v1/account/profile-picture"]
+	require.Equal(t, imaging.MaxFileSize(testProfilePictureMaxSizeBytes)+uploadMultipartAllowance, limit)
 
 	assertReadNoFurtherThanTheValue(t, server, counts, paddedRequest{
 		method:      http.MethodPost,

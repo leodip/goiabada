@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"io"
 	"log/slog"
@@ -29,17 +30,16 @@ import (
 // same assertions passing on both sides of the move is what makes it a lock on the behaviour
 // rather than a description of it (#351).
 
-// configVar is one live GOIABADA_* setting: its flag if it has one, what loadFrom lands
+// configVar is one live GOIABADA_* setting: its flag if it has one, what Load lands
 // when nothing is set, and what it lands from the environment and from the command line.
 //
-// read takes the landed value through the exported accessor rather than off the package-global
-// cfg. The accessors are what every call site in the tree uses, so a matrix reading cfg
-// directly would keep passing with all of them broken, and would lock nothing a move of this
-// package could break (#351).
+// read takes the landed value off the configuration Load returned, which is what main hands to
+// everything it builds: a matrix reading anything else would keep passing with that value broken
+// (#351, #434).
 type configVar struct {
 	env  string // the GOIABADA_* name
 	flag string // the flag name, or "" when the variable has none
-	def  any    // what loadFrom lands with nothing set
+	def  any    // what Load lands with nothing set
 
 	// envValue differs from the default, so no environment case can pass by the default
 	// happening to agree. flagValue differs from envValue, so no flag case can pass by the
@@ -51,11 +51,11 @@ type configVar struct {
 	flagValue string // ignored when flag is ""
 	flagWant  any
 
-	read func() any
+	read func(*Config) any
 }
 
 // strVar is a row whose landed value is the string as supplied.
-func strVar(name, flagName, def, fromEnv, fromFlag string, read func() any) configVar {
+func strVar(name, flagName, def, fromEnv, fromFlag string, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: def,
 		envValue: fromEnv, envWant: fromEnv,
@@ -65,11 +65,11 @@ func strVar(name, flagName, def, fromEnv, fromFlag string, read func() any) conf
 }
 
 // strVarNoFlag is strVar for a variable with no flag of its own.
-func strVarNoFlag(name, def, fromEnv string, read func() any) configVar {
+func strVarNoFlag(name, def, fromEnv string, read func(*Config) any) configVar {
 	return configVar{env: name, def: def, envValue: fromEnv, envWant: fromEnv, read: read}
 }
 
-func intVar(name, flagName string, def, fromEnv, fromFlag int, read func() any) configVar {
+func intVar(name, flagName string, def, fromEnv, fromFlag int, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: def,
 		envValue: strconv.Itoa(fromEnv), envWant: fromEnv,
@@ -79,7 +79,7 @@ func intVar(name, flagName string, def, fromEnv, fromFlag int, read func() any) 
 }
 
 // int64VarNoFlag is the int64 row for a variable with no flag of its own.
-func int64VarNoFlag(name string, def, fromEnv int64, read func() any) configVar {
+func int64VarNoFlag(name string, def, fromEnv int64, read func(*Config) any) configVar {
 	return configVar{
 		env: name, def: def,
 		envValue: strconv.FormatInt(fromEnv, 10), envWant: fromEnv,
@@ -87,7 +87,7 @@ func int64VarNoFlag(name string, def, fromEnv int64, read func() any) configVar 
 	}
 }
 
-func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func() any) configVar {
+func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: def,
 		envValue: strconv.FormatBool(fromEnv), envWant: fromEnv,
@@ -98,7 +98,7 @@ func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func() any
 
 // csvVar is a comma-separated row. Its default is a nil []string rather than an empty one,
 // which is what splitCSV answers for an absent value and which reflect.DeepEqual tells apart.
-func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, wantFlag []string, read func() any) configVar {
+func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, wantFlag []string, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: []string(nil),
 		envValue: fromEnv, envWant: wantEnv,
@@ -107,91 +107,85 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 	}
 }
 
-// hexKeyVar is a data-encryption key row. Neither key has a flag, and both are read through
-// the decoding accessor, so the row asserts the decoded bytes rather than the hex text.
-func hexKeyVar(name string, def []byte, fromEnv string, wantEnv []byte, read func() any) configVar {
-	return configVar{env: name, def: def, envValue: fromEnv, envWant: wantEnv, read: read}
-}
-
 // configVariables is every live GOIABADA_* variable this process loads: 25 auth server, the 2
 // admin console values it reads, 8 database and 5 top-level, of which 32 have a flag. The one
-// name loadFrom mentions that is not live configuration is in nonLiveEnvVars.
+// name Load mentions that is not live configuration is in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Auth server
 	strVar("GOIABADA_AUTHSERVER_BASEURL", "authserver-baseurl", "http://localhost:9090",
 		"https://auth.env.example.com", "https://auth.flag.example.com",
-		func() any { return GetAuthServer().BaseURL }),
+		func(c *Config) any { return c.AuthServer.BaseURL }),
 	strVar("GOIABADA_AUTHSERVER_INTERNALBASEURL", "authserver-internalbaseurl", "",
 		"http://auth-env.internal:9090", "http://auth-flag.internal:9090",
-		func() any { return GetAuthServer().InternalBaseURL }),
+		func(c *Config) any { return c.AuthServer.InternalBaseURL }),
 	strVar("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "authserver-listen-host-https", "0.0.0.0",
 		"10.0.0.1", "10.0.0.2",
-		func() any { return GetAuthServer().ListenHostHttps }),
+		func(c *Config) any { return c.AuthServer.ListenHostHttps }),
 	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", "authserver-listen-port-https", 9443,
 		19443, 29443,
-		func() any { return GetAuthServer().ListenPortHttps }),
+		func(c *Config) any { return c.AuthServer.ListenPortHttps }),
 	strVar("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "authserver-listen-host-http", "0.0.0.0",
 		"10.0.1.1", "10.0.1.2",
-		func() any { return GetAuthServer().ListenHostHttp }),
+		func(c *Config) any { return c.AuthServer.ListenHostHttp }),
 	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", "authserver-listen-port-http", 9090,
 		19090, 29090,
-		func() any { return GetAuthServer().ListenPortHttp }),
+		func(c *Config) any { return c.AuthServer.ListenPortHttp }),
 	boolVar("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", "authserver-trust-proxy-headers", false,
 		true, false,
-		func() any { return GetAuthServer().TrustProxyHeaders }),
+		func(c *Config) any { return c.AuthServer.TrustProxyHeaders }),
 	csvVar("GOIABADA_AUTHSERVER_TRUSTED_PROXIES", "authserver-trusted-proxies",
 		" 10.0.0.0/8 , 172.16.0.0/12 ", []string{"10.0.0.0/8", "172.16.0.0/12"},
 		"192.168.0.1,, ,203.0.113.0/24", []string{"192.168.0.1", "203.0.113.0/24"},
-		func() any { return GetAuthServer().TrustedProxies }),
+		func(c *Config) any { return c.AuthServer.TrustedProxies }),
 	boolVar("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", "authserver-log-http-requests", false,
 		true, false,
-		func() any { return GetAuthServer().LogHttpRequests }),
+		func(c *Config) any { return c.AuthServer.LogHttpRequests }),
 	strVar("GOIABADA_AUTHSERVER_LOG_LEVEL", "authserver-log-level", "info",
 		"debug", "warn",
-		func() any { return GetAuthServer().LogLevel }),
+		func(c *Config) any { return c.AuthServer.LogLevel }),
 	strVar("GOIABADA_AUTHSERVER_LOG_FORMAT", "authserver-log-format", "text",
 		"json", "text",
-		func() any { return GetAuthServer().LogFormat }),
+		func(c *Config) any { return c.AuthServer.LogFormat }),
 	strVar("GOIABADA_AUTHSERVER_CERTFILE", "authserver-certfile", "",
 		"/env/auth-cert.pem", "/flag/auth-cert.pem",
-		func() any { return GetAuthServer().CertFile }),
+		func(c *Config) any { return c.AuthServer.CertFile }),
 	strVar("GOIABADA_AUTHSERVER_KEYFILE", "authserver-keyfile", "",
 		"/env/auth-key.pem", "/flag/auth-key.pem",
-		func() any { return GetAuthServer().KeyFile }),
+		func(c *Config) any { return c.AuthServer.KeyFile }),
 	boolVar("GOIABADA_AUTHSERVER_LOG_SQL", "authserver-log-sql", false,
 		true, false,
-		func() any { return GetAuthServer().LogSQL }),
+		func(c *Config) any { return c.AuthServer.LogSQL }),
 	strVar("GOIABADA_AUTHSERVER_STATICDIR", "authserver-staticdir", "",
 		"/env/auth-static", "/flag/auth-static",
-		func() any { return GetAuthServer().StaticDir }),
+		func(c *Config) any { return c.AuthServer.StaticDir }),
 	strVar("GOIABADA_AUTHSERVER_TEMPLATEDIR", "authserver-templatedir", "",
 		"/env/auth-templates", "/flag/auth-templates",
-		func() any { return GetAuthServer().TemplateDir }),
+		func(c *Config) any { return c.AuthServer.TemplateDir }),
 	boolVar("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", "authserver-debug-api-requests", false,
 		true, false,
-		func() any { return GetAuthServer().DebugAPIRequests }),
+		func(c *Config) any { return c.AuthServer.DebugAPIRequests }),
 	strVar("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", "authserver-bootstrap-env-outfile", "",
 		"/env/bootstrap.env", "/flag/bootstrap.env",
-		func() any { return GetAuthServer().BootstrapEnvOutFile }),
+		func(c *Config) any { return c.AuthServer.BootstrapEnvOutFile }),
 	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", "", strings.Repeat("a1", 64),
-		func() any { return GetAuthServer().SessionAuthenticationKey }),
+		func(c *Config) any { return c.AuthServer.SessionAuthenticationKey }),
 	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", "", strings.Repeat("a2", 32),
-		func() any { return GetAuthServer().SessionEncryptionKey }),
+		func(c *Config) any { return c.AuthServer.SessionEncryptionKey }),
 	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", "", strings.Repeat("a3", 64),
-		func() any { return GetAuthServer().SessionAuthenticationKeyPrevious }),
+		func(c *Config) any { return c.AuthServer.SessionAuthenticationKeyPrevious }),
 	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", "", strings.Repeat("a4", 32),
-		func() any { return GetAuthServer().SessionEncryptionKeyPrevious }),
+		func(c *Config) any { return c.AuthServer.SessionEncryptionKeyPrevious }),
 	boolVar("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", "authserver-ratelimiter-enabled", false,
 		true, false,
-		func() any { return GetAuthServer().RateLimiterEnabled }),
+		func(c *Config) any { return c.AuthServer.RateLimiterEnabled }),
 	int64VarNoFlag("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, 5*1024*1024,
-		func() any { return GetAuthServer().ProfilePictureMaxSizeBytes }),
+		func(c *Config) any { return c.AuthServer.ProfilePictureMaxSizeBytes }),
 	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
 	// is what pins both now that the configuration reads it instead (#431).
 	{
 		env: "GOIABADA_I18N_OVERRIDES_DIR", def: "",
 		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
-		read: func() any { return GetAuthServer().I18nOverridesDir },
+		read: func(c *Config) any { return c.AuthServer.I18nOverridesDir },
 	},
 
 	// Admin console: the two values this process reads. The other 17 GOIABADA_ADMINCONSOLE_*
@@ -199,61 +193,57 @@ var configVariables = []configVar{
 	// guard below checks that in both directions, against config.go.
 	strVar("GOIABADA_ADMINCONSOLE_BASEURL", "adminconsole-baseurl", "http://localhost:9091",
 		"https://admin.env.example.com", "https://admin.flag.example.com",
-		func() any { return GetAdminConsole().BaseURL }),
+		func(c *Config) any { return c.AdminConsole.BaseURL }),
 	strVar("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", "adminconsole-oauth-client-secret", "",
 		"env-client-secret", "flag-client-secret",
-		func() any { return GetAdminConsole().OAuthClientSecret }),
+		func(c *Config) any { return c.AdminConsole.OAuthClientSecret }),
 
 	// Database
 	strVar("GOIABADA_DB_TYPE", "db-type", "sqlite",
 		"mysql", "postgres",
-		func() any { return GetDatabase().Type }),
+		func(c *Config) any { return c.Database.Type }),
 	strVar("GOIABADA_DB_USERNAME", "db-username", "root",
 		"env-user", "flag-user",
-		func() any { return GetDatabase().Username }),
+		func(c *Config) any { return c.Database.Username }),
 	strVar("GOIABADA_DB_PASSWORD", "db-password", "",
 		"env-db-password", "flag-db-password",
-		func() any { return GetDatabase().Password }),
+		func(c *Config) any { return c.Database.Password }),
 	strVar("GOIABADA_DB_HOST", "db-host", "localhost",
 		"env.db.example.com", "flag.db.example.com",
-		func() any { return GetDatabase().Host }),
+		func(c *Config) any { return c.Database.Host }),
 	intVar("GOIABADA_DB_PORT", "db-port", 3306,
 		13306, 23306,
-		func() any { return GetDatabase().Port }),
+		func(c *Config) any { return c.Database.Port }),
 	strVar("GOIABADA_DB_NAME", "db-name", "goiabada",
 		"env_goiabada", "flag_goiabada",
-		func() any { return GetDatabase().Name }),
+		func(c *Config) any { return c.Database.Name }),
 	strVar("GOIABADA_DB_DSN", "db-dsn", "file::memory:?cache=shared",
 		"file:env.db?cache=shared", "file:flag.db?cache=shared",
-		func() any { return GetDatabase().DSN }),
+		func(c *Config) any { return c.Database.DSN }),
 	// The one setting whose default is true, which is why it goes through
 	// getEnvAsBoolDefault rather than getEnvAsBool (#293).
 	boolVar("GOIABADA_DB_CREATE", "db-create", true,
 		false, true,
-		func() any { return GetDatabase().Create }),
+		func(c *Config) any { return c.Database.Create }),
 
 	// Initial setup and the data-encryption keys
 	strVar("GOIABADA_ADMIN_EMAIL", "admin-email", "admin",
 		"env-admin@example.com", "flag-admin@example.com",
-		func() any { return GetAdminEmail() }),
+		func(c *Config) any { return c.AdminEmail }),
 	strVar("GOIABADA_ADMIN_PASSWORD", "admin-password", "changeme",
 		"env-admin-password", "flag-admin-password",
-		func() any { return GetAdminPassword() }),
+		func(c *Config) any { return c.AdminPassword }),
 	strVar("GOIABADA_APPNAME", "appname", "Goiabada",
 		"Env Goiabada", "Flag Goiabada",
-		func() any { return GetAppName() }),
-	// hex.DecodeString("") answers an empty non-nil slice, so the current key's default is
-	// an empty slice where the previous key's, which short-circuits on the empty string, is
-	// nil. reflect.DeepEqual tells the two apart, which is why the rows record them apart.
-	hexKeyVar("GOIABADA_AES_ENCRYPTION_KEY", []byte{},
-		strings.Repeat("ab", 32), bytes.Repeat([]byte{0xab}, 32),
-		func() any { return GetAESEncryptionKey() }),
-	hexKeyVar("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", []byte(nil),
-		strings.Repeat("cd", 32), bytes.Repeat([]byte{0xcd}, 32),
-		func() any { return GetAESEncryptionKeyPrevious() }),
+		func(c *Config) any { return c.AppName }),
+	// The hex text as supplied: DataKeys decodes it, and TestDataKeys owns what it answers.
+	strVarNoFlag("GOIABADA_AES_ENCRYPTION_KEY", "", strings.Repeat("ab", 32),
+		func(c *Config) any { return c.AESEncryptionKey }),
+	strVarNoFlag("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", "", strings.Repeat("cd", 32),
+		func(c *Config) any { return c.AESEncryptionKeyPrevious }),
 }
 
-// nonLiveEnvVars are the GOIABADA_* names loadFrom mentions that are not live configuration. For
+// nonLiveEnvVars are the GOIABADA_* names Load mentions that are not live configuration. For
 // this binary that is one name: the removed cookie setting it warns about, because the Secure flag
 // is derived from an https base URL (#293). It lands on no field, so it has no row, and the drift
 // guard carries it as a named exception rather than as silence.
@@ -262,17 +252,34 @@ var configVariables = []configVar{
 // warning about it (#351), and the only place config.go still spells it is the comment saying so.
 // The drift guard reads names wherever they appear in the source, so a name in prose needs an
 // entry here just as one in a warning list does. What holds the warning itself to naming only the
-// auth server's is TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly, not this list. The two
+// auth server's is TestLoad_WarnsAboutThisProcessesRemovedSettingOnly, not this list. The two
 // removed variables the admin console refuses outright (#285) were never this binary's at all.
 var nonLiveEnvVars = []string{
 	"GOIABADA_AUTHSERVER_SET_COOKIE_SECURE",
 	"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE",
 }
 
-// loadMatrix drives loadFrom with its own flag set and returns it, so a case can assert on
-// what was registered as well as on what was landed. Every name in the roster is cleared
-// first, so a developer's own environment cannot decide what a default case observes.
-func loadMatrix(t *testing.T, env map[string]string, args []string) *flag.FlagSet {
+// loadMatrix drives Load with its own flag set and returns the set and the configuration, so a
+// case can assert on what was registered as well as on what was landed. Every name in the roster
+// is cleared first, so a developer's own environment cannot decide what a default case observes.
+//
+// A load error fails the case, so every row of the matrix also shows that the values it sets
+// load without a refusal (#434).
+func loadMatrix(t *testing.T, env map[string]string, args []string) (*flag.FlagSet, *Config) {
+	t.Helper()
+
+	fs, c, err := loadMatrixRefusing(t, env, args)
+	if err != nil {
+		t.Fatalf("Load() = %v, want no error", err)
+	}
+	if c == nil {
+		t.Fatal("Load() answered neither a configuration nor an error")
+	}
+	return fs, c
+}
+
+// loadMatrixRefusing is loadMatrix answering the load's error rather than failing on it.
+func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*flag.FlagSet, *Config, error) {
 	t.Helper()
 
 	for _, v := range configVariables {
@@ -285,41 +292,150 @@ func loadMatrix(t *testing.T, env map[string]string, args []string) *flag.FlagSe
 		t.Setenv(key, value)
 	}
 
-	saved, savedArgs := cfg, positionalArgs
-	t.Cleanup(func() { cfg, positionalArgs = saved, savedArgs })
-
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	loadFrom(fs, args)
-
-	return fs
+	c, err := Load(fs, args)
+	return fs, c, err
 }
 
-func TestLoadFrom_Defaults(t *testing.T) {
+// malformedVariableRows is one refusal per numeric or boolean variable: a value that does not
+// parse, the valid flag for the same setting where the variable has one, and the one problem the
+// refusal names.
+var malformedVariableRows = []struct {
+	env, value, flag, want string
+}{
+	{"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", "9443a", "-authserver-listen-port-https=9443",
+		`GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS is "9443a", not an integer`},
+	{"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", "9090.0", "-authserver-listen-port-http=9090",
+		`GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP is "9090.0", not an integer`},
+	{"GOIABADA_DB_PORT", "0x10", "-db-port=3306",
+		`GOIABADA_DB_PORT is "0x10", not an integer`},
+	{"GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", "3MB", "",
+		`GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES is "3MB", not an integer`},
+	{"GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", "yes", "-authserver-trust-proxy-headers=true",
+		`GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS is "yes", not a boolean (true or false)`},
+	{"GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", "on", "-authserver-log-http-requests=true",
+		`GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS is "on", not a boolean (true or false)`},
+	{"GOIABADA_AUTHSERVER_LOG_SQL", "enabled", "-authserver-log-sql=false",
+		`GOIABADA_AUTHSERVER_LOG_SQL is "enabled", not a boolean (true or false)`},
+	{"GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", "Y", "-authserver-debug-api-requests=true",
+		`GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS is "Y", not a boolean (true or false)`},
+	{"GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", "no", "-authserver-ratelimiter-enabled=false",
+		`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is "no", not a boolean (true or false)`},
+	{"GOIABADA_DB_CREATE", "yes", "-db-create=true",
+		`GOIABADA_DB_CREATE is "yes", not a boolean (true or false)`},
+}
+
+// TestLoad_RefusesAMalformedVariable is decisions 6 and 10 of #434 over the ten numeric and
+// boolean variables this binary loads, each through Load rather than the helper alone, so a row
+// fails if Load reads the variable any other way. Each case also gives a valid flag for the same
+// setting where the variable has one, which must not rescue it: the value the operator wrote is
+// wrong whichever of the two wins. The refusal answers no configuration, so nothing can start
+// from a half-read one.
+func TestLoad_RefusesAMalformedVariable(t *testing.T) {
+	for _, tt := range malformedVariableRows {
+		t.Run(tt.env, func(t *testing.T) {
+			var args []string
+			if tt.flag != "" {
+				args = []string{tt.flag}
+			}
+			_, c, err := loadMatrixRefusing(t, map[string]string{tt.env: tt.value}, args)
+
+			want := "malformed configuration: " + tt.want
+			if err == nil || err.Error() != want {
+				t.Errorf("Load() with %s=%q and %v = %v, want %q", tt.env, tt.value, args, err, want)
+			}
+			if c != nil {
+				t.Errorf("Load() refused and still answered a configuration: %#v", c)
+			}
+		})
+	}
+}
+
+// TestLoad_EveryNumericAndBooleanVariableHasARefusalRow holds the table above to the ten: a
+// numeric or boolean row in the matrix with no refusal row is a variable whose malformed value
+// nothing shows is refused.
+func TestLoad_EveryNumericAndBooleanVariableHasARefusalRow(t *testing.T) {
+	refused := map[string]bool{}
+	for _, row := range malformedVariableRows {
+		refused[row.env] = true
+	}
+	for _, v := range configVariables {
+		switch v.def.(type) {
+		case int, int64, bool:
+			if !refused[v.env] {
+				t.Errorf("%s is numeric or boolean and TestLoad_RefusesAMalformedVariable has no row for it", v.env)
+			}
+			delete(refused, v.env)
+		}
+	}
+	for _, name := range sortedKeys(refused) {
+		t.Errorf("%s has a refusal row but no numeric or boolean row in configVariables", name)
+	}
+}
+
+// TestLoad_NamesEveryMalformedVariableInOneError is the row that pins "all at once". Keep it: a
+// Load stopping at the first malformed variable passes every other case, and costs the operator
+// one restart per typo. The error is one line, because main writes it to stderr as the one line
+// an operator reads (#434).
+func TestLoad_NamesEveryMalformedVariableInOneError(t *testing.T) {
+	_, _, err := loadMatrixRefusing(t, map[string]string{
+		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP": "90 90",
+		"GOIABADA_DB_CREATE":                   "yes",
+	}, nil)
+
+	want := `malformed configuration: GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP is "90 90", not an integer; ` +
+		`GOIABADA_DB_CREATE is "yes", not a boolean (true or false)`
+	if err == nil || err.Error() != want {
+		t.Errorf("Load() = %v, want %q", err, want)
+	}
+}
+
+// TestLoad_ReturnsTheParseError: under a ContinueOnError set the parse's refusal is answered, and
+// -h keeps flag.ErrHelp, so a caller can tell a request for the usage text from a mistake.
+func TestLoad_ReturnsTheParseError(t *testing.T) {
+	t.Run("an undefined flag", func(t *testing.T) {
+		_, c, err := loadMatrixRefusing(t, nil, []string{"-no-such-flag"})
+		if err == nil || !strings.Contains(err.Error(), "flag provided but not defined: -no-such-flag") {
+			t.Errorf("Load() = %v, want the parse's refusal of -no-such-flag", err)
+		}
+		if c != nil {
+			t.Errorf("Load() refused and still answered a configuration: %#v", c)
+		}
+	})
+	t.Run("-h", func(t *testing.T) {
+		_, _, err := loadMatrixRefusing(t, nil, []string{"-h"})
+		if !errors.Is(err, flag.ErrHelp) {
+			t.Errorf("Load() = %v, want flag.ErrHelp", err)
+		}
+	})
+}
+
+func TestLoad_Defaults(t *testing.T) {
 	for _, v := range configVariables {
 		t.Run(v.env, func(t *testing.T) {
-			loadMatrix(t, nil, nil)
+			_, c := loadMatrix(t, nil, nil)
 
-			if got := v.read(); !reflect.DeepEqual(got, v.def) {
+			if got := v.read(c); !reflect.DeepEqual(got, v.def) {
 				t.Errorf("%s unset: got %#v, want the default %#v", v.env, got, v.def)
 			}
 		})
 	}
 }
 
-func TestLoadFrom_FromTheEnvironment(t *testing.T) {
+func TestLoad_FromTheEnvironment(t *testing.T) {
 	for _, v := range configVariables {
 		t.Run(v.env, func(t *testing.T) {
-			loadMatrix(t, map[string]string{v.env: v.envValue}, nil)
+			_, c := loadMatrix(t, map[string]string{v.env: v.envValue}, nil)
 
-			if got := v.read(); !reflect.DeepEqual(got, v.envWant) {
+			if got := v.read(c); !reflect.DeepEqual(got, v.envWant) {
 				t.Errorf("%s=%q: got %#v, want %#v", v.env, v.envValue, got, v.envWant)
 			}
 		})
 	}
 }
 
-func TestLoadFrom_FlagBeatsTheEnvironment(t *testing.T) {
+func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 	for _, v := range configVariables {
 		if v.flag == "" {
 			continue
@@ -328,9 +444,9 @@ func TestLoadFrom_FlagBeatsTheEnvironment(t *testing.T) {
 			// The variable is set to a value the flag does not use, so a pass cannot come
 			// from the environment having supplied the same answer.
 			args := []string{"-" + v.flag + "=" + v.flagValue}
-			loadMatrix(t, map[string]string{v.env: v.envValue}, args)
+			_, c := loadMatrix(t, map[string]string{v.env: v.envValue}, args)
 
-			if got := v.read(); !reflect.DeepEqual(got, v.flagWant) {
+			if got := v.read(c); !reflect.DeepEqual(got, v.flagWant) {
 				t.Errorf("%s=%q with %s: got %#v, want the flag's %#v",
 					v.env, v.envValue, args[0], got, v.flagWant)
 			}
@@ -391,7 +507,7 @@ var authServerFlags = []string{
 // but not defined" and exits 2 where it used to parse and change nothing.
 //
 // Asserting these by name is what makes the case fail for its stated reason. "Not in the expected
-// set" would also pass if loadFrom registered nothing at all.
+// set" would also pass if Load registered nothing at all.
 var refusedFlags = []string{
 	"adminconsole-certfile",
 	"adminconsole-keyfile",
@@ -408,17 +524,17 @@ var refusedFlags = []string{
 	"adminconsole-trusted-proxies",
 }
 
-// TestLoadFrom_RegistersExactlyTheAuthServerFlags holds what this binary's command line is, in
-// both directions: a flag in the list that loadFrom does not register, and a flag it registers
+// TestLoad_RegistersExactlyTheAuthServerFlags holds what this binary's command line is, in
+// both directions: a flag in the list that Load does not register, and a flag it registers
 // that the list does not claim.
-func TestLoadFrom_RegistersExactlyTheAuthServerFlags(t *testing.T) {
-	fs := loadMatrix(t, nil, nil)
+func TestLoad_RegistersExactlyTheAuthServerFlags(t *testing.T) {
+	fs, _ := loadMatrix(t, nil, nil)
 
 	registered := map[string]bool{}
 	fs.VisitAll(func(f *flag.Flag) { registered[f.Name] = true })
 
 	if len(registered) == 0 {
-		t.Fatal("loadFrom registered no flags at all, so this case checked nothing")
+		t.Fatal("Load registered no flags at all, so this case checked nothing")
 	}
 
 	expected := map[string]bool{}
@@ -428,22 +544,22 @@ func TestLoadFrom_RegistersExactlyTheAuthServerFlags(t *testing.T) {
 
 	for _, name := range authServerFlags {
 		if !registered[name] {
-			t.Errorf("the auth server is meant to register %q and loadFrom does not", name)
+			t.Errorf("the auth server is meant to register %q and Load does not", name)
 		}
 	}
 	for _, name := range sortedKeys(registered) {
 		if !expected[name] {
-			t.Errorf("loadFrom registers %q, which is not one of the auth server's flags", name)
+			t.Errorf("Load registers %q, which is not one of the auth server's flags", name)
 		}
 	}
 }
 
-// TestLoadFrom_RefusesTheAdminConsolesOwnFlags is decision 3's narrowing asserted as a refusal.
+// TestLoad_RefusesTheAdminConsolesOwnFlags is decision 3's narrowing asserted as a refusal.
 // Registering the peer's listener, logging and directory flags is loading the peer's
 // configuration, and a flag this binary cannot act on reads to an operator as having configured
 // something.
-func TestLoadFrom_RefusesTheAdminConsolesOwnFlags(t *testing.T) {
-	fs := loadMatrix(t, nil, nil)
+func TestLoad_RefusesTheAdminConsolesOwnFlags(t *testing.T) {
+	fs, _ := loadMatrix(t, nil, nil)
 
 	registered := map[string]bool{}
 	fs.VisitAll(func(f *flag.Flag) { registered[f.Name] = true })
@@ -496,10 +612,10 @@ func TestFlagLists_AgreeWithTheTable(t *testing.T) {
 	}
 }
 
-// TestLoadFrom_ArgsAreWhatTheParseLeft is the half of #424's dispatch that config owns: Args
-// answers the positional arguments in order, and the server's parse stops at the first one, so a
+// TestLoad_ArgsAreWhatTheParseLeft is the half of #424's dispatch that config owns: Config.Args
+// holds the positional arguments in order, and the server's parse stops at the first one, so a
 // flag written after `migrate` is left for the subcommand's own parse rather than landing here.
-func TestLoadFrom_ArgsAreWhatTheParseLeft(t *testing.T) {
+func TestLoad_ArgsAreWhatTheParseLeft(t *testing.T) {
 	cases := []struct {
 		name     string
 		args     []string
@@ -516,25 +632,16 @@ func TestLoadFrom_ArgsAreWhatTheParseLeft(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			loadMatrix(t, nil, tc.args)
+			_, c := loadMatrix(t, nil, tc.args)
 
-			if got := Args(); !slices.Equal(got, tc.wantArgs) {
-				t.Errorf("Args() = %#v, want %#v", got, tc.wantArgs)
+			if got := c.Args; !slices.Equal(got, tc.wantArgs) {
+				t.Errorf("Args = %#v, want %#v", got, tc.wantArgs)
 			}
-			if got := GetDatabase().Type; got != tc.wantType {
+			if got := c.Database.Type; got != tc.wantType {
 				t.Errorf("db-type landed as %q, want %q", got, tc.wantType)
 			}
 		})
 	}
-
-	t.Run("the slice returned is a copy", func(t *testing.T) {
-		loadMatrix(t, nil, []string{"migrate", "version"})
-
-		Args()[0] = "changed"
-		if got := Args()[0]; got != "migrate" {
-			t.Errorf("writing to the returned slice changed what Args answers next: %q", got)
-		}
-	})
 }
 
 // TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven holds the one registration
@@ -627,43 +734,37 @@ func TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine(t *testing.T) {
 	}
 }
 
-// TestAESKeyAccessors_AnswerNilOnAMalformedKey covers the arms the table cannot reach: both
-// accessors decode, and both answer nil rather than an error when the value is not hex.
-// ValidateAESEncryptionKey is what refuses such a value at startup, so the accessors are only
-// reached once it has passed; a nil here is the accessor declining to guess. The previous
-// key's unset-means-nil arm is the row's default case.
+// TestAESKeyAccessors_AnswerNilOnAMalformedKey covers the two getters the data and integration
+// tiers still read: both decode what Init filled, and both answer nil rather than an error when
+// the value is not hex, and the previous key when it is unset. DataKeys is what refuses such a
+// value at startup. It writes cfg directly, as TestSimpleAccessors does, because Init's once
+// cannot be run again (#434).
 func TestAESKeyAccessors_AnswerNilOnAMalformedKey(t *testing.T) {
-	tests := []struct {
-		name string
-		env  map[string]string
-		read func() any
-	}{
-		{
-			name: "the current key",
-			env:  map[string]string{"GOIABADA_AES_ENCRYPTION_KEY": "zz"},
-			read: func() any { return GetAESEncryptionKey() },
-		},
-		{
-			name: "the previous key",
-			env:  map[string]string{"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS": "zz"},
-			read: func() any { return GetAESEncryptionKeyPrevious() },
-		},
+	saved := cfg
+	t.Cleanup(func() { cfg = saved })
+
+	cfg.AESEncryptionKey = strings.Repeat("ab", 32)
+	cfg.AESEncryptionKeyPrevious = ""
+	if got := GetAESEncryptionKey(); !bytes.Equal(got, bytes.Repeat([]byte{0xab}, 32)) {
+		t.Errorf("GetAESEncryptionKey() = %x, want the decoded key", got)
+	}
+	if got := GetAESEncryptionKeyPrevious(); got != nil {
+		t.Errorf("GetAESEncryptionKeyPrevious() unset = %#v, want nil", got)
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			loadMatrix(t, test.env, nil)
-
-			if got := test.read(); got != nil && !reflect.DeepEqual(got, []byte(nil)) {
-				t.Errorf("a malformed key decoded to %#v, want nil", got)
-			}
-		})
+	cfg.AESEncryptionKey = "zz"
+	cfg.AESEncryptionKeyPrevious = "zz"
+	if got := GetAESEncryptionKey(); got != nil {
+		t.Errorf("GetAESEncryptionKey() malformed = %#v, want nil", got)
+	}
+	if got := GetAESEncryptionKeyPrevious(); got != nil {
+		t.Errorf("GetAESEncryptionKeyPrevious() malformed = %#v, want nil", got)
 	}
 }
 
 // TestConfigVariables_EveryRowCanFail holds the table to the discipline its own cases depend
 // on: a row whose environment value is its default, or whose flag value is its environment
-// value, has a case that passes whatever loadFrom does with it.
+// value, has a case that passes whatever Load does with it.
 func TestConfigVariables_EveryRowCanFail(t *testing.T) {
 	seenEnv := map[string]bool{}
 	seenFlag := map[string]bool{}
@@ -704,7 +805,7 @@ var (
 	flagNameInSource = regexp.MustCompile(`fs\.[A-Za-z0-9]+Var\([^,]+, *"([^"]+)"`)
 )
 
-// TestConfigSource_EveryVariableAndFlagHasARow reads config.go and compares what loadFrom
+// TestConfigSource_EveryVariableAndFlagHasARow reads config.go and compares what Load
 // actually names against the table, in both directions. A variable or a flag added with no
 // row fails, and so does a row for one that is gone: without it the matrix locks whatever it
 // happened to be written against, and a setting added later is simply not covered.
@@ -784,16 +885,16 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
-// TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly is decision 4 of #351: each process warns
+// TestLoad_WarnsAboutThisProcessesRemovedSettingOnly is decision 4 of #351: each process warns
 // about its own removed settings. Both binaries used to warn about both removed cookie variables,
 // so the auth server's log carried a line about a setting whose cookies it never wrote.
 //
 // Both variables are set, so the case cannot pass by the admin console's simply being absent, and
 // the record naming it would be a failure rather than a silence.
-func TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
+func TestLoad_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 
-	loadMatrix(t, map[string]string{
+	_, _ = loadMatrix(t, map[string]string{
 		"GOIABADA_AUTHSERVER_SET_COOKIE_SECURE":   "true",
 		"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE": "true",
 	}, nil)
@@ -813,12 +914,12 @@ func TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
 	}
 }
 
-// TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet is the quiet half. Without it the case above
-// passes for a loadFrom that warns unconditionally.
-func TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
+// TestLoad_SaysNothingWhenNoRemovedSettingIsSet is the quiet half. Without it the case above
+// passes for a Load that warns unconditionally.
+func TestLoad_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 
-	loadMatrix(t, nil, nil)
+	_, _ = loadMatrix(t, nil, nil)
 
 	if records := capture.Records(); len(records) != 0 {
 		t.Errorf("got %d records loading a clean environment, want none: %v", len(records), capture.Text())

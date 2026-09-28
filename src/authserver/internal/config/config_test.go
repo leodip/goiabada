@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/hex"
 	"flag"
 	"io"
@@ -10,72 +11,103 @@ import (
 	"testing"
 )
 
-func TestValidateAESEncryptionKey(t *testing.T) {
-	saved := cfg.AESEncryptionKey
-	defer func() { cfg.AESEncryptionKey = saved }()
+const (
+	testDataKeyHex         = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+	testPreviousDataKeyHex = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+)
 
+// TestDataKeys holds the current key's rule, with the messages ValidateAESEncryptionKey wrote
+// word for word: an operator reading the refusal meets the text it always said. A refusal answers
+// no key at all (#434).
+func TestDataKeys(t *testing.T) {
+	const hint = ". Generate with: openssl rand -hex 32"
 	tests := []struct {
 		name    string
 		key     string
-		wantErr bool
+		wantErr string // the whole message, or "" for acceptance
 	}{
-		{"valid 32-byte hex", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", false},
-		{"empty", "", true},
-		{"not hex", "zzzz", true},
-		{"too short (16 bytes)", "00112233445566778899aabbccddeeff", true},
-		{"too long (33 bytes)", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00", true},
+		{"valid 32-byte hex", testDataKeyHex, ""},
+		{"surrounding whitespace is trimmed", "  " + testDataKeyHex + "\t", ""},
+		{"empty", "", "GOIABADA_AES_ENCRYPTION_KEY is required" + hint},
+		{"whitespace only", "   ", "GOIABADA_AES_ENCRYPTION_KEY is required" + hint},
+		{"not hex", "zzzz", "GOIABADA_AES_ENCRYPTION_KEY must be hex-encoded (error: encoding/hex: invalid byte: U+007A 'z')" + hint},
+		{"too short (16 bytes)", "00112233445566778899aabbccddeeff",
+			"GOIABADA_AES_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got 16 bytes" + hint},
+		{"too long (33 bytes)", testDataKeyHex + "00",
+			"GOIABADA_AES_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got 33 bytes" + hint},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg.AESEncryptionKey = tt.key
-			err := ValidateAESEncryptionKey()
-			if tt.wantErr && err == nil {
-				t.Errorf("ValidateAESEncryptionKey(%q): expected error, got nil", tt.key)
-			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("ValidateAESEncryptionKey(%q): unexpected error: %v", tt.key, err)
-			}
-			if !tt.wantErr {
-				if got := GetAESEncryptionKey(); len(got) != 32 {
-					t.Errorf("GetAESEncryptionKey() length = %d, want 32", len(got))
+			c := &Config{AESEncryptionKey: tt.key}
+			current, previous, err := c.DataKeys()
+
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Errorf("DataKeys() error = %v, want %q", err, tt.wantErr)
 				}
+				if current != nil || previous != nil {
+					t.Errorf("DataKeys() refused and still answered keys %x, %x", current, previous)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("DataKeys() = %v, want no error", err)
+			}
+			want, _ := hex.DecodeString(testDataKeyHex)
+			if !bytes.Equal(current, want) {
+				t.Errorf("DataKeys() current = %x, want %x", current, want)
+			}
+			if previous != nil {
+				t.Errorf("DataKeys() previous = %x with none configured, want nil", previous)
 			}
 		})
 	}
 }
 
-func TestValidateAESEncryptionKey_Previous(t *testing.T) {
-	savedCur := cfg.AESEncryptionKey
-	savedPrev := cfg.AESEncryptionKeyPrevious
-	defer func() {
-		cfg.AESEncryptionKey = savedCur
-		cfg.AESEncryptionKeyPrevious = savedPrev
-	}()
-
-	cfg.AESEncryptionKey = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
-
+// TestDataKeys_Previous is the rotation key's half: optional, and held to the same rule when it is
+// set, with the messages it always had, which carry no generate hint because the previous key is
+// the one an operator already has.
+func TestDataKeys_Previous(t *testing.T) {
 	tests := []struct {
 		name    string
 		prev    string
-		wantErr bool
+		wantErr string
 	}{
-		{"absent is fine", "", false},
-		{"valid previous", "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", false},
-		{"previous not hex", "zzzz", true},
-		{"previous wrong length", "00112233445566778899aabbccddeeff", true},
+		{"absent is fine", "", ""},
+		{"whitespace only is absent", "  ", ""},
+		{"valid previous", testPreviousDataKeyHex, ""},
+		{"previous not hex", "zzzz",
+			"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: encoding/hex: invalid byte: U+007A 'z')"},
+		{"previous wrong length", "00112233445566778899aabbccddeeff",
+			"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got 16 bytes"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg.AESEncryptionKeyPrevious = tt.prev
-			err := ValidateAESEncryptionKey()
-			if tt.wantErr && err == nil {
-				t.Errorf("expected error for previous=%q, got nil", tt.prev)
+			c := &Config{AESEncryptionKey: testDataKeyHex, AESEncryptionKeyPrevious: tt.prev}
+			current, previous, err := c.DataKeys()
+
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Errorf("DataKeys() error = %v, want %q", err, tt.wantErr)
+				}
+				if current != nil || previous != nil {
+					t.Errorf("DataKeys() refused and still answered keys %x, %x", current, previous)
+				}
+				return
 			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error for previous=%q: %v", tt.prev, err)
+			if err != nil {
+				t.Fatalf("DataKeys() = %v, want no error", err)
 			}
-			if !tt.wantErr && tt.prev != "" && len(GetAESEncryptionKeyPrevious()) != 32 {
-				t.Errorf("GetAESEncryptionKeyPrevious() length = %d, want 32", len(GetAESEncryptionKeyPrevious()))
+			wantCurrent, _ := hex.DecodeString(testDataKeyHex)
+			if !bytes.Equal(current, wantCurrent) {
+				t.Errorf("DataKeys() current = %x, want %x", current, wantCurrent)
+			}
+			var wantPrevious []byte
+			if strings.TrimSpace(tt.prev) != "" {
+				wantPrevious, _ = hex.DecodeString(tt.prev)
+			}
+			if !bytes.Equal(previous, wantPrevious) || (wantPrevious == nil) != (previous == nil) {
+				t.Errorf("DataKeys() previous = %#v, want %#v", previous, wantPrevious)
 			}
 		})
 	}
@@ -122,12 +154,44 @@ func TestGetEnvAsStringSlice(t *testing.T) {
 	})
 }
 
+// assertRecorded holds a helper call to having recorded exactly the one problem want, or none
+// when want is empty.
+func assertRecorded(t *testing.T, malformed malformedValues, want string) {
+	t.Helper()
+	if want == "" {
+		if len(malformed) != 0 {
+			t.Errorf("recorded %q, want nothing", malformed)
+		}
+		return
+	}
+	if len(malformed) != 1 || malformed[0] != want {
+		t.Errorf("recorded %q, want exactly [%q]", malformed, want)
+	}
+}
+
+// setOrUnset sets key to value, or leaves it absent when set is false. t.Setenv cannot unset, but
+// it registers the restore, so setting then unsetting leaves the variable absent for this subtest
+// only.
+func setOrUnset(t *testing.T, key string, set bool, value string) {
+	t.Helper()
+	t.Setenv(key, value)
+	if !set {
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("os.Unsetenv(%s) = %v", key, err)
+		}
+	}
+}
+
 func TestGetEnvAsBoolDefault(t *testing.T) {
 	const key = "GOIABADA_TEST_DB_CREATE"
 
 	// Every case is run against both defaults, so the default is observed rather than assumed:
 	// a case that only ever ran with defaultVal=false could not tell the fallback apart from
 	// a parsed false.
+	//
+	// Keep the refusal rows: they reverse the earlier position, that anything strconv.ParseBool
+	// refuses falls back to the default, on purpose. "no" reads as false and against a true
+	// default it was true, so GOIABADA_DB_CREATE=no created the database it said not to (#434).
 	tests := []struct {
 		name string
 		// set is false for the unset case, which is the one the helper exists for.
@@ -135,8 +199,11 @@ func TestGetEnvAsBoolDefault(t *testing.T) {
 		value        string
 		wantTrueDef  bool
 		wantFalseDef bool
+		refusal      string // the one recorded problem, or "" for none
 	}{
 		{name: "unset returns the default", set: false, wantTrueDef: true, wantFalseDef: false},
+		{name: "empty returns the default", set: true, value: "", wantTrueDef: true, wantFalseDef: false},
+		{name: "whitespace only returns the default", set: true, value: "  ", wantTrueDef: true, wantFalseDef: false},
 		{name: `"true"`, set: true, value: "true", wantTrueDef: true, wantFalseDef: true},
 		{name: `"1"`, set: true, value: "1", wantTrueDef: true, wantFalseDef: true},
 		{name: `"T"`, set: true, value: "T", wantTrueDef: true, wantFalseDef: true},
@@ -145,30 +212,31 @@ func TestGetEnvAsBoolDefault(t *testing.T) {
 		{name: `"0"`, set: true, value: "0", wantTrueDef: false, wantFalseDef: false},
 		{name: `"f"`, set: true, value: "f", wantTrueDef: false, wantFalseDef: false},
 		{name: "whitespace is trimmed", set: true, value: " false ", wantTrueDef: false, wantFalseDef: false},
-		// strconv.ParseBool rejects all four, so each falls back to the default. Keep the
-		// "no" case: it reads as false and is not, and against defaultVal=true it returns true.
-		{name: `"yes" is not parseable`, set: true, value: "yes", wantTrueDef: true, wantFalseDef: false},
-		{name: `"no" is not parseable`, set: true, value: "no", wantTrueDef: true, wantFalseDef: false},
-		{name: "empty is not parseable", set: true, value: "", wantTrueDef: true, wantFalseDef: false},
-		{name: `"maybe" is not parseable`, set: true, value: "maybe", wantTrueDef: true, wantFalseDef: false},
+		{name: `"yes" is refused`, set: true, value: "yes", wantTrueDef: true, wantFalseDef: false,
+			refusal: key + ` is "yes", not a boolean (true or false)`},
+		{name: `"no" is refused`, set: true, value: "no", wantTrueDef: true, wantFalseDef: false,
+			refusal: key + ` is "no", not a boolean (true or false)`},
+		{name: `"on" is refused`, set: true, value: "on", wantTrueDef: true, wantFalseDef: false,
+			refusal: key + ` is "on", not a boolean (true or false)`},
+		{name: `"maybe" is refused`, set: true, value: "maybe", wantTrueDef: true, wantFalseDef: false,
+			refusal: key + ` is "maybe", not a boolean (true or false)`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// t.Setenv cannot unset, but it registers the restore, so setting then
-			// unsetting leaves the variable absent for this subtest only.
-			t.Setenv(key, tt.value)
-			if !tt.set {
-				if err := os.Unsetenv(key); err != nil {
-					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
-				}
-			}
-			if got := getEnvAsBoolDefault(key, true); got != tt.wantTrueDef {
+			setOrUnset(t, key, tt.set, tt.value)
+
+			var malformed malformedValues
+			if got := getEnvAsBoolDefault(key, true, &malformed); got != tt.wantTrueDef {
 				t.Errorf("getEnvAsBoolDefault(%s=%q, true) = %v, want %v", key, tt.value, got, tt.wantTrueDef)
 			}
-			if got := getEnvAsBoolDefault(key, false); got != tt.wantFalseDef {
+			assertRecorded(t, malformed, tt.refusal)
+
+			malformed = nil
+			if got := getEnvAsBoolDefault(key, false, &malformed); got != tt.wantFalseDef {
 				t.Errorf("getEnvAsBoolDefault(%s=%q, false) = %v, want %v", key, tt.value, got, tt.wantFalseDef)
 			}
+			assertRecorded(t, malformed, tt.refusal)
 		})
 	}
 }
@@ -215,35 +283,47 @@ func TestGetEnv(t *testing.T) {
 func TestGetEnvAsInt(t *testing.T) {
 	const key = "GOIABADA_TEST_PORT"
 
-	// Anything strconv.Atoi refuses falls back to the default rather than to zero, so a
-	// mistyped port leaves the server on the port it was shipped with instead of on port 0.
+	// Unset or empty after the trim is the default, and records nothing: every shipped compose
+	// file writes the https port empty to mean no https listener. Anything else strconv.Atoi
+	// refuses is recorded as malformed.
+	//
+	// Keep the refusal rows: they reverse the earlier position, that a mistyped port falls back to
+	// the port the server shipped with, on purpose. That fallback started a deployment on a port
+	// its operator never chose and said nothing (#434).
 	tests := []struct {
-		name  string
-		set   bool
-		value string
-		want  int
+		name    string
+		set     bool
+		value   string
+		want    int
+		refusal string // the one recorded problem, or "" for none
 	}{
 		{name: "unset returns the default", set: false, want: 9443},
+		{name: "empty returns the default", set: true, value: "", want: 9443},
+		{name: "whitespace only returns the default", set: true, value: "   ", want: 9443},
 		{name: "a number", set: true, value: "8443", want: 8443},
 		{name: "a negative number", set: true, value: "-1", want: -1},
 		{name: "whitespace is trimmed", set: true, value: "  8443  ", want: 8443},
-		{name: "empty falls back", set: true, value: "", want: 9443},
-		{name: "non-numeric falls back", set: true, value: "https", want: 9443},
-		{name: "a decimal falls back", set: true, value: "8443.0", want: 9443},
-		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: 9443},
+		{name: "non-numeric is refused", set: true, value: "https", want: 9443,
+			refusal: key + ` is "https", not an integer`},
+		{name: "a decimal is refused", set: true, value: "9090.0", want: 9443,
+			refusal: key + ` is "9090.0", not an integer`},
+		{name: "a hexadecimal number is refused", set: true, value: "0x10", want: 9443,
+			refusal: key + ` is "0x10", not an integer`},
+		{name: "an overflowing number is refused", set: true, value: "99999999999999999999", want: 9443,
+			refusal: key + ` is "99999999999999999999", not an integer`},
+		{name: "the refusal quotes the trimmed value", set: true, value: " 80 80 ", want: 9443,
+			refusal: key + ` is "80 80", not an integer`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv(key, tt.value)
-			if !tt.set {
-				if err := os.Unsetenv(key); err != nil {
-					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
-				}
-			}
-			if got := getEnvAsInt(key, 9443); got != tt.want {
+			setOrUnset(t, key, tt.set, tt.value)
+
+			var malformed malformedValues
+			if got := getEnvAsInt(key, 9443, &malformed); got != tt.want {
 				t.Errorf("getEnvAsInt(%s=%q, 9443) = %d, want %d", key, tt.value, got, tt.want)
 			}
+			assertRecorded(t, malformed, tt.refusal)
 		})
 	}
 }
@@ -252,33 +332,38 @@ func TestGetEnvAsInt64(t *testing.T) {
 	const key = "GOIABADA_TEST_MAX_SIZE"
 	const defaultVal = int64(3 * 1024 * 1024)
 
+	// Keep the refusal rows, for getEnvAsInt's reason: a size written as 3MB used to be the
+	// default size, silently (#434).
 	tests := []struct {
-		name  string
-		set   bool
-		value string
-		want  int64
+		name    string
+		set     bool
+		value   string
+		want    int64
+		refusal string
 	}{
 		{name: "unset returns the default", set: false, want: defaultVal},
+		{name: "empty returns the default", set: true, value: "", want: defaultVal},
 		{name: "a number", set: true, value: "5242880", want: 5242880},
 		// The reason this one is int64 rather than int: a size beyond the 32-bit range.
 		{name: "a number beyond 32 bits", set: true, value: "4294967296", want: 4294967296},
 		{name: "whitespace is trimmed", set: true, value: " 5242880 ", want: 5242880},
-		{name: "empty falls back", set: true, value: "", want: defaultVal},
-		{name: "non-numeric falls back", set: true, value: "3MB", want: defaultVal},
-		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: defaultVal},
+		{name: "non-numeric is refused", set: true, value: "3MB", want: defaultVal,
+			refusal: key + ` is "3MB", not an integer`},
+		{name: "a hexadecimal number is refused", set: true, value: "0x10", want: defaultVal,
+			refusal: key + ` is "0x10", not an integer`},
+		{name: "an overflowing number is refused", set: true, value: "99999999999999999999", want: defaultVal,
+			refusal: key + ` is "99999999999999999999", not an integer`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv(key, tt.value)
-			if !tt.set {
-				if err := os.Unsetenv(key); err != nil {
-					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
-				}
-			}
-			if got := getEnvAsInt64(key, defaultVal); got != tt.want {
+			setOrUnset(t, key, tt.set, tt.value)
+
+			var malformed malformedValues
+			if got := getEnvAsInt64(key, defaultVal, &malformed); got != tt.want {
 				t.Errorf("getEnvAsInt64(%s=%q, %d) = %d, want %d", key, tt.value, defaultVal, got, tt.want)
 			}
+			assertRecorded(t, malformed, tt.refusal)
 		})
 	}
 }
@@ -286,40 +371,66 @@ func TestGetEnvAsInt64(t *testing.T) {
 func TestGetEnvAsBool(t *testing.T) {
 	const key = "GOIABADA_TEST_TRUST_PROXY_HEADERS"
 
-	// getEnvAsBool can only ever express default-false: anything unparseable is false, which
-	// is the safe answer for every setting that reaches it (each one turns something on).
-	// A setting whose default is true goes through getEnvAsBoolDefault instead (#293).
+	// getEnvAsBool's default is false; a setting whose default is true goes through
+	// getEnvAsBoolDefault instead (#293). Unset or empty is that default; anything
+	// strconv.ParseBool refuses is recorded as malformed.
+	//
+	// Keep the refusal rows: they reverse the earlier position, that anything unparseable is
+	// false, on purpose. yes reads as an affirmative and is not one, so an operator writing it got
+	// the setting off and nothing said so (#434).
 	tests := []struct {
-		name  string
-		set   bool
-		value string
-		want  bool
+		name    string
+		set     bool
+		value   string
+		want    bool
+		refusal string
 	}{
 		{name: "unset is false", set: false, want: false},
+		{name: "empty is false", set: true, value: "", want: false},
+		{name: "whitespace only is false", set: true, value: "  ", want: false},
 		{name: `"true"`, set: true, value: "true", want: true},
 		{name: `"1"`, set: true, value: "1", want: true},
 		{name: `"T"`, set: true, value: "T", want: true},
 		{name: `"false"`, set: true, value: "false", want: false},
 		{name: "whitespace is trimmed", set: true, value: " true ", want: true},
-		{name: "empty is false", set: true, value: "", want: false},
-		// It reads as an affirmative and is not one, which is the case worth pinning: an
-		// operator writing yes gets the setting off.
-		{name: `"yes" is not parseable, so false`, set: true, value: "yes", want: false},
-		{name: `"maybe" is not parseable, so false`, set: true, value: "maybe", want: false},
+		{name: `"yes" is refused`, set: true, value: "yes", want: false,
+			refusal: key + ` is "yes", not a boolean (true or false)`},
+		{name: `"on" is refused`, set: true, value: "on", want: false,
+			refusal: key + ` is "on", not a boolean (true or false)`},
+		{name: `"maybe" is refused`, set: true, value: "maybe", want: false,
+			refusal: key + ` is "maybe", not a boolean (true or false)`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv(key, tt.value)
-			if !tt.set {
-				if err := os.Unsetenv(key); err != nil {
-					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
-				}
-			}
-			if got := getEnvAsBool(key); got != tt.want {
+			setOrUnset(t, key, tt.set, tt.value)
+
+			var malformed malformedValues
+			if got := getEnvAsBool(key, &malformed); got != tt.want {
 				t.Errorf("getEnvAsBool(%s=%q) = %v, want %v", key, tt.value, got, tt.want)
 			}
+			assertRecorded(t, malformed, tt.refusal)
 		})
+	}
+}
+
+func TestMalformedValues_Err(t *testing.T) {
+	var none malformedValues
+	if err := none.err(); err != nil {
+		t.Errorf("err() with nothing recorded = %v, want nil", err)
+	}
+
+	two := malformedValues{`A is "x", not an integer`, `B is "y", not a boolean (true or false)`}
+	want := `malformed configuration: A is "x", not an integer; B is "y", not a boolean (true or false)`
+	if err := two.err(); err == nil || err.Error() != want {
+		t.Errorf("err() = %v, want %q", err, want)
+	}
+
+	// A value carrying a newline is quoted, so the refusal stays the one line main writes.
+	var newline malformedValues
+	newline.add("C", "80\n80", "an integer")
+	if err := newline.err(); err == nil || strings.Contains(err.Error(), "\n") {
+		t.Errorf("err() = %q, want one line", err)
 	}
 }
 
@@ -584,11 +695,11 @@ func unsetEnv(t *testing.T, key string) {
 	_ = os.Unsetenv(key)
 }
 
-// TestLoadFrom_TrustedProxies is the consumer half of the trusted-proxy parse:
+// TestLoad_TrustedProxies is the consumer half of the trusted-proxy parse:
 // the table of what an entry means is ParseTrustedProxies' own, in core. Here it
-// is only that the list loadFrom reads reaches it, and that a refusal names the
+// is only that the list Load reads reaches it, and that a refusal names the
 // setting an operator has to fix (#425).
-func TestLoadFrom_TrustedProxies(t *testing.T) {
+func TestLoad_TrustedProxies(t *testing.T) {
 	const key = "GOIABADA_AUTHSERVER_TRUSTED_PROXIES"
 	tests := []struct {
 		name       string
@@ -610,14 +721,14 @@ func TestLoadFrom_TrustedProxies(t *testing.T) {
 			if tt.value != nil {
 				t.Setenv(key, *tt.value)
 			}
-			saved := cfg
-			t.Cleanup(func() { cfg = saved })
-
 			fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 			fs.SetOutput(io.Discard)
-			loadFrom(fs, nil)
+			c, err := Load(fs, nil)
+			if err != nil {
+				t.Fatalf("Load() = %v", err)
+			}
 
-			ranges, err := cfg.AuthServer.TrustedProxyRanges()
+			ranges, err := c.AuthServer.TrustedProxyRanges()
 			if tt.wantErr != nil {
 				if err == nil {
 					t.Fatalf("TrustedProxyRanges() = %v, want an error", ranges)
@@ -654,9 +765,8 @@ func TestLoadFrom_TrustedProxies(t *testing.T) {
 
 func ptr(s string) *string { return &s }
 
-// loadLogSettings drives loadFrom with its own flag set, which is the whole
-// reason that seam exists: the flags are registered on the set handed in, so
-// each case gets a fresh registration instead of panicking on the second.
+// loadLogSettings drives Load with its own flag set: the flags are registered on the set handed
+// in, so each case gets a fresh registration instead of panicking on the second.
 func loadLogSettings(t *testing.T, env map[string]string, args []string) logSettings {
 	t.Helper()
 
@@ -667,20 +777,20 @@ func loadLogSettings(t *testing.T, env map[string]string, args []string) logSett
 		t.Setenv(key, value)
 	}
 
-	saved := cfg
-	t.Cleanup(func() { cfg = saved })
-
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	loadFrom(fs, args)
+	c, err := Load(fs, args)
+	if err != nil {
+		t.Fatalf("Load() = %v", err)
+	}
 
 	return logSettings{
-		authLevel:  cfg.AuthServer.LogLevel,
-		authFormat: cfg.AuthServer.LogFormat,
+		authLevel:  c.AuthServer.LogLevel,
+		authFormat: c.AuthServer.LogFormat,
 	}
 }
 
-func TestLoadFrom_LogSettings(t *testing.T) {
+func TestLoad_LogSettings(t *testing.T) {
 	// Every flag case sets its variable to a value the flag does not use, so a
 	// pass cannot come from the environment having supplied the same answer.
 	tests := []struct {

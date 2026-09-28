@@ -35,17 +35,6 @@ import (
 const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 	"eyJzdWIiOiJVU0VSLVNVQiIsInNpZCI6IlNFU1NJT04tSUQifQ.U0lHTkFUVVJF"
 
-// withLogHttpRequests sets the flag for the duration of the test and restores it. It has to run
-// before initMiddleware, which is when the value is read.
-func withLogHttpRequests(t *testing.T, enabled bool) {
-	t.Helper()
-	previous := config.GetAuthServer().LogHttpRequests
-	config.GetAuthServer().LogHttpRequests = enabled
-	t.Cleanup(func() {
-		config.GetAuthServer().LogHttpRequests = previous
-	})
-}
-
 // newLoggerTestServer builds a Server by hand, runs the real initMiddleware, and registers one
 // handler that answers 200 and records that it ran.
 //
@@ -55,15 +44,19 @@ func withLogHttpRequests(t *testing.T, enabled bool) {
 // rather than assumed, since mocks_data.NewDatabase(t) fails the test on any call nobody expected.
 func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {
 	t.Helper()
-	withLogHttpRequests(t, logHttpRequests)
 
 	database := mocks_data.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{Id: 1}, nil)
+
+	// The flag initMiddleware reads when it mounts the request logger.
+	cfg := &config.Config{}
+	cfg.AuthServer.LogHttpRequests = logHttpRequests
 
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
+		cfg:          cfg,
 	}
 	// The handler is registered on the branch initMiddleware returns, not on s.router,
 	// so this exercises the whole chain: the root's middleware plus the four the

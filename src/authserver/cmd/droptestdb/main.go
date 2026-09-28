@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 
@@ -58,11 +59,17 @@ var dropByEngine = map[string]func(ctx context.Context, cfg *config.DatabaseConf
 }
 
 func main() {
-	config.Init()
+	// A malformed variable is refused as the server refuses it, with exit 2: the command reads
+	// the server's own configuration, so it answers to the same rule (#434).
+	cfg, err := config.Load(flag.CommandLine, os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "droptestdb: %v\n", err)
+		os.Exit(2)
+	}
 
 	// The command owns this root: nothing above it is waiting, and a stuck server fails the
 	// tier's own timeout.
-	if err := run(context.Background(), config.GetDatabase()); err != nil {
+	if err := run(context.Background(), &cfg.Database); err != nil {
 		fmt.Fprintf(os.Stderr, "droptestdb: %v\n", err)
 		os.Exit(1)
 	}
