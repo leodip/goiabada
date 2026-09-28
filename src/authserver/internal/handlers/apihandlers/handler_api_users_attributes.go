@@ -8,11 +8,12 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/validators"
@@ -186,7 +187,7 @@ func HandleAPIUserAttributeCreatePost(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")
@@ -288,7 +289,7 @@ func HandleAPIUserAttributeUpdatePut(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")
@@ -351,7 +352,7 @@ func HandleAPIUserAttributeDelete(
 		}
 
 		// Get logged in user from access token
-		jwtToken, ok := middleware.GetValidatedToken(r)
+		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
 			loggedInUser = jwtToken.GetStringClaim("sub")

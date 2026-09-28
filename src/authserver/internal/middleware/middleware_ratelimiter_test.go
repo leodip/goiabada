@@ -27,6 +27,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -1277,8 +1278,7 @@ func verificationRequest(subject string) *http.Request {
 	if subject == "" {
 		return req
 	}
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken,
-		oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
 }
 
 // runVerification drives one request through LimitEmailVerification and reports the status,
@@ -1402,8 +1402,7 @@ func accountPasswordRequest(target, subject string) *http.Request {
 	if subject == "" {
 		return req
 	}
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken,
-		oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
 }
 
 // runAccountPassword drives one request through LimitAccountPassword and reports the status,

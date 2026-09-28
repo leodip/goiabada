@@ -16,6 +16,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/require"
 
@@ -1735,8 +1736,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 
 	// A DIFFERENT user's browser session, present exactly as the global middleware would
 	// leave it. Nothing in a password grant may consume this.
-	req = req.WithContext(context.WithValue(req.Context(),
-		constants.ContextKeySessionIdentifier, "some-other-users-browser-session"))
+	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "some-other-users-browser-session"))
 	rr := httptest.NewRecorder()
 
 	client := &models.Client{Id: 1, ClientIdentifier: "test_client"}

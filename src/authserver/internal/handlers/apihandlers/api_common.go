@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -143,7 +143,7 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 // nobody. Do not reintroduce a session read here: this surface is authenticated by bearer
 // token and has no browser session to read (#385).
 func callerSubject(r *http.Request) string {
-	jwtToken, ok := middleware.GetValidatedToken(r)
+	jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 	if !ok {
 		return ""
 	}

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,10 +9,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -173,7 +172,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		userSession := &models.UserSession{
@@ -229,7 +228,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		userSession := &models.UserSession{
@@ -283,7 +282,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		userSession := &models.UserSession{
@@ -341,7 +340,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		// UserSessionLoadUser is stubbed, so User is set here directly: the session answered
@@ -486,7 +485,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				sessionIdentifier := "test-session"
-				ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+				ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 				req = req.WithContext(ctx)
 
 				// UserSessionLoadUser is stubbed, so User is set here directly. A moved counter
@@ -612,7 +611,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				sessionIdentifier := "test-session"
-				ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+				ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 				req = req.WithContext(ctx)
 
 				// UserSessionLoadUser is stubbed, so User is set here directly. A moved counter
@@ -844,7 +843,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, "sess-1"))
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "sess-1"))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{

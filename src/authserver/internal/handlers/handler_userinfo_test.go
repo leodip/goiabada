@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -14,9 +13,9 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -47,27 +46,6 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 	})
 
-	t.Run("Could not type assert ContextKeyValidatedToken to oauth.JwtToken", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
-
-		req, _ := http.NewRequest("GET", "/userinfo", nil)
-		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, "invalid_type")
-		req = req.WithContext(ctx)
-		rr := httptest.NewRecorder()
-
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "unable to get validated token from context"
-		})).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		httpHelper.AssertExpectations(t)
-	})
-
 	// Note: "User not authorized" test case is removed because authorization is now handled by middleware
 
 	t.Run("JwtToken without sub claim", func(t *testing.T) {
@@ -83,7 +61,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": "openid",
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
+		ctx := reqctx.WithValidatedToken(req.Context(), jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
@@ -114,7 +92,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": "openid",
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
+		ctx := reqctx.WithValidatedToken(req.Context(), jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
@@ -146,7 +124,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": "openid",
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
+		ctx := reqctx.WithValidatedToken(req.Context(), jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
@@ -183,7 +161,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 				"scope": "openid profile email address phone groups attributes",
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
+		ctx := reqctx.WithValidatedToken(req.Context(), jwtToken)
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
@@ -520,7 +498,7 @@ func userInfoRequestForScopes(t *testing.T, sub string, oidcScopes string) *http
 			"scope": scope,
 		},
 	}
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken))
+	return req.WithContext(reqctx.WithValidatedToken(req.Context(), jwtToken))
 }
 
 // isUserInfoInvalidToken is what both refusal branches of /userinfo now carry: RFC 6750 section
@@ -580,7 +558,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 					"scope": "openid",
 				},
 			}
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken))
+			req = req.WithContext(reqctx.WithValidatedToken(req.Context(), jwtToken))
 			rr := httptest.NewRecorder()
 
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(test.user, nil)

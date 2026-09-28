@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -38,11 +38,10 @@ func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.IsType(t, oauth.JwtToken{}, token)
-		assert.Equal(t, "validtoken", token.(oauth.JwtToken).TokenBase64)
-		assert.Equal(t, "user", token.(oauth.JwtToken).Claims["sub"])
+		token, ok := reqctx.BearerTokenFrom(r.Context())
+		require.True(t, ok)
+		assert.Equal(t, "validtoken", token.TokenBase64)
+		assert.Equal(t, "user", token.Claims["sub"])
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -64,8 +63,8 @@ func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok)
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -83,8 +82,8 @@ func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok)
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -101,8 +100,8 @@ func TestJwtAuthorizationHeaderToContext_InvalidAuthorizationHeader(t *testing.T
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok)
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -132,11 +131,10 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.IsType(t, oauth.JwtToken{}, token)
-		assert.Equal(t, "validposttoken", token.(oauth.JwtToken).TokenBase64)
-		assert.Equal(t, "user", token.(oauth.JwtToken).Claims["sub"])
+		token, ok := reqctx.BearerTokenFrom(r.Context())
+		require.True(t, ok)
+		assert.Equal(t, "validposttoken", token.TokenBase64)
+		assert.Equal(t, "user", token.Claims["sub"])
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -158,8 +156,8 @@ func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok)
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -191,11 +189,10 @@ func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *te
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.IsType(t, oauth.JwtToken{}, token)
-		assert.Equal(t, "headertoken", token.(oauth.JwtToken).TokenBase64)
-		assert.Equal(t, "headeruser", token.(oauth.JwtToken).Claims["sub"])
+		token, ok := reqctx.BearerTokenFrom(r.Context())
+		require.True(t, ok)
+		assert.Equal(t, "headertoken", token.TokenBase64)
+		assert.Equal(t, "headeruser", token.Claims["sub"])
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -215,8 +212,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from GET request body/query")
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok, "Token should not be extracted from GET request body/query")
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -247,8 +244,8 @@ func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from the URL query of a POST")
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok, "Token should not be extracted from the URL query of a POST")
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -269,8 +266,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *t
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from POST with wrong Content-Type")
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok, "Token should not be extracted from POST with wrong Content-Type")
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -291,8 +288,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) 
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be set for empty access_token")
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok, "Token should not be set for empty access_token")
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -313,8 +310,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testi
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be set when access_token parameter is missing")
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok, "Token should not be set when access_token parameter is missing")
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -346,9 +343,9 @@ func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testi
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.Equal(t, "charsettoken", token.(oauth.JwtToken).TokenBase64)
+		token, ok := reqctx.BearerTokenFrom(r.Context())
+		require.True(t, ok)
+		assert.Equal(t, "charsettoken", token.TokenBase64)
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -378,9 +375,9 @@ func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.Equal(t, "tokenwithotherparams", token.(oauth.JwtToken).TokenBase64)
+		token, ok := reqctx.BearerTokenFrom(r.Context())
+		require.True(t, ok)
+		assert.Equal(t, "tokenwithotherparams", token.TokenBase64)
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -412,9 +409,9 @@ func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) 
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.Equal(t, "fallbacktoken", token.(oauth.JwtToken).TokenBase64)
+		token, ok := reqctx.BearerTokenFrom(r.Context())
+		require.True(t, ok)
+		assert.Equal(t, "fallbacktoken", token.TokenBase64)
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -434,8 +431,8 @@ func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T)
 	rr := httptest.NewRecorder()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from PUT request body")
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok, "Token should not be extracted from PUT request body")
 	})
 
 	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
@@ -504,10 +501,11 @@ func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer the-signed-token")
 
 			nextCalled := false
-			var tokenInContext interface{}
+			var tokenInContext oauth.JwtToken
+			var tokenPresent bool
 			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				nextCalled = true
-				tokenInContext = r.Context().Value(constants.ContextKeyBearerToken)
+				tokenInContext, tokenPresent = reqctx.BearerTokenFrom(r.Context())
 			})
 
 			middleware.JwtAuthorizationHeaderToContext()(nextHandler).ServeHTTP(httptest.NewRecorder(), req)
@@ -516,13 +514,13 @@ func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 			mockTokenParser.AssertExpectations(t)
 
 			if tc.admitted {
-				require.NotNil(t, tokenInContext)
-				assert.Equal(t, "the-signed-token", tokenInContext.(oauth.JwtToken).TokenBase64)
+				require.True(t, tokenPresent)
+				assert.Equal(t, "the-signed-token", tokenInContext.TokenBase64)
 				assert.Empty(t, logs.Records(), "an admitted token writes no record")
 				return
 			}
 
-			assert.Nil(t, tokenInContext, "a refused token must not reach the context")
+			assert.False(t, tokenPresent, "a refused token must not reach the context")
 			records := logs.Records()
 			require.Len(t, records, 1, "one record per refusal")
 			assert.Equal(t, slog.LevelWarn, records[0].Level)
@@ -551,7 +549,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyRefreshTokenRefused(t *testing.
 	nextCalled := false
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
-		assert.Nil(t, r.Context().Value(constants.ContextKeyBearerToken))
+		_, ok := reqctx.BearerTokenFrom(r.Context())
+		assert.False(t, ok)
 	})
 
 	middleware.JwtAuthorizationHeaderToContext()(nextHandler).ServeHTTP(httptest.NewRecorder(), req)

@@ -15,8 +15,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -48,11 +48,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
@@ -196,14 +197,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "session-of-user-1"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		// The request id chi's middleware would have put there, read back by the
 		// AuditTerminatedUserSession expectation below (#328 seam 3).
 		ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, "goiabada/req-completed-1")
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		foreignSession := &models.UserSession{
@@ -380,11 +382,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "expired-session-of-user-1"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		foreignSession := &models.UserSession{
@@ -484,11 +487,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "expired-session-of-user-1"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		ownSession := &models.UserSession{
@@ -592,11 +596,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "session-of-user-1"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		foreignSession := &models.UserSession{
@@ -701,11 +706,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "session-of-user-1"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		foreignSession := &models.UserSession{
@@ -812,11 +818,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		// The session's previous AuthTime, older still, so "the row was written" and "the row
@@ -914,11 +921,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
@@ -1013,11 +1021,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "new-test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		// Simulating no existing session
@@ -1110,11 +1119,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
@@ -1206,11 +1216,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
@@ -1296,11 +1307,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
@@ -1389,11 +1401,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "new-test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
@@ -1524,7 +1537,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
@@ -1569,7 +1582,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -1669,7 +1682,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -1761,7 +1774,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -1849,7 +1862,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -1933,7 +1946,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -2031,7 +2044,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -2116,7 +2129,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -2199,7 +2212,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -2288,11 +2301,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "new-test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
@@ -2376,11 +2390,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "new-test-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
@@ -2476,11 +2491,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "terminated-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		// The session is gone, which is what "ended mid-flight" looks like from here.
@@ -2546,11 +2562,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 
 		sessionIdentifier := "terminated-session"
-		ctx := context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
 		authHelper.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
-			return r.Context().Value(constants.ContextKeySessionIdentifier) == sessionIdentifier
+			id, ok := reqctx.SessionIdentifierFrom(r.Context())
+			return ok && id == sessionIdentifier
 		})).Return(authContext, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)

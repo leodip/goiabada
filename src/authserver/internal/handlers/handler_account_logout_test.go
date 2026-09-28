@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -773,7 +774,7 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Issuer: hintedIssuer})
 	if len(sessionIdentifier) > 0 {
-		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, sessionIdentifier)
+		ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
 	}
 	return req.WithContext(ctx)
 }
@@ -883,7 +884,7 @@ func logoutPostRequest(t *testing.T, form url.Values) *http.Request {
 // withSessionIdentifier puts the identifier the session-identifier middleware would have attached,
 // which it does only when the cookie's session still resolves to a live row.
 func withSessionIdentifier(req *http.Request, sessionIdentifier string) *http.Request {
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, sessionIdentifier))
+	return req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 }
 
 // expectCookieWipedBeforeSave stubs the session store for a request that reaches the terminal
@@ -2440,7 +2441,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			assert.NoError(t, err)
 			ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Issuer: theIssuer})
 			if !tc.noSession {
-				ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, theSessionId)
+				ctx = reqctx.WithSessionIdentifier(ctx, theSessionId)
 			}
 			req = req.WithContext(ctx)
 

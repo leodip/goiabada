@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -423,10 +424,7 @@ func classifyIdTokenHint(
 		return rejectIdTokenHint(r.Context(), "sid", "reason", "sid is missing")
 	}
 
-	sessionIdentifier := ""
-	if v := r.Context().Value(constants.ContextKeySessionIdentifier); v != nil {
-		sessionIdentifier, _ = v.(string)
-	}
+	sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 	if len(sessionIdentifier) == 0 {
 		// An RP may end a session with a hint alone and no cookie in play, which is what makes
 		// RP-initiated logout work from a back-channel-less RP, so the hint's own sid names the
@@ -691,10 +689,7 @@ func doLogout(
 		// path did before the rewrite and what decision 3 keeps.
 	} else {
 		// No client to scope to, so the whole session goes (#109 decision 2).
-		sessionIdentifier := ""
-		if v := r.Context().Value(constants.ContextKeySessionIdentifier); v != nil {
-			sessionIdentifier, _ = v.(string)
-		}
+		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 
 		userId := int64(0)
 		if len(sessionIdentifier) > 0 {

@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -63,7 +63,7 @@ func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Hand
 			if tokenStr != "" {
 				token, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenStr, true)
 				if err == nil && isAccessTokenForAuthServer(r.Context(), token) {
-					ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
+					ctx = reqctx.WithBearerToken(ctx, *token)
 				}
 			}
 
