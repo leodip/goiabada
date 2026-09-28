@@ -11,6 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -138,7 +139,7 @@ func isEncryptedIDTokenHint(hint string) bool {
 // decryptIDTokenHint decrypts a JWE-encrypted id_token_hint. The token is a JWE
 // (dir + A256GCM) whose key is derived from the client secret, per the scheme
 // documented in integration/endpoints.mdx and implemented in
-// encryption.DecryptIDTokenHintJWE. client_id selects which client's secret to
+// idtokenhint.Decrypt. client_id selects which client's secret to
 // use, as required by RP-Initiated Logout for symmetrically-encrypted hints.
 //
 // The returned error is for the server log and never for the End-User. Every failure here means the
@@ -167,7 +168,7 @@ func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, datab
 		return "", errs.Wrap(err, "unable to decrypt the client secret")
 	}
 
-	decryptedToken, err := encryption.DecryptIDTokenHintJWE(idTokenHint, clientSecret)
+	decryptedToken, err := idtokenhint.Decrypt(idTokenHint, clientSecret)
 	if err != nil {
 		// Warn for the same reason as the no-client branch: the hint is a value the relying
 		// party chose, and one this server cannot open is refused rather than failed on.

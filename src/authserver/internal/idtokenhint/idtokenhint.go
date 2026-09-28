@@ -1,4 +1,12 @@
-package encryption
+// Package idtokenhint reads the encrypted id_token_hint RP-Initiated Logout accepts, and holds
+// the reference encryptor for it: a compact JWE, dir + A256GCM, keyed by SHA-256 of the client's
+// secret.
+//
+// It shares nothing with the data cipher in encryption, whose key comes from the environment and
+// never leaves the server: this key is derived from a secret the relying party also holds, and
+// the logout handler is its one production caller. It sat in encryption only because #360 moved
+// that package whole, and left it in #434.
+package idtokenhint
 
 import (
 	"bytes"
@@ -35,7 +43,7 @@ import (
 // dispatched on: "alg" and "enc" are asserted, never used to pick a primitive,
 // so algorithm substitution and downgrade have no surface to work on.
 
-// idTokenHintJWEHeader is the protected header EncryptIDTokenHintJWE writes, byte
+// idTokenHintJWEHeader is the protected header Encrypt writes, byte
 // for byte. It is the header of the scheme integration/endpoints.mdx documents.
 //
 //nolint:gosec // G101: a JWE protected header naming algorithms, not a credential
@@ -66,22 +74,22 @@ var jweSegmentNames = [5]string{
 	"authentication tag",
 }
 
-// DeriveIDTokenHintKey derives the 32-byte AES-256 key used to decrypt an
+// DeriveKey derives the 32-byte AES-256 key used to decrypt an
 // encrypted id_token_hint from the client secret (SHA-256 of the UTF-8 client
 // secret). Exported so tests and tooling derive the key exactly the way the
 // decrypt path does.
-func DeriveIDTokenHintKey(clientSecret string) []byte {
+func DeriveKey(clientSecret string) []byte {
 	sum := sha256.Sum256([]byte(clientSecret))
 	return sum[:]
 }
 
-// EncryptIDTokenHintJWE is the reference encryptor for the id_token_hint scheme
-// documented at integration/endpoints.mdx: it produces what DecryptIDTokenHintJWE
+// Encrypt is the reference encryptor for the id_token_hint scheme
+// documented at integration/endpoints.mdx: it produces what Decrypt
 // reads, with the header above. Nothing in the binaries calls it -- an RP does the
 // encrypting -- but keeping the two halves in one file is what lets every test in
-// either module build a fixture without a JOSE library, and what makes the
+// the auth server build a fixture without a JOSE library, and what makes the
 // documented scheme executable rather than prose (#277).
-func EncryptIDTokenHintJWE(plaintext string, clientSecret string) (string, error) {
+func Encrypt(plaintext string, clientSecret string) (string, error) {
 	if len(plaintext) == 0 {
 		return "", errs.New("id_token_hint plaintext is empty")
 	}
@@ -117,12 +125,12 @@ func EncryptIDTokenHintJWE(plaintext string, clientSecret string) (string, error
 	}, "."), nil
 }
 
-// DecryptIDTokenHintJWE decrypts a compact-serialized JWE id_token_hint with a
+// Decrypt decrypts a compact-serialized JWE id_token_hint with a
 // key derived from the client secret and returns the plaintext, which is the
 // inner signed ID Token (a compact JWS) to be validated by the caller. Only the
 // dir + A256GCM scheme is accepted; every other input is refused, each with its
 // own message so the server log tells a malformed hint from a wrong key.
-func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, error) {
+func Decrypt(compactJWE string, clientSecret string) (string, error) {
 	if len(compactJWE) == 0 {
 		return "", errs.New("id_token_hint is empty")
 	}
@@ -242,7 +250,7 @@ func DecryptIDTokenHintJWE(compactJWE string, clientSecret string) (string, erro
 // AES-256 here; the errors below are unreachable in practice, and are returned
 // rather than panicked on.
 func idTokenHintGCM(clientSecret string) (cipher.AEAD, error) {
-	block, err := aes.NewCipher(DeriveIDTokenHintKey(clientSecret))
+	block, err := aes.NewCipher(DeriveKey(clientSecret))
 	if err != nil {
 		return nil, errs.Wrap(err, "id_token_hint cipher setup failed")
 	}

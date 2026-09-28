@@ -14,7 +14,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -162,7 +162,7 @@ func TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut(t *testing.T) {
 	grant := createOfflineGrant(t)
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
 
-	hint, err := encryption.EncryptIDTokenHintJWE(idToken, grant.clientSecret)
+	hint, err := idtokenhint.Encrypt(idToken, grant.clientSecret)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(strings.Split(hint, ".")),
 		"the hint must reach the endpoint as a compact JWE, or it takes the plain-token path instead")
@@ -198,7 +198,7 @@ func TestLogout_EncryptedIdTokenHint_WrongSecret_AsksTheEndUserAndRefusesTheRedi
 	grant := createOfflineGrant(t)
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
 
-	hint, err := encryption.EncryptIDTokenHintJWE(idToken, fake.LetterN(32))
+	hint, err := idtokenhint.Encrypt(idToken, fake.LetterN(32))
 	require.NoError(t, err)
 
 	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
