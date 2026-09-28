@@ -178,7 +178,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
-			AcrLevel: models.AcrLevel1.String(),
+			AcrLevel: models.AcrLevel1,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
@@ -234,7 +234,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
-			AcrLevel: models.AcrLevel1.String(),
+			AcrLevel: models.AcrLevel1,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
@@ -288,7 +288,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:       1,
 			UserId:   1,
-			AcrLevel: models.AcrLevel1.String(),
+			AcrLevel: models.AcrLevel1,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
@@ -348,7 +348,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:                  1,
 			UserId:              1,
-			AcrLevel:            models.AcrLevel2Optional.String(),
+			AcrLevel:            models.AcrLevel2Optional,
 			OtpConfigGeneration: 0,
 			User:                models.User{Id: 1, OtpConfigGeneration: 1},
 		}
@@ -498,7 +498,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				userSession := &models.UserSession{
 					Id:                  1,
 					UserId:              1,
-					AcrLevel:            tt.sessionAcrLevel.String(),
+					AcrLevel:            tt.sessionAcrLevel,
 					OtpConfigGeneration: 0,
 					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}
@@ -624,7 +624,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				userSession := &models.UserSession{
 					Id:                  1,
 					UserId:              1,
-					AcrLevel:            tt.sessionAcrLevel.String(),
+					AcrLevel:            tt.sessionAcrLevel,
 					OtpConfigGeneration: 0,
 					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}

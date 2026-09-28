@@ -101,7 +101,7 @@ func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSessio
 // and only the password handler sets that, alongside authenticatedAt; the refusal is what
 // makes that invariant fail closed rather than an argument in a comment.
 func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId int64, clientId int64, authMethods string, acrLevel string,
+	userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
 	authStateGeneration int64, otpConfigGeneration *int64,
 	authenticatedAt *time.Time) (*models.UserSession, error) {
 
@@ -308,7 +308,7 @@ func (u *UserSessionManager) abandonUserSession(ctx context.Context, userSession
 //   - acrLevel: The target ACR level for the current auth flow.
 //     The session's ACR is only upgraded (never downgraded) to maintain security guarantees.
 func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
-	authMethods string, acrLevel string) (*models.UserSession, error) {
+	authMethods string, acrLevel models.AcrLevel) (*models.UserSession, error) {
 
 	userSession, err := u.database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
@@ -424,7 +424,7 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 //
 // It is built from the same two predicates BumpUserSession applies, so the decider and
 // the writer cannot drift apart.
-func WillRaisePrivilege(userSession *models.UserSession, authMethods, acrLevel string) bool {
+func WillRaisePrivilege(userSession *models.UserSession, authMethods string, acrLevel models.AcrLevel) bool {
 	if userSession == nil {
 		return false
 	}
@@ -445,16 +445,14 @@ func raisesAuthMethods(current, incoming string) bool {
 // authenticates with OTP for a level2 client, the session's ACR should be upgraded.
 //
 // Uses models.AcrLevel.IsHigherThan() as the single source of truth for ACR comparison.
-func shouldUpgradeAcrLevel(currentAcr, newAcr string) bool {
-	currentLevel, err := models.AcrLevelFromString(currentAcr)
-	if err != nil {
-		return false // Unknown current ACR, fail safe
+// A level outside the three answers false on either side, which IsHigherThan alone does not:
+// an unrecognized current level has priority 0, so any known level would be higher than it,
+// and a session row carrying a value this server never wrote would be raised rather than
+// left as found. Priority 0 is what marks the value unrecognized (#433).
+func shouldUpgradeAcrLevel(currentAcr, newAcr models.AcrLevel) bool {
+	if currentAcr.Priority() == 0 || newAcr.Priority() == 0 {
+		return false // Unknown ACR, fail safe
 	}
 
-	newLevel, err := models.AcrLevelFromString(newAcr)
-	if err != nil {
-		return false // Unknown new ACR, fail safe
-	}
-
-	return newLevel.IsHigherThan(currentLevel)
+	return newAcr.IsHigherThan(currentAcr)
 }

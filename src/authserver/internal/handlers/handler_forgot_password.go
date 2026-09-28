@@ -103,7 +103,7 @@ func HandleForgotPasswordPost(
 			}
 
 			bind := map[string]interface{}{
-				"name": user.GetFullName(),
+				"name": user.FullName(),
 				"link": emaillinks.ResetPasswordLink(verificationCode),
 			}
 			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, user.Locale, "en"))

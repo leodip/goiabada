@@ -63,7 +63,7 @@ func (acr AcrLevel) IsHigherThan(other AcrLevel) bool {
 	return acr.Priority() > other.Priority()
 }
 
-// Max returns the ACR level with higher security strength.
+// AcrMax returns the ACR level with higher security strength.
 // If either level is unknown (priority 0), returns the known one.
 // If both are unknown, returns the first argument.
 func AcrMax(a, b AcrLevel) AcrLevel {

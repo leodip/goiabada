@@ -13,7 +13,7 @@ type UserSession struct {
 	Started           time.Time    `db:"started"`
 	LastAccessed      time.Time    `db:"last_accessed"`
 	AuthMethods       string       `db:"auth_methods"`
-	AcrLevel          string       `db:"acr_level"`
+	AcrLevel          AcrLevel     `db:"acr_level"`
 	AuthTime          time.Time    `db:"auth_time"`
 	IpAddress         string       `db:"ip_address"`
 	DeviceName        string       `db:"device_name"`
@@ -70,7 +70,7 @@ func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) 
 	return utcNow.Before(max) || utcNow.Equal(max)
 }
 
-func (us *UserSession) isValidSinceLastAcessed(userSessionIdleTimeoutInSeconds int) bool {
+func (us *UserSession) isValidSinceLastAccessed(userSessionIdleTimeoutInSeconds int) bool {
 	utcNow := time.Now().UTC()
 	max := us.LastAccessed.Add(time.Second * time.Duration(userSessionIdleTimeoutInSeconds))
 	return utcNow.Before(max) || utcNow.Equal(max)
@@ -79,7 +79,7 @@ func (us *UserSession) isValidSinceLastAcessed(userSessionIdleTimeoutInSeconds i
 func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionMaxLifetimeInSeconds int,
 	requestedMaxAgeInSeconds *int) bool {
 
-	isValid := us.isValidSinceLastAcessed(userSessionIdleTimeoutInSeconds) &&
+	isValid := us.isValidSinceLastAccessed(userSessionIdleTimeoutInSeconds) &&
 		us.isValidSinceStarted(userSessionMaxLifetimeInSeconds)
 
 	if requestedMaxAgeInSeconds != nil {

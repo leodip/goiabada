@@ -95,7 +95,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	assert.Equal(t, input.Nonce, claims["nonce"])
 
 	// OIDC profile scope claims
-	assert.Equal(t, input.User.GetFullName(), claims["name"])
+	assert.Equal(t, input.User.FullName(), claims["name"])
 	assert.Equal(t, input.User.GivenName, claims["given_name"])
 	assert.Equal(t, input.User.MiddleName, claims["middle_name"])
 	assert.Equal(t, input.User.FamilyName, claims["family_name"])
@@ -269,7 +269,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	// OIDC profile scope claims should be present
 	assert.Equal(t, input.User.GivenName, claims["given_name"])
 	assert.Equal(t, input.User.FamilyName, claims["family_name"])
-	assert.Equal(t, input.User.GetFullName(), claims["name"])
+	assert.Equal(t, input.User.FullName(), claims["name"])
 
 	// OIDC email scope claims should be present
 	assert.Equal(t, input.User.Email, claims["email"])
@@ -500,7 +500,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
-	assert.Equal(t, code.AcrLevel, idClaims["acr"])
+	assert.Equal(t, code.AcrLevel.String(), idClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 
 	// OIDC scope claims should NOT be in ID token
@@ -605,7 +605,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Cl
 	assert.Equal(t, user.EmailVerified, idClaims["email_verified"])
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
-	assert.Equal(t, user.GetFullName(), idClaims["name"])
+	assert.Equal(t, user.FullName(), idClaims["name"])
 
 	// Access token should NOT have them (global setting is false, no client override for access token)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)

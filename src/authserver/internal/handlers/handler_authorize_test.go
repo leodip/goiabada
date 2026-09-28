@@ -919,8 +919,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    models.AcrLevel1.String(), // Set this to the appropriate level
-			AuthMethods: "pwd",                     // Set this to the appropriate method(s)
+			AcrLevel:    models.AcrLevel1, // Set this to the appropriate level
+			AuthMethods: "pwd",            // Set this to the appropriate method(s)
 			User: models.User{
 				Id:      123,
 				Enabled: true,
@@ -2871,7 +2871,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      123,
@@ -2963,7 +2963,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      123,
@@ -3057,7 +3057,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      456,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      456,
@@ -3153,7 +3153,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      789,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			// Session at 7, user at 9. The prompt=none path is a SEPARATE session-reuse
 			// site from the interactive one, and it must inherit from the session too, or a
@@ -3175,7 +3175,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return u.Id == 789
 		})).Return("openid", nil)
 
-		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1.String()).Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1).Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
@@ -3271,7 +3271,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:                  1,
 			UserId:              789,
-			AcrLevel:            models.AcrLevel1.String(),
+			AcrLevel:            models.AcrLevel1,
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 7,
 			User: models.User{
@@ -3290,7 +3290,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return u.Id == 789
 		})).Return(requestedScope, nil)
 
-		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1.String()).Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1).Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
@@ -3380,7 +3380,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,
@@ -3476,7 +3476,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,
@@ -3576,7 +3576,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,
@@ -3668,7 +3668,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1,
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,

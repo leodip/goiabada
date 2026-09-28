@@ -138,7 +138,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -276,7 +276,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -416,7 +416,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -560,7 +560,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -721,7 +721,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -886,7 +886,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1039,7 +1039,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1196,7 +1196,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1357,7 +1357,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1522,7 +1522,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 

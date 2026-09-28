@@ -10,7 +10,7 @@ import (
 //
 // It lives here rather than on api.UserResponse because the API enforces nothing about a full
 // name: it is three fields of the same response joined for display, and putting it on the wire
-// type would make it a third implementation beside models.User.GetFullName and the one in
+// type would make it a third implementation beside models.User.FullName and the one in
 // core/handlerhelpers that already says it mimics that method (#350).
 func UserFullName(user *api.UserResponse) string {
 	if user == nil {

@@ -72,7 +72,7 @@ type CodeIssuer interface {
 type UserSessionManager interface {
 	HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
-		userId int64, clientId int64, authMethods string, acrLevel string,
+		userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
 		authStateGeneration int64, otpConfigGeneration *int64,
 		authenticatedAt *time.Time) (*models.UserSession, error)
 
@@ -82,7 +82,7 @@ type UserSessionManager interface {
 	// are upgraded to reflect the stronger authentication that was performed.
 	// Note: ACR is only upgraded, never downgraded, during a session's lifetime.
 	BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
-		authMethods string, acrLevel string) (*models.UserSession, error)
+		authMethods string, acrLevel models.AcrLevel) (*models.UserSession, error)
 }
 
 type TokenValidator interface {

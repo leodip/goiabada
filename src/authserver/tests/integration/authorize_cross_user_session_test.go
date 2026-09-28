@@ -171,7 +171,7 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel models.AcrLevel,
 	sessionsA, err := database.GetUserSessionsByUserId(context.Background(), nil, userA.Id)
 	require.NoError(t, err)
 	require.Len(t, sessionsA, 1, "user A should be signed in on exactly one session")
-	require.Equal(t, aSessionAcrLevel.String(), sessionsA[0].AcrLevel)
+	require.Equal(t, aSessionAcrLevel, sessionsA[0].AcrLevel)
 
 	// Pin what A's session records, because every provenance assertion downstream is only worth
 	// anything while it differs from B's "pwd". If a change to this fixture ever stopped A presenting
@@ -349,7 +349,7 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 	} {
 		assert.Equal(t, []interface{}{ceremony.AuthMethodPassword.String()}, token.claims["amr"],
 			"%s must carry only the methods this ceremony proved", token.name)
-		assert.Equal(t, code.AcrLevel, token.claims["acr"],
+		assert.Equal(t, code.AcrLevel.String(), token.claims["acr"],
 			"%s must carry the acr the ceremony recorded on its own code", token.name)
 	}
 
@@ -457,7 +457,7 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 		b.userB.Email, b.passwordB, false, "")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel,
+	assert.Equal(t, models.AcrLevel1, code.AcrLevel,
 		"the acr must describe this ceremony, not the session the browser arrived with")
 
 	assertCeremonyBoundToUserB(t, b, codeVal)

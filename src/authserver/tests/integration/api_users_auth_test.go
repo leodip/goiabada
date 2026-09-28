@@ -396,7 +396,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	// Assert: Session data should match
 	assert.Equal(t, testSession.SessionIdentifier, getSessionResponse.Session.SessionIdentifier)
 	assert.Equal(t, testSession.AuthMethods, getSessionResponse.Session.AuthMethods)
-	assert.Equal(t, testSession.AcrLevel, getSessionResponse.Session.AcrLevel)
+	assert.Equal(t, testSession.AcrLevel.String(), getSessionResponse.Session.AcrLevel)
 	assert.Equal(t, testSession.IpAddress, getSessionResponse.Session.IpAddress)
 	assert.Equal(t, testSession.DeviceName, getSessionResponse.Session.DeviceName)
 	assert.Equal(t, testSession.UserId, getSessionResponse.Session.UserId)

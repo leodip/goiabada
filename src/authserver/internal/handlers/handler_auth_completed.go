@@ -134,7 +134,7 @@ func HandleAuthCompletedGet(
 			// arm below, inside StartNewUserSession. What this buys is the other half of
 			// OWASP's "regenerate on any privilege level change", and this server's ACR
 			// levels are privilege levels by construction (#266 decision 6).
-			if usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel.String()) {
+			if usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel) {
 				if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
 					httpHelper.InternalServerError(w, r, regenerateSessionErr)
 					return
@@ -146,7 +146,7 @@ func HandleAuthCompletedGet(
 			// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
 			// will be upgraded to reflect the stronger authentication that was performed.
 			bumpedSession, sessionErr := userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
-				authContext.AuthMethods, targetAcrLevel.String())
+				authContext.AuthMethods, targetAcrLevel)
 			if sessionErr != nil {
 				httpHelper.InternalServerError(w, r, sessionErr)
 				return
@@ -318,7 +318,7 @@ func HandleAuthCompletedGet(
 			// inventing one, so if that invariant ever breaks this arm answers 500 instead of
 			// minting a session that claims a sign-in happened just now.
 			newSession, startNewUserSessionErr := userSessionManager.StartNewUserSession(
-				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),
+				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel,
 				authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
 				authContext.AuthenticatedAt)
 			if startNewUserSessionErr != nil {

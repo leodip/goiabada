@@ -209,7 +209,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 			}
 
 			// Build a GetFullName equivalent as a simple field
-			// This mimics what User.GetFullName() does
+			// This mimics what the auth server's models.User.FullName() does
 			// NOTE: We don't use email as fallback here - the template will show email separately
 			fullName := ""
 			if givenName, ok := loggedInUser["GivenName"].(string); ok && givenName != "" {

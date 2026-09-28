@@ -26,7 +26,7 @@ type Code struct {
 	ResponseMode        string         `db:"response_mode"`
 	AuthenticatedAt     time.Time      `db:"authenticated_at"`
 	SessionIdentifier   string         `db:"session_identifier"`
-	AcrLevel            string         `db:"acr_level"`
+	AcrLevel            AcrLevel       `db:"acr_level"`
 	AuthMethods         string         `db:"auth_methods"`
 	Used                bool           `db:"used"`
 	// Revoked records that the session this code was issued through was explicitly

@@ -276,7 +276,7 @@ UserSession (DB)
 └── UserId
 ```
 
-### Session Validity (`usersession.go:40-51`)
+### Session Validity (`models/user_session.go`, `IsValid`)
 Valid if ALL true:
 1. `now <= LastAccessed + IdleTimeoutSeconds`
 2. `now <= Started + MaxLifetimeSeconds`

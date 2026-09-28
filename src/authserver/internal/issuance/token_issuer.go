@@ -69,8 +69,8 @@ type tokenGenerationInput struct {
 	Scope string
 
 	// Authentication context
-	AcrLevel        string   // e.g., "urn:goiabada:level1", "urn:goiabada:level2_optional"
-	AuthMethods     []string // e.g., ["pwd"], ["pwd", "otp"]
+	AcrLevel        models.AcrLevel // e.g., models.AcrLevel1, models.AcrLevel2Optional
+	AuthMethods     []string        // e.g., ["pwd"], ["pwd", "otp"]
 	AuthenticatedAt time.Time
 
 	// Optional claims
@@ -668,7 +668,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
 	claims["jti"] = uuidutil.New()
-	claims["acr"] = input.AcrLevel
+	claims["acr"] = input.AcrLevel.String()
 	// Omit amr rather than signing an empty array. OIDC Core 1.0 section 2 makes amr OPTIONAL, so
 	// absent says nothing about how the user authenticated, where "amr": [] positively asserts that
 	// no method was used. Reinstating the unconditional assignment would sign that false claim for
@@ -772,7 +772,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
 	claims["jti"] = uuidutil.New()
-	claims["acr"] = input.AcrLevel
+	claims["acr"] = input.AcrLevel.String()
 	// Omitted when no method was recorded, for the reason given in generateAccessTokenCore (#240).
 	if len(input.AuthMethods) > 0 {
 		claims["amr"] = input.AuthMethods
@@ -883,7 +883,7 @@ func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput, now time.T
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthMethods:       []string{ceremony.AuthMethodPassword.String()},
 		AuthenticatedAt:   now, // ROPC auth happens at token request time
 		SessionIdentifier: "",  // ROPC is sessionless: see ROPCGrantInput
@@ -897,7 +897,7 @@ type ImplicitGrantInput struct {
 	Client            *models.Client
 	User              *models.User
 	Scope             string
-	AcrLevel          string
+	AcrLevel          models.AcrLevel
 	AuthMethods       string
 	SessionIdentifier string
 	Nonce             string

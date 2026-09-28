@@ -418,7 +418,7 @@ func TestSetAcrLevel_NoSessionUsesTarget(t *testing.T) {
 			err := ac.SetAcrLevel(target, nil)
 
 			assert.NoError(t, err)
-			assert.Equal(t, target.String(), ac.AcrLevel)
+			assert.Equal(t, target, ac.AcrLevel)
 		})
 	}
 }
@@ -464,12 +464,12 @@ func TestSetAcrLevel_UsesHigherOfTargetAndSession(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ac := &AuthContext{}
-			session := &models.UserSession{AcrLevel: tc.sessionAcr.String()}
+			session := &models.UserSession{AcrLevel: tc.sessionAcr}
 
 			err := ac.SetAcrLevel(tc.target, session)
 
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantAcr.String(), ac.AcrLevel, tc.description)
+			assert.Equal(t, tc.wantAcr, ac.AcrLevel, tc.description)
 		})
 	}
 }
@@ -483,7 +483,7 @@ func TestSetAcrLevel_InvalidSessionAcrReturnsError(t *testing.T) {
 	err := ac.SetAcrLevel(models.AcrLevel1, session)
 
 	assert.Error(t, err)
-	assert.Equal(t, "", ac.AcrLevel, "the ACR must not be set when the session level cannot be parsed")
+	assert.Empty(t, ac.AcrLevel, "the ACR must not be set when the session level cannot be parsed")
 }
 
 // =============================================================================
