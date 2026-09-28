@@ -22,7 +22,7 @@ type Settings struct {
 	IncludeOpenIDConnectClaimsInAccessToken   bool           `db:"include_open_id_connect_claims_in_access_token"`
 	IncludeOpenIDConnectClaimsInIdToken       bool           `db:"include_open_id_connect_claims_in_id_token"`
 	// AESEncryptionKeyLegacy is the data key as historically stored in the DB.
-	// The key now comes from the environment (config.GetAESEncryptionKey, issue
+	// The key now comes from the environment ((*config.Config).DataKeys, issue
 	// #83). Do NOT use it for encrypt/decrypt at runtime.
 	//
 	// NOTHING READS IT ANY MORE. #359 deleted the startup re-encryption that was

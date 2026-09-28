@@ -135,60 +135,71 @@ type Config struct {
 	// idempotent) and should be removed once rotation is confirmed. Supplied via
 	// GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS.
 	AESEncryptionKeyPrevious string
+
+	// Args is what the flag parse left, in order. The parse stops at the first argument that is
+	// not a flag, so the first of these selects the command and the rest belong to it; none means
+	// the server runs (#424).
+	Args []string
 }
 
 var (
 	cfg  Config
 	once sync.Once
-
-	// positionalArgs is what the flag parse in loadFrom left, read through Args.
-	positionalArgs []string
 )
 
-// Init initializes the configuration
+// Init fills the package configuration the getters read, for the data and integration tiers,
+// which are the last readers of it: the binaries call Load and hand what it returns to whatever
+// needs it (#434). A refusal panics, because a tier's TestMain has nothing better to do with it.
 func Init() {
-	once.Do(load)
+	once.Do(func() {
+		loaded, err := Load(flag.CommandLine, os.Args[1:])
+		if err != nil {
+			panic(err)
+		}
+		cfg = *loaded
+	})
 }
 
-func load() {
-	loadFrom(flag.CommandLine, os.Args[1:])
-}
-
-// loadFrom is load with the flag set and the arguments supplied.
+// Load reads the configuration from the environment, registers a flag over each value that has
+// one on fs, and parses args. Each caller passes its own set: main flag.CommandLine, whose
+// ExitOnError keeps the usage text and exit 2 for a bad flag, and a test a ContinueOnError set of
+// its own, which is also what lets it load twice in one process (#320).
 //
-// The seam exists because these flags live on the process-global
-// flag.CommandLine, which panics on the second registration of any name: load()
-// can therefore run exactly once per process, and no test could call it twice to
-// observe what a flag or a variable lands on the config (#320).
-func loadFrom(fs *flag.FlagSet, args []string) {
+// It answers a whole configuration or an error: the parse's, or one naming every numeric or
+// boolean variable that is set and does not parse. A flag given for the same setting does not
+// rescue the variable, because the value the operator wrote is wrong whichever of the two wins,
+// and a setting only the server reads is refused before `migrate` as well, as its flag already
+// is (#434).
+func Load(fs *flag.FlagSet, args []string) (*Config, error) {
+	var malformed malformedValues
 	authServerBaseURL := getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090")
 
-	cfg = Config{
+	c := &Config{
 		AuthServer: AuthServerConfig{
 			BaseURL:                          authServerBaseURL,
 			InternalBaseURL:                  getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
 			ListenHostHttps:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443, &malformed),
 			ListenHostHttp:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
-			TrustProxyHeaders:                getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090, &malformed),
+			TrustProxyHeaders:                getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
-			LogHttpRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
+			LogHttpRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", &malformed),
 			LogLevel:                         getEnv("GOIABADA_AUTHSERVER_LOG_LEVEL", "info"),
 			LogFormat:                        getEnv("GOIABADA_AUTHSERVER_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
 			KeyFile:                          getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
-			LogSQL:                           getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
+			LogSQL:                           getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL", &malformed),
 			StaticDir:                        getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
 			TemplateDir:                      getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
-			DebugAPIRequests:                 getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS"),
+			DebugAPIRequests:                 getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", &malformed),
 			BootstrapEnvOutFile:              getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
 			SessionAuthenticationKey:         getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
 			SessionEncryptionKey:             getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", ""),
 			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
 			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
-			RateLimiterEnabled:               getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
-			ProfilePictureMaxSizeBytes:       getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024),
+			RateLimiterEnabled:               getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", &malformed),
+			ProfilePictureMaxSizeBytes:       getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, &malformed),
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AdminConsole: AdminConsoleConfig{
@@ -200,10 +211,10 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 			Username: getEnv("GOIABADA_DB_USERNAME", "root"),
 			Password: getEnv("GOIABADA_DB_PASSWORD", ""),
 			Host:     getEnv("GOIABADA_DB_HOST", "localhost"),
-			Port:     getEnvAsInt("GOIABADA_DB_PORT", 3306),
+			Port:     getEnvAsInt("GOIABADA_DB_PORT", 3306, &malformed),
 			Name:     getEnv("GOIABADA_DB_NAME", "goiabada"),
 			DSN:      getEnv("GOIABADA_DB_DSN", "file::memory:?cache=shared"),
-			Create:   getEnvAsBoolDefault("GOIABADA_DB_CREATE", true),
+			Create:   getEnvAsBoolDefault("GOIABADA_DB_CREATE", true, &malformed),
 		},
 		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
 		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
@@ -213,51 +224,52 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 	}
 
 	// Auth server
-	fs.StringVar(&cfg.AuthServer.BaseURL, "authserver-baseurl", cfg.AuthServer.BaseURL, "Goiabada auth server base URL")
-	fs.StringVar(&cfg.AuthServer.InternalBaseURL, "authserver-internalbaseurl", cfg.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
-	fs.StringVar(&cfg.AuthServer.ListenHostHttps, "authserver-listen-host-https", cfg.AuthServer.ListenHostHttps, "Auth server https host")
-	fs.IntVar(&cfg.AuthServer.ListenPortHttps, "authserver-listen-port-https", cfg.AuthServer.ListenPortHttps, "Auth server https port")
-	fs.StringVar(&cfg.AuthServer.ListenHostHttp, "authserver-listen-host-http", cfg.AuthServer.ListenHostHttp, "Auth server http host")
-	fs.IntVar(&cfg.AuthServer.ListenPortHttp, "authserver-listen-port-http", cfg.AuthServer.ListenPortHttp, "Auth server http port")
-	fs.BoolVar(&cfg.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", cfg.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
-	authServerTrustedProxies := strings.Join(cfg.AuthServer.TrustedProxies, ",")
+	fs.StringVar(&c.AuthServer.BaseURL, "authserver-baseurl", c.AuthServer.BaseURL, "Goiabada auth server base URL")
+	fs.StringVar(&c.AuthServer.InternalBaseURL, "authserver-internalbaseurl", c.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
+	fs.StringVar(&c.AuthServer.ListenHostHttps, "authserver-listen-host-https", c.AuthServer.ListenHostHttps, "Auth server https host")
+	fs.IntVar(&c.AuthServer.ListenPortHttps, "authserver-listen-port-https", c.AuthServer.ListenPortHttps, "Auth server https port")
+	fs.StringVar(&c.AuthServer.ListenHostHttp, "authserver-listen-host-http", c.AuthServer.ListenHostHttp, "Auth server http host")
+	fs.IntVar(&c.AuthServer.ListenPortHttp, "authserver-listen-port-http", c.AuthServer.ListenPortHttp, "Auth server http port")
+	fs.BoolVar(&c.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", c.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	authServerTrustedProxies := strings.Join(c.AuthServer.TrustedProxies, ",")
 	fs.StringVar(&authServerTrustedProxies, "authserver-trusted-proxies", authServerTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
-	fs.BoolVar(&cfg.AuthServer.LogHttpRequests, "authserver-log-http-requests", cfg.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
-	fs.StringVar(&cfg.AuthServer.LogLevel, "authserver-log-level", cfg.AuthServer.LogLevel, "Lowest level of log record the auth server writes. Options: debug, info, warn, error")
-	fs.StringVar(&cfg.AuthServer.LogFormat, "authserver-log-format", cfg.AuthServer.LogFormat, "Format the auth server writes log records in. Options: text, json")
-	fs.StringVar(&cfg.AuthServer.CertFile, "authserver-certfile", cfg.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
-	fs.StringVar(&cfg.AuthServer.KeyFile, "authserver-keyfile", cfg.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
-	fs.BoolVar(&cfg.AuthServer.LogSQL, "authserver-log-sql", cfg.AuthServer.LogSQL, "Log SQL queries for auth server")
-	fs.StringVar(&cfg.AuthServer.StaticDir, "authserver-staticdir", cfg.AuthServer.StaticDir, "Static files directory for auth server")
-	fs.StringVar(&cfg.AuthServer.TemplateDir, "authserver-templatedir", cfg.AuthServer.TemplateDir, "Template files directory for auth server")
-	fs.BoolVar(&cfg.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", cfg.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
-	fs.StringVar(&cfg.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", cfg.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
-	fs.BoolVar(&cfg.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", cfg.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
+	fs.BoolVar(&c.AuthServer.LogHttpRequests, "authserver-log-http-requests", c.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
+	fs.StringVar(&c.AuthServer.LogLevel, "authserver-log-level", c.AuthServer.LogLevel, "Lowest level of log record the auth server writes. Options: debug, info, warn, error")
+	fs.StringVar(&c.AuthServer.LogFormat, "authserver-log-format", c.AuthServer.LogFormat, "Format the auth server writes log records in. Options: text, json")
+	fs.StringVar(&c.AuthServer.CertFile, "authserver-certfile", c.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
+	fs.StringVar(&c.AuthServer.KeyFile, "authserver-keyfile", c.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
+	fs.BoolVar(&c.AuthServer.LogSQL, "authserver-log-sql", c.AuthServer.LogSQL, "Log SQL queries for auth server")
+	fs.StringVar(&c.AuthServer.StaticDir, "authserver-staticdir", c.AuthServer.StaticDir, "Static files directory for auth server")
+	fs.StringVar(&c.AuthServer.TemplateDir, "authserver-templatedir", c.AuthServer.TemplateDir, "Template files directory for auth server")
+	fs.BoolVar(&c.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", c.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
+	fs.StringVar(&c.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", c.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
+	fs.BoolVar(&c.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", c.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
 
 	// Admin console: the two values this process reads, and nothing else. A flag the binary
 	// cannot act on is a trap rather than a courtesy, because it reads as having configured
 	// something -- so -adminconsole-log-level and the twelve others beside it are not
 	// registered here, and this binary now refuses them instead of ignoring them (#351).
-	fs.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	fs.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
+	fs.StringVar(&c.AdminConsole.BaseURL, "adminconsole-baseurl", c.AdminConsole.BaseURL, "Goiabada admin console base URL")
+	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 
 	// Database
-	RegisterDatabaseFlags(fs, &cfg.Database)
+	RegisterDatabaseFlags(fs, &c.Database)
 
 	// Initial setup
-	fs.StringVar(&cfg.AdminEmail, "admin-email", cfg.AdminEmail, "Default admin email")
-	fs.StringVar(&cfg.AdminPassword, "admin-password", cfg.AdminPassword, "Default admin password")
-	fs.StringVar(&cfg.AppName, "appname", cfg.AppName, "Default app name")
+	fs.StringVar(&c.AdminEmail, "admin-email", c.AdminEmail, "Default admin email")
+	fs.StringVar(&c.AdminPassword, "admin-password", c.AdminPassword, "Default admin password")
+	fs.StringVar(&c.AppName, "appname", c.AppName, "Default app name")
 
-	// The error is discarded rather than returned: flag.CommandLine is built with
-	// ExitOnError, so a server given a bad flag has already exited by here, and a
-	// test supplying its own set asserts on the config rather than on the parse.
-	_ = fs.Parse(args)
-	positionalArgs = fs.Args()
+	// Under flag.CommandLine, built with ExitOnError, a bad flag has already exited by here; a set
+	// built with ContinueOnError answers it, flag.ErrHelp for -h included.
+	if err := fs.Parse(args); err != nil {
+		return nil, errs.WithStack(err)
+	}
+	c.Args = fs.Args()
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
-	cfg.AuthServer.TrustedProxies = splitCSV(authServerTrustedProxies)
+	c.AuthServer.TrustedProxies = splitCSV(authServerTrustedProxies)
 
 	// Warn about removed settings still present in the environment so a
 	// deployment relying on them notices they are now ignored. The Secure cookie
@@ -269,12 +281,17 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 	// one it never honoured. Each binary warning about both would mean each carrying the other's
 	// list of removed names, which is the coupling this split exists to remove (#351).
 	for _, k := range deprecatedEnvVarsPresent("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE") {
-		// This is the one record in the tree the installed handler never sees: config.Init runs
+		// This is the one record in the tree the installed handler never sees: config.Load runs
 		// before logging.Install, because the level and format it installs are read from this
 		// very config. So it prints under Go's built-in handler, at its shape (#320).
 		slog.Warn("a removed setting is present in the environment and is ignored, because the secure cookie flag is now derived from an https base url",
 			"setting", k)
 	}
+
+	if err := malformed.err(); err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // RegisterDatabaseFlags registers the eight --db-* flags on fs, each writing into c and
@@ -295,12 +312,8 @@ func RegisterDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) {
 	fs.BoolVar(&c.Create, "db-create", c.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
 }
 
-// Args returns the positional arguments the command-line parse left, in order. The flag parse
-// stops at the first argument that is not a flag, so the first of these selects the command and
-// the rest belong to it; none means the server runs (#424).
-func Args() []string {
-	return append([]string(nil), positionalArgs...)
-}
+// The getters below read the configuration Init filled, and the data and integration tiers are
+// their last callers (#434).
 
 func GetAuthServer() *AuthServerConfig {
 	return &cfg.AuthServer
@@ -326,9 +339,8 @@ func GetAppName() string {
 	return cfg.AppName
 }
 
-// GetAESEncryptionKey returns the decoded 32-byte data-encryption key. Call
-// ValidateAESEncryptionKey() at startup first; this returns nil if the key is
-// absent or malformed.
+// GetAESEncryptionKey returns the decoded 32-byte data-encryption key, or nil if the key is
+// absent or malformed; DataKeys is what refuses such a key.
 func GetAESEncryptionKey() []byte {
 	b, err := hex.DecodeString(strings.TrimSpace(cfg.AESEncryptionKey))
 	if err != nil {
@@ -337,9 +349,8 @@ func GetAESEncryptionKey() []byte {
 	return b
 }
 
-// GetAESEncryptionKeyPrevious returns the decoded previous data-encryption key
-// used during rotation, or nil if not set. Only valid after
-// ValidateAESEncryptionKey() has confirmed it is well-formed.
+// GetAESEncryptionKeyPrevious returns the decoded previous data-encryption key used during
+// rotation, or nil if it is not set or malformed.
 func GetAESEncryptionKeyPrevious() []byte {
 	raw := strings.TrimSpace(cfg.AESEncryptionKeyPrevious)
 	if raw == "" {
@@ -352,36 +363,37 @@ func GetAESEncryptionKeyPrevious() []byte {
 	return b
 }
 
-// ValidateAESEncryptionKey validates that the data-encryption key is present,
-// hex-encoded, and exactly 32 bytes. Mirrors the session-key validation so the
-// key is supplied from the environment rather than co-located with the
-// ciphertext it protects.
-func ValidateAESEncryptionKey() error {
-	key := strings.TrimSpace(cfg.AESEncryptionKey)
+// DataKeys decodes the data-encryption keys: the current one, which must be present,
+// hex-encoded and exactly 32 bytes, and the previous one, nil unless a rotation is in progress
+// and held to the same rule when it is. The key is supplied from the environment rather than
+// co-located with the ciphertext it protects (#83). On a refusal both keys are nil, so no caller
+// can go on with half a validated pair.
+func (c *Config) DataKeys() (current, previous []byte, err error) {
+	key := strings.TrimSpace(c.AESEncryptionKey)
 	if key == "" {
-		return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
+		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
 	}
-	keyBytes, err := hex.DecodeString(key)
+	current, err = hex.DecodeString(key)
 	if err != nil {
-		return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
+		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
 	}
-	if len(keyBytes) != 32 {
-		return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(keyBytes))
+	if len(current) != 32 {
+		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(current))
 	}
 
 	// The previous key is optional (rotation only), but if present it must be a
 	// valid 32-byte hex key too.
-	if prev := strings.TrimSpace(cfg.AESEncryptionKeyPrevious); prev != "" {
-		prevBytes, err := hex.DecodeString(prev)
+	if prev := strings.TrimSpace(c.AESEncryptionKeyPrevious); prev != "" {
+		previous, err = hex.DecodeString(prev)
 		if err != nil {
-			return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
+			return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
 		}
-		if len(prevBytes) != 32 {
-			return errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevBytes))
+		if len(previous) != 32 {
+			return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(previous))
 		}
 	}
 
-	return nil
+	return current, previous, nil
 }
 
 func getEnv(key string, defaultVal string) string {
@@ -391,38 +403,76 @@ func getEnv(key string, defaultVal string) string {
 	return strings.TrimSpace(defaultVal)
 }
 
-func getEnvAsInt(key string, defaultVal int) int {
-	valueStr := getEnv(key, "")
-	if value, err := strconv.Atoi(strings.TrimSpace(valueStr)); err == nil {
-		return value
-	}
-	return defaultVal
+// malformedValues collects every numeric or boolean variable Load could not parse, so one refusal
+// names them all rather than costing the operator a restart per typo (#434).
+type malformedValues []string
+
+func (m *malformedValues) add(key, value, want string) {
+	*m = append(*m, key+" is "+strconv.Quote(value)+", not "+want)
 }
 
-func getEnvAsInt64(key string, defaultVal int64) int64 {
-	valueStr := getEnv(key, "")
-	if value, err := strconv.ParseInt(strings.TrimSpace(valueStr), 10, 64); err == nil {
-		return value
+// err is the refusal: one line, whatever the values hold, because main writes it to stderr
+// before any log handler exists and an operator reads it as the one reason the server stopped.
+// The values are quoted, so not even a value carrying a newline can break it.
+func (m malformedValues) err() error {
+	if len(m) == 0 {
+		return nil
 	}
-	return defaultVal
+	return errs.Errorf("malformed configuration: %s", strings.Join(m, "; "))
 }
 
-func getEnvAsBool(key string) bool {
+// getEnvAsInt answers the default when the variable is unset or empty after the trim, and the
+// number when it parses. Anything else is recorded as malformed rather than read as the default:
+// a mistyped port used to leave the server on the port it shipped with and say nothing (#434).
+// Empty stays the default because every shipped compose file and the setup wizard write
+// GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS= to mean no https listener, and run-tests.sh exports
+// GOIABADA_DB_PORT empty.
+func getEnvAsInt(key string, defaultVal int, malformed *malformedValues) int {
 	valueStr := getEnv(key, "")
-	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
-		return value
+	if valueStr == "" {
+		return defaultVal
 	}
-	return false
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		malformed.add(key, valueStr, "an integer")
+		return defaultVal
+	}
+	return value
 }
 
-// getEnvAsBoolDefault is getEnvAsBool with a caller-supplied default, for a setting whose
-// default is true: getEnvAsBool can only ever express default-false (#293).
-func getEnvAsBoolDefault(key string, defaultVal bool) bool {
+// getEnvAsInt64 is getEnvAsInt for a 64-bit setting.
+func getEnvAsInt64(key string, defaultVal int64, malformed *malformedValues) int64 {
 	valueStr := getEnv(key, "")
-	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
-		return value
+	if valueStr == "" {
+		return defaultVal
 	}
-	return defaultVal
+	value, err := strconv.ParseInt(valueStr, 10, 64)
+	if err != nil {
+		malformed.add(key, valueStr, "an integer")
+		return defaultVal
+	}
+	return value
+}
+
+// getEnvAsBool is getEnvAsBoolDefault for a setting whose default is false.
+func getEnvAsBool(key string, malformed *malformedValues) bool {
+	return getEnvAsBoolDefault(key, false, malformed)
+}
+
+// getEnvAsBoolDefault is getEnvAsInt's rule for a boolean with a caller-supplied default, for a
+// setting whose default is true (#293): an operator writing yes used to get the default, silently
+// (#434).
+func getEnvAsBoolDefault(key string, defaultVal bool, malformed *malformedValues) bool {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return defaultVal
+	}
+	value, err := strconv.ParseBool(valueStr)
+	if err != nil {
+		malformed.add(key, valueStr, "a boolean (true or false)")
+		return defaultVal
+	}
+	return value
 }
 
 func getEnvAsStringSlice(key string) []string {

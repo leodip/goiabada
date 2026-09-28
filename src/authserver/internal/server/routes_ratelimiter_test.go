@@ -98,17 +98,6 @@ const (
 		"?algorithm=SHA1&digits=6&issuer=Goiabada&period=30&secret=" + routesTestOTPSecret
 )
 
-// withRateLimiterEnabled turns the limiter on for the duration of the test and restores the
-// previous value. It has to run before initRoutes, which is when the flag is read.
-func withRateLimiterEnabled(t *testing.T) {
-	t.Helper()
-	previous := config.GetAuthServer().RateLimiterEnabled
-	config.GetAuthServer().RateLimiterEnabled = true
-	t.Cleanup(func() {
-		config.GetAuthServer().RateLimiterEnabled = previous
-	})
-}
-
 // routesTestSettings is what MiddlewareSettings would put in the context. Self-registration
 // and SMTP are on, or two of the handlers below refuse before reaching their credential
 // check. Both audit sinks are off, which keeps the real AuditLogger from writing rows the
@@ -130,7 +119,13 @@ func routesTestSettings() *models.Settings {
 // per case, because the limiter it constructs holds the counters.
 func newRoutesTestServer(t *testing.T) *Server {
 	t.Helper()
-	withRateLimiterEnabled(t)
+	return newRoutesTestServerWith(t, nil)
+}
+
+// newRoutesTestServerWith is newRoutesTestServer with configure applied to the configuration
+// initRoutes reads, after the limiter is switched on.
+func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Server {
+	t.Helper()
 
 	passwordHash, err := passwordhash.Hash("the account's real password")
 	assert.NoError(t, err)
@@ -158,11 +153,19 @@ func newRoutesTestServer(t *testing.T) *Server {
 		Return(&models.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
 	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
 
+	// The limiter on, which initRoutes reads when it builds the limiter.
+	cfg := &config.Config{}
+	cfg.AuthServer.RateLimiterEnabled = true
+	if configure != nil {
+		configure(cfg)
+	}
+
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),
+		cfg:          cfg,
 	}
 	s.initRoutes(s.router)
 	return s

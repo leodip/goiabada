@@ -9,6 +9,7 @@ import (
 	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -83,12 +84,22 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 // the exact call it is denying rather than any call at all.
 var nilTx = (*sql.Tx)(nil)
 
+// testProfilePictureMaxSizeBytes is the configured image size newStaticBranchTestServer hands the
+// chain. It is not the default, so a body-limit row that read the default instead of the
+// configured value would admit the row's bound plus one byte and fail
+// TestBodyLimitPolicy_EachRowAtItsBoundary (#434).
+const testProfilePictureMaxSizeBytes = 100 << 10
+
 func newStaticBranchTestServer(database *mocks_data.Database) *Server {
+	cfg := &config.Config{}
+	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
+
 	return &Server{
 		router:       chi.NewRouter(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		staticFS:     fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},
+		cfg:          cfg,
 	}
 }
 

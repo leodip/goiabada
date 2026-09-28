@@ -22,7 +22,7 @@ import (
 const runMainMarker = "GOIABADA_TEST_RUN_MAIN"
 
 // TestMain hands a marked child process to main before any test flag is parsed, so the child's
-// command line is exactly the one the case gave it, parsed by config.Init on a fresh
+// command line is exactly the one the case gave it, parsed by config.Load on a fresh
 // flag.CommandLine. Every other run is the test run.
 func TestMain(m *testing.M) {
 	if os.Getenv(runMainMarker) == "1" {
@@ -109,8 +109,8 @@ func recordedVersion(t *testing.T, path string) int {
 }
 
 // TestMain_MigrateFindsItsFlagsWhereverTheyAre is R1 at the process: the real main, its real
-// config.Init over a real command line, and a SQLite file stepped down from the head to 44.
-// These are the cases that fail if main stops dispatching on config.Args(), or stops handing
+// config.Load over a real command line, and a SQLite file stepped down from the head to 44.
+// These are the cases that fail if main stops dispatching on the loaded Args, or stops handing
 // migrate the configuration its flags were parsed into; every function below it can be right
 // while that wiring is wrong.
 func TestMain_MigrateFindsItsFlagsWhereverTheyAre(t *testing.T) {
@@ -173,6 +173,44 @@ func TestMain_RefusesAServerFlagAfterMigrateBeforeOpeningAnything(t *testing.T) 
 	assert.Contains(t, stderr, "--authserver-log-level is not a flag migrate accepts")
 	assert.NoFileExists(t, flagged)
 	assert.NoFileExists(t, decoy)
+}
+
+// TestMain_RefusesAMalformedVariableBeforeOpeningAnything is decisions 6 and 10 of #434 at the
+// process: a numeric or boolean variable that does not parse stops main at the load, with the
+// channel and code a malformed flag has, before the log handler exists and before anything is
+// opened, and it does so under `migrate` too, whose schema work never reads the listen port.
+//
+// Two variables are malformed, so the one line naming both is what shows the refusal came from
+// the whole load. The exit code alone proves little under `migrate version`, which would also exit
+// on the decoy database; the exact stderr and the decoy never being created are what fail.
+func TestMain_RefusesAMalformedVariableBeforeOpeningAnything(t *testing.T) {
+	const want = `malformed configuration: GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP is "90 90", not an integer; ` +
+		`GOIABADA_DB_CREATE is "yes", not a boolean (true or false)` + "\n"
+	env := []string{
+		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=90 90",
+		"GOIABADA_DB_CREATE=yes",
+		// Present, so a child that got past the load would go on to open the decoy.
+		"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
+	}
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"the server", nil},
+		{"migrate version", []string{"migrate", "version"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			decoy := filepath.Join(t.TempDir(), "d.db")
+
+			code, stderr := runMainProcessWith(t, decoy, env, tc.args...)
+
+			require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
+			assert.Equal(t, want, stderr)
+			assert.NoFileExists(t, decoy)
+		})
+	}
 }
 
 // TestMain_RefusesAMalformedTrustedProxyListBeforeOpeningAnything: an entry that is neither an IP

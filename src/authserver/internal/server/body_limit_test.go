@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/web"
@@ -56,7 +55,7 @@ func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
 // TestBodyLimitPolicy_EachRowAtItsBoundary sends each row's limit and one byte more through the
 // real root chain, to a stub at a pattern that row governs.
 func TestBodyLimitPolicy_EachRowAtItsBoundary(t *testing.T) {
-	uploadLimit := imaging.MaxFileSize(config.GetAuthServer().ProfilePictureMaxSizeBytes) + 64*1024
+	uploadLimit := imaging.MaxFileSize(testProfilePictureMaxSizeBytes) + 64*1024
 
 	tests := []struct {
 		name    string

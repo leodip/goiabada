@@ -54,13 +54,13 @@ type Server struct {
 	staticFS   fs.FS
 	templateFS fs.FS
 
-	// Config fields
-	baseURL         string
-	setCookieSecure bool
+	// Loaded once by main and read here and in routes.go wherever a listener, a middleware or a
+	// handler needs a setting, so nothing below main reads a process-wide configuration (#434).
+	cfg *config.Config
 }
 
 func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore,
-	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet) *Server {
+	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet, cfg *config.Config) *Server {
 
 	s := Server{
 		router:       router,
@@ -71,12 +71,10 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 
 		trustedProxies: trustedProxies,
 
-		// Config fields
-		baseURL:         config.GetAuthServer().BaseURL,
-		setCookieSecure: config.GetAuthServer().IsCookieSecure(),
+		cfg: cfg,
 	}
 
-	if envVar := config.GetAuthServer().StaticDir; len(envVar) == 0 {
+	if envVar := cfg.AuthServer.StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
 		slog.Info("using the embedded static files")
 	} else {
@@ -84,7 +82,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 		slog.Info("using static files from a directory", "directory", envVar)
 	}
 
-	if envVar := config.GetAuthServer().TemplateDir; len(envVar) == 0 {
+	if envVar := cfg.AuthServer.TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
 		slog.Info("using the embedded template files")
 	} else {
@@ -100,10 +98,10 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 // cancellation, and otherwise the error, unlogged: main writes the one record for it and owns the
 // exit, so nothing below main decides to end the process (#426, #390).
 func (s *Server) Start(ctx context.Context) error {
-	httpsHost := config.GetAuthServer().ListenHostHttps
-	httpsPort := config.GetAuthServer().ListenPortHttps
-	certFile := config.GetAuthServer().CertFile
-	keyFile := config.GetAuthServer().KeyFile
+	httpsHost := s.cfg.AuthServer.ListenHostHttps
+	httpsPort := s.cfg.AuthServer.ListenPortHttps
+	certFile := s.cfg.AuthServer.CertFile
+	keyFile := s.cfg.AuthServer.KeyFile
 	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
 
 	// One record per listener where five and three lines used to be. A reader
@@ -116,8 +114,8 @@ func (s *Server) Start(ctx context.Context) error {
 		"cert_file", certFile,
 		"key_file", keyFile)
 
-	httpHost := config.GetAuthServer().ListenHostHttp
-	httpPort := config.GetAuthServer().ListenPortHttp
+	httpHost := s.cfg.AuthServer.ListenHostHttp
+	httpPort := s.cfg.AuthServer.ListenPortHttp
 	httpEnabled := httpHost != "" && httpPort > 0
 
 	slog.InfoContext(ctx, "http listener configuration",
@@ -333,13 +331,13 @@ func (s *Server) initMiddleware() chi.Router {
 	s.router.Use(middleware.RequestID)
 
 	// Security headers (before Recoverer so 500 responses carry them too)
-	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(s.setCookieSecure))
+	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(s.cfg.AuthServer.IsCookieSecure()))
 
 	// Real IP: resolve the client IP into r.RemoteAddr from the socket peer and
 	// (when trusted) the forwarded headers, so all downstream consumers (rate
 	// limiter, session/audit IP, request logger) share one trustworthy value.
 	s.router.Use(custom_middleware.MiddlewareRealIP(
-		config.GetAuthServer().TrustProxyHeaders,
+		s.cfg.AuthServer.TrustProxyHeaders,
 		s.trustedProxies,
 	))
 
@@ -361,7 +359,7 @@ func (s *Server) initMiddleware() chi.Router {
 	//
 	// It stays before StripSlashes, which edits r.URL.Path in place, which is why the
 	// middleware renders the target before calling the next handler.
-	logHttpRequests := config.GetAuthServer().LogHttpRequests
+	logHttpRequests := s.cfg.AuthServer.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(custom_middleware.MiddlewareRequestLogger(logHttpRequests))
 
@@ -377,7 +375,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// because the /auth/logout exemption predicate parses the form body right there at the root,
 	// and a body read before this mount would be read without a bound.
 	s.router.Use(custom_middleware.MiddlewareBodyLimit(s.router,
-		bodyLimitPolicy(config.GetAuthServer().ProfilePictureMaxSizeBytes)))
+		bodyLimitPolicy(s.cfg.AuthServer.ProfilePictureMaxSizeBytes)))
 
 	// CSRF
 	// Note: CSRF runs before the locale middleware below, so there is no localizer on the context

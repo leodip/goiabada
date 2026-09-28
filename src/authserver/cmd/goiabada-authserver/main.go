@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -43,8 +44,17 @@ func main() {
 	// the install goes out in a shape the deployment did not choose, and a value
 	// the handler cannot read has to stop the server rather than be silently
 	// replaced by a default (#320).
-	config.Init()
-	if err := logging.Install(config.GetAuthServer().LogLevel, config.GetAuthServer().LogFormat); err != nil {
+	//
+	// A variable that does not parse stops the process here, before `migrate` is dispatched as
+	// well: the variable is its flag's default, and a malformed flag already exits 2 at this very
+	// parse. So the refusal takes the flag's channel and code, one line on stderr, since no log
+	// handler exists yet, and exit 2 (#434).
+	cfg, loadErr := config.Load(flag.CommandLine, os.Args[1:])
+	if loadErr != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", loadErr)
+		os.Exit(migrateExitUsage)
+	}
+	if err := logging.Install(cfg.AuthServer.LogLevel, cfg.AuthServer.LogFormat); err != nil {
 		slog.Error("unable to install the log handler", "error", err)
 		os.Exit(1)
 	}
@@ -54,7 +64,7 @@ func main() {
 	// to 44` for a server start and migrated a database up that the operator asked to step down
 	// (#424). A refusal is the operator's typo rather than a server event, so it goes to stderr
 	// as one line and nothing is opened.
-	migrateArgs, isMigrate, err := dispatch(config.Args())
+	migrateArgs, isMigrate, err := dispatch(cfg.Args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(migrateExitUsage)
@@ -75,7 +85,7 @@ func main() {
 	// configuration is handed over by value, so the --db-* flags it parses among them override a
 	// copy and the loaded configuration stays what the process was started with (#424).
 	if isMigrate {
-		os.Exit(migrateCommand(migrateArgs, *config.GetDatabase(), os.Stdout, os.Stderr))
+		os.Exit(migrateCommand(migrateArgs, cfg.Database, os.Stdout, os.Stderr))
 	}
 
 	// A trusted-proxy entry that is neither an IP nor a CIDR stops the server whatever
@@ -84,7 +94,7 @@ func main() {
 	// would otherwise surface only on the day trust is switched on (#425). It is checked after
 	// `migrate` for the reason the encryption key is: that command serves no request, and a
 	// setting only the server reads is no precondition for repairing a schema.
-	trustedProxies, proxyErr := config.GetAuthServer().TrustedProxyRanges()
+	trustedProxies, proxyErr := cfg.AuthServer.TrustedProxyRanges()
 	if proxyErr != nil {
 		slog.Error("the trusted proxy list is malformed, so the auth server cannot start", "error", proxyErr)
 		os.Exit(1)
@@ -94,7 +104,8 @@ func main() {
 	// before the database is opened: NewDatabase runs the at-rest re-encryption
 	// migration, which needs the key. The key is supplied from the environment
 	// and never co-located with the ciphertext (issue #83).
-	if aesKeyErr := config.ValidateAESEncryptionKey(); aesKeyErr != nil {
+	currentDataKey, previousDataKey, aesKeyErr := cfg.DataKeys()
+	if aesKeyErr != nil {
 		// One record where three used to be, for the same reason decision 6 collapses the
 		// banners: the two lines after the failure were prose an operator had to read as a
 		// unit, and a JSON deployment received them as three unrelated records with the
@@ -106,7 +117,7 @@ func main() {
 	}
 	// One cipher for the process, built here and handed to every consumer rather than set as a
 	// package-wide key each of them reads (#434).
-	dataCipher, dataCipherErr := encryption.NewDataCipher(config.GetAESEncryptionKey())
+	dataCipher, dataCipherErr := encryption.NewDataCipher(currentDataKey)
 	if dataCipherErr != nil {
 		slog.Error("unable to initialize the data cipher", "error", dataCipherErr)
 		os.Exit(1)
@@ -114,10 +125,10 @@ func main() {
 	slog.Info("data encryption key validated")
 
 	slog.Info("using configuration",
-		"auth_server_base_url", config.GetAuthServer().BaseURL,
-		"auth_server_internal_base_url", config.GetAuthServer().InternalBaseURL,
-		"admin_console_base_url", config.GetAdminConsole().BaseURL,
-		"debug_api_requests", config.GetAuthServer().DebugAPIRequests)
+		"auth_server_base_url", cfg.AuthServer.BaseURL,
+		"auth_server_internal_base_url", cfg.AuthServer.InternalBaseURL,
+		"admin_console_base_url", cfg.AdminConsole.BaseURL,
+		"debug_api_requests", cfg.AuthServer.DebugAPIRequests)
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -128,7 +139,7 @@ func main() {
 
 	// Merge the overrides directory the configuration read from GOIABADA_I18N_OVERRIDES_DIR over
 	// the embedded message catalogs. Fail-fast: a malformed catalog is a config bug.
-	if loadBundleErr := i18n.LoadBundle(config.GetAuthServer().I18nOverridesDir); loadBundleErr != nil {
+	if loadBundleErr := i18n.LoadBundle(cfg.AuthServer.I18nOverridesDir); loadBundleErr != nil {
 		slog.Error("unable to load the i18n message catalogs", "error", loadBundleErr)
 		os.Exit(1)
 	}
@@ -145,9 +156,8 @@ func main() {
 	// context rather than opening one where it lands (#386).
 	startupCtx := context.Background()
 
-	database, err := datafactory.NewDatabase(startupCtx, config.GetDatabase(),
-		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(),
-		config.GetAuthServer().LogSQL)
+	database, err := datafactory.NewDatabase(startupCtx, &cfg.Database,
+		currentDataKey, previousDataKey, cfg.AuthServer.LogSQL)
 	if err != nil {
 		slog.Error("unable to create the database connection", "error", err)
 		os.Exit(1)
@@ -159,13 +169,13 @@ func main() {
 	// whole or not at all and the next start retries it (#386, #424). bootstrap owns the choice
 	// and the records; main owns only what the process does next.
 	outcome, err := bootstrap.Run(startupCtx, database, dataCipher, bootstrap.Config{
-		AdminEmail:          config.GetAdminEmail(),
-		AdminPassword:       config.GetAdminPassword(),
-		AppName:             config.GetAppName(),
-		AuthServerBaseURL:   config.GetAuthServer().BaseURL,
-		AdminConsoleBaseURL: config.GetAdminConsole().BaseURL,
-		OAuthClientSecret:   config.GetAdminConsole().OAuthClientSecret,
-		BootstrapEnvOutFile: config.GetAuthServer().BootstrapEnvOutFile,
+		AdminEmail:          cfg.AdminEmail,
+		AdminPassword:       cfg.AdminPassword,
+		AppName:             cfg.AppName,
+		AuthServerBaseURL:   cfg.AuthServer.BaseURL,
+		AdminConsoleBaseURL: cfg.AdminConsole.BaseURL,
+		OAuthClientSecret:   cfg.AdminConsole.OAuthClientSecret,
+		BootstrapEnvOutFile: cfg.AuthServer.BootstrapEnvOutFile,
 	})
 	if err != nil {
 		slog.Error("unable to bootstrap the database", "error", err)
@@ -183,15 +193,15 @@ func main() {
 	// the session keys: the store seals with the current pair and opens with the current pair
 	// and then this one, so a rotation signs nobody out; the operator removes the two _PREVIOUS
 	// variables once the maximum session lifetime has passed (#269, #270, #434).
-	currentKeys, previousKeys, sessionKeysErr := config.GetAuthServer().SessionKeys()
+	currentKeys, previousKeys, sessionKeysErr := cfg.AuthServer.SessionKeys()
 	if sessionKeysErr != nil {
-		bootstrap.LogCredentialsNotConfigured(startupCtx, sessionKeysErr, config.GetAuthServer().BootstrapEnvOutFile)
+		bootstrap.LogCredentialsNotConfigured(startupCtx, sessionKeysErr, cfg.AuthServer.BootstrapEnvOutFile)
 		os.Exit(1)
 	}
 	slog.Info("session keys validated")
 
 	slog.Info("cookie security derived from the base URL",
-		"cookie_secure", config.GetAuthServer().IsCookieSecure())
+		"cookie_secure", cfg.AuthServer.IsCookieSecure())
 
 	if previousKeys != nil {
 		slog.Info("previous session keys configured: a session sealed under them still opens")
@@ -209,7 +219,7 @@ func main() {
 	// path here can name an admin console session however it is composed.
 	sessionStore, err := newSessionStore(
 		sessionbackend.NewAuthServerBackend(database),
-		config.GetAuthServer().IsCookieSecure(),
+		cfg.AuthServer.IsCookieSecure(),
 		currentKeys,
 		previousKeys,
 	)
@@ -221,7 +231,7 @@ func main() {
 	slog.Info("initialized server-side session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies)
+	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies, cfg)
 
 	// The process owns the signals; the server just gets told when to stop. On
 	// SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and

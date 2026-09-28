@@ -35,8 +35,9 @@ const (
 )
 
 // ParseDialect maps a configured database type onto a Dialect. The empty string is SQLite,
-// which is what config.GetDatabase().Type reports when nothing is set, and surrounding
-// quotes and whitespace are tolerated because an environment variable often carries them.
+// which is what the loaded configuration's Database.Type reports when nothing is set, and
+// surrounding quotes and whitespace are tolerated because an environment variable often carries
+// them.
 //
 // Anything else is an error rather than a fallback. Every switch this package replaced fell
 // through its default arm to SQLite, which in a four-engine process would read the wrong

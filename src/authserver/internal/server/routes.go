@@ -4,7 +4,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
@@ -45,7 +44,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	codeIssuer := issuance.NewCodeIssuer(s.database)
 	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
-	tokenIssuer := issuance.NewTokenIssuer(s.database, s.baseURL, s.dataCipher)
+	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher)
 	userCreator := usercreation.NewUserCreator(s.database)
 	emailSender := emaildelivery.NewSender(s.dataCipher)
 
@@ -55,9 +54,9 @@ func (s *Server) initRoutes(root chi.Router) {
 	middlewareBearerToken := middleware.NewMiddlewareBearerToken(tokenParser)
 	authHeaderToContext := middlewareBearerToken.JwtAuthorizationHeaderToContext()
 
-	authServerConfig := config.GetAuthServer()
+	authServerConfig := &s.cfg.AuthServer
 	baseURL := authServerConfig.BaseURL
-	adminConsoleBaseURL := config.GetAdminConsole().BaseURL
+	adminConsoleBaseURL := s.cfg.AdminConsole.BaseURL
 	maxUploadBytes := authServerConfig.ProfilePictureMaxSizeBytes
 	rateLimiter := middleware.NewRateLimiterMiddleware(
 		authHelper,
