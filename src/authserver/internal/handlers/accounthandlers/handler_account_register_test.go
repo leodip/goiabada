@@ -15,10 +15,10 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -58,7 +58,7 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
@@ -80,7 +80,7 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 			SelfRegistrationEnabled: false,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("NotFound", rr, req).Return().Once()
@@ -112,7 +112,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
@@ -146,7 +146,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "invalid-email").Return(customerrors.NewErrorDetail("", "Please enter a valid email address."))
@@ -181,7 +181,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "existing@example.com").Return(nil)
@@ -217,7 +217,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "preregistered@example.com").Return(nil)
@@ -254,7 +254,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
@@ -304,7 +304,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
@@ -355,7 +355,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
@@ -397,7 +397,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
@@ -436,7 +436,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
@@ -475,7 +475,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
@@ -515,7 +515,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: false,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		// The not-found page, RFC 9110 section 15.5.5, rather than the 500 page it used to be.
@@ -564,7 +564,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SMTPHost:                "smtp.example.com",
 			SelfRegistrationRequiresEmailVerification: true,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
@@ -656,7 +656,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             false, // SMTP is disabled
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
@@ -723,7 +723,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			PasswordPolicy:          models.PasswordPolicyHigh,
 			SelfRegistrationRequiresEmailVerification: false,
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
@@ -817,8 +817,7 @@ func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-				&models.Settings{SelfRegistrationEnabled: true})
+			ctx := reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: true})
 			req = req.WithContext(ctx)
 
 			emailValidator.On("ValidateEmailAddress", "invalid-email").Return(testCase.err)

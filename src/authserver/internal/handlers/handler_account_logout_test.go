@@ -49,7 +49,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		settings := &models.Settings{}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		httpHelper.On("LookupFromUrlQueryOrFormPost", req, "id_token_hint").Return("", false)
@@ -82,7 +82,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		req, _ := http.NewRequest("GET", "/auth/logout", nil)
 		rr := httptest.NewRecorder()
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 
 		httpHelper.On("LookupFromUrlQueryOrFormPost", req, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", req, "post_logout_redirect_uri").Return("https://example.com/out")
@@ -136,7 +136,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 				req, _ := http.NewRequest("GET", "/auth/logout", nil)
 				rr := httptest.NewRecorder()
-				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 
 				httpHelper.On("GetFromUrlQueryOrFormPost", req, mock.Anything).Return("")
 				httpHelper.On("LookupFromUrlQueryOrFormPost", req, "id_token_hint").Return("", false)
@@ -170,7 +170,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		req, _ := http.NewRequest("GET", "/auth/logout?ui_locales=pt-BR", nil)
 		rr := httptest.NewRecorder()
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, mock.Anything).Return("")
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
@@ -772,7 +772,7 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 		assert.NoError(t, err)
 	}
 
-	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Issuer: hintedIssuer})
+	ctx := reqctx.WithSettings(req.Context(), &models.Settings{Issuer: hintedIssuer})
 	if len(sessionIdentifier) > 0 {
 		ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
 	}
@@ -878,7 +878,7 @@ func logoutPostRequest(t *testing.T, form url.Values) *http.Request {
 	req, err := http.NewRequest("POST", "/auth/logout", strings.NewReader(form.Encode()))
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 }
 
 // withSessionIdentifier puts the identifier the session-identifier middleware would have attached,
@@ -2439,7 +2439,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 
 			req, err := http.NewRequest("GET", "/auth/logout", nil)
 			assert.NoError(t, err)
-			ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Issuer: theIssuer})
+			ctx := req.Context()
 			if !tc.noSession {
 				ctx = reqctx.WithSessionIdentifier(ctx, theSessionId)
 			}
@@ -2487,7 +2487,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			}
 			stubDB(database)
 
-			got, err := classifyIdTokenHint(req, httpHelper, database, tokenParser)
+			got, err := classifyIdTokenHint(req, theIssuer, httpHelper, database, tokenParser)
 
 			if tc.wantErr {
 				assert.Error(t, err, "a database failure in either lookup that decides whether the hint's session may be trusted must propagate")

@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,11 +11,11 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -58,8 +57,7 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 	req.Header.Set("Content-Type", "application/json")
 	// The handler reads the password policy off the request's settings and passes it to the
 	// validator, so settings must be there or it panics on the type assertion.
-	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{PasswordPolicy: models.PasswordPolicyLow})
+	ctx := reqctx.WithSettings(req.Context(), &models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	return setTokenContextWithClaims(req.WithContext(ctx), claims)
 }
 

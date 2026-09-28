@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -14,12 +13,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/pquerna/otp/totp"
@@ -218,7 +217,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		settings := &models.Settings{
 			AppName: "TestApp",
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		authContext := &ceremony.AuthContext{
@@ -327,7 +326,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		settings := &models.Settings{
 			AppName: "TestApp",
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		firstRenderKeyURL := otpTestKeyURL("FIRSTRENDERSECRET")

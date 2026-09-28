@@ -11,11 +11,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -135,7 +135,11 @@ func HandleAuthOtpGet(
 			// the ceremony on a 500 that every reload repeats (#247).
 			secretKey, err := otp.SecretFromKeyURL(authContext.OTPKeyURL)
 			if err != nil {
-				settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+				settings, ok := reqctx.SettingsFrom(r.Context())
+				if !ok {
+					httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+					return
+				}
 				keyURL, genErr := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
 				if genErr != nil {
 					httpHelper.InternalServerError(w, r, genErr)

@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -39,8 +39,7 @@ func MiddlewareSettings(database settingsDatabase) func(next http.Handler) http.
 				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", requestId), http.StatusInternalServerError)
 				return
 			}
-			ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r.WithContext(reqctx.WithSettings(ctx, settings)))
 		}
 		return http.HandlerFunc(fn)
 	}
@@ -60,9 +59,8 @@ func NewAuditSwitches(database settingsDatabase) *AuditSwitches {
 }
 
 func (a *AuditSwitches) AuditSwitches(ctx context.Context) (audit.Switches, error) {
-	// The nil check is not defensive: the assertion succeeds on a typed nil pointer.
-	settings, ok := ctx.Value(constants.ContextKeySettings).(*models.Settings)
-	if !ok || settings == nil {
+	settings, ok := reqctx.SettingsFrom(ctx)
+	if !ok {
 		var err error
 		settings, err = a.database.GetSettingsById(ctx, nil, 1)
 		if err != nil {

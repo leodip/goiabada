@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,10 +9,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -31,7 +30,7 @@ func sendTestEmailRequest(t *testing.T, settings *models.Settings) *http.Request
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/settings/email/send-test", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+	return req.WithContext(reqctx.WithSettings(req.Context(), settings))
 }
 
 // The test send goes out through the relay the request's settings configure, the password still

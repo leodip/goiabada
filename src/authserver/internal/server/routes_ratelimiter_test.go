@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -172,7 +171,7 @@ func newRoutesTestServer(t *testing.T) *Server {
 // withRoutesTestSettings puts in the context what MiddlewareSettings puts there in
 // production. Both the handlers and the browser rejection page read it from there.
 func withRoutesTestSettings(r *http.Request) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), constants.ContextKeySettings, routesTestSettings()))
+	return r.WithContext(reqctx.WithSettings(r.Context(), routesTestSettings()))
 }
 
 // browserRequest is an unauthenticated form post from one host, which is what the per-IP

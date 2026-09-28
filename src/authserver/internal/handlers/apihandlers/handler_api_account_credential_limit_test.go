@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -11,12 +10,12 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -92,8 +91,7 @@ func (e *credentialEnv) putPassword(t *testing.T, current, next string) *httptes
 	req.RemoteAddr = "203.0.113.7:5000"
 	// The password validator reads the policy straight off the context and panics on the type
 	// assertion without it, and MiddlewareSettings puts it there in production.
-	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{PasswordPolicy: models.PasswordPolicyLow})
+	ctx := reqctx.WithSettings(req.Context(), &models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": credentialSubject})
 

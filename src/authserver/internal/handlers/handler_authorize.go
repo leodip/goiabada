@@ -252,7 +252,11 @@ func HandleAuthorizeGet(
 
 		// Settings are read here, above the session predicate, because the predicate needs the two
 		// session lifetimes, and the PKCE and implicit-flow decisions below read them too.
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 
 		// The client's max_age as the session predicate applies it. A malformed value is refused
 		// by ValidateRequest below with invalid_request, and until then it constrains nothing: it

@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -29,7 +29,7 @@ func TestMiddlewareSettings(t *testing.T) {
 
 		var contextSettings *models.Settings
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contextSettings = r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+			contextSettings, _ = reqctx.SettingsFrom(r.Context())
 		})).ServeHTTP(rr, req)
 
 		assert.Equal(t, expectedSettings, contextSettings)

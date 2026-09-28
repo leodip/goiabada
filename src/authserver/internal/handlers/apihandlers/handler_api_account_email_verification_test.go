@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -11,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -110,7 +109,7 @@ func (e *verificationEnv) post(t *testing.T, submitted string) *httptest.Respons
 	req.RemoteAddr = "203.0.113.7:5000"
 	// The handler reads SMTPEnabled straight off the context and panics on the type
 	// assertion without it, and MiddlewareSettings puts it there in production.
-	ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{SMTPEnabled: true})
+	ctx := reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": verificationSubject})
 

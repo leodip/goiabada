@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -13,13 +12,13 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -489,8 +488,7 @@ func descriptionOf(t *testing.T, rr *httptest.ResponseRecorder) string {
 // settings the handler reads out of the request context.
 func enrollmentGetRequest(subject string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/account/otp/enrollment", nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{AppName: "Goiabada"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "Goiabada"}))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 

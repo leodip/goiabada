@@ -10,11 +10,10 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -152,7 +151,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{
 			"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
 			"auth_error.html":             {Data: []byte(`{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`)},
-		}, authmiddleware.SettingsReader{})
+		})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,
 			ceremony.AuthStateLevel1Password, ceremony.AuthStateLevel1PasswordCompleted)
@@ -175,7 +174,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{
 			"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
 			"auth_error.html":             {Data: []byte(`{{define "content"}}{{.title}}{{end}}`)},
-		}, authmiddleware.SettingsReader{})
+		})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,
 			ceremony.AuthStateRequiresConsent, ceremony.AuthStateInitial)
@@ -196,7 +195,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 // renderer rather than of anything under test here.
 func renderableRequest(target string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 }
 
 // TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext is the third of #328's four call

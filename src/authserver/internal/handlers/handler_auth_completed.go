@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -94,7 +93,11 @@ func HandleAuthCompletedGet(
 		}
 
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		hasValidUserSession := userSessionManager.HasValidUserSession(userSession,
 			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, authContext.RequestedMaxAge())
 		// Validity and ownership are separate questions and both have to be yes before this

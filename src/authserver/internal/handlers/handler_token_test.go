@@ -23,9 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -125,7 +123,7 @@ func TestHandleTokenPost(t *testing.T) {
 			req, _ := http.NewRequest("POST", "/token",
 				http.MaxBytesReader(rr, io.NopCloser(strings.NewReader(form)), int64(len(form)-1)))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Id: 1}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1}))
 			require.Error(t, req.ParseForm(), "the limiter's parse fails")
 
 			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -2054,7 +2052,7 @@ func TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte(t *testing.T) {
 	r := requestWithAdoptedRequestId(t, "caller\U0001F4A3id\"x\\yаб")
 	rec := httptest.NewRecorder()
 
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}), rec, r, errors.New("malformed form body"))
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), rec, r, errors.New("malformed form body"))
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -2086,10 +2084,10 @@ func TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter(t *testing.T) 
 	err := errors.New("something the token endpoint did not expect")
 
 	fromSharedWriter := httptest.NewRecorder()
-	handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}).JsonError(fromSharedWriter, r, err)
+	handlerhelpers.NewHttpHelper(nil).JsonError(fromSharedWriter, r, err)
 
 	fromBoundary := httptest.NewRecorder()
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}), fromBoundary, r, err)
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), fromBoundary, r, err)
 
 	assert.Equal(t, fromSharedWriter.Body.String(), fromBoundary.Body.String(),
 		"the boundary's generic answer must be byte-identical to the shared writer's; "+
@@ -2117,7 +2115,7 @@ func TestJsonErrorConformed_CarriesTheBasicChallengeThrough(t *testing.T) {
 		"Client authentication failed. Please review your client_secret.",
 		http.StatusUnauthorized, "Basic")
 
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}), rec, r,
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), rec, r,
 		errs.Wrap(refusal, "unable to validate the token request"))
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
@@ -2143,7 +2141,7 @@ func theseSettings(want *models.Settings) interface{} {
 }
 
 func withSettings(req *http.Request, settings *models.Settings) *http.Request {
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+	return req.WithContext(reqctx.WithSettings(req.Context(), settings))
 }
 
 // authCodeClient is the client an authorization code flow refresh fixture implies: the flow that

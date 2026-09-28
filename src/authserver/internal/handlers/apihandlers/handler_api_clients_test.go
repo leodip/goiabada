@@ -13,11 +13,11 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -885,7 +885,7 @@ func redirectURIsBody(t *testing.T, wanted, expected []string) string {
 func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/redirect-uris", strings.NewReader(body))
-	r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeySettings, &models.Settings{}))
+	r = r.WithContext(reqctx.WithSettings(r.Context(), &models.Settings{}))
 	return setChiURLParam(r, "id", id)
 }
 

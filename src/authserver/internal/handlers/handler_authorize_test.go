@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -89,7 +88,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// Add settings to context
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -178,7 +177,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// Add settings to context
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -362,7 +361,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -468,7 +467,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// Add settings to context
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -527,7 +526,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// Add settings to context
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -595,7 +594,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -661,7 +660,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -723,7 +722,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -780,7 +779,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// Add settings to context
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -888,7 +887,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// Add settings to context
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -978,7 +977,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -1053,7 +1052,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -1120,7 +1119,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 
 		settings := &models.Settings{PKCERequired: true}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -1197,7 +1196,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		settings := &models.Settings{PKCERequired: true}
-		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
+		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2229,7 +2228,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			ImplicitFlowEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2303,7 +2302,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			ImplicitFlowEnabled: true,
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2373,7 +2372,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			ImplicitFlowEnabled: false, // Disabled globally
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2436,7 +2435,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			ImplicitFlowEnabled: false, // Disabled globally
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2554,7 +2553,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2617,7 +2616,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://correct-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2689,7 +2688,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2762,7 +2761,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -2831,7 +2830,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-123")
 		req = req.WithContext(ctx)
 
@@ -2923,7 +2922,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-123")
 		req = req.WithContext(ctx)
 
@@ -3017,7 +3016,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-456")
 		req = req.WithContext(ctx)
 
@@ -3111,7 +3110,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-789")
 		req = req.WithContext(ctx)
 
@@ -3233,7 +3232,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-789")
 		req = req.WithContext(ctx)
 
@@ -3343,7 +3342,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
@@ -3445,7 +3444,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
@@ -3545,7 +3544,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
@@ -3637,7 +3636,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			Issuer:       "https://test-issuer.com",
 		}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		ctx = reqctx.WithSessionIdentifier(ctx, "session-999")
 		req = req.WithContext(ctx)
 
@@ -3723,7 +3722,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3773,7 +3772,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -3822,7 +3821,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		settings := &models.Settings{PKCERequired: true}
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -4012,8 +4011,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			}
 
 			req := httptest.NewRequest("GET", target, nil)
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-				&models.Settings{}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 			rr := httptest.NewRecorder()
 
 			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
@@ -4131,8 +4129,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			}
 
 			req := httptest.NewRequest("GET", target, nil)
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-				&models.Settings{}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 			rr := httptest.NewRecorder()
 
 			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
@@ -4212,8 +4209,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	req := httptest.NewRequest("GET",
 		"/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb"+
 			"&response_type=code&scope="+url.QueryEscape("openid 💣"), nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 	rr := httptest.NewRecorder()
 
 	// The first save carries no parked error; the second is the deferral.
@@ -4326,8 +4322,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
 			req := httptest.NewRequest("GET", target, nil)
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-				&models.Settings{}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 			rr := httptest.NewRecorder()
 
 			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)

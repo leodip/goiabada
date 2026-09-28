@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -22,6 +20,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -236,8 +235,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setChiURLParam(req, "id", "42")
-	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{PasswordPolicy: models.PasswordPolicyLow})
+	ctx := reqctx.WithSettings(req.Context(), &models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": adminSubject, "auth_time": float64(1)})
 
@@ -343,8 +341,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{AppName: "TestApp", SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPFromName: "Acme"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp", SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPFromName: "Acme"}))
 
 	// The handler mutates this model in place before writing it, so it is what the
 	// assertions below read.
@@ -427,8 +424,7 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{AppName: "TestApp"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp"}))
 
 	// The pre-check passes: at this instant nobody holds the address.
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "taken@example.com").Return(nil, nil)
@@ -482,8 +478,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{AppName: "TestApp"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp"}))
 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "fresh@example.com").Return(nil, nil)
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(nil,
@@ -609,9 +604,8 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-				&models.Settings{AppName: "TestApp", SMTPEnabled: tc.smtpEnabled,
-					PasswordPolicy: models.PasswordPolicyLow}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp", SMTPEnabled: tc.smtpEnabled,
+				PasswordPolicy: models.PasswordPolicyLow}))
 
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
 

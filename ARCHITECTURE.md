@@ -201,9 +201,10 @@ Notes on rows that are not self-evident:
   `both-apps` on its own account and cannot leave core — moving them out beside it would spell
   eight scope strings twice with nothing holding the two spellings equal.
 - There is no `ContextKeySettings` row because the two processes share nothing but its spelling.
-  Each declares its own, and each asserts a different type out of it — `*models.Settings` in the
-  auth server against `*api.PublicSettingsResponse` in the admin console — so either assertion
-  panics on the other's value. It satisfied the letter of `both-apps`, and that row would have been
+  Each declares its own, the auth server's now an unexported key in `internal/reqctx` (#433), and
+  each asserts a different type out of it — `*models.Settings` in the auth server against
+  `*api.PublicSettingsResponse` in the admin console — so either assertion panics on the other's
+  value. It satisfied the letter of `both-apps`, and that row would have been
   true and misleading (#351).
 - No row reads `kernel` any more, and that is #385's doing rather than an omission. Every symbol
   that carried the word did so on the strength of one core package: `core/handlerhelpers`, which
@@ -221,7 +222,8 @@ Notes on rows that are not self-evident:
   them — the OAuth client, the JWT session middleware and the console's renderer to
   `adminconsole/internal`, the bearer middleware and the auth server's renderer to
   `authserver/internal` — and every key went with its one writer, to that module's own
-  `internal/constants`.
+  `internal/constants`. The auth server's have since moved on to `internal/reqctx`, as unexported
+  keys behind typed accessors (#433).
 - `ManageAccountPermissionIdentifier` dropped from `kernel` to `both-apps` in the same commit, for
   the same reason and with no change in the tree beyond it: `core/middleware/middleware_jwt.go`
   was its one core referrer, through `buildScopeString`. Both applications still name it, so it

@@ -48,7 +48,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	userCreator := usercreation.NewUserCreator(s.database)
 	emailSender := emaildelivery.NewSender()
 
-	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, middleware.SettingsReader{})
+	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName)
 
 	middlewareBearerToken := middleware.NewMiddlewareBearerToken(tokenParser)

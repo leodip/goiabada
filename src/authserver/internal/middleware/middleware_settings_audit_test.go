@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ func TestAuditSwitches_AnswersFromTheRequestsSettings(t *testing.T) {
 
 	for _, want := range combinations {
 		mockDB := mocks_data.NewDatabase(t)
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+		ctx := reqctx.WithSettings(context.Background(), &models.Settings{
 			AuditLogsInConsoleEnabled:  want.Console,
 			AuditLogsInDatabaseEnabled: want.Database,
 		})
@@ -44,23 +44,16 @@ func TestAuditSwitches_AnswersFromTheRequestsSettings(t *testing.T) {
 }
 
 // Nothing usable on the context means the row is read, which is every root registration, the rate
-// limiter's tiers and the background workers. The typed nil is the shape worth its own case: the
-// assertion succeeds on a (*models.Settings)(nil), so a guard reading only its second result would
-// dereference it and panic in the audit path of every event.
+// limiter's tiers and the background workers. The typed nil is the shape worth its own case: it is
+// the one wrong value reqctx.WithSettings can store, and reading it as settings would dereference
+// it and panic in the audit path of every event.
 func TestAuditSwitches_ReadsTheRowWhenTheContextHasNoSettings(t *testing.T) {
 	contexts := []struct {
 		name string
 		ctx  context.Context
 	}{
 		{name: "nothing on the context", ctx: context.Background()},
-		{
-			name: "a typed nil on the context",
-			ctx:  context.WithValue(context.Background(), constants.ContextKeySettings, (*models.Settings)(nil)),
-		},
-		{
-			name: "a value of another type on the context",
-			ctx:  context.WithValue(context.Background(), constants.ContextKeySettings, "not a settings row"),
-		},
+		{name: "a typed nil on the context", ctx: reqctx.WithSettings(context.Background(), nil)},
 	}
 
 	for _, tc := range contexts {

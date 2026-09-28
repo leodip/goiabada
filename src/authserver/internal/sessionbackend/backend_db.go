@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -198,8 +199,8 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 // that has no request behind it. Both halves read the same settings, so which one runs
 // changes no outcome, only whether a read happens.
 func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime time.Duration, err error) {
-	settings, ok := ctx.Value(constants.ContextKeySettings).(*models.Settings)
-	if !ok || settings == nil {
+	settings, ok := reqctx.SettingsFrom(ctx)
+	if !ok {
 		settings, err = b.database.GetSettingsById(ctx, nil, 1)
 		if err != nil {
 			return 0, 0, errs.Wrap(err, "unable to read the settings")

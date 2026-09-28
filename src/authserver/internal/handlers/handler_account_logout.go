@@ -279,8 +279,12 @@ func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClass
 // signed for one user tear down another user's session, silently, because the confirmed branch is the
 // one that skips the consent page. That is the ownership gate at the bottom, and it is the reason the
 // session is now looked up whether or not the hint has expired (#133).
+//
+// issuer is this OP's own, which doLogout reads from the settings and passes down, so this helper
+// has no failure of its own to answer when the settings are missing (#433).
 func classifyIdTokenHint(
 	r *http.Request,
+	issuer string,
 	httpHelper HttpHelper,
 	database accountLogoutDatabase,
 	tokenParser TokenParser,
@@ -346,13 +350,12 @@ func classifyIdTokenHint(
 		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "iat is missing or is not an integral number")
 	}
 
-	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-	issuer := idToken.GetStringClaim("iss")
-	if len(issuer) == 0 {
+	hintIssuer := idToken.GetStringClaim("iss")
+	if len(hintIssuer) == 0 {
 		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is missing")
 	}
-	if issuer != settings.Issuer {
-		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is not this server", "iss", issuer)
+	if hintIssuer != issuer {
+		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is not this server", "iss", hintIssuer)
 	}
 
 	// GetStringClaim yields "" for an aud that arrived as an array, which is right for a hint: an ID
@@ -614,8 +617,14 @@ func doLogout(
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 ) {
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+		return
+	}
+
 	// 1. Classify.
-	hint, err := classifyIdTokenHint(r, httpHelper, database, tokenParser)
+	hint, err := classifyIdTokenHint(r, settings.Issuer, httpHelper, database, tokenParser)
 	if err != nil {
 		// Classification propagates a failure instead of rejecting for one narrow reason: a database
 		// fault in either of the two lookups that decide whether the hint's session may be trusted,
