@@ -80,6 +80,10 @@
 #     this script's comments keep returning to. Refused with --race, which it
 #     does not cover.
 #   * Rate limiter is disabled via GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false.
+#   * Every data and integration run starts from an empty database: the SQLite
+#     files are removed, and goiabada_data / goiabada_integration are dropped on
+#     mysql, postgres and mssql by cmd/droptestdb, so the server or the data tier
+#     recreates and migrates them, and the integration server seeds its own.
 #   * Per-phase output is also written to $LOG_DIR (printed at startup). On
 #     failure the log path plus a FAIL/panic summary is printed at the bottom
 #     so you don't have to scroll up through thousands of PASS lines.
@@ -494,6 +498,22 @@ configure_database() {
     export GOIABADA_AES_ENCRYPTION_KEY="${GOIABADA_AES_ENCRYPTION_KEY:-00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff}"
 }
 
+# Drop the database configure_database just named, on the three engines with a server, so the
+# tier about to run recreates it and starts from nothing, as CI does on fresh service containers
+# and as SQLite does once remove_sqlite_files has run. Before this the two names were created once
+# and reused by every local run, and whatever a run left behind was the next run's starting state.
+# cmd/droptestdb drops goiabada_data and goiabada_integration and refuses every other name (#433).
+drop_test_database() {
+    case "$GOIABADA_DB_TYPE" in
+        mysql|postgres|mssql)
+            if ! go run ./cmd/droptestdb; then
+                echo "Unable to drop $GOIABADA_DB_NAME on $GOIABADA_DB_TYPE, so the run would not start from an empty database" >&2
+                exit 1
+            fi
+            ;;
+    esac
+}
+
 # ---- module test runs (no DB matrix) ----------------------------------------
 # -count=1 defeats Go's test result cache, matching what run_tests already does
 # for the data and integration tiers. It is not optional here: emaildelivery's
@@ -744,6 +764,7 @@ if should_run_data; then
     for db in "${databases[@]}"; do
         echo "=== Running data tests with $db ==="
         configure_database "$db" true
+        drop_test_database
         run_tests "data"
         echo "=== Completed data tests with $db ==="
         echo
@@ -754,6 +775,7 @@ if should_run_integration; then
     for db in "${databases[@]}"; do
         echo "=== Running integration tests with $db ==="
         configure_database "$db" false
+        drop_test_database
         start_server_and_wait
         run_tests "integration"
         stop_server

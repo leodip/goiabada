@@ -369,6 +369,13 @@ before its first change; each registers a `t.Cleanup` that writes the whole row 
 run with the row at its start and fails the tier naming each changed field, so a test that forgets
 fails the run instead of the tests after it (#433).
 
+**Fresh test databases**: every data and integration run starts from an empty database, as CI's
+fresh service containers always did. `run-tests.sh` removes the SQLite files, and on mysql,
+postgres and mssql it drops `goiabada_data` or `goiabada_integration` through `cmd/droptestdb`,
+which refuses every other name, so the server or the data tier recreates and migrates it and the
+integration server seeds it. The drop itself is each engine package's `DropDatabase`, the one
+spelling `schemadump` and the data tier's fixtures use too (#433).
+
 **Transaction stub**: a unit test that needs the mock database to answer `RunInTransaction`
 uses `mocks_data.ExpectRunInTransaction`, hand-written beside the generated mock in
 `authserver/internal/data/mocks` and reachable from every caller without a new import, with
