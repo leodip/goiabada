@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/hex"
+	"errors"
 	"flag"
 	"io"
 	"os"
@@ -96,22 +97,36 @@ func TestGetEnv(t *testing.T) {
 func TestGetEnvAsInt(t *testing.T) {
 	const key = "GOIABADA_TEST_PORT"
 
-	// Anything strconv.Atoi refuses falls back to the default rather than to zero, so a
-	// mistyped port leaves the server on the port it was shipped with instead of on port 0.
+	// Unset or empty after the trim is the default, and records nothing: every shipped compose
+	// file writes the https port empty to mean no https listener. Anything else strconv.Atoi
+	// refuses is recorded as malformed.
+	//
+	// Keep the refusal rows: they reverse the earlier position, that a mistyped port falls back to
+	// the port the server shipped with, on purpose. That fallback started a deployment on a port
+	// its operator never chose and said nothing (#434).
 	tests := []struct {
-		name  string
-		set   bool
-		value string
-		want  int
+		name    string
+		set     bool
+		value   string
+		want    int
+		refusal string // the one recorded problem, or "" for none
 	}{
 		{name: "unset returns the default", set: false, want: 9444},
+		{name: "empty returns the default", set: true, value: "", want: 9444},
+		{name: "whitespace only returns the default", set: true, value: "   ", want: 9444},
 		{name: "a number", set: true, value: "8444", want: 8444},
 		{name: "a negative number", set: true, value: "-1", want: -1},
 		{name: "whitespace is trimmed", set: true, value: "  8444  ", want: 8444},
-		{name: "empty falls back", set: true, value: "", want: 9444},
-		{name: "non-numeric falls back", set: true, value: "https", want: 9444},
-		{name: "a decimal falls back", set: true, value: "8444.0", want: 9444},
-		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: 9444},
+		{name: "non-numeric is refused", set: true, value: "https", want: 9444,
+			refusal: key + ` is "https", not an integer`},
+		{name: "a decimal is refused", set: true, value: "8444.0", want: 9444,
+			refusal: key + ` is "8444.0", not an integer`},
+		{name: "a hexadecimal number is refused", set: true, value: "0x10", want: 9444,
+			refusal: key + ` is "0x10", not an integer`},
+		{name: "an overflowing number is refused", set: true, value: "99999999999999999999", want: 9444,
+			refusal: key + ` is "99999999999999999999", not an integer`},
+		{name: "the refusal quotes the trimmed value", set: true, value: " 80 80 ", want: 9444,
+			refusal: key + ` is "80 80", not an integer`},
 	}
 
 	for _, tt := range tests {
@@ -122,37 +137,62 @@ func TestGetEnvAsInt(t *testing.T) {
 					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
 				}
 			}
-			if got := getEnvAsInt(key, 9444); got != tt.want {
+			var malformed malformedValues
+			if got := getEnvAsInt(key, 9444, &malformed); got != tt.want {
 				t.Errorf("getEnvAsInt(%s=%q, 9444) = %d, want %d", key, tt.value, got, tt.want)
 			}
+			assertRecorded(t, malformed, tt.refusal)
 		})
+	}
+}
+
+// assertRecorded holds a helper call to having recorded exactly the one problem want, or none
+// when want is empty.
+func assertRecorded(t *testing.T, malformed malformedValues, want string) {
+	t.Helper()
+	if want == "" {
+		if len(malformed) != 0 {
+			t.Errorf("recorded %q, want nothing", malformed)
+		}
+		return
+	}
+	if len(malformed) != 1 || malformed[0] != want {
+		t.Errorf("recorded %q, want exactly [%q]", malformed, want)
 	}
 }
 
 func TestGetEnvAsBool(t *testing.T) {
 	const key = "GOIABADA_TEST_TRUST_PROXY_HEADERS"
 
-	// getEnvAsBool can only ever express default-false: anything unparseable is false, which
-	// is the safe answer for every setting that reaches it (each one turns something on).
-	// Nothing this process loads has a default of true, which is why getEnvAsBoolDefault
-	// (#293) stayed with the auth server, whose GOIABADA_DB_CREATE is the one such setting.
+	// getEnvAsBool's default is false: nothing this process loads has a default of true, which
+	// is why getEnvAsBoolDefault (#293) stayed with the auth server, whose GOIABADA_DB_CREATE is
+	// the one such setting. Unset or empty is that default; anything strconv.ParseBool refuses is
+	// recorded as malformed.
+	//
+	// Keep the refusal rows: they reverse the earlier position, that anything unparseable is
+	// false, on purpose. yes reads as an affirmative and is not one, so an operator writing it got
+	// the setting off and nothing said so (#434).
 	tests := []struct {
-		name  string
-		set   bool
-		value string
-		want  bool
+		name    string
+		set     bool
+		value   string
+		want    bool
+		refusal string // the one recorded problem, or "" for none
 	}{
 		{name: "unset is false", set: false, want: false},
+		{name: "empty is false", set: true, value: "", want: false},
+		{name: "whitespace only is false", set: true, value: "  ", want: false},
 		{name: `"true"`, set: true, value: "true", want: true},
 		{name: `"1"`, set: true, value: "1", want: true},
 		{name: `"T"`, set: true, value: "T", want: true},
 		{name: `"false"`, set: true, value: "false", want: false},
 		{name: "whitespace is trimmed", set: true, value: " true ", want: true},
-		{name: "empty is false", set: true, value: "", want: false},
-		// It reads as an affirmative and is not one, which is the case worth pinning: an
-		// operator writing yes gets the setting off.
-		{name: `"yes" is not parseable, so false`, set: true, value: "yes", want: false},
-		{name: `"maybe" is not parseable, so false`, set: true, value: "maybe", want: false},
+		{name: `"yes" is refused`, set: true, value: "yes", want: false,
+			refusal: key + ` is "yes", not a boolean (true or false)`},
+		{name: `"on" is refused`, set: true, value: "on", want: false,
+			refusal: key + ` is "on", not a boolean (true or false)`},
+		{name: `"maybe" is refused`, set: true, value: "maybe", want: false,
+			refusal: key + ` is "maybe", not a boolean (true or false)`},
 	}
 
 	for _, tt := range tests {
@@ -163,10 +203,46 @@ func TestGetEnvAsBool(t *testing.T) {
 					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
 				}
 			}
-			if got := getEnvAsBool(key); got != tt.want {
+			var malformed malformedValues
+			if got := getEnvAsBool(key, &malformed); got != tt.want {
 				t.Errorf("getEnvAsBool(%s=%q) = %v, want %v", key, tt.value, got, tt.want)
 			}
+			assertRecorded(t, malformed, tt.refusal)
 		})
+	}
+}
+
+func TestMalformedValues_Err(t *testing.T) {
+	var none malformedValues
+	if err := none.err(); err != nil {
+		t.Errorf("err() with nothing recorded = %v, want nil", err)
+	}
+
+	two := malformedValues{`A is "x", not an integer`, `B is "y", not a boolean (true or false)`}
+	want := `malformed configuration: A is "x", not an integer; B is "y", not a boolean (true or false)`
+	if err := two.err(); err == nil || err.Error() != want {
+		t.Errorf("err() = %v, want %q", err, want)
+	}
+}
+
+// TestInit_ReturnsTheLoadErrorOnEveryCall is the one Init call in this package, because the once
+// it holds cannot be reset: the first call refuses a malformed port, and the second refuses again
+// with the variable fixed, which is what shows the once kept the error rather than the load
+// running again or the error being dropped after the first answer (#434).
+func TestInit_ReturnsTheLoadErrorOnEveryCall(t *testing.T) {
+	const key = "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP"
+	saved := cfg
+	t.Cleanup(func() { cfg = saved })
+
+	t.Setenv(key, "https")
+	first := Init()
+	if first == nil || !strings.Contains(first.Error(), key+` is "https", not an integer`) {
+		t.Fatalf("Init() = %v, want the refusal naming %s", first, key)
+	}
+
+	t.Setenv(key, "9091")
+	if second := Init(); !errors.Is(second, first) {
+		t.Errorf("the second Init() = %v, want the first call's error %v", second, first)
 	}
 }
 
@@ -558,7 +634,9 @@ func TestLoadFrom_TrustedProxies(t *testing.T) {
 
 			fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 			fs.SetOutput(io.Discard)
-			loadFrom(fs, nil)
+			if err := loadFrom(fs, nil); err != nil {
+				t.Fatalf("loadFrom() = %v, want no error", err)
+			}
 
 			ranges, err := cfg.AdminConsole.TrustedProxyRanges()
 			if tt.wantErr != nil {
@@ -615,7 +693,9 @@ func loadLogSettings(t *testing.T, env map[string]string, args []string) logSett
 
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	loadFrom(fs, args)
+	if err := loadFrom(fs, args); err != nil {
+		t.Fatalf("loadFrom() = %v, want no error", err)
+	}
 
 	return logSettings{
 		adminLevel:  cfg.AdminConsole.LogLevel,

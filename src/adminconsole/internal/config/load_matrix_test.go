@@ -193,7 +193,21 @@ var nonLiveEnvVars = []string{
 // loadMatrix drives loadFrom with its own flag set and returns it, so a case can assert on
 // what was registered as well as on what was landed. Every name in the roster is cleared
 // first, so a developer's own environment cannot decide what a default case observes.
+//
+// A load error fails the case, so every row of the matrix also shows that the values it sets
+// load without a refusal (#434).
 func loadMatrix(t *testing.T, env map[string]string, args []string) *flag.FlagSet {
+	t.Helper()
+
+	fs, err := loadMatrixRefusing(t, env, args)
+	if err != nil {
+		t.Fatalf("loadFrom() = %v, want no error", err)
+	}
+	return fs
+}
+
+// loadMatrixRefusing is loadMatrix answering the load's error rather than failing on it.
+func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*flag.FlagSet, error) {
 	t.Helper()
 
 	for _, v := range configVariables {
@@ -211,9 +225,54 @@ func loadMatrix(t *testing.T, env map[string]string, args []string) *flag.FlagSe
 
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	loadFrom(fs, args)
+	return fs, loadFrom(fs, args)
+}
 
-	return fs
+// TestLoadFrom_RefusesAMalformedVariable is decision 7 of #434 over the four numeric and boolean
+// variables this binary loads, each through loadFrom rather than the helper alone, so a row
+// fails if loadFrom reads the variable any other way. Each case also gives a valid flag for the
+// same setting, which must not rescue the variable: the value the operator wrote is wrong
+// whichever of the two wins.
+func TestLoadFrom_RefusesAMalformedVariable(t *testing.T) {
+	tests := []struct {
+		env, value, flag, want string
+	}{
+		{"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", "9444a", "-adminconsole-listen-port-https=9444",
+			`GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS is "9444a", not an integer`},
+		{"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", "http", "-adminconsole-listen-port-http=9091",
+			`GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP is "http", not an integer`},
+		{"GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS", "yes", "-adminconsole-trust-proxy-headers=true",
+			`GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS is "yes", not a boolean (true or false)`},
+		{"GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", "on", "-adminconsole-log-http-requests=true",
+			`GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS is "on", not a boolean (true or false)`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.env, func(t *testing.T) {
+			_, err := loadMatrixRefusing(t, map[string]string{tt.env: tt.value}, []string{tt.flag})
+
+			want := "malformed configuration: " + tt.want
+			if err == nil || err.Error() != want {
+				t.Errorf("loadFrom() with %s=%q and %s = %v, want %q", tt.env, tt.value, tt.flag, err, want)
+			}
+		})
+	}
+}
+
+// TestLoadFrom_NamesEveryMalformedVariableInOneError is the row that pins "all at once". Keep it:
+// a loadFrom stopping at the first malformed variable passes every other case, and costs the
+// operator one restart per typo. The error is one line, because main writes it to stderr as the
+// one line an operator reads (#434).
+func TestLoadFrom_NamesEveryMalformedVariableInOneError(t *testing.T) {
+	_, err := loadMatrixRefusing(t, map[string]string{
+		"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP":    "90 91",
+		"GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS": "yes",
+	}, nil)
+
+	want := `malformed configuration: GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP is "90 91", not an integer; ` +
+		`GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS is "yes", not a boolean (true or false)`
+	if err == nil || err.Error() != want {
+		t.Errorf("loadFrom() = %v, want %q", err, want)
+	}
 }
 
 func TestLoadFrom_Defaults(t *testing.T) {

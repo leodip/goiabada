@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -8,7 +9,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	config.Init()
+	if err := config.Init(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	code := m.Run()
 	os.Exit(code)
 }
