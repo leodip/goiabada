@@ -47,6 +47,7 @@ func HandleForgotPasswordPost(
 	httpHelper HttpHelper,
 	database forgotPasswordDatabase,
 	emailSender EmailSender,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +78,7 @@ func HandleForgotPasswordPost(
 		if user != nil {
 
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
-			verificationCodeEncrypted, resetEmailErr := encryption.EncryptData(verificationCode)
+			verificationCodeEncrypted, resetEmailErr := dataCipher.Encrypt(verificationCode)
 			if resetEmailErr != nil {
 				httpHelper.InternalServerError(w, r, resetEmailErr)
 				return

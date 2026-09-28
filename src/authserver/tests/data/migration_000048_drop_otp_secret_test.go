@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +70,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		dbType())
 
 	const seed = "JBSWY3DPEHPK3PXP"
-	encrypted, err := encryption.EncryptData(seed)
+	encrypted, err := dataCipher.Encrypt(seed)
 	require.NoError(t, err, "the process cipher is initialized in TestMain")
 
 	user := &models.User{
@@ -108,7 +107,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	require.NotNilf(t, got, "users.id=%d is gone; this migration deletes no rows", user.Id)
 	assert.Truef(t, got.OTPEnabled, "the drop must not disturb otp_enabled on %s", dbType())
 
-	decrypted, err := encryption.DecryptData(got.OTPSecretEncrypted)
+	decrypted, err := dataCipher.Decrypt(got.OTPSecretEncrypted)
 	require.NoErrorf(t, err, "the encrypted seed must still decrypt after the drop on %s", dbType())
 	assert.Equalf(t, seed, decrypted,
 		"the seed has to survive the drop: a user whose authenticator stops working is what dropping the wrong column looks like on %s",
@@ -137,7 +136,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	rolledBack, err := h.DB.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.NotNil(t, rolledBack)
-	stillDecrypts, err := encryption.DecryptData(rolledBack.OTPSecretEncrypted)
+	stillDecrypts, err := dataCipher.Decrypt(rolledBack.OTPSecretEncrypted)
 	require.NoErrorf(t, err, "the encrypted seed is untouched by the roll back on %s", dbType())
 	assert.Equal(t, seed, stillDecrypts,
 		"a down migration that restores a shape must not disturb the column that actually carries the seed")

@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -197,6 +198,7 @@ func HandleAuthOtpPost(
 	database authOTPDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -335,7 +337,7 @@ func HandleAuthOtpPost(
 		// the entry point rather than from here (#111 decision 10, #387).
 		var verified otpcredential.VerifyResult
 		if user.OTPEnabled {
-			verified, err = otpcredential.VerifyStored(r.Context(), database, user, otpCode, time.Now().UTC())
+			verified, err = otpcredential.VerifyStored(r.Context(), database, dataCipher, user, otpCode, time.Now().UTC())
 		} else {
 			verified, err = otpcredential.VerifySupplied(r.Context(), database, user, secretKey, otpCode,
 				time.Now().UTC())
@@ -378,7 +380,7 @@ func HandleAuthOtpPost(
 			// is enrolling to TOTP now. The seed is encrypted at rest, the user written and the
 			// OTP configuration generation's advance committed together, so there is no state in
 			// which the authenticator is on and no session knows (#242 decision 2).
-			enrolledGeneration, establishErr := otpcredential.Establish(r.Context(), database, user, secretKey)
+			enrolledGeneration, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, secretKey)
 			if establishErr != nil {
 				httpHelper.InternalServerError(w, r, establishErr)
 				return

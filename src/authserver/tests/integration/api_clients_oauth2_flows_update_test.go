@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -65,7 +64,7 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 
 	// Create confidential client with a valid secret
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	enc, err := encryption.EncryptData(clientSecret)
+	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "flows-conf-" + strings.ToLower(fake.LetterN(8)),
@@ -234,7 +233,7 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
 
 	// Confidential client (has secret), start with auth code enabled
 	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	enc, err := encryption.EncryptData(clientSecret)
+	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{
 		ClientIdentifier:         "flows-bothoff-" + strings.ToLower(fake.LetterN(8)),

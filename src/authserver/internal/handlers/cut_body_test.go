@@ -47,7 +47,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
-		HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger).ServeHTTP(rr, req)
+		HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 		return rr
 	}
 

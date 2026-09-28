@@ -97,7 +97,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
@@ -124,7 +124,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(false, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	body := decodeErrorBody(t, rr)
@@ -155,7 +155,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
 
-	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	logged := capture.Text()
 
@@ -192,7 +192,7 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 		Return([]models.KeyPair(nil), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", decodeErrorBody(t, rr).ErrorCode)

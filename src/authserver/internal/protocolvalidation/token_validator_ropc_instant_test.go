@@ -9,7 +9,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -50,7 +49,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 			t.Run(tc.name, func(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mocks_protocolvalidation.NewPermissionChecker(t))
+				validator := NewTokenValidator(mockDB, mockTokenParser, mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
 				client := &models.Client{
 					Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
@@ -106,9 +105,9 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 	t.Run("an authorization-code token needs none, its instant being on its code", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mocks_protocolvalidation.NewPermissionChecker(t))
+		validator := NewTokenValidator(mockDB, mockTokenParser, mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 		client := &models.Client{
 			Id: 1, ClientIdentifier: "test_client", Enabled: true,

@@ -60,7 +60,7 @@ func TestSeederLowercasesAdminEmail(t *testing.T) {
 	const givenEmail = "Admin@Example.com"
 	const wantEmail = "admin@example.com"
 
-	outcome, err := bootstrap.Run(context.Background(), h.DB, seedConfig(givenEmail))
+	outcome, err := bootstrap.Run(context.Background(), h.DB, dataCipher, seedConfig(givenEmail))
 	require.NoError(t, err, "seed a fresh deployment with a mixed-case admin address")
 	require.Equal(t, bootstrap.Continue, outcome)
 
@@ -82,7 +82,7 @@ func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 
-	outcome, err := bootstrap.Run(ctx, h.DB, seedConfig("admin@example.com"))
+	outcome, err := bootstrap.Run(ctx, h.DB, dataCipher, seedConfig("admin@example.com"))
 	require.NoError(t, err)
 	require.Equal(t, bootstrap.Continue, outcome)
 
@@ -170,7 +170,7 @@ func TestSeed_AFailedFirstSeedLeavesNothingAndTheNextSeeds(t *testing.T) {
 			faults := tc.fault
 			faults.Database = h.DB
 
-			outcome, err := bootstrap.Run(ctx, &faults, seedConfig("admin@example.com"))
+			outcome, err := bootstrap.Run(ctx, &faults, dataCipher, seedConfig("admin@example.com"))
 
 			require.Error(t, err)
 			assert.Equal(t, bootstrap.Refused, outcome)
@@ -179,7 +179,7 @@ func TestSeed_AFailedFirstSeedLeavesNothingAndTheNextSeeds(t *testing.T) {
 			assert.True(t, isEmpty, "the failed seed left the database empty")
 			assert.Equal(t, before, seededRowCounts(t, h), "and every one of its writes was rolled back")
 
-			outcome, err = bootstrap.Run(ctx, h.DB, seedConfig("admin@example.com"))
+			outcome, err = bootstrap.Run(ctx, h.DB, dataCipher, seedConfig("admin@example.com"))
 
 			require.NoError(t, err, "the next start seeds")
 			assert.Equal(t, bootstrap.Continue, outcome)

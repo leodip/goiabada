@@ -173,7 +173,7 @@ func issueROPCRefreshToken(t *testing.T, f ropcAuthTimeFixture, instant sql.Null
 
 	keyPair, err := database.GetCurrentSigningKey(context.Background(), nil)
 	require.NoError(t, err)
-	privateKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privateKey, err := signingkeys.ParsePrivateKey(dataCipher, keyPair)
 	require.NoError(t, err)
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"iss":                         settings.Issuer,

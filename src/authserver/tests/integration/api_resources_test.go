@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -159,7 +158,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	// Create a confidential client eligible for client_credentials
 	clientSecret := "test-secret-non-admin-1234567890"
 
-	encSecret, err := encryption.EncryptData(clientSecret)
+	encSecret, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

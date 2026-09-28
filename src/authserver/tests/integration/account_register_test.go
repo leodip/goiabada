@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -242,7 +241,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 
 	// The hash is what the link resolves to, and it must be the hash of the code that was
 	// issued or the registration is unactivatable.
-	verificationCode, err := encryption.DecryptData(preReg.VerificationCodeEncrypted)
+	verificationCode, err := dataCipher.Decrypt(preReg.VerificationCodeEncrypted)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, verificationCode)
 	expectedHash := hashutil.HashString(verificationCode)

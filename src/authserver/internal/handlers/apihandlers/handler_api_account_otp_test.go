@@ -13,7 +13,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -61,7 +60,7 @@ const otpTestKeyURL = "otpauth://totp/Goiabada:otp@example.com?algorithm=SHA1&di
 // otpEnrollmentLifetime.
 func pendingEnrollment(t *testing.T, keyURL string, issuedAt time.Time) ([]byte, sql.NullTime) {
 	t.Helper()
-	ciphertext, err := encryption.EncryptData(keyURL)
+	ciphertext, err := testDataCipher.Encrypt(keyURL)
 	require.NoError(t, err)
 	return ciphertext, sql.NullTime{Time: issuedAt, Valid: true}
 }
@@ -153,7 +152,7 @@ func TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -187,7 +186,7 @@ func TestHandleAPIAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 		Return(false, errors.New("the database is unwell")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -214,7 +213,7 @@ func TestHandleAPIAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, wrongButWellFormedCode(t)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -262,7 +261,7 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 	auditLogger.On("Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -303,7 +302,7 @@ func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 		Return(int64(0), errors.New("the database is unwell")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -375,7 +374,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 	auditLogger.On("Log", mock.Anything, audit.AuditDisabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -406,7 +405,7 @@ func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 		Return(errors.New("the database is unwell")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -448,7 +447,7 @@ func wrongCodeDescription(t *testing.T) string {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, wrongButWellFormedCode(t)))
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	return descriptionOf(t, rr)
@@ -516,7 +515,7 @@ func TestHandleAPIAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *test
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+	HandleAPIAccountOTPEnrollmentGet(database, generator, testDataCipher).ServeHTTP(rr, enrollmentGetRequest(subject))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	resp := decodeEnrollment(t, rr)
@@ -559,7 +558,7 @@ func TestHandleAPIAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T)
 		Return(true, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+	HandleAPIAccountOTPEnrollmentGet(database, generator, testDataCipher).ServeHTTP(rr, enrollmentGetRequest(subject))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	freshSecret, err := otp.SecretFromKeyURL(freshKeyURL)
@@ -595,7 +594,7 @@ func TestHandleAPIAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *te
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), loser.Id).Return(winner, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+	HandleAPIAccountOTPEnrollmentGet(database, generator, testDataCipher).ServeHTTP(rr, enrollmentGetRequest(subject))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	mintedSecret, err := otp.SecretFromKeyURL(mintedKeyURL)
@@ -628,7 +627,7 @@ func TestHandleAPIAccountOTPEnrollmentGet_LostRaceToACompletedEnrollment(t *test
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(enrolled, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPEnrollmentGet(database, generator).ServeHTTP(rr, enrollmentGetRequest(subject))
+	HandleAPIAccountOTPEnrollmentGet(database, generator, testDataCipher).ServeHTTP(rr, enrollmentGetRequest(subject))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "OTP_ALREADY_ENABLED", errorCodeOf(t, rr))
@@ -667,7 +666,7 @@ func TestHandleAPIAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
 			})
 
 			rr := httptest.NewRecorder()
-			HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).ServeHTTP(rr, req)
+			HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errorCodeOf(t, rr))
@@ -690,7 +689,7 @@ func TestHandleAPIAccountOTPPut_SecretKeyIsRefusedOnDisableToo(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).ServeHTTP(rr, req)
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errorCodeOf(t, rr))
@@ -738,7 +737,7 @@ func TestHandleAPIAccountOTPPut_OversizedBodyIsRefused(t *testing.T) {
 		"the body must actually exceed the cap, or this case proves nothing")
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, limiter).ServeHTTP(rr, req)
+	HandleAPIAccountOTPPut(database, auditLogger, limiter, testDataCipher).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "INVALID_REQUEST_BODY", errorCodeOf(t, rr))
@@ -792,7 +791,7 @@ func TestHandleAPIAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *t
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+			HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -836,13 +835,13 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.True(t, user.OTPEnabled)
 
-	stored, err := encryption.DecryptData(user.OTPSecretEncrypted)
+	stored, err := testDataCipher.Decrypt(user.OTPSecretEncrypted)
 	require.NoError(t, err)
 	assert.Equal(t, otpTestSecret, stored,
 		"the enrolled authenticator must be the one the server issued and recorded")
@@ -861,7 +860,7 @@ func TestHandleAPIAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
+	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, "   "))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)

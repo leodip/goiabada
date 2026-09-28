@@ -82,7 +82,7 @@ func TestHandleAPIAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, ""))
+	HandleAPIAccountLogoutRequestPost(database, testDataCipher).ServeHTTP(rr, logoutRequest(t, ""))
 
 	requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
 	assert.Equal(t, int64(7), capture.Records()[0].Attrs["client_id"])
@@ -97,7 +97,7 @@ func TestHandleAPIAccountLogoutRequestPost_AClientLookupFailureAnswers500(t *tes
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAPIAccountLogoutRequestPost(database, testDataCipher).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
 	assert.Equal(t, logoutClientIdent, capture.Records()[0].Attrs["client_identifier"])
@@ -112,7 +112,7 @@ func TestHandleAPIAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAPIAccountLogoutRequestPost(database, testDataCipher).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireRefused(t, rr, capture, http.StatusBadRequest, "VALIDATION_ERROR")
 	assertNothingAfterTheClient(t, database)
@@ -139,7 +139,7 @@ func TestHandleAPIAccountLogoutRequestPost_ASessionLookupFailureAnswers500(t *te
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAPIAccountLogoutRequestPost(database, testDataCipher).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
 	database.AssertNotCalled(t, "UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything)
@@ -154,7 +154,7 @@ func TestHandleAPIAccountLogoutRequestPost_AMissingSessionIsStill401(t *testing.
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+	HandleAPIAccountLogoutRequestPost(database, testDataCipher).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
 	requireRefused(t, rr, capture, http.StatusUnauthorized, "INVALID_SESSION")
 	database.AssertNotCalled(t, "UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything)

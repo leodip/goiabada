@@ -48,7 +48,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	t.Run("Missing required client_id", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
@@ -125,7 +125,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -160,7 +160,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -196,7 +196,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -233,7 +233,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -291,7 +291,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -332,7 +332,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -376,7 +376,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -425,7 +425,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -477,7 +477,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -533,7 +533,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -590,7 +590,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -650,7 +650,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -665,7 +665,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		clientSecret := "client_secret"
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -716,7 +716,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -776,7 +776,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -830,7 +830,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -931,7 +931,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -980,13 +980,13 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
 
 		clientSecret := "the_secret"
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -1028,7 +1028,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -1069,7 +1069,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -1122,7 +1122,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -1164,13 +1164,13 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
 
 		clientSecret := "the_secret"
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -1212,13 +1212,13 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
 
 		clientSecret := "the_secret"
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
 		client := &models.Client{
@@ -1260,7 +1260,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -1304,7 +1304,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -1345,7 +1345,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -1436,7 +1436,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1448,7 +1448,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1481,7 +1481,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1492,7 +1492,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1519,7 +1519,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1531,7 +1531,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1566,7 +1566,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1578,7 +1578,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1607,7 +1607,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1619,7 +1619,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1651,7 +1651,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1663,7 +1663,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1692,7 +1692,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1704,7 +1704,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1734,7 +1734,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1746,7 +1746,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1777,7 +1777,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		subtestCtx := context.Background()
 
@@ -1789,7 +1789,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		clientSecret := "valid_secret"
-		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "valid_client",
@@ -1842,7 +1842,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		authserverManage = models.Permission{Id: 40, PermissionIdentifier: "manage", ResourceId: 4}
 	)
 
-	ccSecretEncrypted, _ := encryption.EncryptData("valid_secret")
+	ccSecretEncrypted, _ := testDataCipher.Encrypt("valid_secret")
 
 	// Registered with .Maybe() because each case reaches only the lookups its own
 	// scope string requires, and the assertion that matters is the outcome rather
@@ -1874,7 +1874,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
-		validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
+		validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
 		client := &models.Client{
 			ClientIdentifier:         "cc_client",
@@ -2140,7 +2140,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
+			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
 			client := &models.Client{
 				ClientIdentifier:         "cc_client",
@@ -2189,7 +2189,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -2197,7 +2197,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		input := &ValidateTokenRequestInput{
@@ -2261,7 +2261,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2299,7 +2299,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2312,7 +2312,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		correctSecret := "correct_secret"
-		encryptedSecret, _ := encryption.EncryptData(correctSecret)
+		encryptedSecret, _ := testDataCipher.Encrypt(correctSecret)
 
 		client := &models.Client{
 			ClientIdentifier:         "confidential_client",
@@ -2341,7 +2341,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2377,7 +2377,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2415,7 +2415,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2452,7 +2452,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2505,7 +2505,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -2567,7 +2567,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -2630,7 +2630,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -2645,7 +2645,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "nil_session_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -2700,7 +2700,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -2715,7 +2715,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "invalid_session_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -2777,7 +2777,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2789,7 +2789,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "expired_offline_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -2844,7 +2844,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2856,7 +2856,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "invalid_offline_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -2906,7 +2906,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -2918,7 +2918,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "invalid_typ_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -2967,7 +2967,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -2983,7 +2983,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			Scope:        "openid profile email address", // 'address' is not in original scopes
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -3050,7 +3050,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -3062,7 +3062,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "valid_offline_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -3126,7 +3126,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 		ctx := context.Background()
@@ -3138,7 +3138,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "valid_offline_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -3202,7 +3202,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -3218,7 +3218,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			Scope:        "openid srv1:read", // Reduced scope (should be allowed)
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -3283,7 +3283,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -3298,7 +3298,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "revoked_consent_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -3366,7 +3366,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -3381,7 +3381,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "partial_consent_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -3456,7 +3456,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -3471,7 +3471,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "revoked_permission_refresh_token",
 		}
 
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -3550,7 +3550,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -3564,7 +3564,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 		CodeVerifier: "", // No code_verifier provided
 	}
 
-	clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+	clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 	require.NoError(t, err)
 
 	client := &models.Client{
@@ -3617,7 +3617,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -3631,7 +3631,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 		CodeVerifier: "some_code_verifier", // code_verifier provided but PKCE was not used
 	}
 
-	clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+	clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 	require.NoError(t, err)
 
 	client := &models.Client{
@@ -3682,7 +3682,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -3742,7 +3742,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -3802,7 +3802,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -3868,7 +3868,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -3882,7 +3882,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 		CodeVerifier: "", // No code_verifier
 	}
 
-	clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+	clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 	require.NoError(t, err)
 
 	client := &models.Client{
@@ -3939,7 +3939,7 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 
@@ -4023,7 +4023,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
@@ -4045,7 +4045,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	}
 
 	if !isPublic {
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 		client.ClientSecretEncrypted = clientSecretEncrypted
 		input.ClientSecret = "client_secret"
@@ -4137,7 +4137,7 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -4178,7 +4178,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4230,7 +4230,7 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
@@ -4268,7 +4268,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
@@ -4318,7 +4318,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true, // Globally enabled
@@ -4355,7 +4355,7 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4395,7 +4395,7 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4437,7 +4437,7 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4481,7 +4481,7 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4531,7 +4531,7 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4576,7 +4576,7 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4615,7 +4615,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4664,7 +4664,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4713,7 +4713,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4763,7 +4763,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4805,9 +4805,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	encryptedSecret, _ := encryption.EncryptData("correct-secret")
+	encryptedSecret, _ := testDataCipher.Encrypt("correct-secret")
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4844,14 +4844,57 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 	assert.Equal(t, 401, customErr.GetHttpStatusCode())
 }
 
+// TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCipher holds the client
+// secret to the cipher the validator was built with, where it used to be opened with a process-wide
+// key: the right secret, sealed under another key than the validator's, does not authenticate. The
+// refusal is the decrypt failure itself, not an invalid_client answer, since the stored row cannot
+// be read at all (#434).
+func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCipher(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
+	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+
+	otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
+	require.NoError(t, err)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, otherCipher)
+
+	encryptedSecret, err := testDataCipher.Encrypt("correct-secret")
+	require.NoError(t, err)
+
+	ropcEnabled := true
+	client := &models.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                false,
+		ClientSecretEncrypted:                   encryptedSecret,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(context.Background(),
+		&models.Settings{ResourceOwnerPasswordCredentialsEnabled: true},
+		&ValidateTokenRequestInput{
+			GrantType:    "password",
+			ClientId:     "ropc-client",
+			ClientSecret: "correct-secret",
+			Username:     "user@example.com",
+			Password:     "password",
+		})
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	var errorDetail *customerrors.ErrorDetail
+	assert.False(t, errors.As(err, &errorDetail), "a secret the cipher cannot open answered %v", err)
+}
+
 func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	encryptedSecret, _ := encryption.EncryptData("correct-secret")
+	encryptedSecret, _ := testDataCipher.Encrypt("correct-secret")
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4905,7 +4948,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -4954,7 +4997,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -5010,7 +5053,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 			mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 			mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 			settings := &models.Settings{
 				ResourceOwnerPasswordCredentialsEnabled: true,
@@ -5062,7 +5105,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -5115,7 +5158,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -5176,7 +5219,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -5287,7 +5330,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
+			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
 			settings := &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 			ctx := context.Background()
@@ -5355,7 +5398,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
@@ -5398,7 +5441,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	} else {
 		// Session-bound, which is what a release before #425 issued for OFFLINE_ACCESS: issuance
 		// matched offline_access exactly, so the uppercase spelling never made a grant offline.
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 		client = &models.Client{
 			Id:                       1,
@@ -5806,11 +5849,11 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
+			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 			settings := &models.Settings{}
 			ctx := context.Background()
 
-			clientSecretEncrypted, _ := encryption.EncryptData("valid_secret")
+			clientSecretEncrypted, _ := testDataCipher.Encrypt("valid_secret")
 			client := &models.Client{
 				ClientIdentifier:         "cc_client",
 				Enabled:                  true,
@@ -5881,7 +5924,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 				settings := &models.Settings{}
 				ctx := context.Background()
 
@@ -5889,7 +5932,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				// boundary and nothing else. It was public only to sidestep the secret
 				// check, and a public client with a challenge-less code is now refused
 				// before the generation check is ever reached (#245).
-				clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+				clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 				require.NoError(t, err)
 
 				client := &models.Client{
@@ -5962,7 +6005,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 				settings := &models.Settings{
 					UserSessionIdleTimeoutInSeconds: 3600,
 					UserSessionMaxLifetimeInSeconds: 86400,
@@ -5972,7 +6015,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				// Confidential for the same reason as the redemption case above: the
 				// subject is the generation boundary, and a public client whose grant
 				// descends from a challenge-less code is now refused before it (#245).
-				clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+				clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 				require.NoError(t, err)
 
 				client := &models.Client{
@@ -6050,7 +6093,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 				settings := &models.Settings{}
 				ctx := context.Background()
 
@@ -6133,7 +6176,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	mockDB := mocks_data.NewDatabase(t)
 	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &models.Settings{}
 	ctx := context.Background()
@@ -6194,7 +6237,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-		return NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker), mockDB, mockTokenParser
+		return NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher), mockDB, mockTokenParser
 	}
 
 	t.Run("authorization code redemption", func(t *testing.T) {
@@ -6203,7 +6246,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			settings := &models.Settings{}
 			ctx := context.Background()
 
-			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+			clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 			require.NoError(t, err)
 
 			client := &models.Client{
@@ -6250,7 +6293,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			settings := &models.Settings{}
 			ctx := context.Background()
 
-			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+			clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 			require.NoError(t, err)
 
 			client := &models.Client{
@@ -6333,7 +6376,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			settings := &models.Settings{}
 			ctx := context.Background()
 
-			clientSecretEncrypted, err := encryption.EncryptData("the_client_secret")
+			clientSecretEncrypted, err := testDataCipher.Encrypt("the_client_secret")
 			require.NoError(t, err)
 
 			client := &models.Client{
@@ -6386,7 +6429,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			settings := &models.Settings{}
 			ctx := context.Background()
 
-			clientSecretEncrypted, err := encryption.EncryptData("the_real_client_secret")
+			clientSecretEncrypted, err := testDataCipher.Encrypt("the_real_client_secret")
 			require.NoError(t, err)
 
 			client := &models.Client{
@@ -6434,7 +6477,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			settings := &models.Settings{}
 			ctx := context.Background()
 
-			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+			clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 			require.NoError(t, err)
 
 			client := &models.Client{
@@ -6486,7 +6529,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		// code marker, and the code they build carries no challenge, so a public client
 		// would now be refused by the PKCE boundary immediately below the marker check and
 		// every row here would pass for the wrong reason.
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		build := func(revoked bool, clientIdOnCode int64) (*models.Client, *models.RefreshToken, models.User) {
@@ -6685,7 +6728,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -6695,7 +6738,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		// Confidential, and it used to be public (#245). The subject is session ownership,
 		// and the grant's code carries no challenge, so a public client would now be refused
 		// by the PKCE boundary before the session is ever looked up.
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -6819,14 +6862,14 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 
 		// Confidential, and it used to be public (#245). The subject is the code's session
 		// ownership, and the code carries no challenge, so a public client would now be
 		// refused by the PKCE boundary before the session is ever looked up.
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -6968,14 +7011,14 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 
 		// Confidential, and it used to be public (#245). The subject is the offline grant's
 		// session ownership, and its code carries no challenge, so a public client would now
 		// be refused by the PKCE boundary before any of these rows could measure anything.
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -7140,14 +7183,14 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &models.Settings{}
 
 		// Confidential, and the code carries no challenge, so the PKCE boundary (#245) does not
 		// pre-empt the subject. The secret also gives the ordering cases below something real to
 		// get wrong.
-		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
 		client := &models.Client{
@@ -7360,7 +7403,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 			mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
-			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 			settings := &models.Settings{}
 			ctx := context.Background()
 

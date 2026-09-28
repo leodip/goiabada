@@ -32,7 +32,7 @@ func TestRun_AlreadySeeded_ContinuesWithoutWritingInEveryMode(t *testing.T) {
 			database.On("IsEmpty", mock.Anything).Return(false, nil).Once()
 			logs := logtest.CaptureSlog(t)
 
-			outcome, err := Run(context.Background(), database, cfg)
+			outcome, err := Run(context.Background(), database, testDataCipher, cfg)
 
 			require.NoError(t, err)
 			assert.Equal(t, Continue, outcome, "a seeded database starts, whatever the bootstrap variables say")
@@ -49,7 +49,7 @@ func TestRun_IsEmptyFails_RefusesAndSaysWhich(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("IsEmpty", mock.Anything).Return(false, errs.New("connection reset")).Once()
 
-	outcome, err := Run(context.Background(), database, Config{OAuthClientSecret: "secret"})
+	outcome, err := Run(context.Background(), database, testDataCipher, Config{OAuthClientSecret: "secret"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to check whether the database is empty")
@@ -62,7 +62,7 @@ func TestRun_NeitherModeConfigured_RefusesWithoutWriting(t *testing.T) {
 	database.On("IsEmpty", mock.Anything).Return(true, nil).Once()
 	logs := logtest.CaptureSlog(t)
 
-	outcome, err := Run(context.Background(), database, Config{AdminEmail: "admin@example.com"})
+	outcome, err := Run(context.Background(), database, testDataCipher, Config{AdminEmail: "admin@example.com"})
 
 	require.NoError(t, err, "the refusal is the operator's to act on, carried by its record, not an error")
 	assert.Equal(t, Refused, outcome)
@@ -85,7 +85,7 @@ func TestRun_RefusesAnOverlongAdminPasswordBeforeAnyWrite(t *testing.T) {
 	database.On("IsEmpty", mock.Anything).Return(true, nil).Once()
 	target := filepath.Join(t.TempDir(), "bootstrap.env")
 
-	outcome, err := Run(context.Background(), database, Config{
+	outcome, err := Run(context.Background(), database, testDataCipher, Config{
 		AdminEmail:          "admin@example.com",
 		AdminPassword:       strings.Repeat("a", passwordhash.MaxPasswordBytes+1),
 		BootstrapEnvOutFile: target,
@@ -131,7 +131,7 @@ func TestCheckAdminPasswordLength_CountsBytes(t *testing.T) {
 // The production key size and the production rename, which the tests below replace: a runner built
 // any other way than through newRunner does not reach production.
 func TestNewRunner_ProductionDefaults(t *testing.T) {
-	r := newRunner(mocks_data.NewDatabase(t), Config{})
+	r := newRunner(mocks_data.NewDatabase(t), testDataCipher, Config{})
 
 	assert.Equal(t, 4096, r.keySizeBits)
 	assert.Equal(t, reflect.ValueOf(os.Rename).Pointer(), reflect.ValueOf(r.rename).Pointer())

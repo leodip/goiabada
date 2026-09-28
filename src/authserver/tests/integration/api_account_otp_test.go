@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -171,7 +170,7 @@ func installPendingEnrollmentForTest(t *testing.T, userId int64, keyURL string, 
 
 	assert.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
 
-	ciphertext, err := encryption.EncryptData(keyURL)
+	ciphertext, err := dataCipher.Encrypt(keyURL)
 	assert.NoError(t, err)
 
 	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, userId, ciphertext, issuedAt,
@@ -298,7 +297,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	updated, err := database.GetUserById(context.Background(), nil, userId)
 	assert.NoError(t, err)
 	assert.True(t, updated.OTPEnabled)
-	decrypted, err := encryption.DecryptData(updated.OTPSecretEncrypted)
+	decrypted, err := dataCipher.Decrypt(updated.OTPSecretEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, strings.ToUpper(secret), decrypted)
 }

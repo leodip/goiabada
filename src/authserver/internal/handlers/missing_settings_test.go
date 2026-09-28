@@ -88,7 +88,7 @@ func TestMissingSettings_DynamicClientRegistrationAnswersTheRFC7591Envelope(t *t
 
 	capture := logtest.CaptureSlog(t)
 	HandleDynamicClientRegistrationPost(mocks_handlers.NewHttpHelper(t), database,
-		mocks_handlers.NewAuditLogger(t)).ServeHTTP(rr, req)
+		mocks_handlers.NewAuditLogger(t), testDataCipher).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	var envelope map[string]any

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -218,7 +217,7 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 
 	t.Run("client credentials token at an admin route", func(t *testing.T) {
 		clientSecret := fake.Password(32)
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 		require.NoError(t, err)
 		client := &models.Client{
 			ClientIdentifier:         "bearer-aud-client-" + strings.ToLower(fake.LetterN(8)),

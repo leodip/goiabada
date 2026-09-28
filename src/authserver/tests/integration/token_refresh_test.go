@@ -14,7 +14,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -93,7 +92,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -271,7 +270,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client.ClientSecretEncrypted = clientSecretEncrypted
 
@@ -299,7 +298,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	privKey, err := signingkeys.ParsePrivateKey(keyPair)
+	privKey, err := signingkeys.ParsePrivateKey(dataCipher, keyPair)
 	if err != nil {
 		t.Fatal("unable to parse private key from PEM")
 	}
@@ -342,7 +341,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 
 	// Create a new client
 	wrongClientSecret := fake.Password(32)
-	wrongClientSecretEncrypted, err := encryption.EncryptData(wrongClientSecret)
+	wrongClientSecretEncrypted, err := dataCipher.Encrypt(wrongClientSecret)
 	assert.NoError(t, err)
 
 	wrongClient := &models.Client{
@@ -435,7 +434,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	// Create a client with consent required
 
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -569,7 +568,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

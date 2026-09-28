@@ -8,9 +8,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
-// ParsePrivateKey decrypts a key pair's stored private-key PEM with the process data cipher
-// (encryption.InitDataCipher must have run at startup) and parses it into an *rsa.PrivateKey for
-// signing.
+// ParsePrivateKey decrypts a key pair's stored private-key PEM with the data cipher it is given
+// and parses it into an *rsa.PrivateKey for signing.
 //
 // It is here rather than on models.KeyPair, where it was a method until #387, because decrypting
 // and parsing a key is a capability and models.KeyPair is a persistence record: the row as it is
@@ -22,8 +21,8 @@ import (
 //
 // The error is returned as it arrives, from the cipher or from the parser, which is what the four
 // call sites expect: each wraps or answers it in its own terms.
-func ParsePrivateKey(keyPair *models.KeyPair) (*rsa.PrivateKey, error) {
-	pem, err := encryption.DecryptData(keyPair.PrivateKeyPEM)
+func ParsePrivateKey(dataCipher *encryption.DataCipher, keyPair *models.KeyPair) (*rsa.PrivateKey, error) {
+	pem, err := dataCipher.Decrypt(keyPair.PrivateKeyPEM)
 	if err != nil {
 		return nil, err
 	}

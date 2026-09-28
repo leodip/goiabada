@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -275,7 +274,7 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 func TestPromptNone_CodeExchange(t *testing.T) {
 	// Create a confidential client for token exchange
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +427,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 
 func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +585,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 
 func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -745,7 +744,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 
 func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -895,7 +894,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 // with offline_access scope can be exchanged for tokens and then refreshed.
 func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1085,7 +1084,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 // request is preserved in the issued id_token.
 func TestPromptNone_NoncePreserved(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1232,7 +1231,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 // (success case - correct verifier).
 func TestPromptNone_PKCESupported(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}

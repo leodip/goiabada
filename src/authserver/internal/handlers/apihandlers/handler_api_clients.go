@@ -157,6 +157,7 @@ func HandleAPIClientsGet(
 // HandleAPIClientGet - GET /api/v1/admin/clients/{id}
 func HandleAPIClientGet(
 	database clientsDatabase,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +204,7 @@ func HandleAPIClientGet(
 
 		// Decrypt client secret if it exists
 		if client.ClientSecretEncrypted != nil {
-			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
+			clientSecretDecrypted, err := dataCipher.Decrypt(client.ClientSecretEncrypted)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "failed to decrypt client secret"), "client_id", client.Id)
 				return
@@ -275,6 +276,7 @@ func HandleAPIClientCreatePost(
 	database clientsDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -335,7 +337,7 @@ func HandleAPIClientCreatePost(
 
 		// Generate and encrypt client secret
 		clientSecret := stringutil.GenerateSecurityRandomString(60)
-		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+		clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to encrypt client secret"))
 			return
@@ -596,6 +598,7 @@ func HandleAPIClientUpdatePut(
 func HandleAPIClientAuthenticationPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -640,7 +643,7 @@ func HandleAPIClientAuthenticationPut(
 				return
 			}
 
-			enc, err := encryption.EncryptData(req.ClientSecret)
+			enc, err := dataCipher.Encrypt(req.ClientSecret)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "failed to encrypt client secret"), "client_id", client.Id)
 				return

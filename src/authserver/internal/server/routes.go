@@ -33,7 +33,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
 	permissionChecker := permissions.NewPermissionChecker(s.database)
-	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker)
+	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker, s.dataCipher)
 	emailValidator := accountvalidation.NewEmailValidator(s.database)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 	profileValidator := accountvalidation.NewProfileValidator(s.database)
@@ -44,9 +44,9 @@ func (s *Server) initRoutes(root chi.Router) {
 	codeIssuer := issuance.NewCodeIssuer(s.database)
 	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
-	tokenIssuer := issuance.NewTokenIssuer(s.database, s.baseURL)
+	tokenIssuer := issuance.NewTokenIssuer(s.database, s.baseURL, s.dataCipher)
 	userCreator := usercreation.NewUserCreator(s.database)
-	emailSender := emaildelivery.NewSender()
+	emailSender := emaildelivery.NewSender(s.dataCipher)
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, sessionkeys.AuthServerSessionName)
@@ -71,8 +71,8 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.Get("/", handlers.HandleIndexGet(httpHelper))
 	root.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	root.Get("/forgot-password", handlers.HandleForgotPasswordGet(httpHelper))
-	root.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender))
-	root.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger))
+	root.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, s.dataCipher))
+	root.With(rateLimiter.LimitResetPwd).Get("/reset-password", handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
 	root.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger))
 	root.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
 	root.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
@@ -94,7 +94,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
 	root.With(rateLimiter.LimitDCR).Post("/connect/register",
-		handlers.HandleDynamicClientRegistrationPost(httpHelper, s.database, auditLogger))
+		handlers.HandleDynamicClientRegistrationPost(httpHelper, s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
 	publicSettingsHandler := handlers.NewHandlerPublicSettings(s.database)
@@ -112,21 +112,21 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database))
 		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter))
 		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, authHelper, s.database, otpSecretGenerator))
-		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter))
+		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter, s.dataCipher))
 		r.Get("/consent", handlers.HandleConsentGet(httpHelper, authHelper, s.database))
 		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger, permissionChecker))
 		// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force)
 		r.With(rateLimiter.LimitROPC).Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
-		r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger))
-		r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger))
+		r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
+		r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
 	})
 
 	root.Route("/account", func(r chi.Router) {
 		r.Get("/register", accounthandlers.HandleAccountRegisterGet(httpHelper))
 		// The POST alone is limited: the GET renders a static form, while the POST probes
 		// whether an address already has an account, sends mail to it and writes a row.
-		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleAccountRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger))
-		r.With(rateLimiter.LimitActivate).Get("/activate", accounthandlers.HandleAccountActivateGet(httpHelper, s.sessionStore, s.database, userCreator, auditLogger))
+		r.With(rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleAccountRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.dataCipher))
+		r.With(rateLimiter.LimitActivate).Get("/activate", accounthandlers.HandleAccountActivateGet(httpHelper, s.sessionStore, s.database, userCreator, auditLogger, s.dataCipher))
 	})
 
 	// Admin API routes
@@ -193,14 +193,14 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(s.database, profileValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(s.database, addressValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/email", apihandlers.HandleAPIUserEmailPut(s.database, emailValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleAPIUserEmailVerificationCodePost(s.database, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleAPIUserEmailVerificationCodePost(s.database, auditLogger, s.dataCipher))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleAPIUserPhonePut(s.database, phoneValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(s.database, passwordValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(s.database, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureGet(s.database))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePicturePost(s.database, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleAPIUserDelete(s.database, auditLogger))
 
 		// User attributes routes
@@ -263,11 +263,11 @@ func (s *Server) initRoutes(root chi.Router) {
 
 		// Client management routes
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients", apihandlers.HandleAPIClientsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleAPIClientGet(s.database))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleAPIClientGet(s.database, s.dataCipher))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/sessions", apihandlers.HandleAPIClientSessionsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients", apihandlers.HandleAPIClientCreatePost(s.database, identifierValidator, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients", apihandlers.HandleAPIClientCreatePost(s.database, identifierValidator, auditLogger, s.dataCipher))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}", apihandlers.HandleAPIClientUpdatePut(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/authentication", apihandlers.HandleAPIClientAuthenticationPut(s.database, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/authentication", apihandlers.HandleAPIClientAuthenticationPut(s.database, auditLogger, s.dataCipher))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/oauth2-flows", apihandlers.HandleAPIClientOAuth2FlowsPut(s.database, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/redirect-uris", apihandlers.HandleAPIClientRedirectURIsPut(s.database, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/web-origins", apihandlers.HandleAPIClientWebOriginsPut(s.database, auditLogger))
@@ -285,7 +285,7 @@ func (s *Server) initRoutes(root chi.Router) {
 
 		// Settings - Email
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleAPISettingsEmailGet())
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(s.database, emailValidator, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(s.database, emailValidator, auditLogger, s.dataCipher))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleAPISettingsEmailSendTestPost(emailValidator, emailSender, auditLogger))
 
 		// Settings - Sessions
@@ -302,7 +302,7 @@ func (s *Server) initRoutes(root chi.Router) {
 
 		// Settings - Keys
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/keys", apihandlers.HandleAPISettingsKeysGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/keys/rotate", apihandlers.HandleAPISettingsKeysRotatePost(s.database, auditLogger))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/keys/rotate", apihandlers.HandleAPISettingsKeysRotatePost(s.database, auditLogger, s.dataCipher))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/settings/keys/{id}", apihandlers.HandleAPISettingsKeyDelete(s.database, auditLogger))
 
 		// Settings - Audit Logs
@@ -336,11 +336,11 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(s.database, profileValidator, auditLogger))
 		r.Put("/email", apihandlers.HandleAPIAccountEmailPut(s.database, emailValidator, auditLogger))
-		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger))
+		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher))
 		// The verification check is limited, the send beside it is not: sending checks no
 		// credential and already carries its own 60 second resend cooldown.
 		r.With(rateLimiter.LimitEmailVerification).Post("/email/verification",
-			apihandlers.HandleAPIAccountEmailVerificationPost(s.database, auditLogger, rateLimiter))
+			apihandlers.HandleAPIAccountEmailVerificationPost(s.database, auditLogger, rateLimiter, s.dataCipher))
 		r.Put("/phone", apihandlers.HandleAPIAccountPhonePut(s.database, phoneValidator, auditLogger))
 		r.Put("/address", apihandlers.HandleAPIAccountAddressPut(s.database, addressValidator, auditLogger))
 		// One limiter over both PUTs, which is what makes the failure budget shared: they
@@ -348,9 +348,9 @@ func (s *Server) initRoutes(root chi.Router) {
 		// alternating. The enrollment GET between them checks no credential.
 		r.With(rateLimiter.LimitAccountPassword).Put("/password",
 			apihandlers.HandleAPIAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter))
-		r.Get("/otp/enrollment", apihandlers.HandleAPIAccountOTPEnrollmentGet(s.database, otpSecretGenerator))
+		r.Get("/otp/enrollment", apihandlers.HandleAPIAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
 		r.With(rateLimiter.LimitAccountPassword).Put("/otp",
-			apihandlers.HandleAPIAccountOTPPut(s.database, auditLogger, rateLimiter))
+			apihandlers.HandleAPIAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher))
 		r.Get("/consents", apihandlers.HandleAPIAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAPIAccountConsentDelete(s.database, auditLogger))
 
@@ -359,7 +359,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Delete("/sessions/{id}", apihandlers.HandleAPIAccountSessionDelete(s.database, auditLogger))
 
 		// Logout request (self-service)
-		r.Post("/logout-request", apihandlers.HandleAPIAccountLogoutRequestPost(s.database))
+		r.Post("/logout-request", apihandlers.HandleAPIAccountLogoutRequestPost(s.database, s.dataCipher))
 
 		// Profile picture (self-service)
 		r.Get("/profile-picture", apihandlers.HandleAPIAccountProfilePictureGet(s.database))

@@ -90,7 +90,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Validate the data-encryption key EARLY and initialize the process cipher
+	// Validate the data-encryption key EARLY and build the data cipher from it
 	// before the database is opened: NewDatabase runs the at-rest re-encryption
 	// migration, which needs the key. The key is supplied from the environment
 	// and never co-located with the ciphertext (issue #83).
@@ -104,8 +104,11 @@ func main() {
 			"generate_with", "openssl rand -hex 32")
 		os.Exit(1)
 	}
-	if initDataCipherErr := encryption.InitDataCipher(config.GetAESEncryptionKey()); initDataCipherErr != nil {
-		slog.Error("unable to initialize the data cipher", "error", initDataCipherErr)
+	// One cipher for the process, built here and handed to every consumer rather than set as a
+	// package-wide key each of them reads (#434).
+	dataCipher, dataCipherErr := encryption.NewDataCipher(config.GetAESEncryptionKey())
+	if dataCipherErr != nil {
+		slog.Error("unable to initialize the data cipher", "error", dataCipherErr)
 		os.Exit(1)
 	}
 	slog.Info("data encryption key validated")
@@ -155,7 +158,7 @@ func main() {
 	// listens and before the signal context exists: nothing cancels the seed, since it commits
 	// whole or not at all and the next start retries it (#386, #424). bootstrap owns the choice
 	// and the records; main owns only what the process does next.
-	outcome, err := bootstrap.Run(startupCtx, database, bootstrap.Config{
+	outcome, err := bootstrap.Run(startupCtx, database, dataCipher, bootstrap.Config{
 		AdminEmail:          config.GetAdminEmail(),
 		AdminPassword:       config.GetAdminPassword(),
 		AppName:             config.GetAppName(),
@@ -218,7 +221,7 @@ func main() {
 	slog.Info("initialized server-side session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, sessionStore, trustedProxies)
+	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies)
 
 	// The process owns the signals; the server just gets told when to stop. On
 	// SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and

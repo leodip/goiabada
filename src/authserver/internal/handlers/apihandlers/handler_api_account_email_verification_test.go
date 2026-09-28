@@ -11,7 +11,6 @@ import (
 	"time"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -62,7 +61,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	encrypted, err := encryption.EncryptData(verificationCode)
+	encrypted, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
 
 	user := &models.User{
@@ -78,7 +77,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)
-	handler := HandleAPIAccountEmailVerificationPost(database, auditLogger, rateLimiter)
+	handler := HandleAPIAccountEmailVerificationPost(database, auditLogger, rateLimiter, testDataCipher)
 
 	return &verificationEnv{
 		handler:  rateLimiter.LimitEmailVerification(handler),
@@ -91,7 +90,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 // clears on a successful verification.
 func (e *verificationEnv) reset(t *testing.T) {
 	t.Helper()
-	encrypted, err := encryption.EncryptData(verificationCode)
+	encrypted, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
 	e.user.EmailVerified = false
 	e.user.EmailVerificationCodeEncrypted = encrypted

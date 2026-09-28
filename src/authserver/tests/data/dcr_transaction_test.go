@@ -62,7 +62,7 @@ func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder, httpHelper *m
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
-	handlers.HandleDynamicClientRegistrationPost(httpHelper, db, auditLogger).ServeHTTP(rr, req)
+	handlers.HandleDynamicClientRegistrationPost(httpHelper, db, auditLogger, dataCipher).ServeHTTP(rr, req)
 	return rr
 }
 

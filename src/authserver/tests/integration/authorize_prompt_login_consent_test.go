@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -618,7 +617,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 // creates a new auth_time in the issued token (not preserving the old one).
 func TestPromptLogin_NewAuthTime(t *testing.T) {
 	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		t.Fatal(err)
 	}

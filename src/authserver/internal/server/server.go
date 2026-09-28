@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
@@ -41,7 +42,10 @@ type Server struct {
 	// constructors whose ports name Regenerate, which is what proves at compile time that the
 	// store this server runs rotates the session identifier at sign-in (#431).
 	sessionStore *sessionstore.ServerSideStore
-	worker       *workers.Worker
+	// Built by main from the configured data key and handed to every consumer routes.go
+	// constructs, so no service reads a process-wide key (#434).
+	dataCipher *encryption.DataCipher
+	worker     *workers.Worker
 
 	// Parsed by main, which refuses to start on a malformed entry (#425), so the real-IP
 	// middleware takes ranges and has no error path of its own.
@@ -55,12 +59,14 @@ type Server struct {
 	setCookieSecure bool
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore, trustedProxies []*net.IPNet) *Server {
+func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore,
+	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet) *Server {
 
 	s := Server{
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
+		dataCipher:   dataCipher,
 		worker:       workers.NewWorker(database),
 
 		trustedProxies: trustedProxies,

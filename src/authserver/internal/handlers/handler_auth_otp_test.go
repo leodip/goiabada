@@ -29,8 +29,8 @@ import (
 )
 
 // otpTestAESKey is a fixed 32-byte AES key used to exercise the encrypted OTP
-// secret paths (issue #82). It matches the process data cipher key initialized
-// in TestMain, so values encrypted with it decrypt via encryption.DecryptData.
+// secret paths (issue #82). It is testDataCipher's key, so values encrypted with it decrypt
+// through the cipher every handler in this package is given.
 var otpTestAESKey = []byte("0123456789abcdef0123456789abcdef")
 
 func encryptOTPForTest(t *testing.T, secret string) []byte {
@@ -383,7 +383,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -419,7 +419,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -448,7 +448,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -533,7 +533,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
-				handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+				handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 				form := url.Values{}
 				form.Add("otp", "123456")
@@ -579,7 +579,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -615,7 +615,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -662,7 +662,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -712,7 +712,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -779,7 +779,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -836,7 +836,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -892,7 +892,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -945,7 +945,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1034,7 +1034,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1093,7 +1093,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			if u.Id != 1 || !u.OTPEnabled || len(u.OTPSecretEncrypted) == 0 {
 				return false
 			}
-			decrypted, err := encryption.DecryptData(u.OTPSecretEncrypted)
+			decrypted, err := testDataCipher.Decrypt(u.OTPSecretEncrypted)
 			return err == nil && decrypted == otpSecret
 		})).Return(nil).
 			Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
@@ -1162,7 +1162,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1239,7 +1239,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1310,7 +1310,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1403,7 +1403,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1495,7 +1495,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1557,7 +1557,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testDataCipher)
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1668,7 +1668,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			template, mock.Anything).Return(nil).Maybe()
 
 		rateLimiter := newTestRateLimiter(authHelper)
-		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, rateLimiter)
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, rateLimiter, testDataCipher)
 		return rateLimiter.LimitOtp(handler), authContext
 	}
 

@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -462,7 +461,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 // which is the only column a seed lives in since migration 000048 dropped
 // users.otp_secret (#98), and keep the plaintext in a local for generating codes.
 func encryptOTPSecretForTest(t *testing.T, plain string) []byte {
-	enc, err := encryption.EncryptData(plain)
+	enc, err := dataCipher.Encrypt(plain)
 	assert.NoError(t, err)
 	return enc
 }
@@ -500,7 +499,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		opt = opts[0]
 	}
 
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{
@@ -624,7 +623,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 // It guarantees custom scopes survive filtering and end up in the token if requested.
 func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
 
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	client := &models.Client{

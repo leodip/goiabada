@@ -63,7 +63,7 @@ type seedValues struct {
 func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 
 	// The data-encryption key comes from the environment (GOIABADA_AES_ENCRYPTION_KEY,
-	// issue #83) via the process cipher; the seed does not generate or store it.
+	// issue #83) via the cipher Run was given; the seed does not generate or store it.
 
 	adminEmail := r.cfg.AdminEmail
 	if len(adminEmail) == 0 {
@@ -133,16 +133,16 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 		clientSecret = stringutil.GenerateSecurityRandomString(60)
 		slog.InfoContext(ctx, "generated new OAuth client secret")
 	}
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	clientSecretEncrypted, err := r.dataCipher.Encrypt(clientSecret)
 	if err != nil {
 		return errs.Wrap(err, "unable to encrypt admin console client secret")
 	}
 
-	currentKey, err := signingkeys.NewKeyPair(models.KeyStateCurrent, r.keySizeBits)
+	currentKey, err := signingkeys.NewKeyPair(r.dataCipher, models.KeyStateCurrent, r.keySizeBits)
 	if err != nil {
 		return err
 	}
-	nextKey, err := signingkeys.NewKeyPair(models.KeyStateNext, r.keySizeBits)
+	nextKey, err := signingkeys.NewKeyPair(r.dataCipher, models.KeyStateNext, r.keySizeBits)
 	if err != nil {
 		return err
 	}

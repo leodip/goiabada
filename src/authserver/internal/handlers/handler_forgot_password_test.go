@@ -14,7 +14,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
@@ -86,7 +85,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
+		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher)
 
 		req, err := http.NewRequest("POST", "/forgot-password", strings.NewReader(""))
 		assert.NoError(t, err)
@@ -119,7 +118,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
+		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher)
 
 		form := url.Values{}
 		form.Add("email", "nonexistent@example.com")
@@ -160,7 +159,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
+		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher)
 
 		form := url.Values{}
 		form.Add("email", "existing@example.com")
@@ -227,7 +226,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// (#112). Derived from the code the handler actually issued, decrypted out of the
 		// column it wrote, rather than from a value the test chose: a hash of anything
 		// else would leave the user unable to reset at all.
-		issuedCode, err := encryption.DecryptData(user.ForgotPasswordCodeEncrypted)
+		issuedCode, err := testDataCipher.Decrypt(user.ForgotPasswordCodeEncrypted)
 		assert.NoError(t, err)
 		expectedHash := hashutil.HashString(issuedCode)
 		assert.Equal(t, expectedHash, user.ForgotPasswordCodeHash,

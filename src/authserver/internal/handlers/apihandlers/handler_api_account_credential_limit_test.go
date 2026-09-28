@@ -75,7 +75,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 		password: rateLimiter.LimitAccountPassword(
 			HandleAPIAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter)),
 		otp: rateLimiter.LimitAccountPassword(
-			HandleAPIAccountOTPPut(database, auditLogger, rateLimiter)),
+			HandleAPIAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher)),
 		database: database,
 	}
 }

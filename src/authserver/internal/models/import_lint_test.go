@@ -233,14 +233,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSomething(t *testing.T) { assert.NotNil(t, encryption.EncryptData) }
+func TestSomething(t *testing.T) { assert.NotNil(t, encryption.NewDataCipher) }
 `)
 	// Accepted: the same import in another package. The scope is this directory.
 	writeImportFixture(t, root, "authserver/internal/signingkeys/private_key.go", `package signingkeys
 
 import "github.com/leodip/goiabada/authserver/internal/encryption"
 
-var _ = encryption.DecryptData
+var _ = encryption.DecryptText
 `)
 	// Accepted: a subdirectory, which the rule deliberately does not descend into.
 	writeImportFixture(t, root, modelsDir+"/sub/thing.go", `package sub
@@ -265,7 +265,7 @@ import (
 var _ sql.NullTime
 var _ *rsa.PrivateKey
 var _ = jwt.ParseRSAPrivateKeyFromPEM
-var _ = encryption.DecryptData
+var _ = encryption.DecryptText
 `)
 	writeImportFixture(t, root, modelsDir+"/settings.go", `package models
 
@@ -298,7 +298,7 @@ func TestModels_ImportGuard_FailsOnACapability(t *testing.T) {
 
 import "github.com/leodip/goiabada/authserver/internal/encryption"
 
-var _ = encryption.DecryptData
+var _ = encryption.DecryptText
 `)
 
 	report := testutil.RunGuard(func(r testutil.Reporter) {

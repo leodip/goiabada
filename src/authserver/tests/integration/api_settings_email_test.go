@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
@@ -263,7 +262,7 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
-	stored, err := encryption.DecryptData(settings.SMTPPasswordEncrypted)
+	stored, err := dataCipher.Decrypt(settings.SMTPPasswordEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, strings.Repeat("p", 256), stored)
 }

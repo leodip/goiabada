@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 )
@@ -40,7 +39,7 @@ func seedOneKeyPerState(t *testing.T) (previous, current, next *models.KeyPair) 
 func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	previous, current, next := seedOneKeyPerState(t)
 
-	if err := signingkeys.NewSigningKeyRotator(database).Rotate(context.Background()); err != nil {
+	if err := signingkeys.NewSigningKeyRotator(database, dataCipher).Rotate(context.Background()); err != nil {
 		t.Fatalf("Rotate failed: %v", err)
 	}
 
@@ -113,7 +112,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 
 	// The private key survives the round trip through the column encrypted (#83), so it
 	// decrypts back to a PEM rather than being stored in the clear.
-	decrypted, err := encryption.DecryptData(newNext.PrivateKeyPEM)
+	decrypted, err := dataCipher.Decrypt(newNext.PrivateKeyPEM)
 	if err != nil {
 		t.Fatalf("Failed to decrypt the new next key's private key: %v", err)
 	}
@@ -139,7 +138,7 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 	previous, current, _ := seedOneKeyPerState(t)
 	clearKeyPairState(t, models.KeyStateNext.String())
 
-	err := signingkeys.NewSigningKeyRotator(database).Rotate(context.Background())
+	err := signingkeys.NewSigningKeyRotator(database, dataCipher).Rotate(context.Background())
 	if err == nil {
 		t.Fatal("Expected the rotation to be refused")
 	}

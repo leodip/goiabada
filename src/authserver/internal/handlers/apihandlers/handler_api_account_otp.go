@@ -54,14 +54,14 @@ const maxOTPRequestBodyBytes = 64 * 1024
 // the caller down the minting path, where that same conditional UPDATE declines to replace a value
 // that is not yet stale, so the request would answer 200 with a seed that was never stored and
 // that the PUT could therefore never accept (#247).
-func livePendingEnrollmentKeyURL(user *models.User, staleBefore time.Time) (string, error) {
+func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *models.User, staleBefore time.Time) (string, error) {
 	if len(user.OtpEnrollmentSecretEncrypted) == 0 || !user.OtpEnrollmentIssuedAt.Valid {
 		return "", nil
 	}
 	if user.OtpEnrollmentIssuedAt.Time.Before(staleBefore) {
 		return "", nil
 	}
-	return encryption.DecryptData(user.OtpEnrollmentSecretEncrypted)
+	return dataCipher.Decrypt(user.OtpEnrollmentSecretEncrypted)
 }
 
 // accountOTPDatabase is what the account OTP endpoints need: the caller's user row, the pending
@@ -83,6 +83,7 @@ type accountOTPDatabase interface {
 func HandleAPIAccountOTPEnrollmentGet(
 	database accountOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Token and scope are enforced by middleware; extract validated token
@@ -130,7 +131,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 		now := time.Now().UTC()
 		staleBefore := now.Add(-otpEnrollmentLifetime)
 
-		keyURL, err := livePendingEnrollmentKeyURL(user, staleBefore)
+		keyURL, err := livePendingEnrollmentKeyURL(dataCipher, user, staleBefore)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -151,7 +152,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 				return
 			}
 
-			secretEncrypted, enrollErr := encryption.EncryptData(keyURL)
+			secretEncrypted, enrollErr := dataCipher.Encrypt(keyURL)
 			if enrollErr != nil {
 				writeInternalServerError(w, r, enrollErr)
 				return
@@ -184,7 +185,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 					return
 				}
 
-				keyURL, enrollErr = livePendingEnrollmentKeyURL(user, staleBefore)
+				keyURL, enrollErr = livePendingEnrollmentKeyURL(dataCipher, user, staleBefore)
 				if enrollErr != nil {
 					writeInternalServerError(w, r, enrollErr)
 					return
@@ -223,6 +224,7 @@ func HandleAPIAccountOTPPut(
 	database accountOTPDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Token and scope are enforced by middleware; extract validated token
@@ -351,7 +353,7 @@ func HandleAPIAccountOTPPut(
 			// enrolling stops working, which is the safe direction, instead of accepting a
 			// secret from the wire again.
 			now := time.Now().UTC()
-			keyURL, verifyErr := livePendingEnrollmentKeyURL(user, now.Add(-otpEnrollmentLifetime))
+			keyURL, verifyErr := livePendingEnrollmentKeyURL(dataCipher, user, now.Add(-otpEnrollmentLifetime))
 			if verifyErr != nil {
 				writeInternalServerError(w, r, verifyErr)
 				return
@@ -407,7 +409,7 @@ func HandleAPIAccountOTPPut(
 			// authenticator is on and no session knows (#242 decision 2). The returned
 			// generation is discarded here: only the browser ceremony, which captured the
 			// pre-enrollment value earlier in the same ceremony, has a use for it.
-			if _, establishErr := otpcredential.Establish(r.Context(), database, user, pendingSecret); establishErr != nil {
+			if _, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, pendingSecret); establishErr != nil {
 				writeInternalServerError(w, r, establishErr)
 				return
 			}

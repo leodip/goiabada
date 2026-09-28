@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -95,9 +96,10 @@ func HandleAPISettingsKeysGet(
 func HandleAPISettingsKeysRotatePost(
 	database settingsKeysDatabase,
 	auditLogger AuditLogger,
+	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
-	rotator := signingkeys.NewSigningKeyRotator(database)
+	rotator := signingkeys.NewSigningKeyRotator(database, dataCipher)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := rotator.Rotate(r.Context())
