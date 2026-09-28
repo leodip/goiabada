@@ -232,7 +232,7 @@ func discardedErrorsIn(
 			return
 		}
 		line := fset.Position(pos).Line
-		if fn, ok := resolve(call.Fun); ok {
+		if fn, matched := resolve(call.Fun); matched {
 			found = append(found, discardedError{file: rel, line: line, fn: fn})
 			return
 		}

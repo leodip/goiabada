@@ -209,7 +209,8 @@ func TestNewDataCipher_CopiesTheKey(t *testing.T) {
 		key[i] = 0
 	}
 
-	if pt, err := c.Decrypt(before); err != nil || pt != "secret" {
+	pt, err := c.Decrypt(before)
+	if err != nil || pt != "secret" {
 		t.Errorf("after the caller zeroed its key, Decrypt = %q, %v; want \"secret\", nil", pt, err)
 	}
 	after, err := c.Encrypt("secret")
@@ -233,7 +234,8 @@ func TestDataCipher_OpensWhatEncryptTextSealed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncryptText: %v", err)
 	}
-	if pt, err := c.Decrypt(stored); err != nil || pt != "sealed-before-434" {
+	pt, err := c.Decrypt(stored)
+	if err != nil || pt != "sealed-before-434" {
 		t.Errorf("Decrypt of an EncryptText value = %q, %v", pt, err)
 	}
 
