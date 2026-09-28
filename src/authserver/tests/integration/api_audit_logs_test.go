@@ -314,15 +314,10 @@ func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string)
 }
 
 // enableAuditLogsInDatabase turns database audit logging on, since nothing is queryable
-// without it, and restores the three settings when the test ends.
+// without it, and restores the row when the test ends.
 func enableAuditLogsInDatabase(t *testing.T) {
 	t.Helper()
-	restoreAuditLogSettings(t)
-
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	settings.AuditLogsInDatabaseEnabled = true
-	assert.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
+	changeSettings(t, func(settings *models.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 }
 
 func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {

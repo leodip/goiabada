@@ -431,7 +431,6 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 // rather than the price of prompt=none.
 func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	httpClient, client, redirectUri, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
@@ -460,7 +459,6 @@ func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 
 func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	httpClient, client, redirectUri, user := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 

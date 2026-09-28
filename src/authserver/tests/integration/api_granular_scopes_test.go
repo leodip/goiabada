@@ -185,6 +185,8 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 // TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints verifies that admin-read scope
 // can access GET endpoints but not PUT/POST/DELETE endpoints for settings
 func TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints(t *testing.T) {
+	restoreSettings(t)
+
 	// Create client with admin-read scope only
 	accessToken, client := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
 	defer func() {

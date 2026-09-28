@@ -43,6 +43,7 @@ func TestAPISettingsGeneralGet_Success(t *testing.T) {
 
 // PUT /api/v1/admin/settings/general - success cases
 func TestAPISettingsGeneralPut_Success(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Build update request with URI issuer and toggles
@@ -83,6 +84,7 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 
 // PUT: disabling self-registration should force RequiresEmailVerification to false
 func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// First enable both
@@ -122,6 +124,7 @@ func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.
 }
 
 func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
 
@@ -214,14 +217,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Save original settings
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	originalImplicitFlow := settings.ImplicitFlowEnabled
-	defer func() {
-		settings.ImplicitFlowEnabled = originalImplicitFlow
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	settings := restoreSettings(t)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
 
@@ -238,7 +234,7 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.SettingsGeneralResponse
-	err = json.NewDecoder(resp.Body).Decode(&body)
+	err := json.NewDecoder(resp.Body).Decode(&body)
 	assert.NoError(t, err)
 	assert.True(t, body.ImplicitFlowEnabled, "ImplicitFlowEnabled should be true in response")
 
@@ -290,14 +286,7 @@ func TestAPISettingsGeneralGet_IncludesImplicitFlowEnabled(t *testing.T) {
 func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Save original settings
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	originalROPC := settings.ResourceOwnerPasswordCredentialsEnabled
-	defer func() {
-		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPC
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	settings := restoreSettings(t)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
 
@@ -315,7 +304,7 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var body api.SettingsGeneralResponse
-	err = json.NewDecoder(resp.Body).Decode(&body)
+	err := json.NewDecoder(resp.Body).Decode(&body)
 	assert.NoError(t, err)
 	assert.True(t, body.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in response")
 
@@ -406,11 +395,9 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 // with its own message, while url.ParseRequestURI accepts it in a path or a host, so an issuer
 // holding markup used to reach the iss claim of every token (#275).
 func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
+	before := restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
-
-	before, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
 
 	cases := []struct {
 		name     string
@@ -449,6 +436,7 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 
 // TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
 func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
 

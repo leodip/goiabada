@@ -362,7 +362,6 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 // remove.
 func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	accessToken, _ := createAdminClientWithToken(t)
 	client := registerDCRClient(t, "Renameable Portal", "https://dcr-rename.example.com/callback")
@@ -404,7 +403,6 @@ func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testi
 // conditional and a shorter generated identifier would quietly retire the regression.
 func TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	accessToken, _ := createAdminClientWithToken(t)
 	client := registerDCRClient(t, "Reviewed Portal", "https://dcr-reviewed.example.com/callback")

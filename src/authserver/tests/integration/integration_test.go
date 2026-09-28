@@ -60,8 +60,33 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// Every test that changes the settings row puts it back (see restoreSettings), and this holds
+	// the tier to that: a run that ends with the row different from how it began fails, naming each
+	// field, whatever the tests themselves reported.
+	atStart, err := database.GetSettingsById(context.Background(), nil, 1)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
+
 	// Run the tests
 	code := m.Run()
+
+	atEnd, err := database.GetSettingsById(context.Background(), nil, 1)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%+v", err))
+		os.Exit(1)
+	}
+	if changes := settingsChanges(atStart, atEnd); len(changes) > 0 {
+		fmt.Fprintln(os.Stderr, "FAIL: the run left the settings row changed; a test that changes it "+
+			"must call restoreSettings or changeSettings first:")
+		for _, change := range changes {
+			fmt.Fprintln(os.Stderr, "    "+change)
+		}
+		if code == 0 {
+			code = 1
+		}
+	}
 
 	if code != 0 {
 		os.Exit(code)

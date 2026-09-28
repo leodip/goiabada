@@ -40,6 +40,7 @@ func TestAPISettingsUIThemeGet_Success(t *testing.T) {
 
 // PUT /api/v1/admin/settings/ui-theme - success set and clear
 func TestAPISettingsUIThemePut_Success(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
 
@@ -81,6 +82,7 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 
 // PUT /api/v1/admin/settings/ui-theme - validation errors
 func TestAPISettingsUIThemePut_ValidationErrors(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
 
@@ -94,6 +96,7 @@ func TestAPISettingsUIThemePut_ValidationErrors(t *testing.T) {
 }
 
 func TestAPISettingsUITheme_InvalidRequestBodyAndUnauthorized(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/ui-theme"
 

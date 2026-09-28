@@ -63,7 +63,6 @@ func assertRedirectWasWithheld(t *testing.T, resp *http.Response, expectedDestin
 // straight to that application's site by this server.
 func TestDCR_Refusal_DeclinedConsentIsNotDeliveredByRedirect(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	httpClient, _, _, _ := walkDCRClientToConsentScreen(t, "Refusing Portal")
 
@@ -121,7 +120,6 @@ func TestDCR_Refusal_AdministratorClientStillRedirects(t *testing.T) {
 // around by sending this link instead.
 func TestDCR_Refusal_InvalidScopeIsNotDeliveredByRedirect(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	const redirectURI = "https://dcr-attack-scope.example.com/callback"
 	client := registerDCRClient(t, "Payroll Portal", redirectURI)
@@ -182,7 +180,6 @@ func TestDCR_Refusal_UnresolvedClientIsNotRedirectedEither(t *testing.T) {
 // untouched by rendering here: the page asks for neither.
 func TestDCR_Refusal_SilentRequestIsNotDeliveredByRedirect(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	const redirectURI = "https://dcr-silent-scope.example.com/callback"
 	client := registerDCRClient(t, "Silent Portal", redirectURI)

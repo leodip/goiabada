@@ -18,37 +18,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// saveAndRestoreRegSettings snapshots the registration-related settings and
-// returns a restore function meant to be deferred. This keeps tests isolated
-// from each other and from the rest of the suite.
-func saveAndRestoreRegSettings(t *testing.T) func() {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	origSelfReg := settings.SelfRegistrationEnabled
-	origRequiresVerify := settings.SelfRegistrationRequiresEmailVerification
-	origSMTPEnabled := settings.SMTPEnabled
-
-	return func() {
-		s, err := database.GetSettingsById(context.Background(), nil, 1)
-		if err != nil {
-			t.Logf("could not restore settings: %v", err)
-			return
-		}
-		s.SelfRegistrationEnabled = origSelfReg
-		s.SelfRegistrationRequiresEmailVerification = origRequiresVerify
-		s.SMTPEnabled = origSMTPEnabled
-		_ = database.UpdateSettings(context.Background(), nil, s)
-	}
-}
-
+// setRegSettings sets the three registration switches until the test ends.
 func setRegSettings(t *testing.T, selfRegEnabled, requiresVerify, smtpEnabled bool) {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	settings.SelfRegistrationEnabled = selfRegEnabled
-	settings.SelfRegistrationRequiresEmailVerification = requiresVerify
-	settings.SMTPEnabled = smtpEnabled
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
+	t.Helper()
+	changeSettings(t, func(settings *models.Settings) {
+		settings.SelfRegistrationEnabled = selfRegEnabled
+		settings.SelfRegistrationRequiresEmailVerification = requiresVerify
+		settings.SMTPEnabled = smtpEnabled
+	})
 }
 
 // loadRegisterPage fetches the registration form and asserts it renders, which every test below
@@ -92,7 +69,6 @@ func bodyString(t *testing.T, resp *http.Response) string {
 // Scenario 1: GET /account/register
 // 1a. With self-registration disabled the page answers the not-found page (#425).
 func TestSelfRegister_GetPage_Disabled(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, false, false, true)
 
 	httpClient := createHttpClient(t)
@@ -109,7 +85,6 @@ func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 // report and refuses anything it calls cross-site (#155). Nothing about that is visible in the
 // rendered HTML, so the assertion has no successor here rather than a weaker one.
 func TestSelfRegister_GetPage_Enabled(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)
@@ -124,7 +99,6 @@ func TestSelfRegister_GetPage_Enabled(t *testing.T) {
 // admin-console profile link is present. Locks in the issue #69 fix at the HTTP
 // layer (no /auth/pwd redirect).
 func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)
@@ -158,7 +132,6 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 // off. Welcome email is sent, success template renders, user is created
 // directly (no pre-registration row).
 func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, true)
 
 	httpClient := createHttpClient(t)
@@ -245,8 +218,7 @@ const activationExpiredText = "Unable to activate the account. The verification 
 // this is also the end-to-end guard for #112 itself: before the change this registration could
 // never be completed.
 func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
 
 	httpClient := createHttpClient(t)
@@ -303,8 +275,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 // attacker kept. What refuses the copy is the code hash it names no longer resolving, because
 // activating deleted the pre-registration.
 func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
 
 	httpClient := createHttpClient(t)
@@ -350,8 +321,7 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 // the redirect already in flight activated whichever link had been followed last, creating an
 // account nobody in that browser had asked for and leaving the intended one pending.
 func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
 
 	browser := createHttpClient(t)
@@ -405,7 +375,6 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 // Scenario 5a: POST while self-registration is disabled returns the not-found
 // page (#425). We load the form while it is enabled, then disable.
 func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)
@@ -421,7 +390,6 @@ func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 
 // Scenario 5b: duplicate user email is rejected with a friendly message.
 func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
 
 	existing := &models.User{
@@ -446,7 +414,6 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 
 // Scenario 5c: duplicate pre-registration is rejected with the same message.
 func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, true, true)
 
 	httpClient := createHttpClient(t)
@@ -473,7 +440,6 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 // Scenario 5d: password confirmation mismatch is reported and no user is
 // created.
 func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
-	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
 
 	httpClient := createHttpClient(t)

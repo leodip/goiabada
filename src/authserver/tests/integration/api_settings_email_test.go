@@ -49,6 +49,7 @@ func TestAPISettingsEmailGet_Success(t *testing.T) {
 
 // PUT /api/v1/admin/settings/email - enable and persist
 func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	req := api.UpdateSettingsEmailRequest{
@@ -97,6 +98,7 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 
 // PUT: disable should reset fields
 func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// First enable with a password
@@ -134,6 +136,7 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 
 // PUT: validation errors
 func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 
@@ -237,6 +240,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 }
 
 func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 
@@ -266,6 +270,7 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 
 // PUT: TCP connectivity failure
 func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 
@@ -290,16 +295,11 @@ func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 // the TLS server name, where `[::1]` names nothing, and before #424 the bracketed form never got that
 // far: the dial refused it with "missing port in address".
 func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
-	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
-
 	// The last row leaves a closed IPv6 port behind, and the tests after this one send mail
 	// through whatever the settings row says.
-	before, err := database.GetSettingsById(context.Background(), nil, 1)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, database.UpdateSettings(context.Background(), nil, before))
-	})
+	restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 
 	tests := []struct {
 		name string
@@ -357,6 +357,7 @@ func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
 
 // PUT: password set and clear lifecycle
 func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 
@@ -407,6 +408,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 
 // POST /api/v1/admin/settings/email/send-test
 func TestAPISettingsEmailSendTest_Success(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Ensure SMTP is enabled and pointing to mailpit
@@ -433,6 +435,7 @@ func TestAPISettingsEmailSendTest_Success(t *testing.T) {
 }
 
 func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Disable SMTP
@@ -473,11 +476,9 @@ func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 // quotes the name, so this is a consistency choice rather than a header-injection fix: every
 // plain-text field this API writes now applies the same rule (#275).
 func TestAPISettingsEmailPut_AngleBracketsRejected(t *testing.T) {
+	before := restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
-
-	before, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
 		SMTPEnabled:    true,
@@ -494,13 +495,13 @@ func TestAPISettingsEmailPut_AngleBracketsRejected(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "validator.settings.smtp_from_name_angle_brackets", errResp.ErrorCode)
 
-	stored, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
+	stored := readSettingsRow(t)
 	assert.Equal(t, before.SMTPFromName, stored.SMTPFromName)
 }
 
 // TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
 func TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
@@ -17,33 +18,6 @@ import (
 // GET / PUT /api/v1/admin/settings/audit-logs
 
 const settingsAuditLogsURL = "/api/v1/admin/settings/audit-logs"
-
-// restoreAuditLogSettings snapshots the audit log settings and puts them back
-// when the test ends. Unlike most settings, these govern whether audit logging
-// happens at all, so leaving them modified would quietly change the behavior
-// every later test runs against.
-func restoreAuditLogSettings(t *testing.T) {
-	t.Helper()
-
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	assert.NotNil(t, settings)
-
-	console := settings.AuditLogsInConsoleEnabled
-	db := settings.AuditLogsInDatabaseEnabled
-	retention := settings.AuditLogRetentionDays
-
-	t.Cleanup(func() {
-		current, err := database.GetSettingsById(context.Background(), nil, 1)
-		if err != nil || current == nil {
-			return
-		}
-		current.AuditLogsInConsoleEnabled = console
-		current.AuditLogsInDatabaseEnabled = db
-		current.AuditLogRetentionDays = retention
-		_ = database.UpdateSettings(context.Background(), nil, current)
-	})
-}
 
 func TestAPISettingsAuditLogsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
@@ -69,7 +43,7 @@ func TestAPISettingsAuditLogsGet_Success(t *testing.T) {
 }
 
 func TestAPISettingsAuditLogsPut_Success(t *testing.T) {
-	restoreAuditLogSettings(t)
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	req := api.UpdateSettingsAuditLogsRequest{
@@ -104,7 +78,7 @@ func TestAPISettingsAuditLogsPut_Success(t *testing.T) {
 // Disabling both sinks must persist too. This is the case where the change is
 // most consequential, since it turns audit logging off.
 func TestAPISettingsAuditLogsPut_CanDisableBothSinks(t *testing.T) {
-	restoreAuditLogSettings(t)
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	req := api.UpdateSettingsAuditLogsRequest{
@@ -127,7 +101,7 @@ func TestAPISettingsAuditLogsPut_CanDisableBothSinks(t *testing.T) {
 
 // Retention is bounded at 0 (meaning infinite) and 3650 days.
 func TestAPISettingsAuditLogsPut_RetentionBoundaries(t *testing.T) {
-	restoreAuditLogSettings(t)
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
 
@@ -160,7 +134,7 @@ func TestAPISettingsAuditLogsPut_RetentionBoundaries(t *testing.T) {
 }
 
 func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
-	restoreAuditLogSettings(t)
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
 
@@ -214,6 +188,7 @@ func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 }
 
 func TestAPISettingsAuditLogsPut_InvalidBody(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
 
@@ -237,15 +212,9 @@ func TestAPISettingsAuditLogsPut_InvalidBody(t *testing.T) {
 // Changing these settings is itself an audited action, and the handler logs it
 // before saving precisely so that turning logging off is still recorded.
 func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
-	restoreAuditLogSettings(t)
-	accessToken, _ := createAdminClientWithToken(t)
-
 	// Database logging must be on for the event to be queryable.
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	settings.AuditLogsInDatabaseEnabled = true
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
+	changeSettings(t, func(settings *models.Settings) { settings.AuditLogsInDatabaseEnabled = true })
+	accessToken, _ := createAdminClientWithToken(t)
 
 	before, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, audit.AuditUpdatedAuditLogsSettings, "")
 	assert.NoError(t, err)
@@ -312,6 +281,7 @@ func TestAPISettingsAuditLogs_UnauthorizedAndScope(t *testing.T) {
 // Reading the settings requires only a read scope, while changing them requires a
 // write scope. A read-only credential must therefore be able to GET but not PUT.
 func TestAPISettingsAuditLogs_ReadScopeCannotWrite(t *testing.T) {
+	restoreSettings(t)
 	url := config.GetAuthServer().BaseURL + settingsAuditLogsURL
 
 	readOnlyToken := createClientCredentialsTokenWithScope(t,

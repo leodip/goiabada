@@ -41,6 +41,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 
 // PUT /api/v1/admin/settings/tokens - success
 func TestAPISettingsTokensPut_Success(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	req := api.UpdateSettingsTokensRequest{
@@ -80,6 +81,7 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 
 // PUT /api/v1/admin/settings/tokens - validation errors
 func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/tokens"
 
@@ -183,6 +185,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 }
 
 func TestAPISettingsTokens_InvalidRequestBodyAndUnauthorized(t *testing.T) {
+	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/tokens"
 
