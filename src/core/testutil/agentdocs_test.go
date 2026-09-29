@@ -51,18 +51,10 @@ var fakeClaudeLines = []string{
 	"", // 24
 }
 
-// The fixture auth_context.go. The real file declares the states under `var (`, so that is the
-// default; the const variant is here because tightening them to constants must not be a change to
-// the guard.
+// The fixture auth_context.go. The states are read from constants only, so the default is a const
+// block; fakeStatesTyped is the real file's shape, and the two var fixtures are the shapes the guard
+// refuses (#436).
 const (
-	fakeStatesVar = `package oauth
-
-var (
-	AuthStateInitial          = "initial"
-	AuthStateLevel2OTP        = "level2_otp"
-	AuthStateReadyToIssueCode = "ready_to_issue_code"
-)
-`
 	fakeStatesConst = `package oauth
 
 const (
@@ -71,9 +63,39 @@ const (
 	AuthStateReadyToIssueCode = "ready_to_issue_code"
 )
 `
-	fakeStatesExtra = `package oauth
+	fakeStatesTyped = `package oauth
+
+type AuthState string
+
+const (
+	AuthStateInitial          AuthState = "initial"
+	AuthStateLevel2OTP        AuthState = "level2_otp"
+	AuthStateReadyToIssueCode AuthState = "ready_to_issue_code"
+)
+`
+	fakeStatesVar = `package oauth
 
 var (
+	AuthStateInitial          = "initial"
+	AuthStateLevel2OTP        = "level2_otp"
+	AuthStateReadyToIssueCode = "ready_to_issue_code"
+)
+`
+	fakeStatesStray = `package oauth
+
+type AuthState string
+
+const (
+	AuthStateInitial          AuthState = "initial"
+	AuthStateLevel2OTP        AuthState = "level2_otp"
+	AuthStateReadyToIssueCode AuthState = "ready_to_issue_code"
+)
+
+var AuthStateStray = "stray"
+`
+	fakeStatesExtra = `package oauth
+
+const (
 	AuthStateInitial          = "initial"
 	AuthStateLevel2OTP        = "level2_otp"
 	AuthStateReadyToIssueCode = "ready_to_issue_code"
@@ -82,11 +104,17 @@ var (
 `
 	fakeStatesNone = `package oauth
 
-var (
+const (
 	sessionCookieName = "session"
 )
 `
 )
+
+// varFinding is the message for one AuthState* name declared with var.
+func varFinding(name string) string {
+	return "src/authserver/internal/ceremony/auth_context.go declares " + name +
+		" with var; the ceremony's states must be constants, declared in its const block"
+}
 
 // TestAgentDocs_TheRuleTable writes one fixture tree per row of the rule and asserts the exact set
 // of findings. Every passing row is a shape that must survive the check untouched; every failing
@@ -111,20 +139,43 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 		{
 			name:   "identical files and a full roster pass",
 			claude: fakeClaudeLines,
-			states: fakeStatesVar,
+			states: fakeStatesConst,
 			want:   nil,
 		},
 		{
-			name:   "the same, with the states declared as constants",
+			// The real file's shape: a defined type and typed constants. The value is still a string
+			// literal, so the roster reads it.
+			name:   "the same, with a defined AuthState type and typed constants",
 			claude: fakeClaudeLines,
-			states: fakeStatesConst,
+			states: fakeStatesTyped,
 			want:   nil,
+		},
+		{
+			// Every state a var: each is its own finding, and none counts as declared, so the
+			// no-constants finding follows and the roster is not compared.
+			name:   "states declared with var fail, one finding each, and leave no constants",
+			claude: fakeClaudeLines,
+			states: fakeStatesVar,
+			want: []string{
+				varFinding("AuthStateInitial"),
+				varFinding("AuthStateLevel2OTP"),
+				varFinding("AuthStateReadyToIssueCode"),
+				"src/authserver/internal/ceremony/auth_context.go declares no AuthState* string constants",
+			},
+		},
+		{
+			// One stray var beside a correct const block. Its value is not read into the roster,
+			// so the var finding is the only one: no roster row is demanded for "stray".
+			name:   "one var beside the const block fails with exactly the var finding",
+			claude: fakeClaudeLines,
+			states: fakeStatesStray,
+			want:   []string{varFinding("AuthStateStray")},
 		},
 		{
 			name:   "a one-line difference in AGENTS.md fails naming the first differing line",
 			claude: fakeClaudeLines,
 			agents: replaceLine(fakeClaudeLines, 6, "The values below are the constants, probably."),
-			states: fakeStatesVar,
+			states: fakeStatesConst,
 			want: []string{
 				"CLAUDE.md and AGENTS.md differ at line 6; they are co-maintained copies and must be identical\n" +
 					"\tCLAUDE.md: The values below are the constants in `src/authserver/internal/ceremony/auth_context.go`.\n" +
@@ -135,7 +186,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			name:   "a shorter AGENTS.md fails at the line where it ends",
 			claude: fakeClaudeLines,
 			agents: fakeClaudeLines[:5],
-			states: fakeStatesVar,
+			states: fakeStatesConst,
 			want: []string{
 				"CLAUDE.md and AGENTS.md differ at line 6; they are co-maintained copies and must be identical\n" +
 					"\tCLAUDE.md: The values below are the constants in `src/authserver/internal/ceremony/auth_context.go`.\n" +
@@ -156,7 +207,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			// occurrence would see nothing wrong here.
 			name:   "a state left only in a later column, its own row deleted, fails naming the value",
 			claude: deleteLine(fakeClaudeLines, 11),
-			states: fakeStatesVar,
+			states: fakeStatesConst,
 			want: []string{
 				`state "level2_otp" is declared in src/authserver/internal/ceremony/auth_context.go but has no row in the "### Auth States (State Machine)" section of CLAUDE.md`,
 			},
@@ -164,7 +215,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 		{
 			name:   "a first-cell token with no declaration fails naming the token",
 			claude: insertLine(fakeClaudeLines, 14, "| `level2_otp_completed` | nobody | dead |"),
-			states: fakeStatesVar,
+			states: fakeStatesConst,
 			want: []string{
 				`the "### Auth States (State Machine)" section of CLAUDE.md has a row for state "level2_otp_completed", which src/authserver/internal/ceremony/auth_context.go does not declare`,
 			},
@@ -178,7 +229,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 		{
 			name:   "a missing heading fails",
 			claude: strings.Split(strings.TrimSuffix(missingHeading, "\n"), "\n"),
-			states: fakeStatesVar,
+			states: fakeStatesConst,
 			want:   []string{`CLAUDE.md has no "### Auth States (State Machine)" section`},
 		},
 	}
@@ -202,7 +253,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 func TestAgentDocs_AMissingAgentsFileFails(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(fakeClaudeLines, "\n"))
-	writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), fakeStatesVar)
+	writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), fakeStatesConst)
 
 	findings := checkAgentDocs(root)
 
@@ -256,7 +307,7 @@ func insertLine(lines []string, n int, line string) []string {
 func TestAgentDocs_TheGuardFailsOnADivergedPairOfDocuments(t *testing.T) {
 	agents := replaceLine(fakeClaudeLines, 6,
 		"The values below are the constants in some other file entirely.")
-	root := writeFakeTree(t, fakeClaudeLines, agents, fakeStatesVar)
+	root := writeFakeTree(t, fakeClaudeLines, agents, fakeStatesConst)
 
 	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
 
@@ -270,7 +321,7 @@ func TestAgentDocs_TheGuardFailsOnADivergedPairOfDocuments(t *testing.T) {
 // appears: a state deleted from that table is still spelled twice in the route table below it.
 func TestAgentDocs_TheGuardFailsOnAStateMissingFromTheRoster(t *testing.T) {
 	shortened := deleteLine(fakeClaudeLines, 11)
-	root := writeFakeTree(t, shortened, shortened, fakeStatesVar)
+	root := writeFakeTree(t, shortened, shortened, fakeStatesConst)
 
 	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
 
@@ -278,10 +329,22 @@ func TestAgentDocs_TheGuardFailsOnAStateMissingFromTheRoster(t *testing.T) {
 	assert.Contains(t, report.Text(), "level2_otp")
 }
 
+// TestAgentDocs_TheGuardFailsOnAStateDeclaredWithVar drives the var rule through the reporting half:
+// a var finding is an Errorf like every other, so the rest of the check still reports.
+func TestAgentDocs_TheGuardFailsOnAStateDeclaredWithVar(t *testing.T) {
+	root := writeFakeTree(t, fakeClaudeLines, fakeClaudeLines, fakeStatesVar)
+
+	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
+
+	require.True(t, report.Failed(), "states declared with var passed the guard")
+	assert.False(t, report.Stopped, "a var finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), varFinding("AuthStateLevel2OTP"))
+}
+
 // TestAgentDocs_TheGuardPassesDocumentsThatAgree is the other direction, and it is what keeps the
 // two cases above from passing for the wrong reason.
 func TestAgentDocs_TheGuardPassesDocumentsThatAgree(t *testing.T) {
-	root := writeFakeTree(t, fakeClaudeLines, fakeClaudeLines, fakeStatesVar)
+	root := writeFakeTree(t, fakeClaudeLines, fakeClaudeLines, fakeStatesConst)
 
 	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
 
@@ -295,7 +358,7 @@ func TestAgentDocs_TheGuardPassesDocumentsThatAgree(t *testing.T) {
 func TestAgentDocs_TheGuardReportsAnUnreadableDocument(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(fakeClaudeLines, "\n"))
-	writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), fakeStatesVar)
+	writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), fakeStatesConst)
 
 	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
 

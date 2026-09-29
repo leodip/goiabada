@@ -692,7 +692,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 // response OIDC Core 3.1.2.2 with 3.1.2.6 says it MUST receive, just later.
 func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
-	newParkedContext := func(state string) *ceremony.AuthContext {
+	newParkedContext := func(state ceremony.AuthState) *ceremony.AuthContext {
 		return &ceremony.AuthContext{
 			AuthState:                state,
 			ClientId:                 "test-client",
@@ -709,11 +709,11 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	// only with a valid session and that request was answered at /auth/authorize, but the delivery
 	// does not turn on which one it is and a later change to the shortcut must not silently strand
 	// a parked error.
-	for _, state := range []string{
+	for _, state := range []ceremony.AuthState{
 		ceremony.AuthStateLevel1PasswordCompleted,
 		ceremony.AuthStateLevel1ExistingSession,
 	} {
-		t.Run("answers the client on "+state, func(t *testing.T) {
+		t.Run("answers the client on "+string(state), func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)

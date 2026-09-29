@@ -70,7 +70,7 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 
 	details := map[string]interface{}{
 		"clientId":  authContext.ClientId,
-		"authState": authContext.AuthState,
+		"authState": string(authContext.AuthState),
 		"ipAddress": clientIP,
 	}
 	// Absent rather than zero when the ceremony has not identified anyone yet, which is every
@@ -110,10 +110,10 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 // holds belongs to the step the user is actually on, and advancing or clearing it here would let a
 // stale page cancel a live authorization. The client is not told either, for the same reason.
 func rejectAuthStateMismatch(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
-	requiredState string, actualState string) {
+	requiredState, actualState ceremony.AuthState) {
 
 	slog.WarnContext(r.Context(), "auth state mismatch, refusing the request",
-		"required_state", requiredState, "actual_state", actualState)
+		"required_state", string(requiredState), "actual_state", string(actualState))
 
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.state_mismatch.title"),
