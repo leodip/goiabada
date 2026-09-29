@@ -517,7 +517,7 @@ func TestHandleConsentPost(t *testing.T) {
 			submitted string
 			// inQuery puts submitted in the URL query instead of the body.
 			inQuery   bool
-			authState string
+			authState ceremony.AuthState
 			btn       string
 		}{
 			{

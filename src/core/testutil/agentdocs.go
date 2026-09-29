@@ -17,7 +17,10 @@ import (
 // AssertAgentDocs holds CLAUDE.md and AGENTS.md to two rules: the two files are
 // byte-identical, and the roster of states in CLAUDE.md's "Auth States (State
 // Machine)" section is exactly the set of AuthState* string constants declared
-// in src/authserver/internal/ceremony/auth_context.go.
+// in src/authserver/internal/ceremony/auth_context.go. An AuthState* name that
+// file declares with var is a finding of its own: a state is a constant, and a
+// variable could be reassigned underneath every gate that compares against it
+// (#436).
 //
 // Both rules exist because the two files are prose about code, and prose about
 // code is the one thing in this repository nothing else checks. The ceremony's
@@ -37,8 +40,7 @@ import (
 // The roster rule checks membership, not transitions. Reconstructing the state
 // graph from the handlers would be a second implementation of the thing being
 // documented, and it would go red on every comment edit; the roster is the part
-// that goes stale silently, when a state is added or, as #248 is about to do,
-// deleted.
+// that goes stale silently, when a state is added or deleted.
 //
 // Scope is the source root's parent, because SourceRoot returns the directory
 // holding the four go.mod files and the two agent files live one level above it.
@@ -92,7 +94,12 @@ func checkAgentDocs(root string) []string {
 		findings = append(findings, firstDifference(string(claude), string(agents)))
 	}
 
-	declared, declErr := declaredAuthStates(filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"))
+	declared, variables, declErr := declaredAuthStates(filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"))
+	for _, name := range variables {
+		findings = append(findings, fmt.Sprintf(
+			"src/authserver/internal/ceremony/auth_context.go declares %s with var; the ceremony's states must be constants, declared in its const block",
+			name))
+	}
 	switch {
 	case declErr != nil:
 		findings = append(findings, fmt.Sprintf("reading src/authserver/internal/ceremony/auth_context.go: %v", declErr))
@@ -169,19 +176,24 @@ func firstDifference(claude, agents string) string {
 }
 
 // declaredAuthStates returns the unquoted value of every AuthState* string
-// declaration in the file. The declarations live under `var (` today; const is
-// read the same way so that tightening them to constants is not a guard change.
+// constant in the file, and, in declaration order, the name of every AuthState*
+// identifier the file declares with var instead. A var contributes no state: the
+// roster is read from constants only, and the caller reports each var as a
+// finding. The value has to be a string literal, typed or untyped, so a
+// conversion such as AuthState("x") is not read and trips the caller's
+// no-constants finding if it is the only form left.
 //
 // Parsing rather than grepping is the point: a regex over the source would
 // equally match the name in a comment, in a test fixture, or in the handler that
 // assigns it, and the roster has to be the declarations exactly.
-func declaredAuthStates(path string) (map[string]bool, error) {
+func declaredAuthStates(path string) (map[string]bool, []string, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	states := map[string]bool{}
+	var variables []string
 	for _, decl := range file.Decls {
 		gen, ok := decl.(*ast.GenDecl)
 		if !ok || (gen.Tok != token.VAR && gen.Tok != token.CONST) {
@@ -193,7 +205,14 @@ func declaredAuthStates(path string) (map[string]bool, error) {
 				continue
 			}
 			for i, name := range value.Names {
-				if !strings.HasPrefix(name.Name, "AuthState") || i >= len(value.Values) {
+				if !strings.HasPrefix(name.Name, "AuthState") {
+					continue
+				}
+				if gen.Tok == token.VAR {
+					variables = append(variables, name.Name)
+					continue
+				}
+				if i >= len(value.Values) {
 					continue
 				}
 				lit, ok := value.Values[i].(*ast.BasicLit)
@@ -208,7 +227,7 @@ func declaredAuthStates(path string) (map[string]bool, error) {
 			}
 		}
 	}
-	return states, nil
+	return states, variables, nil
 }
 
 // agentDocsSection returns the lines between the heading and the next heading at

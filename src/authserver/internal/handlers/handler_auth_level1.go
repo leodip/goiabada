@@ -91,7 +91,7 @@ func HandleAuthLevel1CompletedGet(
 			return
 		}
 
-		requiredStates := []string{ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession}
+		requiredStates := []ceremony.AuthState{ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession}
 		if !slices.Contains(requiredStates, authContext.AuthState) {
 			errorMsg := fmt.Sprintf("authContext.AuthState '%s' does not match any required state", authContext.AuthState)
 			pageRenderer.InternalServerError(w, r, errs.New(errorMsg))

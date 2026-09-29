@@ -309,7 +309,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			submitted string
 			// inQuery puts submitted in the URL query instead of the body.
 			inQuery   bool
-			authState string
+			authState ceremony.AuthState
 		}{
 			{
 				// The defect's own shape: the password screen of the request that was replaced.

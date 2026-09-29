@@ -485,7 +485,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			submitted string
 			// inQuery puts submitted in the URL query instead of the body.
 			inQuery   bool
-			authState string
+			authState ceremony.AuthState
 		}{
 			{
 				// The defect's own shape: the OTP prompt of the request that was replaced.

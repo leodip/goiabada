@@ -10,18 +10,25 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 )
 
-var (
-	AuthStateInitial                 = "initial"
-	AuthStateRequiresLevel1          = "requires_level_1"
-	AuthStateRequiresLevel2          = "requires_level_2"
-	AuthStateLevel1Password          = "level1_password"
-	AuthStateLevel1PasswordCompleted = "level1_password_completed"
-	AuthStateLevel1ExistingSession   = "level1_existing_session"
-	AuthStateLevel2OTP               = "level2_otp"
-	AuthStateLevel2OTPCompleted      = "level2_otp_completed"
-	AuthStateAuthenticationCompleted = "authentication_completed"
-	AuthStateRequiresConsent         = "requires_consent"
-	AuthStateReadyToIssueCode        = "ready_to_issue_code"
+// AuthState is one state of the authorization ceremony's machine: the value AuthContext.AuthState
+// holds between hops, and what each route's gate compares against. The roster in CLAUDE.md's
+// "Auth States (State Machine)" section is held to these constants by AssertAgentDocs in
+// core/testutil, which reads them from this file's const block, so each is written as a typed
+// string literal rather than a conversion (#436).
+type AuthState string
+
+const (
+	AuthStateInitial                 AuthState = "initial"
+	AuthStateRequiresLevel1          AuthState = "requires_level_1"
+	AuthStateRequiresLevel2          AuthState = "requires_level_2"
+	AuthStateLevel1Password          AuthState = "level1_password"
+	AuthStateLevel1PasswordCompleted AuthState = "level1_password_completed"
+	AuthStateLevel1ExistingSession   AuthState = "level1_existing_session"
+	AuthStateLevel2OTP               AuthState = "level2_otp"
+	AuthStateLevel2OTPCompleted      AuthState = "level2_otp_completed"
+	AuthStateAuthenticationCompleted AuthState = "authentication_completed"
+	AuthStateRequiresConsent         AuthState = "requires_consent"
+	AuthStateReadyToIssueCode        AuthState = "ready_to_issue_code"
 )
 
 type AuthContext struct {
@@ -42,7 +49,7 @@ type AuthContext struct {
 	AcrLevel                      models.AcrLevel
 	AuthMethods                   string
 	UserId                        int64
-	AuthState                     string
+	AuthState                     AuthState
 	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
 	AuthenticatedAt               *time.Time // Optional: override for auth_time in code issuance (used by prompt=none)
 	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
