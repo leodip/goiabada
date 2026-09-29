@@ -54,23 +54,23 @@ func (_m *TokenValidator) EXPECT() *TokenValidator_Expecter {
 }
 
 // ValidateTokenRequest provides a mock function for the type TokenValidator
-func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error) {
+func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error) {
 	ret := _mock.Called(ctx, settings, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidateTokenRequest")
 	}
 
-	var r0 *protocolvalidation.ValidateTokenRequestResult
+	var r0 protocolvalidation.TokenGrant
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)); ok {
 		return returnFunc(ctx, settings, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) *protocolvalidation.ValidateTokenRequestResult); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) protocolvalidation.TokenGrant); ok {
 		r0 = returnFunc(ctx, settings, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*protocolvalidation.ValidateTokenRequestResult)
+			r0 = ret.Get(0).(protocolvalidation.TokenGrant)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) error); ok {
@@ -117,12 +117,12 @@ func (_c *TokenValidator_ValidateTokenRequest_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *TokenValidator_ValidateTokenRequest_Call) Return(validateTokenRequestResult *protocolvalidation.ValidateTokenRequestResult, err error) *TokenValidator_ValidateTokenRequest_Call {
-	_c.Call.Return(validateTokenRequestResult, err)
+func (_c *TokenValidator_ValidateTokenRequest_Call) Return(tokenGrant protocolvalidation.TokenGrant, err error) *TokenValidator_ValidateTokenRequest_Call {
+	_c.Call.Return(tokenGrant, err)
 	return _c
 }
 
-func (_c *TokenValidator_ValidateTokenRequest_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)) *TokenValidator_ValidateTokenRequest_Call {
+func (_c *TokenValidator_ValidateTokenRequest_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)) *TokenValidator_ValidateTokenRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -35,6 +36,15 @@ func expectRedirectURIStillRegistered(mockDB *mocks_data.Database, uri string) {
 			c := args.Get(2).(*models.Client)
 			c.RedirectURIs = []models.RedirectURI{{URI: uri}}
 		}).Return(nil).Maybe()
+}
+
+// grantAs asserts that a validated request is the grant a case expects and returns it typed, so a
+// case that reads a field reads it off the one grant that carries it (#437).
+func grantAs[G TokenGrant](t *testing.T, grant TokenGrant) G {
+	t.Helper()
+	typed, ok := grant.(G)
+	require.True(t, ok, "the validator returned %T", grant)
+	return typed
 }
 
 func TestValidateTokenRequest(t *testing.T) {
@@ -900,6 +910,44 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		})
 
 		assert.NoError(t, err)
-		assert.NotNil(t, result)
+		assert.True(t, grantAs[*RefreshTokenGrant](t, result).IsROPC)
 	})
+}
+
+// TestTokenGrant_EachGrantNamesItsGrantType holds each validated grant to the grant table entry
+// the handler dispatches it as. A grant type naming another grant would send its request down the
+// wrong arm everywhere GrantType() is read.
+func TestTokenGrant_EachGrantNamesItsGrantType(t *testing.T) {
+	for _, tc := range []struct {
+		grant TokenGrant
+		want  oidc.GrantType
+	}{
+		{&AuthorizationCodeGrant{}, oidc.GrantTypeAuthorizationCode},
+		{&ClientCredentialsGrant{}, oidc.GrantTypeClientCredentials},
+		{&RefreshTokenGrant{}, oidc.GrantTypeRefreshToken},
+		{&PasswordGrant{}, oidc.GrantTypePassword},
+	} {
+		assert.Equal(t, tc.want, tc.grant.GrantType(), "%T", tc.grant)
+		assert.True(t, tc.want.AcceptedAtTokenEndpoint(), "%T names a grant the token endpoint refuses", tc.grant)
+	}
+}
+
+// TestAsTokenGrant_ARefusalIsANilInterface pins the one thing asTokenGrant exists for. A grant
+// method refuses with a nil pointer beside its error, and returned straight through the
+// TokenGrant result that pointer becomes an interface which is not nil, so a caller checking the
+// grant would take a refusal for a grant. The comparison is ==, not assert.Nil, because assert.Nil
+// reads through the interface and calls a nil pointer inside one nil as well.
+func TestAsTokenGrant_ARefusalIsANilInterface(t *testing.T) {
+	refused := errs.New("refused")
+
+	grant, err := asTokenGrant((*AuthorizationCodeGrant)(nil), refused)
+
+	assert.Same(t, refused, err)
+	assert.True(t, grant == nil, "a refusal came back as a non-nil %T", grant)
+
+	accepted := &AuthorizationCodeGrant{Code: &models.Code{Id: 7}}
+	grant, err = asTokenGrant(accepted, nil)
+
+	require.NoError(t, err)
+	assert.Same(t, accepted, grant)
 }

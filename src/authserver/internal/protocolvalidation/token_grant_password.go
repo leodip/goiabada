@@ -15,8 +15,8 @@ import (
 
 // ROPCNotAuthorizedErrorMsg is the refusal for a client that may not use the resource owner
 // password credentials grant. Two places emit it: the password grant below, which refuses a
-// new login, and the token handler's refresh arm, which refuses to refresh a token ROPC
-// issued. They have to say the same thing, because an operator turning the switch off is
+// new login, and the token handler's refresh responder, which answers with it when the refresh
+// redemption refuses a token ROPC issued. They have to say the same thing, because an operator turning the switch off is
 // doing one act with two consequences, and a reader told two different stories about it will
 // think only new logins stopped. Exported and package-level because the second user lives in
 // the authserver module (#250).
@@ -24,10 +24,20 @@ const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resou
 	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
 	"or enable it globally in 'Settings > General'."
 
+// PasswordGrant is a validated resource owner password credentials request: the client, the user
+// whose password was just checked, and the scope granted to them.
+type PasswordGrant struct {
+	Client *models.Client
+	User   *models.User
+	Scope  string
+}
+
+func (*PasswordGrant) GrantType() oidc.GrantType { return oidc.GrantTypePassword }
+
 // validatePasswordGrant validates a resource owner password credentials request (RFC 6749
 // section 4.3.2) for a client ValidateTokenRequest has already found and found enabled.
 func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *models.Settings,
-	client *models.Client, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
+	client *models.Client, input *ValidateTokenRequestInput) (*PasswordGrant, error) {
 	// RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 
@@ -110,7 +120,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 		return nil, err
 	}
 
-	return &ValidateTokenRequestResult{
+	return &PasswordGrant{
 		Client: client,
 		User:   user,
 		Scope:  validatedScope,

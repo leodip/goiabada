@@ -88,8 +88,9 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 
 				if tc.wantDesc == "" {
 					require.NoError(t, err)
-					require.NotNil(t, result)
-					assert.Same(t, refreshToken, result.RefreshToken)
+					grant := grantAs[*RefreshTokenGrant](t, result)
+					assert.Same(t, refreshToken, grant.RefreshToken)
+					assert.True(t, grant.IsROPC, "a token with no code was minted by the password grant")
 					return
 				}
 				assert.Nil(t, result)
@@ -152,6 +153,6 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		assert.Same(t, refreshToken, result.RefreshToken)
+		assert.Same(t, refreshToken, grantAs[*RefreshTokenGrant](t, result).RefreshToken)
 	})
 }

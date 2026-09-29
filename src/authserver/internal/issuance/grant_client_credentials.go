@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, settings *models.Settings,
+func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *models.Settings,
 	client *models.Client, scope string) (*oauth.TokenResponse, error) {
 
 	var tokenResponse = oauth.TokenResponse{

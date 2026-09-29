@@ -103,7 +103,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		require.NoError(t, err, "the validator must hold no flow rule on the refresh arm")
 		require.NotNil(t, result)
-		assert.False(t, result.Client.AuthorizationCodeEnabled,
+		assert.False(t, grantAs[*RefreshTokenGrant](t, result).Client.AuthorizationCodeEnabled,
 			"the fixture is only meaningful while the flow is off")
 	})
 
@@ -967,9 +967,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.NoError(t, err)
-		assert.NotNil(t, result)
-		assert.Equal(t, refreshToken, result.RefreshToken)
-		assert.Equal(t, refreshTokenJwt, result.RefreshTokenInfo)
+		grant := grantAs[*RefreshTokenGrant](t, result)
+		assert.Equal(t, refreshToken, grant.RefreshToken)
+		assert.False(t, grant.IsROPC, "a token with a code was minted by the authorization code flow")
 	})
 
 	t.Run("Consent is looked up once for a multi-scope refresh", func(t *testing.T) {
@@ -1123,10 +1123,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.NoError(t, err)
-		assert.NotNil(t, result)
-		assert.Equal(t, refreshToken, result.RefreshToken)
-		assert.Equal(t, refreshTokenJwt, result.RefreshTokenInfo)
-		assert.Equal(t, "openid srv1:read srv1:write", result.CodeEntity.Scope)
+		grant := grantAs[*RefreshTokenGrant](t, result)
+		assert.Equal(t, refreshToken, grant.RefreshToken)
+		assert.False(t, grant.IsROPC, "a token with a code was minted by the authorization code flow")
+		assert.Equal(t, "openid srv1:read srv1:write", grant.RefreshToken.Code.Scope)
+		assert.Equal(t, "openid srv1:read", grant.ScopeRequested, "the narrower scope the request asked for travels on the grant")
 	})
 
 	t.Run("Refresh token with revoked consent", func(t *testing.T) {

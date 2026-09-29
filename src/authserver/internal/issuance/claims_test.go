@@ -23,7 +23,7 @@ import (
 
 func TestGenerateAccessToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -111,7 +111,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -185,7 +185,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 
 func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -296,7 +296,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -343,7 +343,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 
 func TestGenerateIdToken_FullScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -475,7 +475,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 
 func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -547,7 +547,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 
 func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -781,7 +781,7 @@ func TestAuthMethodsToArray_OIDCCompliance(t *testing.T) {
 // This test explicitly checks the type, not just the values.
 func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -845,7 +845,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		}, nil).Once()
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array
@@ -889,7 +889,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		}, nil).Once()
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array with both methods
@@ -920,7 +920,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 			Scope:  "openid",
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array
@@ -986,7 +986,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 // non-nil []interface{}{}, so assert.Nil would pass for either and pin nothing.
 func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1064,7 +1064,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			User:              *user,
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -1095,7 +1095,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			User:              *user,
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -1198,7 +1198,7 @@ func TestAMR_EdgeCases(t *testing.T) {
 // TestCreateTokenInputFromCode verifies the factory function for auth code flow
 func TestCreateTokenInputFromCode(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
@@ -1235,7 +1235,7 @@ func TestCreateTokenInputFromCode(t *testing.T) {
 // TestCreateTokenInputFromImplicit verifies the factory function for implicit flow
 func TestCreateTokenInputFromImplicit(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
@@ -1271,7 +1271,7 @@ func TestCreateTokenInputFromImplicit(t *testing.T) {
 // TestCreateTokenInputFromROPC verifies the factory function for ROPC flow
 func TestCreateTokenInputFromROPC(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
@@ -1308,7 +1308,7 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 // TestGenerateAccessTokenCore_InvalidScope tests error handling for invalid scopes
 func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
@@ -1369,7 +1369,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 // TestGenerateAccessTokenCore_MultipleAudiences tests handling of multiple resource audiences
 func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1411,7 +1411,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 // TestGenerateAccessTokenCore_OptionalClaims tests optional claims (nonce, sid)
 func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1479,7 +1479,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 // TestGenerateIdTokenCore_WithAtHash tests at_hash claim for implicit flow
 func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1549,7 +1549,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 // TestGenerateIdTokenCore_GroupsAndAttributes tests groups/attributes with IncludeInIdToken
 func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1613,7 +1613,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 // TestTokenGenerationInput_AllFieldsCopied ensures all fields are properly copied by factory functions
 func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
 	authTime := now.Add(-10 * time.Minute)
@@ -1654,7 +1654,7 @@ func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
 // TestGenerateAccessTokenCore_ClientOverrideExpiration tests client-specific token expiration
 func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1721,7 +1721,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 // TestGenerateAccessTokenCore_OIDCClaimsInAccessToken tests includeOpenIDConnectClaimsInAccessToken setting
 func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1879,7 +1879,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockDB.On("UserHasProfilePicture", callersContext, mock.Anything, int64(42)).Return(true, nil).Once()
 
-		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher)
+		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
 		claims := jwt.MapClaims{}
 		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "profile"})
 
@@ -1891,7 +1891,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 	t.Run("without the profile scope the port is not reached", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
-		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher)
+		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
 		claims := jwt.MapClaims{}
 		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "email"})
 
@@ -1911,7 +1911,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 // diverges is the scope slice each token type hands it.
 // ============================================================================
 
-// issueCharacterizationTokens drives GenerateTokenResponseForAuthCode once for one scope string
+// issueCharacterizationTokens drives mintAuthorizationCodeTokens once for one scope string
 // and returns the decoded ID and access token claims. Both OIDC claim settings are on, so the
 // two token types differ only where the code makes them differ.
 //
@@ -1922,7 +1922,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, baseURL, testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, baseURL, testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -1974,7 +1974,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -2153,7 +2153,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -2242,7 +2242,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
@@ -2250,10 +2250,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, settings, &GenerateTokenForRefreshInput{
-			Code:         code,
-			RefreshToken: parent,
-		})
+		response, err := tokenIssuer.mintCodeRefreshTokens(ctx, settings, code, parent, "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
@@ -2265,7 +2262,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		issued.reportedScope, issued.accessToken, issued.idToken = response.Scope, response.AccessToken, response.IdToken
 	case "ROPC":
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
+		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
@@ -2273,9 +2270,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, settings, &GenerateTokenForRefreshROPCInput{
-			RefreshToken: parent,
-		})
+		response, err := tokenIssuer.mintROPCRefreshTokens(ctx, settings, parent, "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken

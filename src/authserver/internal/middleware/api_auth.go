@@ -57,7 +57,7 @@ func (m *MiddlewareBearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []st
 // RequireUserBoundToken rejects bearer tokens that do not represent an authenticated
 // user. Endpoints behind this guard resolve the acting user from the `sub` claim, and
 // for a client_credentials token `sub` is the CLIENT identifier, not a user subject
-// (issuance/grant_client_credentials.go, GenerateTokenResponseForClientCred). A client whose identifier
+// (issuance/grant_client_credentials.go, IssueClientCredentialsGrant). A client whose identifier
 // happened to equal a user's subject could therefore act as that user: a 36-character
 // UUID is a valid client identifier whenever its first hex digit is a-f.
 //

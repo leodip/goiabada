@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// TestGenerateTokenResponseForROPC_BasicOpenIDScope tests ROPC with basic openid scope
-func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
+// TestIssuePasswordGrant_BasicOpenIDScope tests ROPC with basic openid scope
+func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -76,7 +76,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -113,10 +113,10 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_WithOfflineAccess tests ROPC with offline_access scope
-func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
+// TestIssuePasswordGrant_WithOfflineAccess tests ROPC with offline_access scope
+func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -175,7 +175,7 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 		Scope:  "openid offline_access",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -193,10 +193,10 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_WithProfileScope tests ROPC with profile scope claims
-func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
+// TestIssuePasswordGrant_WithProfileScope tests ROPC with profile scope claims
+func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -257,7 +257,7 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 		Scope:  "openid profile",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -273,10 +273,10 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_WithEmailScope tests ROPC with email scope claims
-func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
+// TestIssuePasswordGrant_WithEmailScope tests ROPC with email scope claims
+func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -334,7 +334,7 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 		Scope:  "openid email",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -348,10 +348,10 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_WithResourcePermissions tests ROPC with resource:permission scopes
-func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
+// TestIssuePasswordGrant_WithResourcePermissions tests ROPC with resource:permission scopes
+func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -408,7 +408,7 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 		Scope:  "openid myapi:read myapi:write",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -431,10 +431,10 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_WithGroups tests ROPC with groups scope
-func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
+// TestIssuePasswordGrant_WithGroups tests ROPC with groups scope
+func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -494,7 +494,7 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 		Scope:  "openid groups",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -515,10 +515,10 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_WithoutOpenID tests ROPC without openid scope (no id_token)
-func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
+// TestIssuePasswordGrant_WithoutOpenID tests ROPC without openid scope (no id_token)
+func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -575,7 +575,7 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 		Scope:  "myapi:read",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -587,10 +587,10 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey tests error handling for signing key errors
-func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) {
+// TestIssuePasswordGrant_DatabaseError_GetSigningKey tests error handling for signing key errors
+func TestIssuePasswordGrant_DatabaseError_GetSigningKey(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -621,7 +621,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) 
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.Error(t, err)
 	assert.Nil(t, response)
@@ -630,10 +630,10 @@ func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) 
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken tests error handling for refresh token creation errors
-func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testing.T) {
+// TestIssuePasswordGrant_DatabaseError_CreateRefreshToken tests error handling for refresh token creation errors
+func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -689,7 +689,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.Error(t, err)
 	assert.Nil(t, response)
@@ -698,10 +698,10 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_ClientTokenExpiration tests client-specific token expiration override
-func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
+// TestIssuePasswordGrant_ClientTokenExpiration tests client-specific token expiration override
+func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -759,7 +759,7 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -768,10 +768,10 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForROPC_GlobalTokenExpiration tests global token expiration (no client override)
-func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
+// TestIssuePasswordGrant_GlobalTokenExpiration tests global token expiration (no client override)
+func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -829,7 +829,7 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
+	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)

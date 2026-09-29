@@ -18,7 +18,7 @@ import (
 // its password was checked, on every token it issues and on every token any refresh of it issues.
 // OpenID Connect Core 1.0 section 12.2 requires that of the ID token ("the time of the original
 // authentication - not the time that the new ID token is issued") and RFC 9068 section 2.2.1 of
-// the access token. The refresh half is in TestGenerateTokenResponseForRefreshROPC.
+// the access token. The refresh half is in TestMintROPCRefreshTokens.
 
 // ropcGrantFixture is a password grant's issuer over strict mocks, with the first refresh token
 // the grant writes captured.
@@ -52,7 +52,7 @@ func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 		Return(nil)
 
 	return ropcGrantFixture{
-		issuer: NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher),
+		issuer: NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil),
 		settings: &models.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
@@ -68,11 +68,11 @@ func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 // The password grant's access token, ID token and first refresh token all carry the one instant
 // the grant stamped, which is the moment of the grant: the refresh token row is where every later
 // refresh reads it back from.
-func TestGenerateTokenResponseForROPC_EveryTokenCarriesTheGrantsInstant(t *testing.T) {
+func TestIssuePasswordGrant_EveryTokenCarriesTheGrantsInstant(t *testing.T) {
 	f := newROPCGrantFixture(t)
 
 	before := time.Now().UTC()
-	response, err := f.issuer.GenerateTokenResponseForROPC(context.Background(), f.settings, f.input)
+	response, err := f.issuer.IssuePasswordGrant(context.Background(), f.settings, f.input)
 	after := time.Now().UTC()
 	require.NoError(t, err)
 
@@ -92,7 +92,7 @@ func TestGenerateTokenResponseForROPC_EveryTokenCarriesTheGrantsInstant(t *testi
 // The issuer writes the instant, not the caller: the password is checked for this request, so a
 // value the caller left on the input is not an authentication anybody performed, and the input is
 // not written through either.
-func TestGenerateTokenResponseForROPC_TheIssuerStampsTheInstantNotTheCaller(t *testing.T) {
+func TestIssuePasswordGrant_TheIssuerStampsTheInstantNotTheCaller(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		given time.Time
@@ -105,7 +105,7 @@ func TestGenerateTokenResponseForROPC_TheIssuerStampsTheInstantNotTheCaller(t *t
 			f.input.AuthenticatedAt = tc.given
 
 			before := time.Now().UTC()
-			response, err := f.issuer.GenerateTokenResponseForROPC(context.Background(), f.settings, f.input)
+			response, err := f.issuer.IssuePasswordGrant(context.Background(), f.settings, f.input)
 			require.NoError(t, err)
 
 			written := *f.written
@@ -123,17 +123,17 @@ func TestGenerateTokenResponseForROPC_TheIssuerStampsTheInstantNotTheCaller(t *t
 // read or signed. The token endpoint refuses it first; this is what stops a caller that skipped
 // the validator from signing auth_time as the zero time. The strict mock fails the test on any
 // database call.
-func TestGenerateTokenResponseForRefreshROPC_ATokenWithNoInstantIsRefused(t *testing.T) {
+func TestMintROPCRefreshTokens_ATokenWithNoInstantIsRefused(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	response, err := issuer.GenerateTokenResponseForRefreshROPC(context.Background(), &models.Settings{},
-		&GenerateTokenForRefreshROPCInput{RefreshToken: &models.RefreshToken{
+	response, err := issuer.mintROPCRefreshTokens(context.Background(), &models.Settings{},
+		&models.RefreshToken{
 			RefreshTokenJti: "pre-000051-jti",
 			UserId:          sql.NullInt64{Int64: 1, Valid: true},
 			ClientId:        sql.NullInt64{Int64: 1, Valid: true},
 			Scope:           "openid",
-		}})
+		}, "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "records no authentication instant")

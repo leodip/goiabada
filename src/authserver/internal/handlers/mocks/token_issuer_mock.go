@@ -54,12 +54,12 @@ func (_m *TokenIssuer) EXPECT() *TokenIssuer_Expecter {
 	return &TokenIssuer_Expecter{mock: &_m.Mock}
 }
 
-// GenerateTokenResponseForAuthCode provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error) {
+// IssueAuthorizationCodeGrant provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, settings, code)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateTokenResponseForAuthCode")
+		panic("no return value specified for IssueAuthorizationCodeGrant")
 	}
 
 	var r0 *oauth.TokenResponse
@@ -82,20 +82,20 @@ func (_mock *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context, 
 	return r0, r1
 }
 
-// TokenIssuer_GenerateTokenResponseForAuthCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForAuthCode'
-type TokenIssuer_GenerateTokenResponseForAuthCode_Call struct {
+// TokenIssuer_IssueAuthorizationCodeGrant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IssueAuthorizationCodeGrant'
+type TokenIssuer_IssueAuthorizationCodeGrant_Call struct {
 	*mock.Call
 }
 
-// GenerateTokenResponseForAuthCode is a helper method to define mock.On call
+// IssueAuthorizationCodeGrant is a helper method to define mock.On call
 //   - ctx context.Context
 //   - settings *models.Settings
 //   - code *models.Code
-func (_e *TokenIssuer_Expecter) GenerateTokenResponseForAuthCode(ctx any, settings any, code any) *TokenIssuer_GenerateTokenResponseForAuthCode_Call {
-	return &TokenIssuer_GenerateTokenResponseForAuthCode_Call{Call: _e.mock.On("GenerateTokenResponseForAuthCode", ctx, settings, code)}
+func (_e *TokenIssuer_Expecter) IssueAuthorizationCodeGrant(ctx any, settings any, code any) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
+	return &TokenIssuer_IssueAuthorizationCodeGrant_Call{Call: _e.mock.On("IssueAuthorizationCodeGrant", ctx, settings, code)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForAuthCode_Call) Run(run func(ctx context.Context, settings *models.Settings, code *models.Code)) *TokenIssuer_GenerateTokenResponseForAuthCode_Call {
+func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) Run(run func(ctx context.Context, settings *models.Settings, code *models.Code)) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -118,22 +118,22 @@ func (_c *TokenIssuer_GenerateTokenResponseForAuthCode_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForAuthCode_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_GenerateTokenResponseForAuthCode_Call {
+func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
 	_c.Call.Return(tokenResponse, err)
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForAuthCode_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForAuthCode_Call {
+func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error)) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GenerateTokenResponseForClientCred provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error) {
+// IssueClientCredentialsGrant provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, settings, client, scope)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateTokenResponseForClientCred")
+		panic("no return value specified for IssueClientCredentialsGrant")
 	}
 
 	var r0 *oauth.TokenResponse
@@ -156,21 +156,21 @@ func (_mock *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context
 	return r0, r1
 }
 
-// TokenIssuer_GenerateTokenResponseForClientCred_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForClientCred'
-type TokenIssuer_GenerateTokenResponseForClientCred_Call struct {
+// TokenIssuer_IssueClientCredentialsGrant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IssueClientCredentialsGrant'
+type TokenIssuer_IssueClientCredentialsGrant_Call struct {
 	*mock.Call
 }
 
-// GenerateTokenResponseForClientCred is a helper method to define mock.On call
+// IssueClientCredentialsGrant is a helper method to define mock.On call
 //   - ctx context.Context
 //   - settings *models.Settings
 //   - client *models.Client
 //   - scope string
-func (_e *TokenIssuer_Expecter) GenerateTokenResponseForClientCred(ctx any, settings any, client any, scope any) *TokenIssuer_GenerateTokenResponseForClientCred_Call {
-	return &TokenIssuer_GenerateTokenResponseForClientCred_Call{Call: _e.mock.On("GenerateTokenResponseForClientCred", ctx, settings, client, scope)}
+func (_e *TokenIssuer_Expecter) IssueClientCredentialsGrant(ctx any, settings any, client any, scope any) *TokenIssuer_IssueClientCredentialsGrant_Call {
+	return &TokenIssuer_IssueClientCredentialsGrant_Call{Call: _e.mock.On("IssueClientCredentialsGrant", ctx, settings, client, scope)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForClientCred_Call) Run(run func(ctx context.Context, settings *models.Settings, client *models.Client, scope string)) *TokenIssuer_GenerateTokenResponseForClientCred_Call {
+func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) Run(run func(ctx context.Context, settings *models.Settings, client *models.Client, scope string)) *TokenIssuer_IssueClientCredentialsGrant_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -198,22 +198,22 @@ func (_c *TokenIssuer_GenerateTokenResponseForClientCred_Call) Run(run func(ctx 
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForClientCred_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_GenerateTokenResponseForClientCred_Call {
+func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_IssueClientCredentialsGrant_Call {
 	_c.Call.Return(tokenResponse, err)
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForClientCred_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForClientCred_Call {
+func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error)) *TokenIssuer_IssueClientCredentialsGrant_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GenerateTokenResponseForROPC provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error) {
+// IssuePasswordGrant provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, settings, input)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateTokenResponseForROPC")
+		panic("no return value specified for IssuePasswordGrant")
 	}
 
 	var r0 *oauth.TokenResponse
@@ -236,20 +236,20 @@ func (_mock *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, sett
 	return r0, r1
 }
 
-// TokenIssuer_GenerateTokenResponseForROPC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForROPC'
-type TokenIssuer_GenerateTokenResponseForROPC_Call struct {
+// TokenIssuer_IssuePasswordGrant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IssuePasswordGrant'
+type TokenIssuer_IssuePasswordGrant_Call struct {
 	*mock.Call
 }
 
-// GenerateTokenResponseForROPC is a helper method to define mock.On call
+// IssuePasswordGrant is a helper method to define mock.On call
 //   - ctx context.Context
 //   - settings *models.Settings
 //   - input *issuance.ROPCGrantInput
-func (_e *TokenIssuer_Expecter) GenerateTokenResponseForROPC(ctx any, settings any, input any) *TokenIssuer_GenerateTokenResponseForROPC_Call {
-	return &TokenIssuer_GenerateTokenResponseForROPC_Call{Call: _e.mock.On("GenerateTokenResponseForROPC", ctx, settings, input)}
+func (_e *TokenIssuer_Expecter) IssuePasswordGrant(ctx any, settings any, input any) *TokenIssuer_IssuePasswordGrant_Call {
+	return &TokenIssuer_IssuePasswordGrant_Call{Call: _e.mock.On("IssuePasswordGrant", ctx, settings, input)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Run(run func(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+func (_c *TokenIssuer_IssuePasswordGrant_Call) Run(run func(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput)) *TokenIssuer_IssuePasswordGrant_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -272,58 +272,66 @@ func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+func (_c *TokenIssuer_IssuePasswordGrant_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_IssuePasswordGrant_Call {
 	_c.Call.Return(tokenResponse, err)
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+func (_c *TokenIssuer_IssuePasswordGrant_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)) *TokenIssuer_IssuePasswordGrant_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GenerateTokenResponseForRefresh provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
+// IssueRefreshTokenGrant provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *models.Settings, input *issuance.RefreshTokenGrantInput) (*oauth.TokenResponse, *issuance.RefreshOutcome, error) {
 	ret := _mock.Called(ctx, settings, input)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateTokenResponseForRefresh")
+		panic("no return value specified for IssueRefreshTokenGrant")
 	}
 
 	var r0 *oauth.TokenResponse
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)); ok {
+	var r1 *issuance.RefreshOutcome
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.RefreshTokenGrantInput) (*oauth.TokenResponse, *issuance.RefreshOutcome, error)); ok {
 		return returnFunc(ctx, settings, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.GenerateTokenForRefreshInput) *oauth.TokenResponse); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.RefreshTokenGrantInput) *oauth.TokenResponse); ok {
 		r0 = returnFunc(ctx, settings, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*oauth.TokenResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.Settings, *issuance.GenerateTokenForRefreshInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.Settings, *issuance.RefreshTokenGrantInput) *issuance.RefreshOutcome); ok {
 		r1 = returnFunc(ctx, settings, input)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*issuance.RefreshOutcome)
+		}
 	}
-	return r0, r1
+	if returnFunc, ok := ret.Get(2).(func(context.Context, *models.Settings, *issuance.RefreshTokenGrantInput) error); ok {
+		r2 = returnFunc(ctx, settings, input)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
 }
 
-// TokenIssuer_GenerateTokenResponseForRefresh_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForRefresh'
-type TokenIssuer_GenerateTokenResponseForRefresh_Call struct {
+// TokenIssuer_IssueRefreshTokenGrant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IssueRefreshTokenGrant'
+type TokenIssuer_IssueRefreshTokenGrant_Call struct {
 	*mock.Call
 }
 
-// GenerateTokenResponseForRefresh is a helper method to define mock.On call
+// IssueRefreshTokenGrant is a helper method to define mock.On call
 //   - ctx context.Context
 //   - settings *models.Settings
-//   - input *issuance.GenerateTokenForRefreshInput
-func (_e *TokenIssuer_Expecter) GenerateTokenResponseForRefresh(ctx any, settings any, input any) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
-	return &TokenIssuer_GenerateTokenResponseForRefresh_Call{Call: _e.mock.On("GenerateTokenResponseForRefresh", ctx, settings, input)}
+//   - input *issuance.RefreshTokenGrantInput
+func (_e *TokenIssuer_Expecter) IssueRefreshTokenGrant(ctx any, settings any, input any) *TokenIssuer_IssueRefreshTokenGrant_Call {
+	return &TokenIssuer_IssueRefreshTokenGrant_Call{Call: _e.mock.On("IssueRefreshTokenGrant", ctx, settings, input)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Run(run func(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshInput)) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
+func (_c *TokenIssuer_IssueRefreshTokenGrant_Call) Run(run func(ctx context.Context, settings *models.Settings, input *issuance.RefreshTokenGrantInput)) *TokenIssuer_IssueRefreshTokenGrant_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -333,9 +341,9 @@ func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Run(run func(ctx con
 		if args[1] != nil {
 			arg1 = args[1].(*models.Settings)
 		}
-		var arg2 *issuance.GenerateTokenForRefreshInput
+		var arg2 *issuance.RefreshTokenGrantInput
 		if args[2] != nil {
-			arg2 = args[2].(*issuance.GenerateTokenForRefreshInput)
+			arg2 = args[2].(*issuance.RefreshTokenGrantInput)
 		}
 		run(
 			arg0,
@@ -346,86 +354,12 @@ func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
-	_c.Call.Return(tokenResponse, err)
+func (_c *TokenIssuer_IssueRefreshTokenGrant_Call) Return(tokenResponse *oauth.TokenResponse, refreshOutcome *issuance.RefreshOutcome, err error) *TokenIssuer_IssueRefreshTokenGrant_Call {
+	_c.Call.Return(tokenResponse, refreshOutcome, err)
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GenerateTokenResponseForRefreshROPC provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
-	ret := _mock.Called(ctx, settings, input)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GenerateTokenResponseForRefreshROPC")
-	}
-
-	var r0 *oauth.TokenResponse
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)); ok {
-		return returnFunc(ctx, settings, input)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.GenerateTokenForRefreshROPCInput) *oauth.TokenResponse); ok {
-		r0 = returnFunc(ctx, settings, input)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauth.TokenResponse)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.Settings, *issuance.GenerateTokenForRefreshROPCInput) error); ok {
-		r1 = returnFunc(ctx, settings, input)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// TokenIssuer_GenerateTokenResponseForRefreshROPC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForRefreshROPC'
-type TokenIssuer_GenerateTokenResponseForRefreshROPC_Call struct {
-	*mock.Call
-}
-
-// GenerateTokenResponseForRefreshROPC is a helper method to define mock.On call
-//   - ctx context.Context
-//   - settings *models.Settings
-//   - input *issuance.GenerateTokenForRefreshROPCInput
-func (_e *TokenIssuer_Expecter) GenerateTokenResponseForRefreshROPC(ctx any, settings any, input any) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
-	return &TokenIssuer_GenerateTokenResponseForRefreshROPC_Call{Call: _e.mock.On("GenerateTokenResponseForRefreshROPC", ctx, settings, input)}
-}
-
-func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) Run(run func(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshROPCInput)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *models.Settings
-		if args[1] != nil {
-			arg1 = args[1].(*models.Settings)
-		}
-		var arg2 *issuance.GenerateTokenForRefreshROPCInput
-		if args[2] != nil {
-			arg2 = args[2].(*issuance.GenerateTokenForRefreshROPCInput)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
-	_c.Call.Return(tokenResponse, err)
-	return _c
-}
-
-func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
+func (_c *TokenIssuer_IssueRefreshTokenGrant_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.RefreshTokenGrantInput) (*oauth.TokenResponse, *issuance.RefreshOutcome, error)) *TokenIssuer_IssueRefreshTokenGrant_Call {
 	_c.Call.Return(run)
 	return _c
 }

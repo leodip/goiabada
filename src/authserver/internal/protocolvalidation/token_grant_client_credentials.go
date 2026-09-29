@@ -12,10 +12,19 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 )
 
+// ClientCredentialsGrant is a validated client credentials request: the authenticated client and
+// the scope it is granted, which is every permission it holds when the request named none.
+type ClientCredentialsGrant struct {
+	Client *models.Client
+	Scope  string
+}
+
+func (*ClientCredentialsGrant) GrantType() oidc.GrantType { return oidc.GrantTypeClientCredentials }
+
 // validateClientCredentialsGrant validates a client credentials request (RFC 6749 section 4.4.2)
 // for a client ValidateTokenRequest has already found and found enabled.
 func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, client *models.Client,
-	input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
+	input *ValidateTokenRequestInput) (*ClientCredentialsGrant, error) {
 	if !client.ClientCredentialsEnabled {
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
 			"The client associated with the provided client_id does not support client credentials flow.",
@@ -86,7 +95,7 @@ func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, c
 		return nil, err
 	}
 
-	return &ValidateTokenRequestResult{
+	return &ClientCredentialsGrant{
 		Client: client,
 		Scope:  input.Scope,
 	}, nil

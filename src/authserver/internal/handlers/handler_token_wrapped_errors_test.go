@@ -37,13 +37,12 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	t.Helper()
 
 	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator,
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator,
 		auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=abc&redirect_uri=http://example.com&client_id=test_client"

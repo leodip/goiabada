@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
+func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -110,7 +110,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -266,9 +266,9 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
+func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -330,7 +330,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -400,9 +400,9 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testing.T) {
+func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -482,7 +482,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -578,9 +578,9 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testing.T) {
+func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -639,7 +639,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -696,9 +696,9 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
+func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -759,7 +759,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)

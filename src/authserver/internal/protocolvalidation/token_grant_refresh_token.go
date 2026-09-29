@@ -30,19 +30,36 @@ const invalidGenerationMessage = "The refresh token is invalid because it was su
 // would confirm which JTIs were ever issued.
 const invalidRefreshTokenMessage = "The refresh token is invalid."
 
+// RefreshTokenGrant is a validated refresh: the presented token as it was read, which may already be
+// revoked (the issuer contains its family then, #128), the client that owns it, and the narrower
+// scope the request asked for, empty to keep the token's own.
+//
+// IsROPC says which grant minted the token, which decides both the flow switch that governs the
+// refresh (#250) and where its user and client are read from. A password grant's token carries no
+// code, so its user and client are on the token row; an authorization code's are on
+// RefreshToken.Code, loaded by the validator.
+type RefreshTokenGrant struct {
+	Client         *models.Client
+	RefreshToken   *models.RefreshToken
+	ScopeRequested string
+	IsROPC         bool
+}
+
+func (*RefreshTokenGrant) GrantType() oidc.GrantType { return oidc.GrantTypeRefreshToken }
+
 // validateRefreshTokenGrant validates a refresh (RFC 6749 section 6) for a client
 // ValidateTokenRequest has already found and found enabled. It serves both shapes of refresh
 // token: one descended from an authorization code, and one the password grant issued, which has
 // no code.
 func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settings *models.Settings,
-	client *models.Client, input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
+	client *models.Client, input *ValidateTokenRequestInput) (*RefreshTokenGrant, error) {
 	// No flow rule lives on this arm, deliberately. A refresh is governed by the switch
 	// of the flow that ISSUED the token, and which flow that was is not known here: the
 	// method reads the presented token's linkage further below, and the client's flags
 	// say nothing about a token minted before they were last changed.
 	//
-	// The gate is in HandleTokenPost's refresh arm instead, below the replay containment
-	// block. Moving it back up here would refuse a stolen token before containment runs,
+	// The gate is in the refresh redemption instead (issuance.IssueRefreshTokenGrant), below the
+	// replay containment. Moving it back up here would refuse a stolen token before containment runs,
 	// so a thief replaying a token whose flow happens to be switched off would leave the
 	// rotation family live and nothing in the audit log. Whether a theft is detected must
 	// not depend on which switches are on (#250).
@@ -435,17 +452,10 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		}
 	}
 
-	// For auth code flow tokens, return the Code entity
-	// For ROPC tokens, CodeEntity will be nil (the handler will use RefreshToken.User and RefreshToken.Client)
-	var codeEntity *models.Code
-	if !isROPCToken {
-		codeEntity = &refreshToken.Code
-	}
-
-	return &ValidateTokenRequestResult{
-		CodeEntity:       codeEntity,
-		Client:           client,
-		RefreshToken:     refreshToken,
-		RefreshTokenInfo: refreshTokenInfo,
+	return &RefreshTokenGrant{
+		Client:         client,
+		RefreshToken:   refreshToken,
+		ScopeRequested: input.Scope,
+		IsROPC:         isROPCToken,
 	}, nil
 }

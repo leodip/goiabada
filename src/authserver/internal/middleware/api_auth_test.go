@@ -1582,7 +1582,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 	})
 
 	t.Run("rejects a client credentials token, which has no auth_time", func(t *testing.T) {
-		// Exactly the claim set GenerateTokenResponseForClientCred produces: sub is the
+		// Exactly the claim set IssueClientCredentialsGrant produces: sub is the
 		// client identifier, and the scope required by the route is present. Only the
 		// absence of auth_time distinguishes it.
 		token := oauth.JwtToken{

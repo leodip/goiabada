@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestGenerateTokenResponseForClientCred(t *testing.T) {
+func TestIssueClientCredentialsGrant(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -72,7 +72,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 				PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 			}, nil)
 
-			response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, settings, tt.client, tt.scope)
+			response, err := tokenIssuer.IssueClientCredentialsGrant(ctx, settings, tt.client, tt.scope)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, response)
@@ -103,9 +103,9 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 	}
 }
 
-func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
+func TestIssueClientCredentialsGrant_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -126,7 +126,7 @@ func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, settings, client, "invalid-scope")
+	response, err := tokenIssuer.IssueClientCredentialsGrant(ctx, settings, client, "invalid-scope")
 
 	if err == nil {
 		t.Error("Expected an error, but got nil")

@@ -44,7 +44,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 		wrongSecretMsg string
 		arrange        func(t *testing.T, mockDB *mocks_data.Database, client *models.Client, input *ValidateTokenRequestInput)
 		passed         func(t *testing.T, mockDB *mocks_data.Database, client *models.Client,
-			result *ValidateTokenRequestResult, err error)
+			result TokenGrant, err error)
 	}
 
 	refusedWith := func(t *testing.T, err error, want refusal) {
@@ -78,7 +78,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil).Once()
 				mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil).Once()
 			},
-			passed: func(t *testing.T, _ *mocks_data.Database, client *models.Client, result *ValidateTokenRequestResult, err error) {
+			passed: func(t *testing.T, _ *mocks_data.Database, client *models.Client, result TokenGrant, err error) {
 				assert.Nil(t, result)
 				if client.IsPublic {
 					refusedWith(t, err, refusal{"invalid_grant",
@@ -97,10 +97,10 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			arrange: func(t *testing.T, _ *mocks_data.Database, client *models.Client, _ *ValidateTokenRequestInput) {
 				client.ClientCredentialsEnabled = true
 			},
-			passed: func(t *testing.T, mockDB *mocks_data.Database, client *models.Client, result *ValidateTokenRequestResult, err error) {
+			passed: func(t *testing.T, mockDB *mocks_data.Database, client *models.Client, result TokenGrant, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, result)
-				assert.Same(t, client, result.Client)
+				assert.Same(t, client, grantAs[*ClientCredentialsGrant](t, result).Client)
 			},
 		},
 		{
@@ -109,7 +109,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			// Authentication is the first thing the refresh grant does; no refresh_token is sent,
 			// so the refusal that follows it is the missing parameter.
 			arrange: func(*testing.T, *mocks_data.Database, *models.Client, *ValidateTokenRequestInput) {},
-			passed: func(t *testing.T, _ *mocks_data.Database, _ *models.Client, result *ValidateTokenRequestResult, err error) {
+			passed: func(t *testing.T, _ *mocks_data.Database, _ *models.Client, result TokenGrant, err error) {
 				assert.Nil(t, result)
 				refusedWith(t, err, refusal{"invalid_request", "Missing required refresh_token parameter.",
 					http.StatusBadRequest, ""})
@@ -124,7 +124,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				input.Username = "someone@example.com"
 				input.Password = "a password"
 			},
-			passed: func(t *testing.T, _ *mocks_data.Database, _ *models.Client, result *ValidateTokenRequestResult, err error) {
+			passed: func(t *testing.T, _ *mocks_data.Database, _ *models.Client, result TokenGrant, err error) {
 				assert.Nil(t, result)
 				refusedWith(t, err, refusal{"invalid_grant", "Invalid resource owner credentials.",
 					http.StatusBadRequest, ""})

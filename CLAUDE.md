@@ -95,21 +95,21 @@ Primary flow for web/mobile apps. User authenticates via browser, receives code,
 - Endpoint: `GET /auth/authorize` → `POST /auth/token` (grant_type=authorization_code)
 - PKCE: always required for a public client; otherwise configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
-- Implementation: `handler_authorize.go`, `handler_token.go`, `issuance/code_issuer.go`
+- Implementation: `handler_authorize.go`, `issuance/code_issuer.go`; redeemed by `handler_token_authorization_code.go`, `protocolvalidation/token_grant_authorization_code.go`, `issuance/grant_authorization_code.go`
 
 ### Client Credentials
 Server-to-server auth. No user context, client authenticates directly for access token.
 - Endpoint: `POST /auth/token` (grant_type=client_credentials)
 - Requires: `Client.ClientCredentialsEnabled = true`
 - Auth methods: `client_secret_basic` (Authorization header) or `client_secret_post` (form body)
-- Implementation: `handler_token.go` case "client_credentials"
+- Implementation: `handler_token_client_credentials.go`, `protocolvalidation/token_grant_client_credentials.go`, `issuance/grant_client_credentials.go`
 
 ### Refresh Token
 Exchange refresh token for new access/refresh tokens. Works with auth code and ROPC flows.
 - Endpoint: `POST /auth/token` (grant_type=refresh_token)
 - Offline tokens: Configurable idle timeout and max lifetime per client/globally
 - Revocation: Old refresh token revoked on use, new one issued
-- Implementation: `handler_token.go` case "refresh_token", `issuance/grant_refresh_token.go`
+- Implementation: `handler_token_refresh_token.go`, `protocolvalidation/token_grant_refresh_token.go`, `issuance/grant_refresh_token.go`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
@@ -123,7 +123,7 @@ Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to
 - Endpoint: `POST /auth/token` (grant_type=password, username, password)
 - Disabled by default. Enable via `Settings.ResourceOwnerPasswordCredentialsEnabled` or per-client
 - Rate limited. Blocks users with 2FA enabled. Logs `AuditROPCAuthFailed` on failure
-- Implementation: `handler_token.go` case "password", `protocolvalidation/token_grant_password.go`
+- Implementation: `handler_token_password.go`, `protocolvalidation/token_grant_password.go`, `issuance/grant_password.go`
 
 ### Dynamic Client Registration (RFC 7591)
 Programmatic client registration for MCP servers, native apps, etc.
