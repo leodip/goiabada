@@ -10,15 +10,16 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 )
 
-// The collaborator ports this package's two handlers take, declared here rather than imported
-// from the parent handlers package.
+// The collaborator ports this package's handlers take, declared here rather than imported from
+// the parent handlers package.
 //
 // handler_account_activate.go and handler_account_register.go named handlers.HttpHelper,
 // handlers.AuditLogger and four more, which is the only reason this package imported a transport
 // package sitting above it. A port belongs to the side that calls it (#386), so each of these
-// names only what these two files call: PageRenderer carries the same four page methods as the
-// parent's. The concrete types the composition root builds satisfy them structurally, so routes.go is
-// unchanged, and so do the generated mocks (#387).
+// names only what this package's files call: PageRenderer carries the same four page methods as
+// the parent's. The concrete types the composition root builds satisfy them structurally, and so
+// do the generated mocks (#387). The forgot and reset password handlers moved here in #435 and
+// named no port these did not already declare.
 //
 // Per-file database ports stay per-file, beside the function taking them: the database is the
 // dependency that genuinely varies from handler to handler, and these six do not.
@@ -33,7 +34,7 @@ type AuditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
-// PageRenderer renders this package's pages and its one email body. These two handlers answer
+// PageRenderer renders this package's pages and its two email bodies. These handlers answer
 // HTML, so unlike apihandlers they name every page writer. NotFound answers every
 // self-registration page while the feature is off (#425).
 type PageRenderer interface {

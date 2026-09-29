@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -168,7 +169,7 @@ func HandleDynamicClientRegistrationPost(
 			"clientIdentifier": client.ClientIdentifier,
 			"grantTypes":       req.GrantTypes,
 			"isPublic":         isPublic,
-			"sourceIP":         getClientIP(r),
+			"sourceIP":         middleware.GetClientIPFromRequest(r),
 		})
 
 		// 12. Build response (RFC 7591 §3.2.1)
@@ -429,14 +430,6 @@ func containsGrantType(grantTypes []string, grantType string) bool {
 		}
 	}
 	return false
-}
-
-// getClientIP returns the client IP for audit logging. The RealIP middleware
-// (MiddlewareRealIP) has already resolved r.RemoteAddr to the trustworthy client
-// IP from the socket peer and, when configured, the forwarded headers, so we do
-// not re-parse X-Forwarded-For here (doing so would reintroduce a spoofable path).
-func getClientIP(r *http.Request) string {
-	return r.RemoteAddr
 }
 
 // writeDCRError writes RFC 7591 §3.2.2 error response.

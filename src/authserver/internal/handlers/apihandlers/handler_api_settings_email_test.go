@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -36,7 +37,7 @@ func sendTestEmailRequest(t *testing.T, settings *models.Settings) *http.Request
 // The test send goes out through the relay the request's settings configure, the password still
 // encrypted: SendEmail decrypts it, so the handler never holds the plaintext (#433 decision 10).
 func TestHandleAPISettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing.T) {
-	emailSender := mocks_handlers.NewEmailSender(t)
+	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	settings := &models.Settings{
@@ -74,7 +75,7 @@ func TestHandleAPISettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *test
 // is the wording the admin console shows. Moving the decryption into SendEmail's caller would have
 // moved this text; keeping it in SendEmail keeps it (#433 decision 10).
 func TestHandleAPISettingsEmailSendTestPost_AFailedSendNamesTheCause(t *testing.T) {
-	emailSender := mocks_handlers.NewEmailSender(t)
+	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).

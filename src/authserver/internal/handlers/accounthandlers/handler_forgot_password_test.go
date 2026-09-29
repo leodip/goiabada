@@ -1,4 +1,4 @@
-package handlers
+package accounthandlers
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
@@ -83,7 +84,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Email not given", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_handlers.NewEmailSender(t)
+		emailSender := mocks_accounthandlers.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, testDataCipher, testBaseURL)
 
@@ -116,7 +117,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("User not found", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_handlers.NewEmailSender(t)
+		emailSender := mocks_accounthandlers.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, testDataCipher, testBaseURL)
 
@@ -157,7 +158,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Success path, email is sent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_handlers.NewEmailSender(t)
+		emailSender := mocks_accounthandlers.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, testDataCipher, testBaseURL)
 

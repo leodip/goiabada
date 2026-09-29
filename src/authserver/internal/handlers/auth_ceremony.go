@@ -53,16 +53,16 @@ func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 // receive an error is the current one, whose authorization the user still wants (#79
 // decision 5).
 //
-// Mirrors rejectResetPassword: audit, then render, at http.StatusBadRequest because a
+// Mirrors accounthandlers' rejectResetPassword: audit, then render, at http.StatusBadRequest because a
 // submission was genuinely refused.
 func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, w http.ResponseWriter,
 	r *http.Request, authContext *ceremony.AuthContext) {
 
 	const maxAuditedValueLength = 100
 
-	// Truncated for the same reason auditFailedResetPasswordCode truncates it:
-	// MiddlewareRealIP resolves the IP from a forwarded header in a proxied deployment, so
-	// this is a sink for a value that originates outside the process.
+	// Truncated for the same reason accounthandlers' auditedClientIP truncates it for the two
+	// emailed-link flows: MiddlewareRealIP resolves the IP from a forwarded header in a proxied
+	// deployment, so this is a sink for a value that originates outside the process.
 	clientIP := middleware.GetClientIPFromRequest(r)
 	if len(clientIP) > maxAuditedValueLength {
 		clientIP = clientIP[:maxAuditedValueLength]

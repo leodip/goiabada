@@ -190,7 +190,15 @@ const (
 	AuditSentEmailVerificationMessage = "sent_email_verification_message"
 	AuditFailedEmailVerificationCode  = "failed_email_verification_code"
 	AuditFailedResetPasswordCode      = "failed_reset_password_code"
-	AuditChangedPassword              = "changed_password"
+	// AuditFailedAccountActivationCode records a refused self-registration activation link, the
+	// twin of AuditFailedResetPasswordCode: both emailed-link flows answer every refusal with one
+	// page, so this entry is the only place the cause is visible, and a burst of them is what
+	// probing activation links looks like. It replaced a Warn record in #435.
+	//
+	// Payload: reason (the reset flow's names for the same states), the client IP, and
+	// preRegistrationId only when the lookup resolved a pre-registration the link's code matched.
+	AuditFailedAccountActivationCode = "failed_account_activation_code"
+	AuditChangedPassword             = "changed_password"
 	// AuditRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
 	// refresh tokens revoked. Emitted by the four sites that perform that action AFTER their
@@ -376,6 +384,7 @@ var auditEventTypes = []string{
 	AuditDisabledOTP,
 	AuditDynamicClientRegistration,
 	AuditEnabledOTP,
+	AuditFailedAccountActivationCode,
 	AuditFailedEmailVerificationCode,
 	AuditFailedResetPasswordCode,
 	AuditGeneratedEmailVerificationCode,

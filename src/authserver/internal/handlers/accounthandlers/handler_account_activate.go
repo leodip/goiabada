@@ -28,8 +28,8 @@ import (
 // same rule the reset flow states in isForgotPasswordCodeExpired (#112 decision 7).
 const verificationCodeLifetime = 5 * time.Minute
 
-// The reasons an activation link is refused, as recorded on the Warn record. They are the reset
-// flow's names for the same states, so one log query reads both emailed-link flows. The marker's
+// The reasons an activation link is refused, as recorded in the audit entry. They are the reset
+// flow's names for the same states, so one audit query reads both emailed-link flows. The marker's
 // own rejections (marker_missing, marker_wrong_flow, marker_expired, continuation_in_flight) pass
 // through as emaillinks decided them, as they do on the reset side (#425).
 const (
@@ -43,19 +43,35 @@ const (
 	activationReasonCodeNoLongerOutstanding = "code_no_longer_outstanding"
 )
 
-// refuseActivationLink is every activation refusal: one Warn record naming the reason, then the
+// refuseActivationLink is every activation refusal: one audit entry naming the reason, then the
 // one rendering, at 200.
 //
-// 200 and not a 4xx, for the reason renderResetPasswordCodeInvalid gives on the reset side:
-// activation links are fetched by mail scanners and link previewers that treat a 4xx as a broken
-// link, and the page itself was served. The response is the same for every reason, so the record
-// is the only place the cause is visible. An unknown code used to answer the 500 page with an
-// error-level stack, which paged an operator for a user clicking an old link (#425 decision 5).
+// 200 and not a 4xx, for the reason renderResetPasswordCodeInvalid gives: activation links are
+// fetched by mail scanners and link previewers that treat a 4xx as a broken link, and the page
+// itself was served. The response is the same for every reason, so the entry is the only place
+// the cause is visible. An unknown code used to answer the 500 page with an error-level stack,
+// which paged an operator for a user clicking an old link (#425 decision 5).
+//
+// Audited rather than logged, as a refused reset link is, so an administrator sees probing of
+// activation links where they see it for reset links; a Warn record reached the console alone
+// until #435. preRegistrationId is written only when the lookup resolved a pre-registration the
+// code matched; on the other branches the key is absent rather than zero, since a payload naming
+// row 0 asserts a row that does not exist.
 //
 // Genuine server faults must NOT come here: a stored code that will not decrypt, a database
 // failure and a session store that cannot be read stay InternalServerError.
-func refuseActivationLink(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, reason string) {
-	slog.WarnContext(r.Context(), "account activation link refused", "reason", reason)
+func refuseActivationLink(pageRenderer PageRenderer, auditLogger AuditLogger, w http.ResponseWriter,
+	r *http.Request, preRegistrationId int64, reason string) {
+
+	details := map[string]interface{}{
+		"ip":     auditedClientIP(r),
+		"reason": reason,
+	}
+	if preRegistrationId != 0 {
+		details["preRegistrationId"] = preRegistrationId
+	}
+
+	auditLogger.Log(r.Context(), audit.AuditFailedAccountActivationCode, details)
 	renderActivationLinkExpired(pageRenderer, w, r)
 }
 
@@ -133,7 +149,7 @@ func HandleAccountActivateGet(
 		}
 
 		if code := r.URL.Query().Get("code"); len(code) > 0 {
-			handleActivationLinkFollowed(pageRenderer, httpSession, database, dataCipher, w, r, code)
+			handleActivationLinkFollowed(pageRenderer, httpSession, database, auditLogger, dataCipher, w, r, code)
 			return
 		}
 
@@ -147,8 +163,8 @@ func HandleAccountActivateGet(
 // the URL writes a marker into its own throwaway cookie jar and leaves the code usable for the
 // real user.
 func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession sessionstore.Store,
-	database accountActivateDatabase, dataCipher *encryption.DataCipher, w http.ResponseWriter, r *http.Request,
-	code string) {
+	database accountActivateDatabase, auditLogger AuditLogger, dataCipher *encryption.DataCipher,
+	w http.ResponseWriter, r *http.Request, code string) {
 
 	codeHash := hashutil.HashString(code)
 
@@ -161,7 +177,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession session
 	// An unknown code is also a consumed one: the activation deletes the row, so a link clicked
 	// twice lands here.
 	if preRegistration == nil {
-		refuseActivationLink(pageRenderer, w, r, activationReasonUnknownCode)
+		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, activationReasonUnknownCode)
 		return
 	}
 
@@ -173,9 +189,10 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession session
 
 	// The index found a candidate; this decides. Reachable only through a SHA-256 collision now
 	// that the row is located by hash, and kept so the comparison stays load-bearing rather than
-	// decorative. Answered as an unknown code, as the reset twin answers its own mismatch.
+	// decorative. Answered as an unknown code, as the reset twin answers its own mismatch, and
+	// with no preRegistrationId for the reason it gives: nothing about the row is established.
 	if verificationCode != code {
-		refuseActivationLink(pageRenderer, w, r, activationReasonUnknownCode)
+		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, activationReasonUnknownCode)
 		return
 	}
 
@@ -186,7 +203,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession session
 			return
 		}
 
-		refuseActivationLink(pageRenderer, w, r, activationReasonCodeExpired)
+		refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.Id, activationReasonCodeExpired)
 		return
 	}
 
@@ -203,15 +220,15 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession session
 	// A second, different link followed while one is still live, of either flow. The first
 	// continuation keeps the session and this one is refused: the clean hop reads the
 	// marker alone, so replacing here would make the redirect already in flight activate
-	// this registration instead of the one that authorized it. Logged rather than audited,
-	// because this handler has no failed-activation event to record it under; the reset side,
-	// which has one, audits the same refusal as continuation_in_flight.
+	// this registration instead of the one that authorized it. Audited as the reset side audits
+	// the same refusal, naming this link's pre-registration, which resolved; the one holding the
+	// live marker is not named.
 	//
 	// Activation carries no continuation id, unlike the reset form: its continuation is the
 	// browser following a 303 with no page in between, so there is nothing on screen to be
 	// retargeted later and nowhere to put an id that would not go back into the URL.
 	if rejection != "" {
-		refuseActivationLink(pageRenderer, w, r, string(rejection))
+		refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.Id, string(rejection))
 		return
 	}
 
@@ -245,7 +262,9 @@ func handleActivationCleanHop(pageRenderer PageRenderer, httpSession sessionstor
 		return
 	}
 	if rejection != "" {
-		refuseActivationLink(pageRenderer, w, r, string(rejection))
+		// No preRegistrationId: a rejected marker was not resolved against any row, and the id
+		// it carries is a label rather than something this request established.
+		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, string(rejection))
 		return
 	}
 
@@ -258,7 +277,7 @@ func handleActivationCleanHop(pageRenderer PageRenderer, httpSession sessionstor
 		return
 	}
 	if preRegistration == nil {
-		refuseActivationLink(pageRenderer, w, r, activationReasonCodeNoLongerOutstanding)
+		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, activationReasonCodeNoLongerOutstanding)
 		return
 	}
 

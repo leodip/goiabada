@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -210,7 +211,7 @@ func TestHandleAPIAccountEmailVerificationPost_CodeComparison(t *testing.T) {
 func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHanded(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
-	emailSender := mocks_handlers.NewEmailSender(t)
+	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,

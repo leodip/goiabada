@@ -76,12 +76,12 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	root.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
 	root.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
-	root.Get("/forgot-password", handlers.HandleForgotPasswordGet(httpHelper))
-	root.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", handlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, s.dataCipher, baseURL))
+	root.Get("/forgot-password", accounthandlers.HandleForgotPasswordGet(httpHelper))
+	root.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, s.dataCipher, baseURL))
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
-	root.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, handlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	root.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL))
+	root.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
+	root.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL))
 	root.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper, baseURL))
 	root.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
 	// /userinfo takes a user's access token whose scope carries openid, which is what OIDC Core 1.0

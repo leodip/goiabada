@@ -127,7 +127,7 @@ func HandleAuthorizeGet(
 			State:                         r.FormValue("state"),
 			Nonce:                         r.FormValue("nonce"),
 			UserAgent:                     r.UserAgent(),
-			IpAddress:                     r.RemoteAddr,
+			IpAddress:                     authserver_middleware.GetClientIPFromRequest(r),
 		}
 		authContext.SetScope(r.FormValue("scope"))
 

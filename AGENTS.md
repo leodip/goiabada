@@ -52,7 +52,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 
 ### Auth Server (`src/authserver/`)
 - `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR)
-- `internal/handlers/accounthandlers/` - User self-service handlers
+- `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imaging,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, images, themes

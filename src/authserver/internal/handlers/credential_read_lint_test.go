@@ -15,8 +15,8 @@ import (
 //
 // The instrument's honest limit, stated because it decides what this file is worth: it asserts a
 // spelling is absent, not that the replacement is right. In this module the four behavioural cases
-// in handler_auth_pwd_test.go, handler_auth_otp_test.go, handler_reset_password_test.go and
-// accounthandlers/handler_account_register_test.go cover the replacement; the lint covers the
+// in handler_auth_pwd_test.go, handler_auth_otp_test.go, accounthandlers/handler_reset_password_test.go
+// and accounthandlers/handler_account_register_test.go cover the replacement; the lint covers the
 // spelling coming back.
 //
 // The list below is this module's, not a shared one. It must not carry "state": handler_authorize.go

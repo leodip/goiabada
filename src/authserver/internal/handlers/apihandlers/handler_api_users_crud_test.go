@@ -323,7 +323,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	emailSender := mocks_handlers.NewEmailSender(t)
+	emailSender := mocks_accounthandlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -404,7 +404,7 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	emailSender := mocks_handlers.NewEmailSender(t)
+	emailSender := mocks_accounthandlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -458,7 +458,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	emailSender := mocks_handlers.NewEmailSender(t)
+	emailSender := mocks_accounthandlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -581,7 +581,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 			userCreator := mocks_accounthandlers.NewUserCreator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
-			emailSender := mocks_handlers.NewEmailSender(t)
+			emailSender := mocks_accounthandlers.NewEmailSender(t)
 
 			handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 				accountvalidation.NewEmailValidator(database),
