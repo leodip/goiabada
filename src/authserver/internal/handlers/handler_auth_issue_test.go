@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -773,6 +774,53 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 		assert.Equal(t, []string{"issued", "audit"}, order)
 		f.codeIssuer.AssertExpectations(t)
 		f.auditLogger.AssertExpectations(t)
+	})
+
+	// A clear that fails after the mint answers 500 before the code is delivered, and leaves the
+	// context in ready_to_issue_code. The reload that follows mints again, and that is a retry, not
+	// a second grant: the first code was answered to nobody, and only its hash was stored, so the
+	// second is the only code the client ever receives (#248 part 6, #436).
+	t.Run("A failed clear delivers no code, and the reload delivers exactly one", func(t *testing.T) {
+		f := newFixture(t, "")
+
+		clearErr := errs.New("the session store is unreachable")
+		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
+			Return(&models.Code{Id: 1, Code: "first-code", ClientId: 1,
+				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
+		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
+			Return(&models.Code{Id: 2, Code: "second-code", ClientId: 1,
+				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
+		f.auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return().Twice()
+		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req).Return(clearErr).Once()
+		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req).Return(nil).Once()
+		f.pageRenderer.On("InternalServerError", mock.Anything, f.req, mock.MatchedBy(func(err error) bool {
+			return err == clearErr
+		})).Run(func(args mock.Arguments) {
+			args.Get(0).(http.ResponseWriter).WriteHeader(http.StatusInternalServerError)
+		}).Return().Once()
+
+		f.serve()
+		first := f.rr
+
+		assert.Equal(t, http.StatusInternalServerError, first.Code)
+		assert.Empty(t, first.Header().Get("Location"), "a failed clear must not redirect to the client")
+		assert.NotContains(t, first.Body.String(), "first-code")
+
+		// The reload: the context was never cleared, so the same ceremony is served again.
+		f.rr = httptest.NewRecorder()
+		f.serve()
+		second := f.rr
+
+		assert.Equal(t, http.StatusFound, second.Code)
+		location, err := url.Parse(second.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"second-code"}, location.Query()["code"],
+			"the reload delivers exactly one code, and not the one the failed clear withheld")
+
+		f.codeIssuer.AssertExpectations(t)
+		f.ceremonyStore.AssertExpectations(t)
+		f.auditLogger.AssertExpectations(t)
+		f.pageRenderer.AssertExpectations(t)
 	})
 
 	// Both refusals get the session-gone answer. A session row gone under the ceremony is #139's

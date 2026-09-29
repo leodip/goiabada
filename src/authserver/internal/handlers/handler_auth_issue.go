@@ -477,6 +477,12 @@ func HandleIssueGet(
 			"codeId":   code.Id,
 		})
 
+		// A failed clear leaves the context in ready_to_issue_code, so a reload mints a second
+		// code, and that is a retry rather than a second grant. The code row stores only the
+		// plaintext's SHA-256 (models.Code.Code is db:"-"), and this 500 is answered before
+		// issueAuthCode, so the first code reaches nobody and cannot be redeemed; the reload's is
+		// the only one delivered. Clearing before minting would strand the user on a transient
+		// mint fault where a reload now retries (#248 part 6, #436).
 		err = ceremonyStore.ClearAuthContext(w, r)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)

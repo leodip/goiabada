@@ -73,7 +73,11 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore.AssertExpectations(t)
 	})
 
-	t.Run("Successful rendering with email from user session", func(t *testing.T) {
+	// A browser session no longer prefills the email field. The lookup that did it never loaded the
+	// session's user, so the value was always empty, and it is gone rather than repaired (#248 part
+	// 3, #436). The session identifier stays on the request so a lookup would have something to
+	// look up; the database mock is strict and stubs none, so making one fails the case.
+	t.Run("A browser session prefills nothing and is not looked up", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
@@ -97,14 +101,6 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
 		req = req.WithContext(ctx)
 
-		userSession := &models.UserSession{
-			Id: 1,
-			User: models.User{
-				Email: "test@example.com",
-			},
-		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
-
 		client := &models.Client{
 			ClientIdentifier: "my-app",
 			DisplayName:      "",
@@ -122,7 +118,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["email"] == "test@example.com" && data["smtpEnabled"] == true &&
+			_, hasEmail := data["email"]
+			return !hasEmail && data["smtpEnabled"] == true &&
 				data["layoutShowClientSection"] == true &&
 				data["layoutClientName"] == "my-app" && data["layoutHasClientLogo"] == false &&
 				data["layoutClientLogoUrl"] == "" && data["layoutClientDescription"] == "" &&
@@ -130,6 +127,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
+
+		database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)

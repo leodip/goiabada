@@ -1,7 +1,6 @@
 package ceremony
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -228,28 +227,26 @@ func (ac *AuthContext) Restart() {
 	ac.OTPKeyURL = ""
 }
 
-func (ac *AuthContext) AddAuthMethod(method string) {
-	method = strings.ToLower(strings.TrimSpace(method))
-
-	if method == "" {
+// AddAuthMethod records a completed factor on AuthMethods, the space-separated list that becomes
+// the amr claim, once: a method already listed is not added again. It takes an AuthMethod rather
+// than a string, so every value it can store is one String() spells; an out-of-range value, whose
+// String() is "", adds nothing (#436).
+func (ac *AuthContext) AddAuthMethod(method AuthMethod) {
+	value := method.String()
+	if value == "" {
 		return
 	}
 
 	if ac.AuthMethods == "" {
-		ac.AuthMethods = method
+		ac.AuthMethods = value
 		return
 	}
 
-	lowerMethods := strings.ToLower(ac.AuthMethods)
-	methods := strings.Fields(lowerMethods)
-
-	for _, existingMethod := range methods {
-		if existingMethod == method {
-			return
-		}
+	if slices.Contains(strings.Fields(ac.AuthMethods), value) {
+		return
 	}
 
-	ac.AuthMethods = ac.AuthMethods + " " + method
+	ac.AuthMethods = ac.AuthMethods + " " + value
 }
 
 // RequestedMaxAge is the client's max_age as every hop after /auth/authorize reads it: nil when
@@ -305,18 +302,17 @@ func (ac *AuthContext) OwnsSession(userSession *models.UserSession) bool {
 	return userSession != nil && ac.UserId != 0 && userSession.UserId == ac.UserId
 }
 
+// parseAcrValuesFromAuthorizeRequest reads acr_values, which OIDC Core 1.0 section 3.1.2.1 defines
+// as a space-separated string, through oidc.SplitScope, the one splitter for the space-delimited
+// parameters, keeping each recognised level once in request order. SplitScope also trims each value
+// with strings.TrimSpace, so a value padded with Unicode whitespace is recognised; that can only
+// raise the target, because computeTargetAcrLevel floors it at the client's default (#436).
 func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []models.AcrLevel {
 	arr := []models.AcrLevel{}
-	acrValues := ac.AcrValuesFromAuthorizeRequest
-	if len(strings.TrimSpace(acrValues)) > 0 {
-		space := regexp.MustCompile(`\s+`)
-		acrValues = space.ReplaceAllString(acrValues, " ")
-		parts := strings.Split(acrValues, " ")
-		for _, v := range parts {
-			acr, err := models.AcrLevelFromString(v)
-			if err == nil && !slices.Contains(arr, acr) {
-				arr = append(arr, acr)
-			}
+	for _, v := range oidc.SplitScope(ac.AcrValuesFromAuthorizeRequest) {
+		acr, err := models.AcrLevelFromString(v)
+		if err == nil && !slices.Contains(arr, acr) {
+			arr = append(arr, acr)
 		}
 	}
 	return arr
