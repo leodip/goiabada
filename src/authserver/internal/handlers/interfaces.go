@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -111,14 +110,6 @@ type TokenValidator interface {
 
 type TokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
-}
-
-type PasswordValidator interface {
-	ValidatePassword(policy models.PasswordPolicy, password string) error
-}
-
-type EmailSender interface {
-	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error
 }
 
 // AuditLogger records one security event. The context is first because every audit event raised

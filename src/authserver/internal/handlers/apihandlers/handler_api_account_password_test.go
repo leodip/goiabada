@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -66,7 +67,7 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 func TestHandleAPIAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	passwordValidator := mocks_handlers.NewPasswordValidator(t)
+	passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
 
 	const currentPassword = "0ldP4ss!word"
 	currentHash, err := passwordhash.Hash(currentPassword)

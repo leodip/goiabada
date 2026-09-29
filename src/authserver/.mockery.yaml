@@ -33,10 +33,6 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
-      PasswordValidator:
-        config:
-          dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
       TokenValidator:
         config:
           dir: "./internal/handlers/mocks"
@@ -54,10 +50,6 @@ packages:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
       TokenParser:
-        config:
-          dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
-      EmailSender:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
@@ -90,11 +82,21 @@ packages:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
   # accounthandlers declares EmailValidator and UserCreator, which internal/handlers stopped
-  # naming in #387, so both are generated from it and live beside it. apihandlers declares
-  # the identical UserCreator, and its tests use this mock structurally (#431).
+  # naming in #387, so both are generated from it and live beside it (#431); EmailSender and
+  # PasswordValidator followed when the forgot and reset password handlers, their last callers
+  # in internal/handlers, moved here (#435). apihandlers declares the identical UserCreator,
+  # EmailSender and PasswordValidator, and its tests use these mocks structurally.
   github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers:
     interfaces:
+      EmailSender:
+        config:
+          dir: "./internal/handlers/accounthandlers/mocks"
+          pkgname: "mocks_accounthandlers"
       EmailValidator:
+        config:
+          dir: "./internal/handlers/accounthandlers/mocks"
+          pkgname: "mocks_accounthandlers"
+      PasswordValidator:
         config:
           dir: "./internal/handlers/accounthandlers/mocks"
           pkgname: "mocks_accounthandlers"

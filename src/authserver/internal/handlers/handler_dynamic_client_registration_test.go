@@ -462,6 +462,31 @@ func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublic
 	assert.Empty(t, response.ClientSecret, "a public client is answered no secret")
 }
 
+// The registration's audit entry records the client IP through the module's one reader, so it
+// names the address every other audit entry names: httptest's "192.0.2.1:1234" is recorded as
+// "192.0.2.1". This handler returned r.RemoteAddr as is until #435.
+func TestHandleDynamicClientRegistrationPost_AuditsTheClientIPWithoutItsPort(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+
+	mocks_data.ExpectRunInTransaction(database, dcrTx)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration,
+		mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["sourceIP"] == "192.0.2.1"
+		})).Return().Once()
+
+	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
+		ClientName:              "A Public Client",
+		RedirectURIs:            []string{"http://127.0.0.1:8765/callback"},
+		TokenEndpointAuthMethod: "none",
+		GrantTypes:              []string{"authorization_code"},
+	}, database, auditLogger)
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+}
+
 // Every refusal is decided before the transaction opens, so none reaches RunInTransaction: the
 // strict mock has no expectation for it and would fail the case if it were called (#428).
 func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(t *testing.T) {

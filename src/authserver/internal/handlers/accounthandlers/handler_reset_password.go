@@ -1,4 +1,4 @@
-package handlers
+package accounthandlers
 
 import (
 	"context"
@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
@@ -177,19 +176,10 @@ func renderResetPasswordCodeInvalid(pageRenderer PageRenderer, w http.ResponseWr
 // other branches the key is absent rather than zero, since a payload naming user 0 asserts a
 // row that does not exist.
 //
-// The IP is truncated for the same reason the address used to be: MiddlewareRealIP resolves
-// it from a forwarded header in a proxied deployment, so this function is still a sink for a
-// value that originates outside the process.
+// The IP is truncated for the same reason the address used to be; auditedClientIP says why.
 func auditFailedResetPasswordCode(auditLogger AuditLogger, r *http.Request, userId int64, reason string) {
-	const maxAuditedValueLength = 100
-
-	clientIP := middleware.GetClientIPFromRequest(r)
-	if len(clientIP) > maxAuditedValueLength {
-		clientIP = clientIP[:maxAuditedValueLength]
-	}
-
 	details := map[string]interface{}{
-		"ip":     clientIP,
+		"ip":     auditedClientIP(r),
 		"reason": reason,
 	}
 	if userId != 0 {

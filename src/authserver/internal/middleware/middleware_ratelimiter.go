@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -843,32 +842,14 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 	})
 }
 
-// GetClientIPFromRequest extracts the client IP used as a rate-limit key.
-//
-// It reads only r.RemoteAddr, which MiddlewareRealIP has already resolved to the
-// trustworthy client IP (from the socket peer and, when configured, the trusted
-// forwarded headers). It never re-parses X-Forwarded-For / X-Real-IP here, which
-// would reintroduce a spoofable path.
-//
-// Exported because the reset-password handler audits the same value the limiter keys on
-// (#112): the failed-reset audit entry no longer has an address to record, so the client IP
-// is the identifier an administrator watching for probing has. A second copy of these three
-// lines in the handler package would be free to drift from this one.
-func GetClientIPFromRequest(r *http.Request) string {
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
-	}
-	return r.RemoteAddr
-}
-
 // clientIPRateLimitKey buckets a request by the block its client controls: the address
 // itself for IPv4, the /64 for IPv6. A host with SLAAC normally owns a whole /64, so
 // keying on the full address hands one client 2^64 buckets, which voids every per-IP
 // tier (measured: 200 of 200 requests allowed against a 30/min budget, #219).
 //
 // Separate from GetClientIPFromRequest, not folded into it, because that function also
-// feeds two audit sinks that need the address an administrator can act on rather than
-// the block it sits in.
+// feeds the audit sinks and the recorded addresses, which need the address an administrator
+// can act on rather than the block it sits in.
 //
 // MiddlewareRealIP guarantees the input is a real IP: it drops X-Forwarded-For entries
 // and an X-Real-IP that net.ParseIP rejects, and net/http guarantees RemoteAddr is

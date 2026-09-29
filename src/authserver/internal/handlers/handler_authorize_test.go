@@ -3114,8 +3114,11 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
+		// The context's address, which the authorization code is later written with, is read by
+		// the same reader as the session's: the IP without the port, not r.RemoteAddr as is (#435).
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
+			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client" &&
+				ac.IpAddress == "203.0.113.7"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
