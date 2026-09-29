@@ -14,19 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// issuanceOutcome is what one authorization ceremony's transaction came to: whether its
-// acquisition found the session row, the code it minted when it did, and the error if any.
+// issuanceOutcome is what one authorization ceremony's transaction came to: the code it minted,
+// and the error if any, ErrIssuingSessionGone for a refusal.
 type issuanceOutcome struct {
-	live bool
 	code *models.Code
 	err  error
 }
 
-// mintCode inserts one authorization code through the real CodeIssuer, so the client lookup and
-// the insert run on the transaction production runs them on, rather than through a bare
-// CreateCode.
-func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) (*models.Code, error) {
-	return issuance.NewCodeIssuer(db).CreateAuthCode(context.Background(), tx, &issuance.CreateCodeInput{
+// ceremonyCodeInput is the code a ceremony for this client, user and session asks the issuer for.
+func ceremonyCodeInput(client *models.Client, user *models.User, sessionIdentifier string) *issuance.CreateCodeInput {
+	return &issuance.CreateCodeInput{
 		AuthContext: ceremony.AuthContext{
 			ClientId:    client.ClientIdentifier,
 			UserId:      user.Id,
@@ -36,35 +33,19 @@ func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.
 			AuthMethods: "pwd",
 		},
 		SessionIdentifier: sessionIdentifier,
-	})
-}
-
-// issuanceStatements issues, on the caller's transaction, what /auth/issue issues on the
-// authorization code branch: the session row, then the code. When the acquisition reports the
-// session row gone it inserts nothing, which is the refusal (#139 decision 3), and the caller
-// decides whether to commit.
-//
-// The handler itself cannot be driven from this tier: it owns its transaction and answers over
-// HTTP. The pairing is the one #139 uses throughout: the unit tests beside the production code pin
-// that production issues exactly this sequence in exactly this order, and this tier answers what
-// a mock cannot, what two real transactions of these shapes do to each other on a real catalog.
-func issuanceStatements(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) issuanceOutcome {
-	live, err := db.AcquireUserSessionRow(context.Background(), tx, sessionIdentifier)
-	if err != nil || !live {
-		return issuanceOutcome{live: live, err: err}
 	}
-	code, err := mintCode(db, tx, client, user, sessionIdentifier)
-	return issuanceOutcome{live: true, code: code, err: err}
 }
 
 // TestIssuanceOrdering_AgainstTermination is #139 itself, measured where it has to hold: on a real
 // catalog, on every engine, with the code insert and the session termination genuinely
 // overlapping. It is section 4's "there is no third case" as a test rather than a probe.
 //
-// Both parties write the one user_sessions row before touching anything else, the termination by
-// deleting it and the ceremony by AcquireUserSessionRow, so on every engine one of them waits for
-// the other and reads its answer AFTER the wait rather than from a snapshot taken before it. That
-// leaves exactly two outcomes, one per subtest:
+// The ceremony is issuance.CodeIssuer.IssueAuthCode itself, on a transaction this test holds open,
+// so the statements measured are the ones /auth/issue ships. Both parties write the one
+// user_sessions row before touching anything else, the termination by deleting it and the
+// ceremony by AcquireUserSessionRow, so on every engine one of them waits for the other and reads
+// its answer AFTER the wait rather than from a snapshot taken before it. That leaves exactly two
+// outcomes, one per subtest:
 //
 //   - the termination waits, and its code sweep then runs after the insert committed, so the code
 //     it hands the client is already marked revoked;
@@ -111,9 +92,14 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		require.NoError(t, err, "opening the ceremony's transaction")
 		defer func() { _ = db.RollbackTransaction(context.Background(), tx) }()
 
-		live, err := db.AcquireUserSessionRow(context.Background(), tx, session.SessionIdentifier)
-		require.NoError(t, err, "the ceremony takes the session row")
-		require.True(t, live, "the session row is still there when the ceremony takes it")
+		// The acquisition and the insert, both on the transaction the ceremony holds. The code is
+		// written and not yet committed, which is the window the issue is about: an uncommitted
+		// insert is invisible to a sweep, so without the acquisition ahead of it the termination
+		// below would not wait, and its sweep would run past a code that then commits.
+		code, err := issuance.NewCodeIssuer(db).IssueAuthCode(context.Background(), tx,
+			ceremonyCodeInput(client, user, session.SessionIdentifier))
+		require.NoError(t, err, "the ceremony takes the session row and inserts on its transaction")
+		require.NotNil(t, code)
 
 		// The real termination, on the other handle, arriving while the ceremony holds the row.
 		// Its first statement is the delete, which is what makes it wait.
@@ -127,12 +113,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 			return terminationOutcome{result: result, err: terminateErr}
 		})
 
-		// THE INSERT COMES AFTER THE TERMINATION HAS ARRIVED. This is the window the issue is
-		// about: the termination is in flight, and the code does not exist yet.
 		termination.requireBlocked(t)
-
-		code, err := mintCode(db, tx, client, user, session.SessionIdentifier)
-		require.NoError(t, err, "the ceremony's insert on the transaction holding the row")
 		termination.requireStillWaiting(t)
 		require.NoError(t, db.CommitTransaction(context.Background(), tx), "committing the ceremony")
 
@@ -142,10 +123,10 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 
 		// The whole value of the termination waiting: its sweep ran after the insert committed,
 		// so it found the code this ceremony minted. Before #139 this count was 0, the sweep
-		// having run before the row existed. Under RCSI this is the assertion that would move if
-		// the sweep read a snapshot taken before the insert rather than the committed row.
+		// having run before the row was visible. Under RCSI this is the assertion that would move
+		// if the sweep read a snapshot taken before the insert rather than the committed row.
 		assert.Equal(t, int64(1), outcome.result.RevokedCodeCount,
-			"the termination's code sweep must mark the code inserted while it was waiting")
+			"the termination's code sweep must mark the code inserted before it arrived")
 		assertCodeRevokedOn(t, db, code.Id, true, "the code the client received")
 		assertSessionGoneOn(t, db, session.Id, "the terminated session")
 	})
@@ -174,12 +155,13 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 			defer func() { _ = other.RollbackTransaction(context.Background(), otherTx) }()
 
 			reached()
-			outcome := issuanceStatements(other, otherTx, client, user, session.SessionIdentifier)
-			if outcome.err == nil && outcome.code != nil {
+			code, issueErr := issuance.NewCodeIssuer(other).IssueAuthCode(context.Background(), otherTx,
+				ceremonyCodeInput(client, user, session.SessionIdentifier))
+			if issueErr != nil {
 				// Production commits only what it minted; a refusal rolls back.
-				outcome.err = other.CommitTransaction(context.Background(), otherTx)
+				return issuanceOutcome{code: code, err: issueErr}
 			}
-			return outcome
+			return issuanceOutcome{code: code, err: other.CommitTransaction(context.Background(), otherTx)}
 		})
 
 		ceremony.requireBlocked(t)
@@ -187,15 +169,14 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		require.NoError(t, db.CommitTransaction(context.Background(), tx), "committing the termination")
 
 		outcome := ceremony.await(t)
-		require.NoError(t, outcome.err,
-			"the ceremony must wait for the termination and then read its answer, not deadlock with it or be refused")
 
 		// The whole value of the ceremony waiting: its acquisition reads its answer AFTER the
 		// wait, so it sees the row the termination removed and refuses. This is the other
 		// assertion RCSI could move: a writer released from the queue must re-read the current
-		// committed row rather than the snapshot it opened with.
-		assert.False(t, outcome.live,
-			"the acquisition must report the session gone, which is what waiting for the termination buys")
+		// committed row rather than the snapshot it opened with. A deadlock or any other failure
+		// is a different error and fails here too.
+		require.ErrorIs(t, outcome.err, issuance.ErrIssuingSessionGone,
+			"the ceremony must wait for the termination and then refuse, not deadlock with it or insert")
 		assert.Nil(t, outcome.code, "a ceremony whose session is gone writes no code at all")
 
 		// And the catalog agrees: nothing of this session is left for a sweep to mark. A ceremony

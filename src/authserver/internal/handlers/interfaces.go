@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"net/http"
 	"time"
 
@@ -82,8 +81,10 @@ type AuthorizeValidator interface {
 	ValidateUnsupportedRequestParameters(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) error
 }
 
+// CodeIssuer issues an authorization code in a transaction of its own, which takes the session row
+// before the insert (#139). The handler opens no transaction for it.
 type CodeIssuer interface {
-	CreateAuthCode(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error)
+	IssueAuthCodeTx(ctx context.Context, input *issuance.CreateCodeInput) (*models.Code, error)
 }
 
 type UserSessionManager interface {

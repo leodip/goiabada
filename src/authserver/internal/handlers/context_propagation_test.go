@@ -98,17 +98,17 @@ func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
 // port, and the session lookup every ceremony makes is issued under it.
 
 // issueRequestCarryingId is requestWithSessionIdentifier plus the chi request id, so a
-// CreateAuthCode called with anything but this request's context matches nothing.
+// IssueAuthCodeTx called with anything but this request's context matches nothing.
 func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Request {
 	t.Helper()
 	req := requestWithSessionIdentifier(t, sessionIdentifier)
 	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, propagatedRequestId))
 }
 
-// The accept arm, and the one that matters most in this stage: CreateAuthCode is the port whose
-// signature moved, and the insert it makes is the statement #139 orders against a concurrent
-// termination. Both the acquisition and the insert are matched on the request's context, so a
-// transaction opened on a context nobody can cancel fails here rather than in production.
+// The accept arm: the code issuer opens the transaction whose acquisition and insert #139 orders
+// against a concurrent termination, so the context it is handed is the one that transaction runs
+// under. It is matched on the request's context, so a transaction opened on a context nobody can
+// cancel fails here rather than in production; the issuer's own test carries it to the statements.
 func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
@@ -134,12 +134,10 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-	// The session read, the acquisition and the insert, each matched on THIS request's context.
+	// The session read and the issuer, each matched on THIS request's context.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
-	mocks_data.ExpectRunInTransaction(database, issuanceTx)
-	database.On("AcquireUserSessionRow", theRequestsContext(), issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
-	codeIssuer.On("CreateAuthCode", theRequestsContext(), issuanceTx, mock.Anything).
+	codeIssuer.On("IssueAuthCodeTx", theRequestsContext(), mock.Anything).
 		Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: "https://example.com/callback"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
@@ -154,8 +152,8 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	codeIssuer.AssertExpectations(t)
 }
 
-// The reject arm: a ceremony whose bound session is gone restarts at level 1, so the transaction
-// is never opened and the issuer is never reached. Without it the accept arm would also pass on a
+// The reject arm: a ceremony whose bound session is gone restarts at level 1, so the issuer is
+// never reached. Without it the accept arm would also pass on a
 // handler that issued unconditionally.
 func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
@@ -193,6 +191,5 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 
 	require.Equal(t, http.StatusFound, rr.Code)
 	assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
-	codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything, mock.Anything)
+	codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 }

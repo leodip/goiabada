@@ -24,19 +24,18 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// authIssueDatabase is what code issuance needs: the session row it takes before inserting the
-// code, inside one transaction.
+// authIssueDatabase is what /auth/issue reads before it issues: the client, its redirect URIs, the
+// user and the ambient session. The session row taken before the insert, and the transaction, are
+// the code issuer's (#139).
 //
 // It embeds the authorize port because a refusal here is answered through redirToClientWithError.
 type authIssueDatabase interface {
 	authorizeDatabase
 
-	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 func HandleIssueGet(
@@ -361,7 +360,7 @@ func HandleIssueGet(
 			return
 		}
 
-		// Whichever field the issuer will READ, and never the other one. CreateAuthCode and
+		// Whichever field the issuer will READ, and never the other one. IssueAuthCodeTx and
 		// handleImplicitFlow both prefer ConsentedScope and fall back to Scope when it is empty,
 		// so writing an emptied ConsentedScope back would fall through to the full unfiltered
 		// request, which is why the empty result refuses instead of writing anything at all
@@ -442,61 +441,14 @@ func HandleIssueGet(
 			SessionIdentifier: sessionIdentifier,
 		}
 
-		// The observation that the session is still there and the insert that binds a grant to it
-		// go in ONE transaction, and the acquisition is what orders this ceremony against a
-		// termination of that session (#139).
-		//
-		// The liveness read above cannot do this on its own, however recently it ran: it is a
-		// read on one connection followed by an insert on another, so a termination can commit in
-		// between, and worse, a code inserted after that termination's sweep and before its
-		// COMMIT is invisible to the sweep and the termination is invisible to any compensating
-		// read, which still sees the uncommitted-deleted session row. The termination deletes
-		// the session row as its first statement, so both sides write the same row before
-		// touching anything else and one of them waits. Either this transaction waits and the
-		// acquisition then matches no rows, so nothing is issued, or the termination waits and
-		// its code sweep runs after this insert committed, so the code it hands the client is
-		// marked revoked and redemption answers invalid_grant. There is no third case: that row
-		// is the only object both sides touch and neither takes any other lock before it.
-		//
-		// Opened HERE rather than higher up so the row is held across as few statements as
-		// possible, and on the authorization code branch only: the implicit flow mints no code
-		// and no refresh token, so it has no durable grant for this to protect (#139 decision 6).
-		//
-		// This is the one ordering the repository keeps on purpose, and it is an integrity rule
-		// rather than a deadlock rule: it exists so a code can never slip between a termination's
-		// sweep and its commit. No other order is imposed. Concurrent transactions on the same
-		// account can still deadlock on MySQL, PostgreSQL or SQL Server; the loser is rolled back
-		// with nothing half applied and rerun by RunInTransaction, bounded, before the error
-		// surfaces. SQLite has one connection and cannot deadlock. Do not add ordering here to
-		// prevent a deadlock; add a test that forces it and shows the retry resolves it (#301).
-		//
-		// The body is safe to rerun: createCodeInput is only read, code is whatever the attempt
-		// that committed minted, and the audit event, the context clear and the redirect all wait
-		// below for the helper to return.
-		var code *models.Code
-		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
-			// ago and are not re-asked here: the only thing this narrower question misses is an idle
-			// timeout elapsing in the microseconds between the two, and buying that would cost a
-			// SELECT on every authorization code issued (#139 decision 7).
-			live, issueErr := database.AcquireUserSessionRow(r.Context(), tx, sessionIdentifier)
-			if issueErr != nil {
-				return issueErr
-			}
-
-			if !live {
-				// The gone shape, and it is answered exactly as the liveness read above answers it:
-				// the browser restarts at level 1 and a prompt=none ceremony is told login_required.
-				// The acquisition cannot tell WHY the row is gone, which is #129's own finding, so an
-				// explicit termination, a logout in another tab and either background reaper all get
-				// this one answer (#139 decisions 3 and 9). No code row is written at all, so nothing
-				// is left behind to reap. Answered below, once the helper has rolled back: the
-				// sentinel's comment says why that order is not optional.
-				return errIssuanceRefused
-			}
-
-			code, issueErr = codeIssuer.CreateAuthCode(r.Context(), tx, createCodeInput)
-			if issueErr != nil {
+		// The session row and the insert share one transaction the issuer opens, which is what
+		// orders this ceremony against a termination of that session (#139); the liveness read
+		// above cannot do it alone. It is opened here, on the authorization code branch only, so
+		// the row is held across as few statements as possible: the implicit flow mints no code and
+		// no refresh token, so it has no durable grant for this to protect (#139 decision 6).
+		code, err := codeIssuer.IssueAuthCodeTx(r.Context(), createCodeInput)
+		if errors.Is(err, issuance.ErrIssuingSessionGone) || errors.Is(err, issuance.ErrIssuingClientGone) {
+			if errors.Is(err, issuance.ErrIssuingClientGone) {
 				// The client's registration went away under this ceremony, between the liveness
 				// read above the dispatch and the insert. Answered as the session-gone shape rather
 				// than as a 500: nothing is wrong with this server, the application the browser was
@@ -505,27 +457,24 @@ func HandleIssueGet(
 				// re-reads the registration on its way out and withholds the redirect, so a deleted
 				// client is told on an interstitial rather than by a redirect to an address nobody
 				// owns any more (#248 part 5).
-				if errors.Is(issueErr, issuance.ErrIssuingClientGone) {
-					slog.WarnContext(r.Context(), "the client this ceremony is issuing for no longer exists, refusing to issue a code",
-						"client_identifier", authContext.ClientId,
-						"session_identifier", sessionIdentifier)
-					return errIssuanceRefused
-				}
-				return issueErr
+				slog.WarnContext(r.Context(), "the client this ceremony is issuing for no longer exists, refusing to issue a code",
+					"client_identifier", authContext.ClientId,
+					"session_identifier", sessionIdentifier)
 			}
-			return nil
-		})
-		if errors.Is(err, errIssuanceRefused) {
+			// The gone shape, answered exactly as the liveness read above answers it: the browser
+			// restarts at level 1 and a prompt=none ceremony is told login_required. The issuer
+			// returns either sentinel only after its transaction has rolled back, which the refusal
+			// needs: it writes the session store on a nil transaction, and on SQLite that is the
+			// connection the transaction was holding (#139).
 			refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
 				sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
 			return
 		}
 
-		// Everything below this line attests to a write, so it waits for the helper to return,
-		// which is after the commit: the rule revocation.TerminateUserSessionTx documents, never attest to a
-		// write that could still roll back. A commit that returns an error leaves the code row's
-		// fate indeterminate, which is the same contract that helper already carries, and the
-		// client is answered with a 500 rather than a code.
+		// Everything below this line attests to a write, so it waits for the issuer to return,
+		// which is after the commit: the rule revocation.TerminateUserSessionTx documents, never
+		// attest to a write that could still roll back. A commit that returns an error leaves the
+		// code row's fate indeterminate, and the client is answered with a 500 rather than a code.
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -548,19 +497,6 @@ func HandleIssueGet(
 		}
 	}
 }
-
-// errIssuanceRefused is what the issuance transaction returns when the ceremony is to be refused
-// rather than failed: the session row is gone, or the client's registration went away under it.
-// It leaves RunInTransaction without committing and without a fault, and is not a deadlock, so
-// the helper rolls back once and hands it straight back.
-//
-// The refusal runs only AFTER the helper has returned, and that order is not optional (#139).
-// Every path out of refuseIssuanceUnusableSession touches the database on a nil transaction
-// through the server-side session store: SaveAuthContext and ClearAuthContext write it and
-// redirToClientWithError reads the client. On SQLite the whole process shares one connection,
-// the one the transaction was holding, so a refusal issued while it was open would wait on
-// itself. Returning this from inside the closure is what guarantees the rollback comes first.
-var errIssuanceRefused = errors.New("the issuance was refused")
 
 // sessionRefusalShape names which of the three conditions on the session backing a ceremony
 // refuseIssuanceUnusableSession is answering. They are mutually exclusive by construction: a row

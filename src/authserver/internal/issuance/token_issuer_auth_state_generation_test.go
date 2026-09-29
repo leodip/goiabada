@@ -312,8 +312,8 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		input.ResponseMode = "query"
 		input.AuthStateGeneration = 7 // the user is at 9; reading the user would emit 9
 
-		_, err := issuer.CreateAuthCode(context.Background(), nil, input)
-		require.NoError(t, err, "CreateAuthCode")
+		_, err := issuer.createAuthCode(context.Background(), nil, input)
+		require.NoError(t, err, "createAuthCode")
 		require.NotNil(t, captured, "CreateCode was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration,
 			"the code must carry the generation this ceremony authenticated under")

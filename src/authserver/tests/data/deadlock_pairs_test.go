@@ -3,11 +3,13 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
@@ -186,42 +188,30 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 		code *models.Code
 		err  error
 	}
-	issuance := goBlocked(t, "issuance", sweepTx, func(reached func()) issuanceOut {
-		var out issuanceOut
-		out.err = other.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-			// Each attempt starts clean. out lives outside the closure, so a rerun would
-			// otherwise inherit the aborted attempt's code and could report a gone session
-			// holding a code that was never committed, which is the impossible shape the
-			// assertions below refuse. RunInTransaction's doc comment names this hazard.
-			out = issuanceOut{}
-
-			live, err := other.AcquireUserSessionRow(context.Background(), tx, session.SessionIdentifier)
-			if err != nil {
-				return err
-			}
-			if !live {
-				out.live = false
-				return nil // the ceremony's legitimate session-gone refusal
-			}
-			reached() // the next statement, the code insert, is the one that may block on the FK
-			code, err := mintCode(other, tx, client, user, session.SessionIdentifier)
-			if err != nil {
-				return err
-			}
-			out.live, out.code = true, code
-			return nil
-		})
-		return out
+	issuing := goBlocked(t, "issuance", sweepTx, func(reached func()) issuanceOut {
+		// The shipped transaction, retry included: IssueAuthCodeTx opens it through
+		// RunInTransaction, takes the session row and inserts, and returns the committing
+		// attempt's code, so a rerun cannot hand back an aborted attempt's code. reached() comes
+		// before the call rather than on the line before the insert, which is inside the issuer:
+		// check 1 is then only "the goroutine started", and the engine's own report of a waiter
+		// behind the sweep is what says the insert blocked.
+		reached()
+		code, err := issuance.NewCodeIssuer(other).IssueAuthCodeTx(context.Background(),
+			ceremonyCodeInput(client, user, session.SessionIdentifier))
+		if errors.Is(err, issuance.ErrIssuingSessionGone) {
+			return issuanceOut{live: false} // the ceremony's legitimate session-gone refusal
+		}
+		return issuanceOut{live: err == nil, code: code, err: err}
 	})
 
 	// PostgreSQL does not block here (see the doc comment), so record the outcome rather than
 	// requiring it. On MySQL and SQL Server issuance is queued behind the parked sweep.
-	blocked := issuance.awaitBlocked() == nil
+	blocked := issuing.awaitBlocked() == nil
 	t.Logf("engine %s: issuance blocked behind the credential sweep = %v", dbType(), blocked)
 
 	b.releaseParked()
 
-	out := issuance.await(t)
+	out := issuing.await(t)
 	sweepErr := awaitWorker(t, "the credential sweep", sweepDone)
 
 	require.NoError(t, sweepErr, "the credential sweep must finish, whether it was the victim or the survivor")
@@ -238,7 +228,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 	// ISSUANCE HAS TWO VALID SHAPES AND THE THIRD IS IMPOSSIBLE. It either found the session
 	// live and minted a code, or found it gone and minted nothing. Which of the two depends on
 	// the party the engine aborted, so neither is required; that they are the only two is. Left
-	// unasserted, a mintCode that quietly returns no code at all satisfies this test, and then
+	// unasserted, an issuer that quietly returns no code at all satisfies this test, and then
 	// the pair proves the two transactions finished without proving the ceremony did anything.
 	if out.live {
 		require.NotNil(t, out.code, "a ceremony that found the session live minted a code")

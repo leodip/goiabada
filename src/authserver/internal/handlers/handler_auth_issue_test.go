@@ -173,16 +173,10 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext) &&
 				input.SessionIdentifier == liveSessionIdentifier
 		})).Return(mockCode, nil)
-
-		// The transaction the insert runs on, with the acquisition reporting the session still
-		// there. The insert above is matched on issuanceTx rather than mock.Anything, which is
-		// what pins that the code is written on the transaction that holds the session row and
-		// not on the pool (#139).
-		stubIssuanceTransaction(database)
 
 		// Mock audit logging
 		auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -216,7 +210,7 @@ func TestHandleIssueGet(t *testing.T) {
 	// sweeps.
 	//
 	// "No code created" is enforced rather than asserted in the refusal rows below: the strict
-	// mocks_handlers.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the
+	// mocks_handlers.CodeIssuer carries no IssueAuthCodeTx expectation, so reaching it fails the
 	// case on its own, and the audit logger is not stubbed either.
 	//
 	// Two outcomes, one predicate. An interactive ceremony restarts level 1 (decision 6), and
@@ -661,22 +655,13 @@ func TestHandleIssueGet(t *testing.T) {
 
 		stubLiveSession(database, 123)
 
-		mockCode := &models.Code{
-			Id:          1,
-			Code:        "test-code",
-			ClientId:    1,
-			RedirectURI: "https://example.com/callback",
-			State:       "test-state",
-		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).Return(mockCode, nil)
-
-		// The commit is where the insert becomes durable, so a failure here leaves the code row's
+		// The commit is where the insert becomes durable, so a failure there leaves the code row's
 		// fate indeterminate and the client must be told nothing rather than handed a code that
-		// may not exist. Everything that attests to the write sits below the commit for this
-		// reason, which is why neither the audit nor the clear runs (#139).
+		// may not exist. The issuer reports it as an error with no code; everything that attests
+		// to the write waits for the issuer, which is why neither the audit nor the clear runs
+		// (#139).
 		commitError := errs.New("commit failed")
-		mocks_data.ExpectRunInTransactionThenFail(database, issuanceTx, commitError)
-		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).Return(nil, commitError).Once()
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == commitError
@@ -697,25 +682,20 @@ func TestHandleIssueGet(t *testing.T) {
 }
 
 // =============================================================================
-// #139: the acquisition that orders this ceremony against a session termination
+// #139: the code issuer's transaction, and the handler's answer to each way it ends
 //
-// The liveness read a few statements above is a read on one connection followed by an insert on
-// another, so a termination can commit between the two, and a code inserted between that
-// termination's sweep and its COMMIT escapes the sweep and every compensating read. The code
-// branch therefore opens a transaction, writes the session row through AcquireUserSessionRow and
-// inserts on that same transaction, so one of the two parties waits for the other.
+// The session row and the insert share one transaction, which is what orders this ceremony against
+// a termination of that session. The code issuer opens it and owns its sequence, and its own tests
+// pin that sequence (issuance.TestIssueAuthCodeTx_TakesTheSessionRowBeforeTheInsert) and that a
+// refusal comes back only after the rollback. What is left here is the handler's half: what it
+// hands the issuer, and how it answers each outcome. The interleaving itself is at the data tier,
+// where two real transactions are ordered by hand on all four engines.
 //
-// These cases own the branch the acquisition adds. What they cannot show is the ordering itself:
-// a mock answers whatever it was told to, so "the row was gone" here is a stipulation rather than
-// an interleaving. The interleaving is at the data tier, where two real transactions can be
-// ordered by hand on all four engines.
-//
-// "No code created" is enforced rather than asserted in every refusal below: the strict
-// mocks_handlers.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the case on
-// its own, and so does an unexpected CommitTransaction.
-func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
+// "No code delivered" is enforced rather than asserted in every refusal below: the audit logger is
+// strict and not stubbed for AuditCreatedAuthCode, so an attestation after a refusal fails the case.
+func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 	// The ceremony every case here runs: a live, owned, valid session, so the liveness read
-	// above the dispatch passes and the acquisition is the only thing left that can refuse.
+	// above the dispatch passes and the issuer is the only thing left that can refuse.
 	issuanceAuthContext := func(prompt string) *ceremony.AuthContext {
 		return &ceremony.AuthContext{
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
@@ -730,382 +710,179 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		}
 	}
 
-	// The transaction's shape is the whole of what the handler contributes to the #139 property,
-	// so it is pinned by sequence: one RunInTransaction, and inside it the acquisition, then the
-	// insert, with no other statement between. It cannot be seen at the data tier, which drives
-	// the statements by hand, and it cannot be seen from outside at all: the acquisition is a
-	// single-row UPDATE of a column nothing reads. A mock recording the sequence is the only
-	// place the handler's own choice is observable. No other row is taken ahead of the session
-	// row: the repository imposes no order between transactions, and a deadlock with one that
-	// takes these rows the other way round is answered by the helper rerunning this body (#301).
-	t.Run("The transaction is the acquisition then the insert, and nothing else", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database,
-			auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
-
-		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
-		rr := httptest.NewRecorder()
-
-		authContext := issuanceAuthContext("")
-		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
-		stubLiveSession(database, 123)
-
-		// Every statement on the transaction records itself, so the assertion below is about the
-		// sequence rather than about each call having happened somewhere. The stub notes the
-		// transaction's edges where the helper places them: "begin" before the body and "commit"
-		// after a nil return.
-		var order []string
-		note := func(what string) func(mock.Arguments) {
-			return func(mock.Arguments) { order = append(order, what) }
+	type fixture struct {
+		pageRenderer  *mocks_handlers.PageRenderer
+		ceremonyStore *mocks_handlers.CeremonyStore
+		codeIssuer    *mocks_handlers.CodeIssuer
+		database      *mocks_data.Database
+		auditLogger   *mocks_handlers.AuditLogger
+		req           *http.Request
+		rr            *httptest.ResponseRecorder
+		authContext   *ceremony.AuthContext
+		serve         func()
+	}
+	newFixture := func(t *testing.T, prompt string) *fixture {
+		f := &fixture{
+			pageRenderer:  mocks_handlers.NewPageRenderer(t),
+			ceremonyStore: mocks_handlers.NewCeremonyStore(t),
+			codeIssuer:    mocks_handlers.NewCodeIssuer(t),
+			database:      mocks_data.NewDatabase(t),
+			auditLogger:   mocks_handlers.NewAuditLogger(t),
+			req:           requestWithSessionIdentifier(t, liveSessionIdentifier),
+			rr:            httptest.NewRecorder(),
+			authContext:   issuanceAuthContext(prompt),
 		}
-		mocks_data.ExpectRunInTransaction(database, issuanceTx, func(edge string) { order = append(order, edge) })
-		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).
-			Run(note("session row")).Return(true, nil).Once()
-		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).Run(note("insert")).
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		if prompt == "none" {
+			stubRegisteredRedirectURI(f.database, f.authContext.RedirectURI)
+			stubClientProvenanceLookup(f.database)
+		}
+		handler := HandleIssueGet(f.pageRenderer, f.ceremonyStore, fstest.MapFS{}, f.codeIssuer,
+			mocks_handlers.NewImplicitTokenIssuer(t), f.database, f.auditLogger, userSessionManager,
+			permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		f.ceremonyStore.On("GetAuthContext", f.req).Return(f.authContext, nil)
+		stubLiveSession(f.database, 123)
+		armIssueGate(f.database, userSessionManager, permissionChecker, f.authContext.RedirectURI)
+		f.serve = func() { handler.ServeHTTP(f.rr, f.req) }
+		return f
+	}
+
+	t.Run("The issuer is handed the ceremony and its session, and the code it returns is delivered", func(t *testing.T) {
+		f := newFixture(t, "")
+
+		// The input is matched field by field rather than with mock.Anything: the session
+		// identifier is the row the issuer takes, so a ceremony handing it any other would take the
+		// wrong row and order nothing.
+		var order []string
+		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+			return reflect.DeepEqual(input.AuthContext, *f.authContext) &&
+				input.SessionIdentifier == liveSessionIdentifier
+		})).Run(func(mock.Arguments) { order = append(order, "issued") }).
 			Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
-				RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
+				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
+		f.auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).
+			Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
 
-		auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		f.serve()
 
-		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, []string{"begin", "session row", "insert", "commit"}, order,
-			"the session row is taken before the insert, on the same transaction, and nothing else is")
-
-		// And the ordering is only worth anything if all of it is on ONE transaction: a row taken
-		// on a different connection is released the moment that statement autocommits. Both
-		// expectations above name issuanceTx, so a statement on any other handle fails the mock.
-		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), "code=test-code")
-
-		pageRenderer.AssertExpectations(t)
-		ceremonyStore.AssertExpectations(t)
-		database.AssertExpectations(t)
-		codeIssuer.AssertExpectations(t)
+		assert.Equal(t, http.StatusFound, f.rr.Code)
+		assert.Contains(t, f.rr.Header().Get("Location"), "code=test-code")
+		// The attestation waits for the issuer to return, which is after its commit.
+		assert.Equal(t, []string{"issued", "audit"}, order)
+		f.codeIssuer.AssertExpectations(t)
+		f.auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("The row is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	// Both refusals get the session-gone answer. A session row gone under the ceremony is #139's
+	// shape; a client registration gone under it is #248 part 5's, which the shared client lock
+	// made the reliable outcome of losing that race rather than a narrow one. Nothing is wrong with
+	// this server in either, so neither is a 500.
+	refusals := []struct {
+		name     string
+		sentinel error
+		warns    bool
+	}{
+		{name: "the session row is gone", sentinel: issuance.ErrIssuingSessionGone},
+		{name: "the client is gone", sentinel: issuance.ErrIssuingClientGone, warns: true},
+	}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	for _, refusal := range refusals {
+		t.Run("Interactive, "+refusal.name+", so the ceremony restarts at level 1", func(t *testing.T) {
+			f := newFixture(t, "")
+			logs := logtest.CaptureSlog(t)
 
-		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
-		rr := httptest.NewRecorder()
+			// The issuer's real return: the sentinel under a stack, so the branch has to match it
+			// with errors.Is rather than by equality.
+			var order []string
+			f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
+				Run(func(mock.Arguments) { order = append(order, "issued") }).
+				Return(nil, errs.WithStack(refusal.sentinel)).Once()
+			var savedAuthContext *ceremony.AuthContext
+			f.ceremonyStore.On("SaveAuthContext", f.rr, f.req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				return ac.AuthState == ceremony.AuthStateRequiresLevel1
+			})).Run(func(args mock.Arguments) {
+				order = append(order, "save")
+				savedAuthContext = args.Get(2).(*ceremony.AuthContext)
+			}).Return(nil).Once()
 
-		authContext := issuanceAuthContext("")
-		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
-		stubLiveSession(database, 123)
+			f.serve()
 
-		// The order of these two is the assertion, not a detail. Every path out of the refusal
-		// reaches the database on a nil transaction through the server-side session store, and on
-		// SQLite the whole process shares one connection: the one this transaction holds. A
-		// refusal issued before the rollback would wait on itself (#139). The stub notes the
-		// rollback where the helper performs it, on the body's error return.
-		var order []string
-		stub := mocks_data.ExpectRunInTransaction(database, issuanceTx, func(edge string) {
-			if edge == "rollback" {
-				order = append(order, "rollback")
+			// The same answer the liveness read gives for the same condition, which is what makes
+			// refuseIssuanceUnusableSession one implementation rather than two that agree today.
+			assert.Equal(t, http.StatusFound, f.rr.Code)
+			assert.Contains(t, f.rr.Header().Get("Location"), "/auth/level1")
+			assert.NotContains(t, f.rr.Header().Get("Location"), "code=")
+			require.NotNil(t, savedAuthContext)
+			assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+			// The refusal writes the session store only after the issuer has returned, and the
+			// issuer returns a refusal only after its rollback (the issuer's own test).
+			assert.Equal(t, []string{"issued", "save"}, order)
+
+			if refusal.warns {
+				record, ok := warningSaying(t, logs, "the client this ceremony is issuing for no longer exists")
+				if ok {
+					assert.Equal(t, "test-client", record.Attrs["client_identifier"])
+					assert.Equal(t, liveSessionIdentifier, record.Attrs["session_identifier"])
+				}
+			} else {
+				noRecordSays(t, logs, "no longer exists")
 			}
+
+			f.pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertExpectations(t)
 		})
-		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 
-		var savedAuthContext *ceremony.AuthContext
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateRequiresLevel1
-		})).Run(func(args mock.Arguments) {
-			order = append(order, "save")
-			savedAuthContext = args.Get(2).(*ceremony.AuthContext)
-		}).Return(nil)
+		t.Run("Silent, "+refusal.name+", so the client is answered login_required", func(t *testing.T) {
+			f := newFixture(t, "none")
 
-		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
+			f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
+				Return(nil, errs.WithStack(refusal.sentinel)).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
 
-		handler.ServeHTTP(rr, req)
+			f.serve()
 
-		// The same answer the liveness read gives for the same condition, which is what makes
-		// refuseIssuanceUnusableSession one implementation rather than two that agree today.
-		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
-		assert.NotContains(t, rr.Header().Get("Location"), "code=")
-		require.NotNil(t, savedAuthContext)
-		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+			// prompt=none forbids UI, so this ceremony cannot be restarted into a password form: it
+			// gets the same login_required the liveness read gives, one redirect hop earlier (#129
+			// decision 16).
+			assert.Equal(t, http.StatusFound, f.rr.Code)
+			location := f.rr.Header().Get("Location")
+			assert.Contains(t, location, "https://example.com/callback")
+			assert.Contains(t, location, "error=login_required")
+			assert.Contains(t, location, "state=test-state")
+			assert.NotContains(t, location, "code=")
+			assert.NotContains(t, location, "/auth/level1")
 
-		require.GreaterOrEqual(t, len(order), 2)
-		assert.Equal(t, "rollback", order[0],
-			"the transaction must be released before the refusal touches the session store, or on SQLite the refusal waits on the connection this transaction holds")
-		assert.Equal(t, "save", order[1])
-
-		// Nothing was written and nothing was attested to: the body left the helper on the
-		// refusal sentinel, which is how it asks for a rollback rather than a commit.
-		assert.ErrorIs(t, stub.BodyErr, errIssuanceRefused)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
-
-		pageRenderer.AssertExpectations(t)
-		ceremonyStore.AssertExpectations(t)
-		database.AssertExpectations(t)
-		codeIssuer.AssertExpectations(t)
-	})
-
-	// #248 PART 5, FOLDED IN HERE BECAUSE THIS BRANCH CHANGED ITS REACHABILITY.
-	//
-	// The shared client acquisition means a ceremony racing a deletion of its own client WAITS for
-	// that deletion and then proceeds into CreateAuthCode's client lookup, which now finds nothing.
-	// So the nil that used to be a narrow race is the reliable outcome of losing this race, and the
-	// answer has to be an answer rather than a panic. It is the session-gone answer: nothing is
-	// wrong with this server, the application the browser was signing in to no longer exists.
-	t.Run("The client is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
-
-		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
-		rr := httptest.NewRecorder()
-
-		authContext := issuanceAuthContext("")
-		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
-		stubLiveSession(database, 123)
-
-		// The session is alive here, which is the point: this ceremony is refused for a reason
-		// that is not the session's, and the rollback still has to precede the refusal for the
-		// SQLite reason the sibling subtest states.
-		var order []string
-		stub := mocks_data.ExpectRunInTransaction(database, issuanceTx, func(edge string) {
-			if edge == "rollback" {
-				order = append(order, "rollback")
-			}
+			f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertExpectations(t)
 		})
-		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
-		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).
-			Return(nil, errs.WithStack(issuance.ErrIssuingClientGone)).Once()
+	}
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateRequiresLevel1
-		})).Run(func(mock.Arguments) { order = append(order, "save") }).Return(nil)
-
-		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
-
-		handler.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
-		assert.NotContains(t, rr.Header().Get("Location"), "code=")
-
-		require.GreaterOrEqual(t, len(order), 2)
-		assert.Equal(t, "rollback", order[0],
-			"the transaction must be released before the refusal touches the session store")
-		assert.Equal(t, "save", order[1])
-
-		// Not a 500, which is the whole of the difference from an ordinary CreateAuthCode failure:
-		// the body turned the client-gone error into the refusal sentinel before handing it to
-		// the helper.
-		pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
-		assert.ErrorIs(t, stub.BodyErr, errIssuanceRefused)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-
-		pageRenderer.AssertExpectations(t)
-		ceremonyStore.AssertExpectations(t)
-		database.AssertExpectations(t)
-		codeIssuer.AssertExpectations(t)
-	})
-
-	// And any OTHER failure from the insert is still a 500, so the branch above is a branch on
-	// this one condition rather than a blanket softening of the insert's errors.
-	t.Run("An ordinary insert failure is still a 500", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
-
-		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
-		rr := httptest.NewRecorder()
-
-		authContext := issuanceAuthContext("")
-		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
-		stubLiveSession(database, 123)
-
-		boom := errs.New("the insert failed")
-		stub := mocks_data.ExpectRunInTransaction(database, issuanceTx)
-		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
-		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).Return(nil, boom).Once()
-		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return errors.Is(err, boom)
-		})).Return()
-
-		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
-
-		handler.ServeHTTP(rr, req)
-
-		assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
-		assert.NotContains(t, rr.Header().Get("Location"), "code=")
-		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-		assert.ErrorIs(t, stub.BodyErr, boom, "the body hands its error to the helper unchanged, which rolls back")
-
-		pageRenderer.AssertExpectations(t)
-		database.AssertExpectations(t)
-		codeIssuer.AssertExpectations(t)
-	})
-
-	t.Run("The row is gone and the ceremony is silent, so the client is answered login_required", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
-
-		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
-		rr := httptest.NewRecorder()
-
-		authContext := issuanceAuthContext("none")
-		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
-		stubClientProvenanceLookup(database)
-		stubLiveSession(database, 123)
-
-		stub := mocks_data.ExpectRunInTransaction(database, issuanceTx)
-		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
-
-		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
-
-		handler.ServeHTTP(rr, req)
-
-		// prompt=none forbids UI, so this ceremony cannot be restarted into a password form: it
-		// gets the same login_required the liveness read gives, one redirect hop earlier (#129
-		// decision 16).
-		assert.Equal(t, http.StatusFound, rr.Code)
-		location := rr.Header().Get("Location")
-		assert.Contains(t, location, "https://example.com/callback")
-		assert.Contains(t, location, "error=login_required")
-		assert.Contains(t, location, "state=test-state")
-		assert.NotContains(t, location, "code=")
-		assert.NotContains(t, location, "/auth/level1")
-
-		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-		assert.ErrorIs(t, stub.BodyErr, errIssuanceRefused)
-
-		pageRenderer.AssertExpectations(t)
-		ceremonyStore.AssertExpectations(t)
-		database.AssertExpectations(t)
-		codeIssuer.AssertExpectations(t)
-	})
-
-	// The two failures of the transaction itself. Both are a 500 and neither is a refusal: a
-	// statement that did not run has not established that the session is gone, so answering the
-	// browser as though it had would restart a ceremony whose session is in fact alive.
-	t.Run("The acquisition or the begin fails, so the ceremony answers 500 and nothing is inserted", func(t *testing.T) {
+	// And any OTHER failure is still a 500, so the branch above is a branch on the two sentinels
+	// rather than a blanket softening of the issuer's errors. A statement that did not run has not
+	// established that the session is gone, so answering it as though it had would restart a
+	// ceremony whose session is in fact alive.
+	t.Run("Any other issuer failure is a 500, not a refusal", func(t *testing.T) {
+		f := newFixture(t, "")
 		boom := errs.New("connection refused")
 
-		// setup returns the stub when the body runs, nil when the helper refuses to open, so the
-		// loop can assert the body handed boom to the helper wherever there was a body.
-		cases := []struct {
-			name  string
-			setup func(database *mocks_data.Database) *mocks_data.RunInTransactionStub
-		}{
-			{
-				name: "the transaction cannot be opened",
-				setup: func(database *mocks_data.Database) *mocks_data.RunInTransactionStub {
-					mocks_data.ExpectRunInTransactionRefused(database, boom)
-					return nil
-				},
-			},
-			{
-				name: "the session row acquisition fails",
-				setup: func(database *mocks_data.Database) *mocks_data.RunInTransactionStub {
-					stub := mocks_data.ExpectRunInTransaction(database, issuanceTx)
-					database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).
-						Return(false, boom).Once()
-					return stub
-				},
-			},
-		}
+		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).Return(nil, boom).Once()
+		f.pageRenderer.On("InternalServerError", f.rr, f.req, mock.MatchedBy(func(err error) bool {
+			return errors.Is(err, boom)
+		})).Return().Once()
 
-		for _, tc := range cases {
-			t.Run(tc.name, func(t *testing.T) {
-				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-				templateFS := fstest.MapFS{}
-				codeIssuer := mocks_handlers.NewCodeIssuer(t)
-				implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_handlers.NewAuditLogger(t)
-				userSessionManager := mocks_handlers.NewUserSessionManager(t)
-				permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		f.serve()
 
-				handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
-
-				req := requestWithSessionIdentifier(t, liveSessionIdentifier)
-				rr := httptest.NewRecorder()
-
-				authContext := issuanceAuthContext("")
-				ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
-				stubLiveSession(database, 123)
-				stub := tc.setup(database)
-
-				pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-					return errors.Is(err, boom)
-				})).Return()
-
-				armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
-
-				handler.ServeHTTP(rr, req)
-
-				// Not a refusal, and not a code: the browser is neither restarted at level 1 nor
-				// sent to the client.
-				assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
-				assert.NotContains(t, rr.Header().Get("Location"), "code=")
-				ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-				ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-				if stub != nil {
-					assert.ErrorIs(t, stub.BodyErr, boom, "the body hands its error to the helper unchanged, which rolls back")
-				}
-
-				pageRenderer.AssertExpectations(t)
-				database.AssertExpectations(t)
-				codeIssuer.AssertExpectations(t)
-			})
-		}
+		assert.NotContains(t, f.rr.Header().Get("Location"), "/auth/level1")
+		assert.NotContains(t, f.rr.Header().Get("Location"), "code=")
+		f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+		f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		f.pageRenderer.AssertExpectations(t)
 	})
 }
 
@@ -1118,7 +895,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 // backstop, so these drive the handler directly rather than through the flow.
 //
 // One case per issuance family, because one shared gate is only worth what its weakest branch
-// is: the code flow reaches CreateAuthCode, and the three implicit response types reach
+// is: the code flow reaches IssueAuthCodeTx, and the three implicit response types reach
 // GenerateTokenResponseForImplicit through a dispatch that used to sit ABOVE this check and
 // never loaded the session at all. An implicit token is signed and handed to a resource server
 // that cannot look the session up, so nothing downstream can catch it later.
@@ -1201,7 +978,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "code=")
 			assert.NotContains(t, location, "access_token=")
 			assert.NotContains(t, location, "id_token=")
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+			codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 			implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
@@ -1283,7 +1060,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "code=")
 			assert.NotContains(t, location, "access_token=")
 
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+			codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 			implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
@@ -1523,29 +1300,12 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 }
 
 // stubLiveSession makes the ownership check pass, which is the precondition for reaching
-// CreateAuthCode or GenerateTokenResponseForImplicit at all. Liveness alone was enough after
+// IssueAuthCodeTx or GenerateTokenResponseForImplicit at all. Liveness alone was enough after
 // #129 stage 6; #133 added the owner comparison, so the caller has to say which user the row
 // belongs to and a subtest that wants the gate to pass has to name its own ceremony's user.
 func stubLiveSession(database *mocks_data.Database, ownerUserId int64) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
-}
-
-// issuanceTx is the opaque non-nil transaction the code branch of /auth/issue opens. The mocks
-// never dereference it; it only has to be the same pointer the handler forwards, which is what
-// lets a case assert that CreateAuthCode was handed THIS transaction rather than nil or another
-// one, and so that the insert really does run on the connection holding the session row (#139).
-var issuanceTx = &sql.Tx{}
-
-// stubIssuanceTransaction arms the transaction the authorization code branch opens around the
-// acquisition and the insert: the helper, and an acquisition reporting the session still there.
-// A case that omits it fails on the strict mock.
-//
-// Cases about the refusal arm these themselves, because the answer they need from the acquisition
-// is the opposite one.
-func stubIssuanceTransaction(database *mocks_data.Database) {
-	mocks_data.ExpectRunInTransaction(database, issuanceTx)
-	database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 }
 
 // The records are read whole rather than as rendered text, because two of the properties decision
@@ -3394,11 +3154,9 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
-
-		stubIssuanceTransaction(database)
 
 		// Mock audit logging
 		auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -3499,8 +3257,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed, or the browser keeps a ready_to_issue_code context to replay")
 
-		// Verify CreateAuthCode was NEVER called
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		// Verify IssueAuthCodeTx was NEVER called
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 		// Verify all other expectations
 		pageRenderer.AssertExpectations(t)
@@ -3572,7 +3330,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.NotContains(t, location, "login_required")
 		assert.NotContains(t, location, "code=")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3766,11 +3524,9 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
-
-		stubIssuanceTransaction(database)
 
 		// Mock audit logging
 		auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -3874,7 +3630,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Equal(t, userASubject, savedAuthContext.IdTokenHintSub, "IdTokenHintSub should persist from authorize request")
 		assert.Equal(t, int64(99), savedAuthContext.UserId, "UserId should be set to authenticated user (user B)")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3998,9 +3754,8 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
-				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.Anything).
+				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
 					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
-				stubIssuanceTransaction(database)
 				auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -4021,7 +3776,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			} else {
 				assert.Empty(t, location,
 					"a withheld redirect must never become a Location: %s", tc.why)
-				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+				codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 				implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			}
@@ -4191,7 +3946,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			assert.Equal(t, http.StatusFound, rr.Code)
 			location := rr.Header().Get("Location")
 			assert.NotContains(t, location, "code=", "no code may be minted on an expired session")
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+			codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 			if tc.silent {
 				assert.Contains(t, location, "https://example.com/callback")
@@ -4226,7 +3981,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 // the authorization_code arm of the token endpoint never consults the permission checker at all,
 // while a REFRESH of an older grant does (#241).
 //
-// The two write-back rows are decision 2's answer and they are not interchangeable. CreateAuthCode
+// The two write-back rows are decision 2's answer and they are not interchangeable. The code issuer
 // and handleImplicitFlow both prefer ConsentedScope and fall back to Scope when it is empty, so the
 // filtered value has to land on whichever of the two the issuer will read and never on the other.
 func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
@@ -4330,12 +4085,11 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
-				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 					return input.AuthContext.Scope == tc.wantScope &&
 						input.AuthContext.ConsentedScope == tc.wantConsented
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
-				stubIssuanceTransaction(database)
 				auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedScopeDenied, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -4357,7 +4111,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				assert.Contains(t, location, "error=access_denied", tc.why)
 				assert.Contains(t, location, "not+authorized+to+access+any+of+the+requested+scopes")
 				assert.NotContains(t, location, "code=")
-				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+				codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 			}
 
 			// Whichever way it went, the field the issuer does NOT read is untouched.
@@ -4561,7 +4315,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// rather than passing as though the refusal had been shown.
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a withheld redirect must never become a Location, least of all because the clear failed")
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 		implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
@@ -4625,7 +4379,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a failure to render the refusal must not become a redirect to the deregistered host")
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -4727,7 +4481,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"the ordinary refusal's code must not stand in for one the server could not complete")
 		assert.NotContains(t, location, "code=")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -4771,7 +4525,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -4812,7 +4566,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
