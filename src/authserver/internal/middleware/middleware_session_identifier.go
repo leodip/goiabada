@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -21,7 +22,11 @@ type sessionIdentifierDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
 }
 
-func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifierDatabase) func(next http.Handler) http.Handler {
+// MiddlewareSessionIdentifier puts on the request's context the session identifier the session
+// cookie names, when that session still exists. A failure to read the session or its row is
+// answered through faults, in the format of the branch it is mounted on; on a page route it is
+// text/plain (#435).
+func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifierDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -31,6 +36,9 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessi
 
 			sess, err := sessionStore.Get(r, sessionkeys.AuthServerSessionName)
 			if err != nil {
+				if faults.answered(w, r, errs.Wrap(err, "unable to get the session store")) {
+					return
+				}
 				slog.ErrorContext(ctx, "unable to get the session store", "error", err)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
@@ -41,6 +49,9 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessi
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 				if err != nil {
+					if faults.answered(w, r, errs.Wrap(err, "unable to get the user session")) {
+						return
+					}
 					slog.ErrorContext(ctx, "unable to get the user session", "error", err)
 					http.Error(w, errorMsg, http.StatusInternalServerError)
 					return
@@ -52,6 +63,9 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessi
 					delete(sess.Values, sessionkeys.SessionKeySessionIdentifier)
 					err = sessionStore.Save(r, w, sess)
 					if err != nil {
+						if faults.answered(w, r, errs.Wrap(err, "unable to save the session")) {
+							return
+						}
 						slog.ErrorContext(ctx, "unable to save the session", "error", err)
 						http.Error(w, errorMsg, http.StatusInternalServerError)
 						return

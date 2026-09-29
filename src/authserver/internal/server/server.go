@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/workers"
@@ -132,11 +133,11 @@ func (s *Server) Start(ctx context.Context) error {
 		return errs.New("no listener is enabled, so the auth server cannot start: configure at least one of the http and https listeners")
 	}
 
-	// The static branch and the application branch, in that order. Both are registered
-	// on s.router; only the second carries the middleware initMiddleware returns, which
-	// is what keeps a stylesheet from costing a settings read and a session load
-	// (see initMiddleware).
-	app := s.initMiddleware()
+	// The static branch and the application branches, in that order. All are registered
+	// on s.router; only the application branches carry the middleware initMiddleware
+	// returns, which is what keeps a stylesheet from costing a settings read and a session
+	// load (see initMiddleware).
+	branches := s.initMiddleware()
 
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
@@ -144,7 +145,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// <link rel="icon"> tags; point it at the real asset under /static.
 	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
 
-	s.initRoutes(app)
+	s.initRoutes(branches)
 
 	var listeners []listener
 
@@ -296,15 +297,16 @@ const (
 	workerStopTimeout = 20 * time.Second
 )
 
-// initMiddleware mounts the chain and returns the router the application's own routes
+// initMiddleware mounts the chain and returns the branches the application's own routes
 // belong on.
 //
 // Two branches, and the split is the point (#266). Everything mounted on s.router below
 // applies to every request this server answers, a stylesheet included: the CORS answer,
 // the request id, the security headers, the real client IP, the panic recovery, the
-// request log, the slash strip and the CSRF origin check. What the returned router adds
+// request log, the slash strip and the CSRF origin check. What the returned branches add
 // is the part a file server has no use for and cannot use: the settings read, the cookie
-// reset, the session load and the locale resolution.
+// reset, the session load and the locale resolution. There are three of them, one per
+// format a route answers a fault in (see appBranches, #435).
 //
 // The cost that split removes is not hypothetical. An auth page references seven
 // same-origin assets, and MiddlewareSettings reads settings from the database uncached on
@@ -318,8 +320,8 @@ const (
 //
 // chi refuses Use after a route has been registered on the same router, and With freezes
 // the parent's chain, so this is a restructure rather than a reorder: every root Use
-// happens here, before the branch, and both branches register their routes afterwards.
-func (s *Server) initMiddleware() chi.Router {
+// happens here, before the branches, and every branch registers its routes afterwards.
+func (s *Server) initMiddleware() appBranches {
 
 	slog.Info("initializing middleware")
 
@@ -403,23 +405,57 @@ func (s *Server) initMiddleware() chi.Router {
 	// scope.
 	i18nCeremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
-	app := s.router.With(
+	branches := appBranches{
+		pages:    s.applicationBranch(authserver_middleware.PageFaults(), i18nCeremonyStore),
+		protocol: s.applicationBranch(authserver_middleware.ProtocolFaults(handlerhelpers.NewHttpHelper(s.templateFS)), i18nCeremonyStore),
+		api:      s.applicationBranch(authserver_middleware.APIFaults(), i18nCeremonyStore),
+	}
+
+	slog.Info("finished initializing middleware")
+
+	return branches
+}
+
+// applicationBranch is the application chain on s.router, answering what stops a request before its
+// handler through faults. The three branches initMiddleware builds run this same middleware in the
+// same order and differ only in faults: the settings or the session could not be read, or something
+// panicked.
+func (s *Server) applicationBranch(faults authserver_middleware.ServerFaults, i18nCeremonyStore *ceremony.Store) chi.Router {
+	return s.router.With(
+		// Answers a panic on the branch in the branch's format; on the page branch it is a
+		// pass-through and the root Recoverer answers
+		faults.Recoverer,
+
 		// Adds settings to the request context
-		authserver_middleware.MiddlewareSettings(s.database),
+		authserver_middleware.MiddlewareSettings(s.database, faults),
 
 		// Clear the session cookie and redirect if unable to decode it, and delete
 		// whatever the chunked cookie store left in this browser
 		custom_middleware.MiddlewareCookieReset(s.sessionStore, sessionkeys.AuthServerSessionName),
 
 		// Adds the session identifier (if available) to the request context
-		authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database),
+		authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database, faults),
 
 		i18n.MiddlewareLocale(i18nCeremonyStore),
 	)
+}
 
-	slog.Info("finished initializing middleware")
-
-	return app
+// appBranches is the application branch in its three answering formats, which initMiddleware returns
+// and initRoutes registers every application route on. A route goes on the branch of the format its
+// handler answers every other fault in, so a client parsing a protocol endpoint or an API as JSON is
+// not handed text/plain when the settings or the session cannot be read, or an empty body when
+// something panics. The format is chosen by where routes.go registers a route and never read off the
+// request path, as the bearer guards' refusals are (#435).
+type appBranches struct {
+	// pages carries everything that answers a page, text, an image or a redirect, and answers such a
+	// fault in text/plain, as every route did before #435.
+	pages chi.Router
+	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
+	// token, userinfo, JWKS, discovery and dynamic client registration.
+	protocol chi.Router
+	// api carries the admin, account and session APIs and the public settings, which answer the
+	// {error_code, error_description} envelope.
+	api chi.Router
 }
 
 // csrfPolicy is the auth server's CSRF exemption policy: the endpoints this binary serves that are

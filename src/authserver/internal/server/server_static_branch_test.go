@@ -40,7 +40,7 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 	database := mocks_data.NewDatabase(t)
 
 	s := newStaticBranchTestServer(database)
-	app := s.initMiddleware()
+	app := s.initMiddleware().pages
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 	app.Get("/auth/authorize", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -63,7 +63,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{Id: 1}, nil).Once()
 
 	s := newStaticBranchTestServer(database)
-	app := s.initMiddleware()
+	app := s.initMiddleware().pages
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 
 	reached := false

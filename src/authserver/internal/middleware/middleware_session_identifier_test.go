@@ -23,7 +23,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 
 		mockSessionStore.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, errors.New("session store error"))
 
-		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
+		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -40,7 +40,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		session := sessionstore.NewSession(mockSessionStore, sessionkeys.AuthServerSessionName)
 		mockSessionStore.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(session, nil)
 
-		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
+		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -63,7 +63,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "valid-session-id").Return(&models.UserSession{}, nil)
 
-		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
+		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -89,7 +89,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "invalid-session-id").Return(nil, nil)
 		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
+		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -119,7 +119,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 			return !hasSessionId && hasAuthContext && authContext == `{"authState":"level1_password"}`
 		})).Return(nil)
 
-		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
+		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -141,7 +141,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "error-session-id").Return(nil, errors.New("database error"))
 
-		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
+		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
