@@ -30,32 +30,32 @@ import (
 // that one exists", which is what a feature switched off is. It used to be the 500 page with an
 // error-level stack, which alerted an operator for every visitor following an old link to a page
 // the operator had turned off on purpose (#425 decision 5).
-func refuseSelfRegistrationDisabled(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) {
+func refuseSelfRegistrationDisabled(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
 	slog.WarnContext(r.Context(), "self-registration request refused because self-registration is disabled")
-	httpHelper.NotFound(w, r)
+	pageRenderer.NotFound(w, r)
 }
 
 func HandleAccountRegisterGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		if !settings.SelfRegistrationEnabled {
-			refuseSelfRegistrationDisabled(httpHelper, w, r)
+			refuseSelfRegistrationDisabled(pageRenderer, w, r)
 			return
 		}
 
 		bind := map[string]interface{}{}
 
-		err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
+		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 	}
@@ -70,7 +70,7 @@ type accountRegisterDatabase interface {
 }
 
 func HandleAccountRegisterPost(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	database accountRegisterDatabase,
 	userCreator UserCreator,
 	emailValidator EmailValidator,
@@ -86,11 +86,11 @@ func HandleAccountRegisterPost(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		if !settings.SelfRegistrationEnabled {
-			refuseSelfRegistrationDisabled(httpHelper, w, r)
+			refuseSelfRegistrationDisabled(pageRenderer, w, r)
 			return
 		}
 
@@ -111,9 +111,9 @@ func HandleAccountRegisterPost(
 				"error": message,
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
+			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 		}
 
@@ -138,7 +138,7 @@ func HandleAccountRegisterPost(
 			case errors.As(err, &errorDetail):
 				renderError(errorDetail.GetDescription())
 			default:
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -147,7 +147,7 @@ func HandleAccountRegisterPost(
 
 		user, err := database.GetUserByEmail(r.Context(), nil, email)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if user != nil {
@@ -157,7 +157,7 @@ func HandleAccountRegisterPost(
 
 		preRegistration, err := database.GetPreRegistrationByEmail(r.Context(), nil, email)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if preRegistration != nil {
@@ -196,14 +196,14 @@ func HandleAccountRegisterPost(
 		if settings.SMTPEnabled && settings.SelfRegistrationRequiresEmailVerification {
 			passwordHash, err := passwordhash.Hash(password)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -223,7 +223,7 @@ func HandleAccountRegisterPost(
 
 			err = database.CreatePreRegistration(r.Context(), nil, preRegistration)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -242,9 +242,9 @@ func HandleAccountRegisterPost(
 			// the originating request's locale so the activation email matches
 			// the language the user just registered in.
 			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, i18n.LocaleTag(r.Context())))
-			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
+			buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -255,7 +255,7 @@ func HandleAccountRegisterPost(
 			}
 			err = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -263,14 +263,14 @@ func HandleAccountRegisterPost(
 				"email": email,
 			}
 
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation.html", bind)
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 		} else {
 			passwordHash, err := passwordhash.Hash(password)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -280,7 +280,7 @@ func HandleAccountRegisterPost(
 				PasswordHash:  passwordHash,
 			})
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -295,9 +295,9 @@ func HandleAccountRegisterPost(
 				// Recipient is the freshly-created user; no stored Locale yet,
 				// so the welcome email uses the locale they registered in.
 				emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, i18n.LocaleTag(r.Context())))
-				buf, emailErr := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
+				buf, emailErr := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
 				if emailErr != nil {
-					httpHelper.InternalServerError(w, r, emailErr)
+					pageRenderer.InternalServerError(w, r, emailErr)
 					return
 				}
 
@@ -308,7 +308,7 @@ func HandleAccountRegisterPost(
 				}
 				emailErr = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 				if emailErr != nil {
-					httpHelper.InternalServerError(w, r, emailErr)
+					pageRenderer.InternalServerError(w, r, emailErr)
 					return
 				}
 			}
@@ -316,9 +316,9 @@ func HandleAccountRegisterPost(
 			bind := map[string]interface{}{
 				"adminConsoleBaseUrl": adminConsoleBaseURL,
 			}
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_success.html", bind)
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_success.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 		}
 	}

@@ -15,9 +15,9 @@ import (
 
 func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 	t.Run("Returns correct OIDC configuration", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 
-		handler := HandleWellKnownOIDCConfigGet(httpHelper, testBaseURL)
+		handler := HandleWellKnownOIDCConfigGet(jsonWriter, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/.well-known/openid-configuration", nil)
 		assert.NoError(t, err)
@@ -31,7 +31,7 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("EncodeJson", rr, req, mock.AnythingOfType("oidc.WellKnownConfig")).Run(func(args mock.Arguments) {
+		jsonWriter.On("EncodeJson", rr, req, mock.AnythingOfType("oidc.WellKnownConfig")).Run(func(args mock.Arguments) {
 			wellKnownConfig := args.Get(2).(oidc.WellKnownConfig)
 
 			assert.Equal(t, "https://example.com", wellKnownConfig.Issuer)
@@ -62,6 +62,6 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 }

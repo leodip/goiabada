@@ -32,7 +32,7 @@ type authPwdDatabase interface {
 }
 
 func HandleAuthPwdGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	database authPwdDatabase,
 	adminConsoleBaseURL string,
@@ -47,14 +47,14 @@ func HandleAuthPwdGet(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		requiredState := ceremony.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -65,7 +65,7 @@ func HandleAuthPwdGet(
 		if len(sessionIdentifier) > 0 {
 			userSession, getUserSessionErr := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 			if getUserSessionErr != nil {
-				httpHelper.InternalServerError(w, r, getUserSessionErr)
+				pageRenderer.InternalServerError(w, r, getUserSessionErr)
 				return
 			}
 			if userSession != nil {
@@ -75,18 +75,18 @@ func HandleAuthPwdGet(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 
 		// Fetch client to get display settings
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.New("client not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 
@@ -112,16 +112,16 @@ func HandleAuthPwdGet(
 			bind["email"] = email
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
+		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 	}
 }
 
 func HandleAuthPwdPost(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	database authPwdDatabase,
 	auditLogger AuditLogger,
@@ -139,7 +139,7 @@ func HandleAuthPwdPost(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -153,13 +153,13 @@ func HandleAuthPwdPost(
 		// r.PostFormValue rather than r.FormValue: this form posts to action="", so r.Form would
 		// let /auth/pwd?ceremonyId=... supply the id, and only the submitted body is a submission.
 		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
-			rejectCeremonyMismatch(httpHelper, auditLogger, w, r, authContext)
+			rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
 			return
 		}
 
 		requiredState := ceremony.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -180,18 +180,18 @@ func HandleAuthPwdPost(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 
 		// Fetch client to get display settings
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.New("client not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 
@@ -215,9 +215,9 @@ func HandleAuthPwdPost(
 				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 			}
 
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 		}
 
@@ -234,7 +234,7 @@ func HandleAuthPwdPost(
 
 		user, err := database.GetUserByEmail(r.Context(), nil, email)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -344,13 +344,13 @@ func HandleAuthPwdPost(
 		// state the attacker needs. Same ordering, and the same reason, as the step-up arm
 		// in handler_auth_completed.
 		if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
-			httpHelper.InternalServerError(w, r, regenerateSessionErr)
+			pageRenderer.InternalServerError(w, r, regenerateSessionErr)
 			return
 		}
 
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		http.Redirect(w, r, baseURL+"/auth/level1completed", http.StatusFound)

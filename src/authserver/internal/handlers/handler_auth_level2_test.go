@@ -17,11 +17,11 @@ import (
 
 func TestHandleAuthLevel2Get(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -29,22 +29,22 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		expectedError := &customerrors.ErrorDetail{}
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -54,20 +54,20 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		expectAuthStateMismatch(t, httpHelper, rr, req)
+		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Client not found", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -80,23 +80,23 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "client test-client not found"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("AcrLevel2Optional with OTP enabled", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -132,17 +132,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/otp", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("AcrLevel2Optional with OTP disabled", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -183,17 +183,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("AcrLevel2Mandatory", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -228,7 +228,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/otp", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
@@ -239,11 +239,11 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	// written. Every sibling ceremony handler already checks this; this one did not, and
 	// "every handler except one" is the kind of gap that regresses (#242 decision 5).
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -264,7 +264,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "user not found"
 		})).Return()
 
@@ -275,17 +275,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assert.Empty(t, rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Invalid AcrLevel", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
@@ -309,13 +309,13 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid targetAcrLevel: urn:goiabada:level1"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})

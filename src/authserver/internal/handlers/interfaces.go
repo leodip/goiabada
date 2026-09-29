@@ -16,17 +16,26 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 )
 
-type HttpHelper interface {
+// PageRenderer and JSONWriter are the two ways a handler here answers, and a handler is handed
+// exactly one of them. The token, userinfo, JWKS and discovery endpoints take JSONWriter alone, so
+// an HTML error page on one of them is a compile error rather than a review finding: a client
+// parsing those endpoints as JSON got an HTML 500 on 23 fault paths while one port carried both
+// writers (#435). Every other handler answers pages and takes PageRenderer. The concrete
+// handlerhelpers.HttpHelper satisfies both, so routes.go builds it once.
+type PageRenderer interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
 	NotFound(w http.ResponseWriter, r *http.Request)
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
 	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) (*bytes.Buffer, error)
+}
+
+// JSONWriter answers the JSON endpoints. JsonError writes an ErrorDetail in the RFC 6749 section
+// 5.2 shape and anything else as a 500 server_error.
+type JSONWriter interface {
 	JsonError(w http.ResponseWriter, r *http.Request, err error)
 	EncodeJson(w http.ResponseWriter, r *http.Request, data interface{})
-	GetFromUrlQueryOrFormPost(r *http.Request, key string) string
-	LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool)
 }
 
 type AuthHelper interface {
@@ -50,11 +59,16 @@ type TokenIssuer interface {
 	// GenerateTokenResponseForRefreshROPC generates new tokens for an ROPC refresh token.
 	// Unlike auth code flow, ROPC tokens have UserId and ClientId directly on the RefreshToken.
 	GenerateTokenResponseForRefreshROPC(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)
-	GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
 	// GenerateTokenResponseForROPC generates tokens for Resource Owner Password Credentials flow.
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 	GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*issuance.ROPCGrantResponse, error)
+}
+
+// ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens
+// in the redirect fragment. The token endpoint issues the other five, through TokenIssuer.
+type ImplicitTokenIssuer interface {
+	GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
 }
 
 type AuthorizeValidator interface {

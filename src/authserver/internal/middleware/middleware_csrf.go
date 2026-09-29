@@ -23,7 +23,7 @@ import (
 // LookupFromUrlQueryOrFormPost is what makes that agreement structural rather than a promise, and
 // it is why "id_token_hint=" is exempt here and Rejected there (#109). Both ends are in this module
 // now: the predicate left core/middleware with the policy that named it, and the handler it has to
-// agree with is handlers.HandleAccountLogoutPost two packages away (#385).
+// agree with is handlers.HandleLogoutPost two packages away (#385).
 //
 // Presence alone is safe because middleware cannot judge whether a hint is genuine and the handler
 // does not trust it to: a POST whose hint fails to validate tears nothing down, it is answered with

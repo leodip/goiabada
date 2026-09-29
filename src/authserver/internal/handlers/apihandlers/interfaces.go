@@ -16,7 +16,7 @@ import (
 // This package used to name handlers.AuditLogger, handlers.HttpHelper and five more, which is the
 // only reason 37 files here imported a transport package sitting above them. A port belongs to the
 // side that calls it (#386), and declaring it here means each one names only the methods this
-// package actually calls: HttpHelper is one method here against the parent's eight. The concrete
+// package actually calls: PageRenderer is one method here against the parent's four. The concrete
 // types the composition root builds satisfy these structurally, so routes.go is unchanged (#387).
 // So do the parent's generated mocks, which live beside the parent's ports in
 // internal/handlers/mocks, because every generated mock lives beside the interface it doubles;
@@ -35,11 +35,11 @@ type AuditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
-// HttpHelper is one method wide here, and deliberately so. Every handler in this package answers
+// PageRenderer is one method wide here, and deliberately so. Every handler in this package answers
 // JSON: a 500 is writeInternalServerError and a refusal is writeJSONError (#279 decision 7), so
 // the page writers the parent's declaration carries have no caller here and are not named. The two
 // sites that remain render an email body to a buffer, which is a template but not a response.
-type HttpHelper interface {
+type PageRenderer interface {
 	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) (*bytes.Buffer, error)
 }

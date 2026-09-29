@@ -39,7 +39,7 @@ type authCompletedDatabase interface {
 }
 
 func HandleAuthCompletedGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
 	database authCompletedDatabase,
@@ -58,14 +58,14 @@ func HandleAuthCompletedGet(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		requiredState := ceremony.AuthStateAuthenticationCompleted
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -73,30 +73,30 @@ func HandleAuthCompletedGet(
 
 		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
 		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
+			pageRenderer.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		hasValidUserSession := userSessionManager.HasValidUserSession(userSession,
@@ -144,7 +144,7 @@ func HandleAuthCompletedGet(
 			// levels are privilege levels by construction (#266 decision 6).
 			if usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel) {
 				if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
-					httpHelper.InternalServerError(w, r, regenerateSessionErr)
+					pageRenderer.InternalServerError(w, r, regenerateSessionErr)
 					return
 				}
 			}
@@ -156,7 +156,7 @@ func HandleAuthCompletedGet(
 			bumpedSession, sessionErr := userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
 				authContext.AuthMethods, targetAcrLevel, middleware.GetClientIPFromRequest(r))
 			if sessionErr != nil {
-				httpHelper.InternalServerError(w, r, sessionErr)
+				pageRenderer.InternalServerError(w, r, sessionErr)
 				return
 			}
 
@@ -178,7 +178,7 @@ func HandleAuthCompletedGet(
 				bumpedSession.AuthTime = authContext.AuthenticatedAt.UTC()
 				sessionErr = database.UpdateUserSession(r.Context(), nil, bumpedSession)
 				if sessionErr != nil {
-					httpHelper.InternalServerError(w, r, sessionErr)
+					pageRenderer.InternalServerError(w, r, sessionErr)
 					return
 				}
 			}
@@ -211,7 +211,7 @@ func HandleAuthCompletedGet(
 				sessionErr = database.PromoteUserSessionOtpConfigGeneration(r.Context(), nil, bumpedSession.Id,
 					*authContext.OtpConfigGeneration)
 				if sessionErr != nil {
-					httpHelper.InternalServerError(w, r, sessionErr)
+					pageRenderer.InternalServerError(w, r, sessionErr)
 					return
 				}
 				bumpedSession.OtpConfigGeneration = *authContext.OtpConfigGeneration
@@ -248,7 +248,7 @@ func HandleAuthCompletedGet(
 				authContext.AuthState = ceremony.AuthStateRequiresLevel1
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 					return
 				}
 				http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
@@ -276,7 +276,7 @@ func HandleAuthCompletedGet(
 			if userSession != nil && !sessionBelongsToCeremony {
 				terminationResult, terminateErr := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
 				if terminateErr != nil {
-					httpHelper.InternalServerError(w, r, terminateErr)
+					pageRenderer.InternalServerError(w, r, terminateErr)
 					return
 				}
 
@@ -352,7 +352,7 @@ func HandleAuthCompletedGet(
 				})
 			}
 			if startNewUserSessionErr != nil {
-				httpHelper.InternalServerError(w, r, startNewUserSessionErr)
+				pageRenderer.InternalServerError(w, r, startNewUserSessionErr)
 				return
 			}
 
@@ -383,17 +383,17 @@ func HandleAuthCompletedGet(
 		// a level 2 client that this ceremony only ever answered with a password (#133).
 		err = authContext.SetAcrLevel(targetAcrLevel, boundSession)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
 		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errs.New("user not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
@@ -413,19 +413,19 @@ func HandleAuthCompletedGet(
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 					"error", refusalErr)
-				refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				refusalErr = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 					redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
 				if refusalErr != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
-					httpHelper.InternalServerError(w, r, refusalErr)
+					pageRenderer.InternalServerError(w, r, refusalErr)
 				}
 				return
 			}
 
-			refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
+			refusalErr = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 				redirectErrorFromAuthContext(authContext, client, "access_denied", "The user account is disabled."))
 			if refusalErr != nil {
-				httpHelper.InternalServerError(w, r, refusalErr)
+				pageRenderer.InternalServerError(w, r, refusalErr)
 				return
 			}
 			return
@@ -437,7 +437,7 @@ func HandleAuthCompletedGet(
 		// by filtering out the scopes where the user is not authorized
 		effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), authContext.Scope, user)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -455,20 +455,20 @@ func HandleAuthCompletedGet(
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 					"error", err)
-				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 					redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
 				if err != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 				}
 				return
 			}
 
-			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+			err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 				redirectErrorFromAuthContext(authContext, client,
 					"access_denied", "The user is not authorized to access any of the requested scopes"))
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			return
@@ -479,7 +479,7 @@ func HandleAuthCompletedGet(
 			authContext.AuthState = ceremony.AuthStateRequiresConsent
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/consent", http.StatusFound)
@@ -492,7 +492,7 @@ func HandleAuthCompletedGet(
 
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/consent", http.StatusFound)
@@ -503,7 +503,7 @@ func HandleAuthCompletedGet(
 		authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)

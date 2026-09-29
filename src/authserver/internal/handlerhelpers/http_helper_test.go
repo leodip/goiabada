@@ -360,12 +360,9 @@ func TestEncodeJson(t *testing.T) {
 }
 
 func TestGetFromUrlQueryOrFormPost(t *testing.T) {
-	templateFS := fstest.MapFS{}
-	httpHelper := NewHttpHelper(templateFS)
-
 	t.Run("Get from URL query", func(t *testing.T) {
 		req := newRequest("GET", "/?key=value", nil)
-		value := httpHelper.GetFromUrlQueryOrFormPost(req, "key")
+		value := GetFromUrlQueryOrFormPost(req, "key")
 		assert.Equal(t, "value", value)
 	})
 
@@ -374,15 +371,12 @@ func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		err := req.ParseForm()
 		assert.NoError(t, err)
-		value := httpHelper.GetFromUrlQueryOrFormPost(req, "key")
+		value := GetFromUrlQueryOrFormPost(req, "key")
 		assert.Equal(t, "value", value)
 	})
 }
 
 func TestLookupFromUrlQueryOrFormPost(t *testing.T) {
-	templateFS := fstest.MapFS{}
-	httpHelper := NewHttpHelper(templateFS)
-
 	// postForm builds a form-encoded POST, optionally with a query string of its own.
 	postForm := func(target string, body string) *http.Request {
 		req := newRequest("POST", target, bytes.NewBufferString(body))
@@ -409,7 +403,7 @@ func TestLookupFromUrlQueryOrFormPost(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			value, present := httpHelper.LookupFromUrlQueryOrFormPost(tc.request, "state")
+			value, present := LookupFromUrlQueryOrFormPost(tc.request, "state")
 			assert.Equal(t, tc.expectValue, value)
 			assert.Equal(t, tc.expectPresent, present)
 		})

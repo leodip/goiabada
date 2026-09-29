@@ -18,7 +18,7 @@ import (
 )
 
 func HandleForgotPasswordGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -27,9 +27,9 @@ func HandleForgotPasswordGet(
 			"error": nil,
 		}
 
-		err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
+		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -44,7 +44,7 @@ type forgotPasswordDatabase interface {
 }
 
 func HandleForgotPasswordPost(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	database forgotPasswordDatabase,
 	emailSender EmailSender,
 	dataCipher *encryption.DataCipher,
@@ -63,16 +63,16 @@ func HandleForgotPasswordPost(
 				"error": i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()),
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
+			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		user, err := database.GetUserByEmail(r.Context(), nil, email)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -81,7 +81,7 @@ func HandleForgotPasswordPost(
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, resetEmailErr := dataCipher.Encrypt(verificationCode)
 			if resetEmailErr != nil {
-				httpHelper.InternalServerError(w, r, resetEmailErr)
+				pageRenderer.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 
@@ -96,7 +96,7 @@ func HandleForgotPasswordPost(
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
 			resetEmailErr = database.UpdateUser(r.Context(), nil, user)
 			if resetEmailErr != nil {
-				httpHelper.InternalServerError(w, r, resetEmailErr)
+				pageRenderer.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 
@@ -105,9 +105,9 @@ func HandleForgotPasswordPost(
 				"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
 			}
 			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, user.Locale, "en"))
-			buf, resetEmailErr := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
+			buf, resetEmailErr := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
 			if resetEmailErr != nil {
-				httpHelper.InternalServerError(w, r, resetEmailErr)
+				pageRenderer.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 
@@ -118,12 +118,12 @@ func HandleForgotPasswordPost(
 			}
 			settings, ok := reqctx.SettingsFrom(r.Context())
 			if !ok {
-				httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+				pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 				return
 			}
 			resetEmailErr = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 			if resetEmailErr != nil {
-				httpHelper.InternalServerError(w, r, resetEmailErr)
+				pageRenderer.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 		}
@@ -132,9 +132,9 @@ func HandleForgotPasswordPost(
 			"linkSent": true,
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
+		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 	}

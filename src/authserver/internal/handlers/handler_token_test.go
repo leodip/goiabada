@@ -49,9 +49,9 @@ func TestHandleTokenPost(t *testing.T) {
 		}
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				jsonWriter := mocks_handlers.NewJSONWriter(t)
 				database := mocks_data.NewDatabase(t)
-				handler := HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), database,
+				handler := HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), database,
 					mocks_handlers.NewTokenIssuer(t), mocks_handlers.NewTokenValidator(t),
 					mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
 
@@ -60,7 +60,7 @@ func TestHandleTokenPost(t *testing.T) {
 				req = withSettings(req, &models.Settings{})
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 					detail, ok := err.(*customerrors.ErrorDetail)
 					return ok && detail.GetCode() == "invalid_request" &&
 						detail.GetHttpStatusCode() == http.StatusBadRequest &&
@@ -69,7 +69,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 				handler.ServeHTTP(rr, req)
 
-				httpHelper.AssertExpectations(t)
+				jsonWriter.AssertExpectations(t)
 				database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 			})
 		}
@@ -82,9 +82,9 @@ func TestHandleTokenPost(t *testing.T) {
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 				return input.GrantType == "client_credentials" && input.ClientId == "a-client" && input.ClientSecret == "a-secret"
 			})).Return(nil, refused).Once()
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			jsonWriter := mocks_handlers.NewJSONWriter(t)
 
-			handler := HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), mocks_data.NewDatabase(t),
+			handler := HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), mocks_data.NewDatabase(t),
 				mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
 
 			rr := httptest.NewRecorder()
@@ -93,14 +93,14 @@ func TestHandleTokenPost(t *testing.T) {
 			req = withSettings(req, &models.Settings{})
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*customerrors.ErrorDetail)
 				return ok && detail.GetCode() == "invalid_client"
 			})).Return().Once()
 
 			handler.ServeHTTP(rr, req)
 
-			httpHelper.AssertExpectations(t)
+			jsonWriter.AssertExpectations(t)
 			tokenValidator.AssertExpectations(t)
 		})
 
@@ -108,9 +108,9 @@ func TestHandleTokenPost(t *testing.T) {
 		// request through, and net/http leaves an empty form behind for the handler's. The real
 		// validator answers that empty form, which names no client.
 		t.Run("a body cut before the handler, as the ROPC limiter leaves it", func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			jsonWriter := mocks_handlers.NewJSONWriter(t)
 			database := mocks_data.NewDatabase(t)
-			handler := HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), database,
+			handler := HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), database,
 				mocks_handlers.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
 				mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
 
@@ -121,7 +121,7 @@ func TestHandleTokenPost(t *testing.T) {
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1}))
 			require.Error(t, req.ParseForm(), "the limiter's parse fails")
 
-			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*customerrors.ErrorDetail)
 				return ok && detail.GetCode() == "invalid_request" &&
 					detail.GetHttpStatusCode() == http.StatusBadRequest &&
@@ -130,19 +130,19 @@ func TestHandleTokenPost(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			httpHelper.AssertExpectations(t)
+			jsonWriter.AssertExpectations(t)
 		})
 	})
 
 	t.Run("ValidateTokenRequest gives error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -155,23 +155,23 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(nil, validationError)
 
-		httpHelper.On("JsonError", rr, req, validationError).Return()
+		jsonWriter.On("JsonError", rr, req, validationError).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 	})
 
 	t.Run("Authorization_code GenerateTokenResponseForAuthCode gives error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -191,7 +191,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mock.Anything, mockCode).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
-		httpHelper.On("JsonError",
+		jsonWriter.On("JsonError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err *customerrors.ErrorDetail) bool {
@@ -201,20 +201,20 @@ func TestHandleTokenPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		tokenIssuer.AssertExpectations(t)
 	})
 
 	t.Run("Authorization_code MarkCodeAsUsed gives error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -232,7 +232,7 @@ func TestHandleTokenPost(t *testing.T) {
 		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).
 			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to mark code as used", http.StatusInternalServerError))
 
-		httpHelper.On("JsonError",
+		jsonWriter.On("JsonError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err error) bool {
@@ -242,7 +242,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
 		// Token generation must not happen when the claim fails.
@@ -250,14 +250,14 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("Authorization_code successful flow", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -287,11 +287,11 @@ func TestHandleTokenPost(t *testing.T) {
 			return ok && codeId == mockCode.Id
 		})).Return()
 
-		httpHelper.On("EncodeJson", rr, req, mockTokenResponse).Return()
+		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		tokenIssuer.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -302,14 +302,14 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("Client_credentials successful flow", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=client_credentials&client_id=test_client&client_secret=test_secret&scope=test_scope"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -341,11 +341,11 @@ func TestHandleTokenPost(t *testing.T) {
 			return ok && clientId == mockClient.Id
 		})).Return()
 
-		httpHelper.On("EncodeJson", rr, req, mockTokenResponse).Return()
+		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		tokenIssuer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -355,14 +355,14 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("Refresh_token and token is revoked", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -380,28 +380,28 @@ func TestHandleTokenPost(t *testing.T) {
 		// already-swept family produces. Zero count means no audit event (#128).
 		database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "family-1").Return(int64(0), nil)
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.(*customerrors.ErrorDetail).GetCode() == "invalid_grant" &&
 				err.(*customerrors.ErrorDetail).GetDescription() == "This refresh token has been revoked."
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Refresh_token MarkRefreshTokenAsRevoked gives error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -422,26 +422,26 @@ func TestHandleTokenPost(t *testing.T) {
 		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to claim refresh token", http.StatusInternalServerError))
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "Failed to claim refresh token")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Refresh_token GenerateTokenResponseForRefresh gives error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -467,27 +467,27 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "Failed to generate token")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
 		tokenIssuer.AssertExpectations(t)
 	})
 
 	t.Run("Refresh_token with SessionIdentifier bumps user session", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -550,14 +550,14 @@ func TestHandleTokenPost(t *testing.T) {
 			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
 		})).Return()
 
-		httpHelper.On("EncodeJson", rr, req, mockTokenResponse).Return()
+		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
 		tokenIssuer.AssertExpectations(t)
@@ -566,14 +566,14 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("Refresh_token success path without session", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -621,14 +621,14 @@ func TestHandleTokenPost(t *testing.T) {
 			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
 		})).Return()
 
-		httpHelper.On("EncodeJson", rr, req, mockTokenResponse).Return()
+		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
 		tokenIssuer.AssertExpectations(t)
@@ -640,14 +640,14 @@ func TestHandleTokenPost(t *testing.T) {
 	})
 
 	t.Run("Unsupported_grant_type", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=unsupported_type&client_id=test_client&client_secret=test_secret"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -660,7 +660,7 @@ func TestHandleTokenPost(t *testing.T) {
 			Return(&protocolvalidation.ValidateTokenRequestResult{}, nil)
 
 		// Expect a JSON error response for unsupported grant type
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			if customErr, ok := err.(*customerrors.ErrorDetail); ok {
 				return customErr.GetCode() == "unsupported_grant_type" &&
 					customErr.GetDescription() == "Unsupported grant_type." &&
@@ -671,7 +671,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		tokenValidator.AssertExpectations(t)
 
 		// Ensure that other methods were not called
@@ -957,14 +957,14 @@ func TestExtractClientCredentials(t *testing.T) {
 // that looks like a clean denial while linked tokens may still be live.
 // It must also skip the audit log, which fires only after a successful commit.
 func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -999,7 +999,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, "sid-reused").
 		Return(nil, dbErr).Once()
 
-	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "connection refused")
 	})).Return().Once()
 
@@ -1007,7 +1007,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 
 	assert.ErrorIs(t, stub.BodyErr, dbErr, "the body hands its error to the helper, which rolls back")
 
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
 	database.AssertExpectations(t)
 
@@ -1016,21 +1016,21 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	// invalid_grant response must NOT be sent: the client gets 500 instead.
 	// The one JsonError call is the 500 matched above; a second would be the invalid_grant.
-	httpHelper.AssertNumberOfCalls(t, "JsonError", 1)
+	jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
 // TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500 covers
 // the earliest failure point: BeginTransaction itself errors. The handler
 // must still surface a 500 and skip both the audit log and the invalid_grant.
 func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1052,18 +1052,18 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	beginErr := errors.New("tx begin failed")
 	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
 
-	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "tx begin failed")
 	})).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
 	database.AssertExpectations(t)
 
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	httpHelper.AssertNumberOfCalls(t, "JsonError", 1)
+	jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
 // TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses verifies the #77 fix:
@@ -1075,14 +1075,14 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 // the winner. A genuine *later* replay is still cascaded by the sequential-reuse
 // path (covered by the integration CodeReuse_* tests).
 func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=raced&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1104,14 +1104,14 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	// This request loses the race: the code was already claimed concurrently.
 	database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), racedCode.Id).Return(false, nil)
 
-	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*customerrors.ErrorDetail)
 		return ok && detail.GetCode() == "invalid_grant"
 	})).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
 	database.AssertExpectations(t)
 
@@ -1138,14 +1138,14 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 // mocked test can establish that one HTTP request really arrived before another. Its
 // sibling for the other branch is the already-revoked subtest inside TestHandleTokenPost.
 func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=refresh_token&refresh_token=raced"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1174,14 +1174,14 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	// read and the claim.
 	database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), racedToken.Id).Return(false, nil)
 
-	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*customerrors.ErrorDetail)
 		return ok && detail.GetCode() == "invalid_grant"
 	})).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
 	database.AssertExpectations(t)
 
@@ -1254,14 +1254,14 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			jsonWriter := mocks_handlers.NewJSONWriter(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_handlers.NewTokenValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 			formData := "grant_type=refresh_token&refresh_token=replayed"
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1281,14 +1281,14 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()
 
-			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*customerrors.ErrorDetail)
 				return ok && detail.GetCode() == "invalid_grant"
 			})).Return().Once()
 
 			handler.ServeHTTP(rr, req)
 
-			httpHelper.AssertExpectations(t)
+			jsonWriter.AssertExpectations(t)
 			tokenValidator.AssertExpectations(t)
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
@@ -1317,14 +1317,14 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 // Emitting on a failed containment would be worse than emitting nothing: the event's
 // contract is that it records members actually revoked, and a failure revoked none.
 func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=refresh_token&refresh_token=replayed"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1349,20 +1349,20 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").
 		Return(int64(0), customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to contain family", http.StatusInternalServerError))
 
-	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		return strings.Contains(err.Error(), "Failed to contain family")
 	})).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
 	database.AssertExpectations(t)
 
 	// No event, and no invalid_grant either: the request did not get a clean refusal,
 	// it got a server error.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	httpHelper.AssertNumberOfCalls(t, "JsonError", 1)
+	jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
 // TestGrantTypeConsumesScope pins which grant types the provided-but-empty rejection applies to.
@@ -1500,14 +1500,14 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			jsonWriter := mocks_handlers.NewJSONWriter(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_handlers.NewTokenValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 			form := url.Values{"grant_type": {tc.grantType}, "client_id": {"test_client"}}
 			if tc.rawScope != omittedScope {
@@ -1528,14 +1528,14 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 					func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 						return input.Scope == tc.wantScope
 					})).Return(nil, validationError).Once()
-				httpHelper.On("JsonError", rr, req, validationError).Return()
+				jsonWriter.On("JsonError", rr, req, validationError).Return()
 
 				handler.ServeHTTP(rr, req)
 
 				// AssertExpectations is what proves the scope matched: an input whose Scope differed
 				// would not satisfy MatchedBy, so the expectation would go unmet.
 				tokenValidator.AssertExpectations(t)
-				httpHelper.AssertExpectations(t)
+				jsonWriter.AssertExpectations(t)
 				return
 			}
 
@@ -1543,7 +1543,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			// test if ValidateTokenRequest is called with no expectation registered, so registering
 			// none is the assertion that it was not reached.
 			var rejection *customerrors.ErrorDetail
-			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*customerrors.ErrorDetail)
 				if !ok {
 					return false
@@ -1554,7 +1554,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			httpHelper.AssertExpectations(t)
+			jsonWriter.AssertExpectations(t)
 			if assert.NotNil(t, rejection, "the handler should have rejected the request") {
 				assert.Equal(t, "invalid_scope", rejection.GetCode())
 				assert.Equal(t, http.StatusBadRequest, rejection.GetHttpStatusCode())
@@ -1574,17 +1574,17 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 // these four cases pin is that a denial reaches the audit logger, that the predicate is not gated on
 // grant type, and that there is exactly one call site.
 func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
-	newHandler := func(t *testing.T) (*mocks_handlers.HttpHelper, *mocks_handlers.TokenValidator,
+	newHandler := func(t *testing.T) (*mocks_handlers.JSONWriter, *mocks_handlers.TokenValidator,
 		*mocks_handlers.TokenIssuer, *mocks_handlers.AuditLogger, http.HandlerFunc) {
 		t.Helper()
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
-		return httpHelper, tokenValidator, tokenIssuer, auditLogger,
-			HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		return jsonWriter, tokenValidator, tokenIssuer, auditLogger,
+			HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 	}
 
 	// Rows 1 and 2 differ ONLY in grant type. Row 2 fails if a GrantType check is ever added to the
@@ -1622,7 +1622,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper, tokenValidator, _, auditLogger, handler := newHandler(t)
+			jsonWriter, tokenValidator, _, auditLogger, handler := newHandler(t)
 
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(tc.form))
 			req = withSettings(req, &models.Settings{})
@@ -1641,12 +1641,12 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 						details["scope"] == tc.wantScope
 				})).Return()
 
-			httpHelper.On("JsonError", rr, req, denial).Return()
+			jsonWriter.On("JsonError", rr, req, denial).Return()
 
 			handler.ServeHTTP(rr, req)
 
 			auditLogger.AssertExpectations(t)
-			httpHelper.AssertExpectations(t)
+			jsonWriter.AssertExpectations(t)
 		})
 	}
 
@@ -1655,7 +1655,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 	// fires before the client is authenticated, so auditing it would let anyone forge rows against a
 	// legitimate client. A second call site there passes every other row and fails only this one.
 	t.Run("the provided-but-empty rejection emits no audit event", func(t *testing.T) {
-		httpHelper, tokenValidator, _, auditLogger, handler := newHandler(t)
+		jsonWriter, tokenValidator, _, auditLogger, handler := newHandler(t)
 
 		form := url.Values{
 			"grant_type": {"client_credentials"},
@@ -1668,7 +1668,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		var rejection *customerrors.ErrorDetail
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			detail, ok := err.(*customerrors.ErrorDetail)
 			if !ok {
 				return false
@@ -1682,7 +1682,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		// expectation, so registering nothing IS the assertion.
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything)
 		if assert.NotNil(t, rejection) {
@@ -1692,7 +1692,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 	// Row 4: the forensic field on the success path. Nothing asserted this payload's shape before.
 	t.Run("successful issuance records the scope", func(t *testing.T) {
-		httpHelper, tokenValidator, tokenIssuer, auditLogger, handler := newHandler(t)
+		jsonWriter, tokenValidator, tokenIssuer, auditLogger, handler := newHandler(t)
 
 		form := "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=billing-api:read"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
@@ -1715,13 +1715,13 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 				return ok && clientId == mockClient.Id && details["scope"] == "billing-api:read"
 			})).Return()
 
-		httpHelper.On("EncodeJson", rr, req, tokenResponse).Return()
+		jsonWriter.On("EncodeJson", rr, req, tokenResponse).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		auditLogger.AssertExpectations(t)
 		tokenIssuer.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 }
 
@@ -1745,13 +1745,13 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 // identifier deliberately present in the context to prove it is ignored rather than merely
 // absent (#106).
 func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	form := "grant_type=password&client_id=test_client&username=u&password=p&scope=openid"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
@@ -1776,7 +1776,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 		Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedROPCResponse, mock.Anything).Return()
-	httpHelper.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
+	jsonWriter.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
 
 	handler.ServeHTTP(rr, req)
 
@@ -1798,14 +1798,14 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 // which is not ErrUserDisabled and not invalid_scope, so a superseded refresh token must not
 // be recorded as either. Stage 5 adds the event that does cover this.
 func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=refresh_token&refresh_token=superseded&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1820,11 +1820,11 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, supersededErr)
 
-	httpHelper.On("JsonError", rr, req, supersededErr).Return().Once()
+	jsonWriter.On("JsonError", rr, req, supersededErr).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -1850,7 +1850,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	// newHandler wires one handler behind its own limiter, the way routes.go does. failure
 	// is what ValidateTokenRequest answers every time; nil means the grant succeeds.
 	newHandler := func(t *testing.T, failure error) (http.Handler, *mocks_handlers.AuditLogger) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
@@ -1860,7 +1860,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		if failure != nil {
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, failure)
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return()
+			jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return()
 		} else {
 			client := &models.Client{Id: 1, ClientIdentifier: "app"}
 			user := &models.User{Id: 42, Subject: fake.UUID()}
@@ -1868,12 +1868,12 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 				Return(&protocolvalidation.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
 			tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything, mock.Anything).
 				Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
-			httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
+			jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 		}
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		rateLimiter := newTestRateLimiter(nil)
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer,
+		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer,
 			tokenValidator, auditLogger, rateLimiter)
 		return rateLimiter.LimitROPC(handler), auditLogger
 	}
@@ -2095,14 +2095,14 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			jsonWriter := mocks_handlers.NewJSONWriter(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_handlers.NewTokenValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 			formData := "grant_type=refresh_token&refresh_token=live"
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -2138,12 +2138,12 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 				// Accepted: the request reaches the claim, and loses it, which is as far as a
 				// test about the gate needs to go.
 				database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), liveToken.Id).Return(false, nil).Once()
-				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 					detail, ok := err.(*customerrors.ErrorDetail)
 					return ok && detail.GetCode() == "invalid_grant"
 				})).Return().Once()
 			} else {
-				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 					detail, ok := err.(*customerrors.ErrorDetail)
 					return ok && detail.GetCode() == tc.wantRefusalIs &&
 						detail.GetDescription() == tc.wantRefusal &&
@@ -2153,7 +2153,7 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			httpHelper.AssertExpectations(t)
+			jsonWriter.AssertExpectations(t)
 			tokenValidator.AssertExpectations(t)
 			database.AssertExpectations(t)
 
@@ -2222,14 +2222,14 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			jsonWriter := mocks_handlers.NewJSONWriter(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_handlers.NewTokenValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 			formData := "grant_type=refresh_token&refresh_token=replayed"
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -2252,7 +2252,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return().Once()
 
-			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*customerrors.ErrorDetail)
 				return ok && detail.GetCode() == "invalid_grant" &&
 					detail.GetDescription() == "This refresh token has been revoked."
@@ -2260,7 +2260,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			httpHelper.AssertExpectations(t)
+			jsonWriter.AssertExpectations(t)
 			tokenValidator.AssertExpectations(t)
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
@@ -2285,24 +2285,24 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 // cases pin is the discrimination, which is the whole of decision 8's name-not-payload rule: the
 // event fires on the sentinel and on nothing else that carries invalid_grant.
 func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
-	newHandler := func(t *testing.T) (*mocks_handlers.HttpHelper, *mocks_handlers.TokenValidator,
+	newHandler := func(t *testing.T) (*mocks_handlers.JSONWriter, *mocks_handlers.TokenValidator,
 		*mocks_handlers.AuditLogger, http.HandlerFunc) {
 		t.Helper()
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
-		return httpHelper, tokenValidator, auditLogger,
-			HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		return jsonWriter, tokenValidator, auditLogger,
+			HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 	}
 
 	const form = "grant_type=authorization_code&client_id=test_client&client_secret=s&" +
 		"code=the_code&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback"
 
 	t.Run("a deregistered redirect URI on the code is audited", func(t *testing.T) {
-		httpHelper, tokenValidator, auditLogger, handler := newHandler(t)
+		jsonWriter, tokenValidator, auditLogger, handler := newHandler(t)
 
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
 		req = withSettings(req, &models.Settings{})
@@ -2321,7 +2321,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 				return details["clientIdentifier"] == "test_client"
 			})).Return()
 
-		httpHelper.On("JsonError", rr, req, mock.Anything).Return()
+		jsonWriter.On("JsonError", rr, req, mock.Anything).Return()
 
 		handler.ServeHTTP(rr, req)
 
@@ -2335,7 +2335,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		// rather than matched by value against the sentinel would name every one of them a
 		// deregistration. This row is what fails if somebody makes that simplification. Note the
 		// strict mockery double: an unexpected Log call fails the test on its own.
-		httpHelper, tokenValidator, _, handler := newHandler(t)
+		jsonWriter, tokenValidator, _, handler := newHandler(t)
 
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
 		req = withSettings(req, &models.Settings{})
@@ -2347,7 +2347,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, refusal)
 
-		httpHelper.On("JsonError", rr, req, mock.Anything).Return()
+		jsonWriter.On("JsonError", rr, req, mock.Anything).Return()
 
 		handler.ServeHTTP(rr, req)
 	})

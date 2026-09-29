@@ -148,7 +148,7 @@ func assertNoParentImport(r testutil.Reporter, root string, dirs []string, refus
 		"A sibling handler package takes its collaborators as ports it declares itself, in its own "+
 		"interfaces.go, naming only the methods it calls (#386, #387). Importing the parent brings "+
 		"back the edge #387 removed and, with it, a port declared for somebody else's call sites: "+
-		"apihandlers calls one of HttpHelper's eight methods and accounthandlers three. Add the "+
+		"apihandlers calls one of PageRenderer's four methods. Add the "+
 		"method to that package's own port instead.",
 		len(found), refused, strings.Join(lines, "\n\t"))
 }
@@ -199,7 +199,7 @@ type AuditLogger interface {
 
 import "github.com/leodip/goiabada/authserver/internal/handlers"
 
-var _ = handlers.HttpHelper(nil)
+var _ = handlers.PageRenderer(nil)
 `)
 	writeChildImportFixture(t, root, "authserver/internal/server/routes.go", `package server
 
@@ -213,7 +213,7 @@ var _ = handlers.HandleTokenPost
 
 import "github.com/leodip/goiabada/authserver/internal/handlers"
 
-var _ = handlers.HttpHelper(nil)
+var _ = handlers.PageRenderer(nil)
 `)
 
 	// Rejected: the plain import, the aliased one that no selector-spelling census would see, and
@@ -227,7 +227,7 @@ import (
 )
 
 var _ = http.MethodPut
-var _ = handlers.HttpHelper(nil)
+var _ = handlers.PageRenderer(nil)
 `)
 	writeChildImportFixture(t, root, childHandlerDirs[0]+"/handler_api_permissions.go", `package apihandlers
 
@@ -245,7 +245,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 )
 
-func TestRegister(t *testing.T) { _ = handlers.HttpHelper(nil) }
+func TestRegister(t *testing.T) { _ = handlers.PageRenderer(nil) }
 `)
 
 	found, files, err := findParentImports(root, childHandlerDirs, parentHandlersPath)

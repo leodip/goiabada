@@ -12,9 +12,9 @@ import (
 
 func TestHandleUnauthorizedGet(t *testing.T) {
 	t.Run("Successful render", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 
-		handler := HandleUnauthorizedGet(httpHelper)
+		handler := HandleUnauthorizedGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/unauthorized", nil)
 		assert.NoError(t, err)
@@ -25,19 +25,19 @@ func TestHandleUnauthorizedGet(t *testing.T) {
 			"_httpStatus": http.StatusUnauthorized,
 		}
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/unauthorized.html", expectedBind).
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/unauthorized.html", expectedBind).
 			Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 
 	t.Run("Render error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 
-		handler := HandleUnauthorizedGet(httpHelper)
+		handler := HandleUnauthorizedGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/unauthorized", nil)
 		assert.NoError(t, err)
@@ -49,14 +49,14 @@ func TestHandleUnauthorizedGet(t *testing.T) {
 		}
 
 		renderErr := assert.AnError
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/unauthorized.html", expectedBind).
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/unauthorized.html", expectedBind).
 			Return(renderErr)
 
-		httpHelper.On("InternalServerError", rr, req, renderErr).
+		pageRenderer.On("InternalServerError", rr, req, renderErr).
 			Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 }

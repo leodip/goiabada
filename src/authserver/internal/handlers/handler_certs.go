@@ -16,7 +16,7 @@ type certsDatabase interface {
 }
 
 func HandleCertsGet(
-	httpHelper HttpHelper,
+	jsonWriter JSONWriter,
 	database certsDatabase,
 ) http.HandlerFunc {
 
@@ -24,7 +24,7 @@ func HandleCertsGet(
 
 		allSigningKeys, err := database.GetAllSigningKeys(r.Context(), nil)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonWriter.JsonError(w, r, err)
 			return
 		}
 
@@ -38,7 +38,7 @@ func HandleCertsGet(
 
 			keyState, err := models.KeyStateFromString(signingKey.State)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 
@@ -56,7 +56,7 @@ func HandleCertsGet(
 			var publicKeyJwk oauth.Jwk
 			err := json.Unmarshal(nextKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 			result.Keys = append(result.Keys, publicKeyJwk)
@@ -66,7 +66,7 @@ func HandleCertsGet(
 			var publicKeyJwk oauth.Jwk
 			err := json.Unmarshal(currentKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 			result.Keys = append(result.Keys, publicKeyJwk)
@@ -76,12 +76,12 @@ func HandleCertsGet(
 			var publicKeyJwk oauth.Jwk
 			err := json.Unmarshal(previousKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 			result.Keys = append(result.Keys, publicKeyJwk)
 		}
 
-		httpHelper.EncodeJson(w, r, result)
+		jsonWriter.EncodeJson(w, r, result)
 	}
 }

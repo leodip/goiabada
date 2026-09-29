@@ -26,32 +26,32 @@ import (
 
 func TestHandleUserInfoGetPost(t *testing.T) {
 	t.Run("No validated token in the context", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "unable to get validated token from context"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 
 	// Note: "User not authorized" test case is removed because authorization is now handled by middleware
 
 	t.Run("JwtToken without sub claim", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
@@ -63,7 +63,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("JsonError",
+		jsonWriter.On("JsonError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err error) bool {
@@ -73,15 +73,15 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 
 	t.Run("GetUserBySubject returns nil", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
@@ -96,22 +96,22 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(nil, nil)
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return isUserInfoInvalidToken(err, "The user could not be found.")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("User is not enabled", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 
@@ -133,23 +133,23 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			return details["userId"] == user.Id
 		})).Return()
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return isUserInfoInvalidToken(err, "The user account is disabled.")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("Success path with all claims", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
@@ -209,7 +209,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 
-		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, sub, claims["sub"])
 			assert.Equal(t, user.Username, claims["preferred_username"])
 			assert.Equal(t, user.Email, claims["email"])
@@ -251,7 +251,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -267,11 +267,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// endpoints answer differently. Neither tier reached this before: the success case above
 	// asks for every scope at once, where the two sides agree.
 	t.Run("userinfo at scope=openid email carries no updated_at", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "email")
@@ -299,7 +299,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		// Not registered, so a profile-picture lookup on this scope would fail the case as
 		// an unexpected call: the picture read lives inside the profile arm.
-		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, sub, claims["sub"])
 			assert.Equal(t, user.Email, claims["email"])
 			assert.Equal(t, user.EmailVerified, claims["email_verified"])
@@ -312,7 +312,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -320,11 +320,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// Divergence 1 stated the other way round: the gate is the profile scope, not "any scope
 	// but openid". Together with the case above this is userinfo's whole side of it.
 	t.Run("userinfo puts updated_at inside the profile arm", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "profile")
@@ -349,7 +349,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 
-		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, updatedAt.UTC().Unix(), claims["updated_at"])
 			assert.Equal(t, user.FullName(), claims["name"])
 			assert.NotContains(t, claims, "email")
@@ -359,7 +359,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -369,11 +369,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// token. The success case above cannot show it, because every flag in its fixture is
 	// IncludeInIdToken: true.
 	t.Run("userinfo filters groups and attributes by IncludeInIdToken", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "groups attributes")
@@ -414,7 +414,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 
-		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, []string{"id-token-group"}, claims["groups"])
 			assert.Equal(t, map[string]string{
 				"idTokenAttr":      "idTokenValue",
@@ -425,7 +425,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -434,11 +434,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// construction, as issuance's is the one injected into NewTokenIssuer (#434). The mapper
 	// takes it as an input rather than reading it back, so each caller keeps the source it has.
 	t.Run("userinfo builds profile and picture from the base URL it was handed", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger, testBaseURL)
+		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL)
 
 		sub := fake.UUID()
 		req := userInfoRequestForScopes(t, sub, "profile")
@@ -458,7 +458,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
 
-		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, "https://auth.test/account/profile", claims["profile"])
 			assert.Equal(t, "https://auth.test/userinfo/picture/"+sub, claims["picture"])
 			return true
@@ -466,7 +466,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})

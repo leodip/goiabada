@@ -91,7 +91,7 @@ type authorizeDatabase interface {
 }
 
 func HandleAuthorizeGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
 	database authorizeDatabase,
@@ -152,7 +152,7 @@ func HandleAuthorizeGet(
 
 		err := authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -167,9 +167,9 @@ func HandleAuthorizeGet(
 				"_httpStatus": httpStatus,
 			}
 
-			renderTemplateErr := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
+			renderTemplateErr := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
 			if renderTemplateErr != nil {
-				httpHelper.InternalServerError(w, r, renderTemplateErr)
+				pageRenderer.InternalServerError(w, r, renderTemplateErr)
 			}
 		}
 
@@ -193,7 +193,7 @@ func HandleAuthorizeGet(
 				renderErrorUi(localizedErr.Localize(r.Context()), http.StatusOK)
 				return
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
@@ -239,11 +239,11 @@ func HandleAuthorizeGet(
 		// client deleted between the two lookups, which answered 500 before the move as well.
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
+			pageRenderer.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
@@ -253,7 +253,7 @@ func HandleAuthorizeGet(
 		// session lifetimes, and the PKCE and implicit-flow decisions below read them too.
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 
@@ -361,7 +361,7 @@ func HandleAuthorizeGet(
 			(!requestsLogin && hasValidUserSession())
 
 		if sessionLoadErr != nil {
-			httpHelper.InternalServerError(w, r, sessionLoadErr)
+			pageRenderer.InternalServerError(w, r, sessionLoadErr)
 			return
 		}
 
@@ -382,7 +382,7 @@ func HandleAuthorizeGet(
 			// asks for itself.
 			input.redirectAlreadyWithheld = emissionLookedUp && !emissionAllowed
 
-			answerClientWithError(w, r, database, httpHelper, authHelper, templateFS, input)
+			answerClientWithError(w, r, database, pageRenderer, authHelper, templateFS, input)
 		}
 
 		// answerValidationError answers one of the five validations that run before this handler
@@ -425,7 +425,7 @@ func HandleAuthorizeGet(
 
 			saveAuthContextErr := authHelper.SaveAuthContext(w, r, &authContext)
 			if saveAuthContextErr != nil {
-				httpHelper.InternalServerError(w, r, saveAuthContextErr)
+				pageRenderer.InternalServerError(w, r, saveAuthContextErr)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
@@ -441,7 +441,7 @@ func HandleAuthorizeGet(
 				answerValidationError(valError)
 				return
 			}
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -468,7 +468,7 @@ func HandleAuthorizeGet(
 				answerValidationError(valError)
 				return
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
@@ -481,7 +481,7 @@ func HandleAuthorizeGet(
 				answerValidationError(valError)
 				return
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
@@ -494,7 +494,7 @@ func HandleAuthorizeGet(
 				answerValidationError(valError)
 				return
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
@@ -510,7 +510,7 @@ func HandleAuthorizeGet(
 				answerValidationError(valError)
 				return
 			}
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		authContext.IdTokenHintSub = hintSub
@@ -531,13 +531,13 @@ func HandleAuthorizeGet(
 		// downstream handlers
 		err = authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
 		// Handle prompt=none: silent authentication without any UI
 		if authContext.HasPromptValue("none") {
-			handlePromptNone(w, r, httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
+			handlePromptNone(w, r, pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
 			return
 		}
 
@@ -546,7 +546,7 @@ func HandleAuthorizeGet(
 			authContext.AuthState = ceremony.AuthStateRequiresLevel1
 			err = authHelper.SaveAuthContext(w, r, &authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
@@ -559,7 +559,7 @@ func HandleAuthorizeGet(
 		// read of a variable.
 		sessionIsValidForSSO := hasValidUserSession()
 		if sessionLoadErr != nil {
-			httpHelper.InternalServerError(w, r, sessionLoadErr)
+			pageRenderer.InternalServerError(w, r, sessionLoadErr)
 			return
 		}
 
@@ -568,7 +568,7 @@ func HandleAuthorizeGet(
 		// reads userSession.User. UserSessionLoadUser answers nil for a nil session.
 		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -581,7 +581,7 @@ func HandleAuthorizeGet(
 				authContext.AuthState = ceremony.AuthStateRequiresLevel1
 				err = authHelper.SaveAuthContext(w, r, &authContext)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 					return
 				}
 				http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
@@ -618,7 +618,7 @@ func HandleAuthorizeGet(
 			authContext.AuthState = ceremony.AuthStateLevel1ExistingSession
 			err = authHelper.SaveAuthContext(w, r, &authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/level1completed", http.StatusFound)
@@ -629,7 +629,7 @@ func HandleAuthorizeGet(
 		authContext.AuthState = ceremony.AuthStateRequiresLevel1
 		err = authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
@@ -640,7 +640,7 @@ func HandleAuthorizeGet(
 // It performs all necessary checks without displaying any UI and either:
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
-func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings, baseURL string) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings, baseURL string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -650,14 +650,14 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// as "retry later" rather than "start an interactive login", which on a genuine server fault
 	// is the accurate instruction of the two.
 	redirectWithError := func(errorCode string, errorDescription string) {
-		answerClientWithError(w, r, database, httpHelper, authHelper, templateFS,
+		answerClientWithError(w, r, database, pageRenderer, authHelper, templateFS,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 	}
 
 	// 1. Check session exists
 	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -669,7 +669,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// Load user for the session
 	err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -754,7 +754,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	user := &userSession.User
 	effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), authContext.Scope, user)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -767,7 +767,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	if client.ConsentRequired || oidc.HasOfflineAccessScope(effectiveScope) {
 		consent, getConsentErr := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 		if getConsentErr != nil {
-			httpHelper.InternalServerError(w, r, getConsentErr)
+			pageRenderer.InternalServerError(w, r, getConsentErr)
 			return
 		}
 
@@ -808,7 +808,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// Set ACR level (takes max of target and session ACR)
 	err = authContext.SetAcrLevel(targetAcrLevel, userSession)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -816,7 +816,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	_, err = userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
 		authContext.AuthMethods, authContext.AcrLevel, authserver_middleware.GetClientIPFromRequest(r))
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -829,7 +829,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 	err = authHelper.SaveAuthContext(w, r, authContext)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -927,7 +927,7 @@ func redirectErrorFromRequest(r *http.Request, client *models.Client,
 // code and description swapped, so each call site keeps the parameter source it built the input
 // from and neither has to restate it.
 func answerClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
-	httpHelper HttpHelper, authHelper AuthHelper, templateFS fs.FS, input redirectErrorInput) {
+	pageRenderer PageRenderer, authHelper AuthHelper, templateFS fs.FS, input redirectErrorInput) {
 
 	err := authHelper.ClearAuthContext(w, r)
 	if err != nil {
@@ -939,17 +939,17 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, database auth
 		fallback.code = "server_error"
 		fallback.description = "Internal server error"
 
-		err = redirToClientWithError(w, r, database, httpHelper, templateFS, fallback)
+		err = redirToClientWithError(w, r, database, pageRenderer, templateFS, fallback)
 		if err != nil {
 			// Nowhere left to send the client, so the 500 is the last resort here.
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 		}
 		return
 	}
 
-	err = redirToClientWithError(w, r, database, httpHelper, templateFS, input)
+	err = redirToClientWithError(w, r, database, pageRenderer, templateFS, input)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 }
@@ -1100,7 +1100,7 @@ func redirectWillBeEmitted(ctx context.Context, database authorizeDatabase, clie
 }
 
 func redirToClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
-	httpHelper HttpHelper, templateFS fs.FS, input redirectErrorInput) error {
+	pageRenderer PageRenderer, templateFS fs.FS, input redirectErrorInput) error {
 
 	// All three gates, asked through the one predicate so this emitter and the callers that ask the
 	// same question before building a response cannot answer it differently. The reasoning for each
@@ -1120,7 +1120,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database aut
 	if input.redirectAlreadyWithheld ||
 		!redirectWillBeEmitted(r.Context(), database, input.client, input.redirectURI, input.responseType,
 			"redirToClientWithError") {
-		return renderRedirectBlocked(httpHelper, w, r, input)
+		return renderRedirectBlocked(pageRenderer, w, r, input)
 	}
 
 	// The description becomes an error_description on the wire from here down, so it is conformed to
@@ -1210,7 +1210,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database aut
 		// Render into a buffer, not straight to w. Execute writes as it walks the template, so a
 		// template that parses and then fails part way through would leave a partial body and an
 		// implicit 200 already on the wire. Every caller answers an error from here with
-		// httpHelper.InternalServerError as its last resort, and a WriteHeader after the response
+		// pageRenderer.InternalServerError as its last resort, and a WriteHeader after the response
 		// is committed changes nothing, so the client would be told 200 for a page that was never
 		// finished. form_post.html is operator supplied whenever GOIABADA_AUTHSERVER_TEMPLATEDIR
 		// is set, so this is reachable in a real deployment rather than only in tests. Buffering

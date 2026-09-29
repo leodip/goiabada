@@ -18,7 +18,7 @@ import (
 )
 
 func HandleAuthLevel1Get(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	baseURL string,
 	adminConsoleBaseURL string,
@@ -32,14 +32,14 @@ func HandleAuthLevel1Get(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		requiredState := ceremony.AuthStateRequiresLevel1
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -49,7 +49,7 @@ func HandleAuthLevel1Get(
 		authContext.AuthState = ceremony.AuthStateLevel1Password
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		http.Redirect(w, r, baseURL+"/auth/pwd", http.StatusFound)
@@ -70,7 +70,7 @@ type authLevel1Database interface {
 }
 
 func HandleAuthLevel1CompletedGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
 	database authLevel1Database,
@@ -87,7 +87,7 @@ func HandleAuthLevel1CompletedGet(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -95,7 +95,7 @@ func HandleAuthLevel1CompletedGet(
 		requiredStates := []string{ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession}
 		if !slices.Contains(requiredStates, authContext.AuthState) {
 			errorMsg := fmt.Sprintf("authContext.AuthState '%s' does not match any required state", authContext.AuthState)
-			httpHelper.InternalServerError(w, r, errs.New(errorMsg))
+			pageRenderer.InternalServerError(w, r, errs.New(errorMsg))
 			return
 		}
 
@@ -117,7 +117,7 @@ func HandleAuthLevel1CompletedGet(
 		// shortcut is reached only with a valid session and that request was answered at once, but
 		// the delivery does not depend on which one it is.
 		if authContext.DeferredErrorCode != "" {
-			answerClientWithError(w, r, database, httpHelper, authHelper, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, authHelper, templateFS,
 				redirectErrorFromAuthContext(authContext,
 					clientProvenance(r.Context(), database, authContext.ClientId),
 					authContext.DeferredErrorCode, authContext.DeferredErrorDescription))
@@ -128,23 +128,23 @@ func HandleAuthLevel1CompletedGet(
 
 		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
 		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
+			pageRenderer.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
@@ -160,7 +160,7 @@ func HandleAuthLevel1CompletedGet(
 		// the target alone decides, and A's OTP configuration snapshot is left alone (#133).
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		hasValidUserSession := userSessionManager.HasValidUserSession(userSession,
@@ -171,7 +171,7 @@ func HandleAuthLevel1CompletedGet(
 			// Parse the session's ACR level
 			acrLevelFromSession, acrLevelErr := models.AcrLevelFromString(userSession.AcrLevel.String())
 			if acrLevelErr != nil {
-				httpHelper.InternalServerError(w, r, acrLevelErr)
+				pageRenderer.InternalServerError(w, r, acrLevelErr)
 				return
 			}
 
@@ -209,7 +209,7 @@ func HandleAuthLevel1CompletedGet(
 			authContext.AuthState = ceremony.AuthStateRequiresLevel2
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/level2", http.StatusFound)
@@ -219,7 +219,7 @@ func HandleAuthLevel1CompletedGet(
 			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)

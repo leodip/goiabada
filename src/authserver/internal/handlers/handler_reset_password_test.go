@@ -42,8 +42,8 @@ const testClientIP = "192.0.2.1"
 // has an account, and these tests fail.
 // wantStatus is the expected _httpStatus; pass 0 to require that no status is set,
 // which is how the GET keeps its long-standing implicit 200.
-func expectRenderedCodeInvalid(httpHelper *mocks_handlers.HttpHelper, wantStatus int) {
-	httpHelper.On("RenderTemplate",
+func expectRenderedCodeInvalid(pageRenderer *mocks_handlers.PageRenderer, wantStatus int) {
+	pageRenderer.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
 		"/layouts/auth_layout.html",
@@ -416,7 +416,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("a valid code marks the session and redirects to a clean URL", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
@@ -424,7 +424,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 		user, codeHash := userWithCode(t, 1, code, time.Now().UTC().Add(-time.Minute))
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -502,16 +502,16 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 
 	for _, tc := range rejections {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
 			tc.arrange(t, database)
 			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserId)
-			expectRenderedCodeInvalid(httpHelper, 0)
+			expectRenderedCodeInvalid(pageRenderer, 0)
 
-			handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+			handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -521,7 +521,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, emaillinks.LinkMarkerMissing, rejection, "a refused code must leave no marker")
 
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
 		})
@@ -535,7 +535,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 	const secondCode = "the-second-links-code"
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	store := newMarkerTestStore()
@@ -548,11 +548,11 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 	// The entry names the link that was refused, which did resolve. The account holding the
 	// live marker is not in the payload.
 	expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerContinuationInFlight), 99)
-	expectRenderedCodeInvalid(httpHelper, 0)
+	expectRenderedCodeInvalid(pageRenderer, 0)
 
 	req := withMarker(t, store, linkFollowedRequest(secondCode), emaillinks.LinkMarkerFlowResetPassword, 42, "the-first-hash")
 
-	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+	handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -567,7 +567,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 	assert.Equal(t, "the-first-hash", marker.CodeHash)
 	assert.Equal(t, int64(42), marker.Id)
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -580,7 +580,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 func TestHandleResetPasswordGet_SecondLinkWhileAnActivationIsInFlight(t *testing.T) {
 	const secondCode = "the-second-links-code"
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	store := newMarkerTestStore()
@@ -589,11 +589,11 @@ func TestHandleResetPasswordGet_SecondLinkWhileAnActivationIsInFlight(t *testing
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
 
 	expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerContinuationInFlight), 99)
-	expectRenderedCodeInvalid(httpHelper, 0)
+	expectRenderedCodeInvalid(pageRenderer, 0)
 
 	req := withMarker(t, store, linkFollowedRequest(secondCode), emaillinks.LinkMarkerFlowAccountActivate, 7, "the-activation-hash")
 
-	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+	handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -606,7 +606,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileAnActivationIsInFlight(t *testing
 	assert.Equal(t, "the-activation-hash", marker.CodeHash,
 		"the activation continuation must still own the session")
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -618,7 +618,7 @@ func TestHandleResetPasswordGet_LifetimeBoundary(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("just inside the lifetime is accepted", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
@@ -627,7 +627,7 @@ func TestHandleResetPasswordGet_LifetimeBoundary(t *testing.T) {
 			time.Now().UTC().Add(-forgotPasswordCodeLifetime+30*time.Second))
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -635,7 +635,7 @@ func TestHandleResetPasswordGet_LifetimeBoundary(t *testing.T) {
 	})
 
 	t.Run("just outside the lifetime is refused", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
@@ -644,14 +644,14 @@ func TestHandleResetPasswordGet_LifetimeBoundary(t *testing.T) {
 			time.Now().UTC().Add(-forgotPasswordCodeLifetime-30*time.Second))
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 		expectAuditFailedCode(auditLogger, auditReasonCodeExpired, 1)
-		expectRenderedCodeInvalid(httpHelper, 0)
+		expectRenderedCodeInvalid(pageRenderer, 0)
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 }
 
@@ -664,14 +664,14 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 	const codeHash = "the-code-hash"
 
 	t.Run("a live marker whose hash still resolves renders the form", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 			Return(&models.User{Id: 1}, nil).Once()
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		req := withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 
 		// The id the marker actually holds, so the assertion below cannot pass against a
@@ -681,7 +681,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 		require.Empty(t, rejection)
 		require.NotEmpty(t, marker.ContinuationId)
 
-		httpHelper.On("RenderTemplate",
+		pageRenderer.On("RenderTemplate",
 			mock.Anything, mock.Anything,
 			"/layouts/auth_layout.html", "/reset_password.html",
 			mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -697,7 +697,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
@@ -742,19 +742,19 @@ func assertCleanGetRefused(t *testing.T, wantReason string,
 	arrange func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request) {
 	t.Helper()
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	store := newMarkerTestStore()
 
 	req := arrange(t, store, database)
 	expectAuditFailedCode(auditLogger, wantReason, 0)
-	expectRenderedCodeInvalid(httpHelper, 0)
+	expectRenderedCodeInvalid(pageRenderer, 0)
 
-	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+	handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -773,8 +773,8 @@ func assertCleanGetRefused(t *testing.T, wantReason string,
 // It also requires the continuation id to come back, which is not incidental: a mistyped
 // confirmation re-renders the form, and a re-render that dropped the hidden field would
 // make the user's next submission refused with no way to recover but the emailed link.
-func expectRenderedFormError(httpHelper *mocks_handlers.HttpHelper, wantContinuationId string) {
-	httpHelper.On("RenderTemplate",
+func expectRenderedFormError(pageRenderer *mocks_handlers.PageRenderer, wantContinuationId string) {
+	pageRenderer.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
 		"/layouts/auth_layout.html",
@@ -866,25 +866,25 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			database := mocks_data.NewDatabase(t)
 			passwordValidator := mocks_handlers.NewPasswordValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
 			tc.arrange(passwordValidator)
-			expectRenderedFormError(httpHelper, tc.wantEchoedContinuationId)
+			expectRenderedFormError(pageRenderer, tc.wantEchoedContinuationId)
 
 			build := tc.build
 			if build == nil {
 				build = postResetRequest
 			}
 
-			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+			handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(),
 				build(tc.password, tc.passwordConfirmation, continuationId))
 
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -1009,7 +1009,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			database := mocks_data.NewDatabase(t)
 			passwordValidator := mocks_handlers.NewPasswordValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1018,12 +1018,12 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 			req := tc.arrange(t, store, database)
 			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserId)
-			expectRenderedCodeInvalid(httpHelper, http.StatusBadRequest)
+			expectRenderedCodeInvalid(pageRenderer, http.StatusBadRequest)
 
-			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+			handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
 			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
@@ -1032,7 +1032,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 }
 
 func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	passwordValidator := mocks_handlers.NewPasswordValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1057,7 +1057,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 
 	auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).Return().Once()
 
-	httpHelper.On("RenderTemplate",
+	pageRenderer.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
 		"/layouts/auth_layout.html",
@@ -1068,13 +1068,13 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 		}),
 	).Return(nil).Once()
 
-	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 	rr := httptest.NewRecorder()
 	req := postWithMarker(t, store, newPassword, newPassword,
 		emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 	handler.ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 
 	assert.NotEmpty(t, savedHash)
@@ -1100,7 +1100,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 // fault: the whole transaction rolls back, including the revocation sweep, and the caller
 // gets the same indistinguishable rejection every other bad link gets.
 func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	passwordValidator := mocks_handlers.NewPasswordValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1118,14 +1118,14 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 
 	// The lookup succeeded, so the entry names the user.
 	expectAuditFailedCode(auditLogger, auditReasonClaimLost, 1)
-	expectRenderedCodeInvalid(httpHelper, http.StatusBadRequest)
+	expectRenderedCodeInvalid(pageRenderer, http.StatusBadRequest)
 
-	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 	handler.ServeHTTP(httptest.NewRecorder(),
 		postWithMarker(t, store, newPassword, newPassword,
 			emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 
@@ -1135,14 +1135,14 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	assert.ErrorIs(t, stub.BodyErr, errResetPasswordClaimLost)
 	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	// And it is not a 500: a lost claim is an ordinary outcome, not a fault.
-	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
+	pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleResetPasswordPost_ClaimFails: the credential write itself errors inside the
 // transaction. The sweep must never start, the transaction must roll back rather than commit,
 // and no audit event may be emitted (#106 finding 26).
 func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	passwordValidator := mocks_handlers.NewPasswordValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1156,14 +1156,14 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
 	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 		Return(false, errors.New("update failed")).Once()
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 	handler.ServeHTTP(httptest.NewRecorder(),
 		postWithMarker(t, store, "Str0ngP4ss!", "Str0ngP4ss!",
 			emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 
 	// Rolled back, not committed. The strict mock already fails on an unstubbed call, so these
@@ -1259,7 +1259,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			database := mocks_data.NewDatabase(t)
 			passwordValidator := mocks_handlers.NewPasswordValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1276,15 +1276,15 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 				Return(true, nil).Once()
 			tc.arrange(database)
-			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+			pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 				Return().Once()
 
-			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+			handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(),
 				postWithMarker(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			database.AssertExpectations(t)
 
 			// No audit event at all, on any of the three. This is the assertion that matters:
@@ -1294,7 +1294,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			// And the success template is never rendered, so the caller is not told the
 			// operation succeeded. This says nothing about the durable outcome: on the
 			// commit-failure variant the write may in fact have applied (finding 36).
-			httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything,
+			pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -1342,10 +1342,10 @@ func TestIsForgotPasswordCodeExpired(t *testing.T) {
 
 // captureResetRender records the bind map passed to RenderTemplate, along with
 // which template was used.
-func captureResetRender(t *testing.T, httpHelper *mocks_handlers.HttpHelper) *map[string]interface{} {
+func captureResetRender(t *testing.T, pageRenderer *mocks_handlers.PageRenderer) *map[string]interface{} {
 	t.Helper()
 	captured := new(map[string]interface{})
-	httpHelper.On("RenderTemplate",
+	pageRenderer.On("RenderTemplate",
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 	).Run(func(args mock.Arguments) {
 		*captured = args.Get(4).(map[string]interface{})
@@ -1374,15 +1374,15 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			name:    "GET, a code matching no outstanding reset",
 			handler: "GET",
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), hashOfRequestCode).
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonUnknownCode, 0)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 				req := linkFollowedRequest(requestCode)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
@@ -1391,7 +1391,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			name:    "GET, an expired code",
 			handler: "GET",
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
@@ -1399,8 +1399,8 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), hash).
 					Return(user, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeExpired, 1)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 				req := linkFollowedRequest(requestCode)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
@@ -1409,13 +1409,13 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			name:    "GET, no marker on the clean URL",
 			handler: "GET",
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 				req := cleanGetRequest()
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
@@ -1424,15 +1424,15 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			name:    "GET, a marker whose hash no longer resolves",
 			handler: "GET",
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 				req := withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
@@ -1442,15 +1442,15 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			handler:    "POST",
 			wantStatus: http.StatusBadRequest,
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword).Return(nil).Once()
 				expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := postResetRequest(newPassword, newPassword, "")
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
@@ -1460,7 +1460,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			handler:    "POST",
 			wantStatus: http.StatusBadRequest,
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1469,8 +1469,8 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := postWithMarker(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
@@ -1481,7 +1481,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			handler:    "POST",
 			wantStatus: http.StatusBadRequest,
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1490,8 +1490,8 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonContinuationMismatch, 1)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := withMarker(t, store,
 					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
@@ -1503,7 +1503,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			handler:    "POST",
 			wantStatus: http.StatusBadRequest,
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				passwordValidator := mocks_handlers.NewPasswordValidator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1515,8 +1515,8 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 					Return(false, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonClaimLost, 1)
-				bind := captureResetRender(t, httpHelper)
-				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+				bind := captureResetRender(t, pageRenderer)
+				handler := HandleResetPasswordPost(pageRenderer, store, database, passwordValidator, auditLogger, testAdminConsoleBaseURL)
 				req := postWithMarker(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
@@ -1555,7 +1555,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("GET, stored code will not decrypt", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
@@ -1568,73 +1568,73 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 			ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		}
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything,
+		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything,
 			mock.MatchedBy(func(err error) bool {
 				return strings.Contains(err.Error(), "unable to decrypt forgot password code")
 			}),
 		).Return().Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		handler.ServeHTTP(httptest.NewRecorder(), linkFollowedRequest(code))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("GET, database failure on the first hop", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 			Return(nil, errors.New("database is down")).Once()
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		handler.ServeHTTP(httptest.NewRecorder(), linkFollowedRequest(code))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("GET, database failure on the clean hop", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), "the-code-hash").
 			Return(nil, errors.New("database is down")).Once()
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		handler.ServeHTTP(httptest.NewRecorder(),
 			withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, "the-code-hash"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	// A marker this process wrote and cannot read back is a fault in this process, not a bad
 	// link: the session cookie is encrypted and signed, so nobody outside it can put one there.
 	t.Run("GET, a corrupt marker", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		handler.ServeHTTP(httptest.NewRecorder(),
 			withRawMarker(t, store, cleanGetRequest(), "not json"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	// A session store that cannot be written is a fault too: proceeding would answer 303 to a
 	// URL the marker never reached, and the user would land on an unexplained dead page.
 	t.Run("GET, the marker cannot be saved", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := mocks_sessionstore.NewStore(t)
@@ -1643,38 +1643,38 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 		store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).
 			Return(nil, errors.New("session store is unavailable"))
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 }
 
 // If rendering the invalid-or-expired page itself fails, that is a real fault and
 // must surface as a 500 rather than a blank response.
 func TestRenderResetPasswordCodeInvalid_RenderFailureFallsBackToInternalServerError(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	store := newMarkerTestStore()
 
 	expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
-	httpHelper.On("RenderTemplate",
+	pageRenderer.On("RenderTemplate",
 		mock.Anything, mock.Anything,
 		"/layouts/auth_layout.html", "/reset_password.html", mock.Anything,
 	).Return(errors.New("template blew up")).Once()
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything,
+	pageRenderer.On("InternalServerError", mock.Anything, mock.Anything,
 		mock.MatchedBy(func(err error) bool { return err.Error() == "template blew up" }),
 	).Return().Once()
 
-	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger, testDataCipher)
+	handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 	handler.ServeHTTP(httptest.NewRecorder(), cleanGetRequest())
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 }
 
 // The audit payload is what an administrator watching for probing reads, and #112 replaced

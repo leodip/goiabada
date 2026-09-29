@@ -23,18 +23,18 @@ import (
 // The accept arm for the key read: /certs serves whatever key pairs the install holds, on behalf
 // of the request that asked for them.
 func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theRequestsContext(), mock.Anything).
 		Return([]models.KeyPair{}, nil).Once()
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleCertsGet(httpHelper, database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/certs"))
+	HandleCertsGet(jsonWriter, database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/certs"))
 
 	database.AssertExpectations(t)
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 }
 
 // The accept arm for the settings read.

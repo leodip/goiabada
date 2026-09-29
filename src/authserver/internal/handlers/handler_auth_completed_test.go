@@ -25,7 +25,7 @@ import (
 
 func TestHandleAuthCompletedGet(t *testing.T) {
 	t.Run("Successful flow, existing session (SSO reuse), consent not required", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -33,7 +33,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		// The reuse bump records the browser's address, read as the rest of the server reads
@@ -110,7 +110,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// from one browser would each strand the other's cookie (#266 decision 6).
 		authHelper.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -171,7 +171,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	}
 
 	t.Run("Valid session belonging to another user is terminated and replaced", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -179,7 +179,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -345,7 +345,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// carrying this ceremony's auth methods.
 		assertNotAttempted(t, database, "UpdateUserSession")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -360,7 +360,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// still has offline refresh tokens that work, and the browser it belongs to has changed
 	// hands either way.
 	t.Run("Session belonging to another user is terminated even when it is no longer valid", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -368,7 +368,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -453,7 +453,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -466,7 +466,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// person signing in. Terminating it would revoke their own offline refresh tokens and any
 	// authorization code they had not yet redeemed, on nothing more than an expired session.
 	t.Run("Own session that is no longer valid is replaced but not terminated", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -474,7 +474,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req.RemoteAddr = "203.0.113.7:4444"
@@ -571,7 +571,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, []string{audit.AuditDeletedUserSession, audit.AuditStartedNewUserSesson}, sequence,
 			"the replaced row's event is written once, after the commit StartNewUserSession reported")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -601,14 +601,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req, _ := http.NewRequest("GET", "/auth/completed", nil)
 			req.RemoteAddr = "203.0.113.7:4444"
@@ -653,7 +653,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				models.AcrLevel1, int64(3), (*int64)(nil), &pwdAuthTime, "203.0.113.7", ownSession).
 				Return(nil, tc.removed, startError)
 
-			httpHelper.On("InternalServerError", rr, req, startError).Run(func(mock.Arguments) { answered = true }).Return().Once()
+			pageRenderer.On("InternalServerError", rr, req, startError).Run(func(mock.Arguments) { answered = true }).Return().Once()
 
 			handler.ServeHTTP(rr, req)
 
@@ -678,7 +678,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// that matters as much as the 500: an event written on a rolled-back termination is a false
 	// security record.
 	t.Run("Termination failure is a 500 with nothing audited and no replacement", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -686,7 +686,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -743,7 +743,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("DeleteUserSession", mock.Anything, crossUserTerminateTx, foreignSession.Id).
 			Return(deleteError).Once()
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == deleteError.Error()
 		})).Return().Once()
 
@@ -773,7 +773,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// here would attest to a revocation that rolled back.
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -789,7 +789,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// after the first is how an operator sees a handover that did not complete. The ceremony
 	// still has to stop dead, because it now has no session at all to bind a code to.
 	t.Run("Replacement failure after a committed termination is a 500 with the handover recorded", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -797,7 +797,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -863,7 +863,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("StartNewUserSession", rr, req, int64(2), int64(1), "pwd",
 			models.AcrLevel1, int64(3), (*int64)(nil), &pwdAuthTime, "", (*models.UserSession)(nil)).Return(nil, nil, startError)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == startError.Error()
 		})).Return().Once()
 
@@ -890,7 +890,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -899,7 +899,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, existing session with re-auth, consent not required", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -907,7 +907,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -991,7 +991,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1007,7 +1007,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// #129 gate does not read it, but nothing else in the file covers it (found by round 2
 	// of the stage 5 review).
 	t.Run("Successful flow, existing session, zero AuthenticatedAt does not refresh AuthTime", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1015,7 +1015,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1088,7 +1088,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1097,7 +1097,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, new session, consent not required", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1105,7 +1105,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1188,7 +1188,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1207,7 +1207,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// =====================================================================================
 
 	t.Run("Reuse arm promotes the captured generation onto the bound session", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1215,7 +1215,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1293,7 +1293,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.EqualValues(t, 4, userSession.OtpConfigGeneration,
 			"the in-memory session must carry what was written, since the ACR below is taken against it")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1306,7 +1306,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// would discharge an obligation the ceremony never answered, and the user would keep their
 	// second factor bypassed for the rest of the session's life.
 	t.Run("Reuse arm does not promote when the target is level 1", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1314,7 +1314,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1387,7 +1387,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.EqualValues(t, 3, userSession.OtpConfigGeneration,
 			"the session must still owe its level 2 re-prompt")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1400,7 +1400,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// written by an older binary unmarshals to, and leaving the session as it stands is the
 	// fail-closed answer there.
 	t.Run("Reuse arm does not promote when the ceremony captured nothing", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1408,7 +1408,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1477,7 +1477,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1489,7 +1489,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// insert. 4 rather than 0 so the expectation cannot pass against a hard-coded zero, and
 	// distinct from the auth state generation beside it so the two cannot be crossed.
 	t.Run("Create arm forwards the captured generation to the new session", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1497,7 +1497,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1568,7 +1568,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// insert, and a second write would be a no-op at best and a race at worst.
 		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1577,7 +1577,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Error in GetAuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1585,7 +1585,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1594,18 +1594,18 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectedError := errors.New("auth context error")
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == expectedError.Error()
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Invalid AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1613,7 +1613,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1624,16 +1624,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		expectAuthStateMismatch(t, httpHelper, rr, req)
+		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Client is nil", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1641,7 +1641,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1661,19 +1661,19 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "client test-client not found")
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("User is not enabled", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1682,7 +1682,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1766,7 +1766,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1775,7 +1775,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("User is not enabled, failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1784,7 +1784,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1844,7 +1844,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// pageRenderer has no InternalServerError expectation, so the mock fails the test if the
 		// handler answers with a bare 500 instead of redirecting the client.
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location := rr.Result().Header.Get("Location")
@@ -1852,7 +1852,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Contains(t, location, "error_description=Internal+server+error")
 		assert.NotContains(t, location, "access_denied")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1861,7 +1861,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("User is not enabled, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1877,7 +1877,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -1935,7 +1935,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
 		// this expectation the handler would answer nothing at all.
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -1945,7 +1945,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the mock's, so no redirect is committed.
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1954,7 +1954,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("User is not enabled, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1966,7 +1966,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2024,7 +2024,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// pinned separately so a future edit cannot delete either copy unnoticed.
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -2032,7 +2032,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2041,7 +2041,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("authContext.Scope is filtered and becomes empty", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2050,7 +2050,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2132,7 +2132,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2141,7 +2141,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Scope filtered to empty with a failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2150,7 +2150,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2207,7 +2207,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// pageRenderer has no InternalServerError expectation, so the mock fails the test if the
 		// handler answers with a bare 500 instead of redirecting the client.
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location := rr.Result().Header.Get("Location")
@@ -2215,7 +2215,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Contains(t, location, "error_description=Internal+server+error")
 		assert.NotContains(t, location, "access_denied")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2224,7 +2224,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Scope filtered to empty with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2236,7 +2236,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2291,7 +2291,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -2299,7 +2299,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2308,7 +2308,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Scope filtered to empty with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2320,7 +2320,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2379,7 +2379,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// fail the mock.
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -2387,7 +2387,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2396,7 +2396,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, new session, consent required", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2404,7 +2404,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2478,7 +2478,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/consent", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2487,7 +2487,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, new session, offline_access scope requires consent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2495,7 +2495,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2568,7 +2568,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/consent", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2590,7 +2590,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// StartNewUserSession is deliberately not stubbed on the strict mock, so reaching it
 	// fails the case on its own rather than through an assertion that could be deleted.
 	t.Run("No valid session and this ceremony did not authenticate, restarts level 1", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2598,7 +2598,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2651,7 +2651,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -2660,7 +2660,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("No valid session and only OTP authenticated this ceremony, restarts level 1", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2668,7 +2668,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthCompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		req = withSessionSettings(req)
@@ -2722,7 +2722,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)

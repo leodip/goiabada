@@ -150,7 +150,7 @@ func continuationMatches(markerContinuationId string, submitted string) bool {
 // Genuine server faults must NOT come here. A stored code that will not decrypt,
 // a database failure, or a session store that cannot be read, stays an
 // InternalServerError so it keeps its stack trace and keeps alerting.
-func renderResetPasswordCodeInvalid(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, httpStatus int) {
+func renderResetPasswordCodeInvalid(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, httpStatus int) {
 	bind := map[string]interface{}{
 		"codeInvalidOrExpired": true,
 	}
@@ -158,8 +158,8 @@ func renderResetPasswordCodeInvalid(httpHelper HttpHelper, w http.ResponseWriter
 		bind["_httpStatus"] = httpStatus
 	}
 
-	if err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind); err != nil {
-		httpHelper.InternalServerError(w, r, err)
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }
 
@@ -201,11 +201,11 @@ func auditFailedResetPasswordCode(auditLogger AuditLogger, r *http.Request, user
 
 // rejectResetPassword audits the cause and renders the one indistinguishable response. The
 // branches are kept separate only so the audit entry can name the reason.
-func rejectResetPassword(httpHelper HttpHelper, auditLogger AuditLogger, w http.ResponseWriter,
+func rejectResetPassword(pageRenderer PageRenderer, auditLogger AuditLogger, w http.ResponseWriter,
 	r *http.Request, userId int64, reason string, httpStatus int) {
 
 	auditFailedResetPasswordCode(auditLogger, r, userId, reason)
-	renderResetPasswordCodeInvalid(httpHelper, w, r, httpStatus)
+	renderResetPasswordCodeInvalid(pageRenderer, w, r, httpStatus)
 }
 
 // resetPasswordDatabase is what the reset password page needs: the code it consumes.
@@ -233,29 +233,29 @@ type resetPasswordDatabase interface {
 // link simply fails. Resolving the hash is what keeps that true (#112, #266).
 //
 // Returns (nil, nil) when the request was refused, having already audited and responded.
-func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessionstore.Store,
+func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession sessionstore.Store,
 	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	httpStatus int) (*emaillinks.LinkMarker, *models.User) {
 
 	marker, rejection, err := emaillinks.GetLinkMarker(httpSession, r, emaillinks.LinkMarkerFlowResetPassword)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return nil, nil
 	}
 	if rejection != "" {
 		// No userId: a rejected marker was not resolved against any row, and the id it
 		// carries is a label rather than something this request established.
-		rejectResetPassword(httpHelper, auditLogger, w, r, 0, string(rejection), httpStatus)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, 0, string(rejection), httpStatus)
 		return nil, nil
 	}
 
 	user, err := database.GetUserByForgotPasswordCodeHash(r.Context(), nil, marker.CodeHash)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return nil, nil
 	}
 	if user == nil {
-		rejectResetPassword(httpHelper, auditLogger, w, r, 0, auditReasonCodeNoLongerOutstanding, httpStatus)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, 0, auditReasonCodeNoLongerOutstanding, httpStatus)
 		return nil, nil
 	}
 
@@ -275,7 +275,7 @@ func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessionstore.
 // and those users could never reset a password. The code's alphabet is entirely RFC 3986
 // unreserved, so there is no encoding step left to get wrong.
 func HandleResetPasswordGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	httpSession sessionstore.Store,
 	database resetPasswordDatabase,
 	auditLogger AuditLogger,
@@ -285,11 +285,11 @@ func HandleResetPasswordGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if code := r.URL.Query().Get("code"); len(code) > 0 {
-			handleResetPasswordLinkFollowed(httpHelper, httpSession, database, auditLogger, dataCipher, w, r, code)
+			handleResetPasswordLinkFollowed(pageRenderer, httpSession, database, auditLogger, dataCipher, w, r, code)
 			return
 		}
 
-		marker, user := resolveResetPasswordMarker(httpHelper, httpSession, database, auditLogger, w, r, 0)
+		marker, user := resolveResetPasswordMarker(pageRenderer, httpSession, database, auditLogger, w, r, 0)
 		if user == nil {
 			return
 		}
@@ -300,9 +300,9 @@ func HandleResetPasswordGet(
 			"continuationId": marker.ContinuationId,
 		}
 
-		err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
+		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 	}
@@ -314,7 +314,7 @@ func HandleResetPasswordGet(
 // previewer that prefetches the URL therefore writes a marker into its own throwaway cookie
 // jar and leaves the code usable for the real user; consuming here would let any prefetching
 // gateway burn the code before the user ever saw the message.
-func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessionstore.Store,
+func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession sessionstore.Store,
 	database resetPasswordDatabase, auditLogger AuditLogger, dataCipher *encryption.DataCipher,
 	w http.ResponseWriter, r *http.Request, code string) {
 
@@ -322,20 +322,20 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 
 	user, err := database.GetUserByForgotPasswordCodeHash(r.Context(), nil, codeHash)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
 	// A code matching no row, and a row carrying a hash but no encrypted code, are answered
 	// exactly as a wrong code is.
 	if user == nil || len(user.ForgotPasswordCodeEncrypted) == 0 {
-		rejectResetPassword(httpHelper, auditLogger, w, r, 0, auditReasonUnknownCode, 0)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, 0, auditReasonUnknownCode, 0)
 		return
 	}
 
 	storedCode, err := dataCipher.Decrypt(user.ForgotPasswordCodeEncrypted)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt forgot password code"))
+		pageRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt forgot password code"))
 		return
 	}
 
@@ -343,12 +343,12 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 	// row matched a hash the supplied code does not reproduce, so nothing about it is
 	// established as the subject of the request.
 	if !forgotPasswordCodeMatches(storedCode, code) {
-		rejectResetPassword(httpHelper, auditLogger, w, r, 0, auditReasonUnknownCode, 0)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, 0, auditReasonUnknownCode, 0)
 		return
 	}
 
 	if isForgotPasswordCodeExpired(user) {
-		rejectResetPassword(httpHelper, auditLogger, w, r, user.Id, auditReasonCodeExpired, 0)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonCodeExpired, 0)
 		return
 	}
 
@@ -357,7 +357,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 	rejection, err := emaillinks.SaveLinkMarker(httpSession, w, r,
 		emaillinks.LinkMarkerFlowResetPassword, user.Id, codeHash)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -372,7 +372,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 	// every other refusal. Status zero, like the other first-hop rejections: the page was
 	// served, it is the link that was refused.
 	if rejection != "" {
-		rejectResetPassword(httpHelper, auditLogger, w, r, user.Id, string(rejection), 0)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, string(rejection), 0)
 		return
 	}
 
@@ -382,7 +382,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 }
 
 func HandleResetPasswordPost(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	httpSession sessionstore.Store,
 	database resetPasswordDatabase,
 	passwordValidator PasswordValidator,
@@ -403,9 +403,9 @@ func HandleResetPasswordPost(
 				"continuationId": r.PostFormValue(continuationIdField),
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
+			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 		}
 
@@ -431,7 +431,7 @@ func HandleResetPasswordPost(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		err := passwordValidator.ValidatePassword(settings.PasswordPolicy, password)
@@ -449,7 +449,7 @@ func HandleResetPasswordPost(
 		// The credential comes from the session marker, not the query: template/reset-form
 		// has an empty action, so this POST re-submits to the clean URL the first hop
 		// redirected to, and there is nothing in it to read.
-		marker, user := resolveResetPasswordMarker(httpHelper, httpSession, database, auditLogger,
+		marker, user := resolveResetPasswordMarker(pageRenderer, httpSession, database, auditLogger,
 			w, r, http.StatusBadRequest)
 		if user == nil {
 			return
@@ -466,14 +466,14 @@ func HandleResetPasswordPost(
 		// The userId audited is the marker's, which resolved: it names the account this
 		// submission would have written into, which is the useful half of the entry.
 		if !continuationMatches(marker.ContinuationId, r.PostFormValue(continuationIdField)) {
-			rejectResetPassword(httpHelper, auditLogger, w, r, user.Id,
+			rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id,
 				auditReasonContinuationMismatch, http.StatusBadRequest)
 			return
 		}
 
 		passwordHash, err := passwordhash.Hash(password)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -504,12 +504,12 @@ func HandleResetPasswordPost(
 			return nil
 		})
 		if errors.Is(err, errResetPasswordClaimLost) {
-			rejectResetPassword(httpHelper, auditLogger, w, r, user.Id, auditReasonClaimLost,
+			rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonClaimLost,
 				http.StatusBadRequest)
 			return
 		}
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -531,9 +531,9 @@ func HandleResetPasswordPost(
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
 		}
 
-		err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
+		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 	}

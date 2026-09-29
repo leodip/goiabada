@@ -32,7 +32,7 @@ import (
 func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	database := mocks_data.NewDatabase(t)
 
@@ -47,7 +47,7 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	req.Header.Set("X-Request-Id", "req-level2-e2e")
 	rr := httptest.NewRecorder()
 
-	chimiddleware.RequestID(HandleAuthLevel2Get(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
+	chimiddleware.RequestID(HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 

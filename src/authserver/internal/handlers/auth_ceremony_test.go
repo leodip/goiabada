@@ -31,12 +31,12 @@ const testCeremonyId = "test-ceremony-id-0123456789abcd"
 
 // expectCeremonyMismatch sets the two calls rejectCeremonyMismatch makes, and asserts the page it
 // renders is the 400 error page rather than anything belonging to the flow that was submitted.
-func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlers.HttpHelper,
+func expectCeremonyMismatch(t *testing.T, pageRenderer *mocks_handlers.PageRenderer,
 	auditLogger *mocks_handlers.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
 	auditLogger.On("Log", mock.Anything, audit.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
-	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["_httpStatus"] == http.StatusBadRequest &&
 				data["title"] != "" && data["error"] != ""
@@ -50,11 +50,11 @@ func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlers.HttpHelper,
 // It asserts the state_mismatch pair specifically and not merely "some title": the ceremony
 // mismatch page beside it says another sign-in was started in this browser, which is not what the
 // Back button did, and a helper that accepted either would let the two pages be confused.
-func expectAuthStateMismatch(t *testing.T, httpHelper *mocks_handlers.HttpHelper,
+func expectAuthStateMismatch(t *testing.T, pageRenderer *mocks_handlers.PageRenderer,
 	rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
-	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["_httpStatus"] == http.StatusBadRequest &&
 				data["title"] == i18n.T(req.Context(), "auth_error.state_mismatch.title") &&
@@ -148,12 +148,12 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/pwd")
 
-		httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{
+		pageRenderer := handlerhelpers.NewHttpHelper(fstest.MapFS{
 			"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
 			"auth_error.html":             {Data: []byte(`{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`)},
 		})
 
-		rejectAuthStateMismatch(httpHelper, rr, req,
+		rejectAuthStateMismatch(pageRenderer, rr, req,
 			ceremony.AuthStateLevel1Password, ceremony.AuthStateLevel1PasswordCompleted)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code,
@@ -171,12 +171,12 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/pwd")
 
-		httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{
+		pageRenderer := handlerhelpers.NewHttpHelper(fstest.MapFS{
 			"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
 			"auth_error.html":             {Data: []byte(`{{define "content"}}{{.title}}{{end}}`)},
 		})
 
-		rejectAuthStateMismatch(httpHelper, rr, req,
+		rejectAuthStateMismatch(pageRenderer, rr, req,
 			ceremony.AuthStateRequiresConsent, ceremony.AuthStateInitial)
 
 		output := logged.Text()
@@ -209,7 +209,7 @@ func renderableRequest(target string) *http.Request {
 func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 	const requestId = "goiabada/req-ceremony-1"
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	req, err := http.NewRequest("POST", "/auth/pwd", nil)
@@ -222,14 +222,14 @@ func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 	}), audit.AuditAuthCeremonyMismatch, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == "test-client"
 	})).Return().Once()
-	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.Anything).Return(nil).Once()
 
-	rejectCeremonyMismatch(httpHelper, auditLogger, rr, req, &ceremony.AuthContext{
+	rejectCeremonyMismatch(pageRenderer, auditLogger, rr, req, &ceremony.AuthContext{
 		ClientId:  "test-client",
 		AuthState: ceremony.AuthStateLevel1Password,
 	})
 
 	auditLogger.AssertExpectations(t)
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 }

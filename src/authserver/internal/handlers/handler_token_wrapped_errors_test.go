@@ -31,19 +31,19 @@ import (
 // wrappedTokenRequest wires a token handler whose validator answers failure, and returns the parts
 // a case needs to drive one authorization_code request through it.
 func wrappedTokenRequest(t *testing.T, failure error) (
-	*mocks_handlers.HttpHelper, *mocks_handlers.AuditLogger, *mocks_data.Database,
+	*mocks_handlers.JSONWriter, *mocks_handlers.AuditLogger, *mocks_data.Database,
 	*httptest.ResponseRecorder, *http.Request, http.Handler,
 ) {
 	t.Helper()
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator,
+	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator,
 		auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=abc&redirect_uri=http://example.com&client_id=test_client"
@@ -55,13 +55,13 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, failure)
 
-	return httpHelper, auditLogger, database, rr, req, handler
+	return jsonWriter, auditLogger, database, rr, req, handler
 }
 
 // expectJsonErrorWithDetail registers the one JsonError call and captures what it was handed.
-func expectJsonErrorWithDetail(httpHelper *mocks_handlers.HttpHelper) *error {
+func expectJsonErrorWithDetail(jsonWriter *mocks_handlers.JSONWriter) *error {
 	var captured error
-	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+	jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()
@@ -77,11 +77,11 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 		"The user account is disabled.", http.StatusBadRequest)
 	require.ErrorIs(t, disabled, protocolvalidation.ErrUserDisabled)
 
-	httpHelper, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
+	jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(disabled, "unable to validate the token request"))
 
 	auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return().Once()
-	captured := expectJsonErrorWithDetail(httpHelper)
+	captured := expectJsonErrorWithDetail(jsonWriter)
 
 	handler.ServeHTTP(rr, req)
 
@@ -102,11 +102,11 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 		http.StatusBadRequest)
 	require.ErrorIs(t, refusal, protocolvalidation.ErrCodeRedirectURIDeregistered)
 
-	httpHelper, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
+	jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(refusal, "unable to validate the token request"))
 
 	auditLogger.On("Log", mock.Anything, audit.AuditRedemptionRefusedRedirectURI, mock.Anything).Return().Once()
-	captured := expectJsonErrorWithDetail(httpHelper)
+	captured := expectJsonErrorWithDetail(jsonWriter)
 
 	handler.ServeHTTP(rr, req)
 
@@ -126,7 +126,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 		Code: &models.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
 	}
 
-	httpHelper, auditLogger, database, rr, req, handler := wrappedTokenRequest(t,
+	jsonWriter, auditLogger, database, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(reuse, "unable to validate the token request"))
 
 	mocks_data.ExpectRunInTransaction(database, revokeTx)
@@ -140,7 +140,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 			details, _ := args.Get(2).(map[string]interface{})
 			auditedCodeId, _ = details["codeId"].(int64)
 		}).Return().Once()
-	captured := expectJsonErrorWithDetail(httpHelper)
+	captured := expectJsonErrorWithDetail(jsonWriter)
 
 	handler.ServeHTTP(rr, req)
 

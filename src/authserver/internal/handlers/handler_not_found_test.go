@@ -15,15 +15,15 @@ import (
 // pinned at the HTTP seam in core/handlerhelpers/http_helper_test.go rather than through a mock
 // that can only report what it was told to return (#279).
 func TestHandleNotFoundGet(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/non-existent-path", nil)
 	rr := httptest.NewRecorder()
 
-	httpHelper.On("NotFound", rr, req).Once()
+	pageRenderer.On("NotFound", rr, req).Once()
 
-	HandleNotFoundGet(httpHelper).ServeHTTP(rr, req)
+	HandleNotFoundGet(pageRenderer).ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	assert.Equal(t, http.StatusOK, rr.Code, "the mock writes nothing, so the recorder keeps its default")
 }

@@ -17,10 +17,10 @@ import (
 
 func TestHandleCertsGet(t *testing.T) {
 	t.Run("Successfully returns JWKS", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleCertsGet(httpHelper, database)
+		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
 		assert.NoError(t, err)
@@ -44,7 +44,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		httpHelper.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
+		jsonWriter.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
 			jwks := args.Get(2).(oauth.Jwks)
 			assert.Len(t, jwks.Keys, 3)
 			assert.Equal(t, "next-kid", jwks.Keys[0].Kid)
@@ -56,14 +56,14 @@ func TestHandleCertsGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 
 	t.Run("Successfully returns JWKS with only current key", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleCertsGet(httpHelper, database)
+		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
 		assert.NoError(t, err)
@@ -79,7 +79,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		httpHelper.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
+		jsonWriter.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
 			jwks := args.Get(2).(oauth.Jwks)
 			assert.Len(t, jwks.Keys, 1)
 			assert.Equal(t, "current-kid", jwks.Keys[0].Kid)
@@ -89,14 +89,14 @@ func TestHandleCertsGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 
 	t.Run("Database error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleCertsGet(httpHelper, database)
+		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
 		assert.NoError(t, err)
@@ -105,21 +105,21 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(nil, errors.New("database error"))
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "database error"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 
 	t.Run("Invalid key state", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleCertsGet(httpHelper, database)
+		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
 		assert.NoError(t, err)
@@ -135,21 +135,21 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid key state invalid"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 
 	t.Run("Invalid JSON in PublicKeyJWK", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleCertsGet(httpHelper, database)
+		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
 		assert.NoError(t, err)
@@ -165,21 +165,21 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid character 'i' looking for beginning of value"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 
 	t.Run("No keys found", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleCertsGet(httpHelper, database)
+		handler := HandleCertsGet(jsonWriter, database)
 
 		req, err := http.NewRequest("GET", "/certs", nil)
 		assert.NoError(t, err)
@@ -188,7 +188,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
 
-		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(jwks oauth.Jwks) bool {
+		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(jwks oauth.Jwks) bool {
 			return len(jwks.Keys) == 0
 		})).Return()
 
@@ -196,6 +196,6 @@ func TestHandleCertsGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		jsonWriter.AssertExpectations(t)
 	})
 }

@@ -92,9 +92,9 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 	form.Add("password", "the password")
 	body := form.Encode()
 
-	serve := func(t *testing.T, limit int, prepare func(httpHelper *mocks_handlers.HttpHelper,
+	serve := func(t *testing.T, limit int, prepare func(pageRenderer *mocks_handlers.PageRenderer,
 		auditLogger *mocks_handlers.AuditLogger, database *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request)) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -110,30 +110,30 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}, nil).Once()
-		prepare(httpHelper, auditLogger, database, rr, req)
+		prepare(pageRenderer, auditLogger, database, rr, req)
 
-		HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+		HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 		database.AssertExpectations(t)
 	}
 
 	t.Run("at exactly the limit the ceremony matches and the sign-in proceeds", func(t *testing.T) {
-		serve(t, len(body), func(httpHelper *mocks_handlers.HttpHelper, _ *mocks_handlers.AuditLogger,
+		serve(t, len(body), func(pageRenderer *mocks_handlers.PageRenderer, _ *mocks_handlers.AuditLogger,
 			database *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request) {
 			// The first read past the ceremony gate. Failing it ends the case there, which is all
 			// this side needs to show: the body was read and the gate passed.
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 				Return(nil, assert.AnError).Once()
-			httpHelper.On("InternalServerError", rr, req, mock.Anything).Return().Once()
+			pageRenderer.On("InternalServerError", rr, req, mock.Anything).Return().Once()
 		})
 	})
 
 	t.Run("one byte short the sign-in is refused before any credential is read", func(t *testing.T) {
-		serve(t, len(body)-1, func(httpHelper *mocks_handlers.HttpHelper, auditLogger *mocks_handlers.AuditLogger,
+		serve(t, len(body)-1, func(pageRenderer *mocks_handlers.PageRenderer, auditLogger *mocks_handlers.AuditLogger,
 			_ *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request) {
-			expectCeremonyMismatch(t, httpHelper, auditLogger, rr, req)
+			expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
 		})
 	})
 }

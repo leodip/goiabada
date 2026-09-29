@@ -51,7 +51,7 @@ func redirectDestinationLabel(redirectURI string) string {
 // Rendered the way rejectCeremonyMismatch renders auth_error.html, and at 200 for the same reason
 // renderErrorUi answers 200: this is an authorization the server refused to complete, reported to
 // the person in front of it, rather than a fault in the HTTP request that carried it.
-func renderRedirectBlocked(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
+func renderRedirectBlocked(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
 	input redirectErrorInput) error {
 
 	bind := map[string]interface{}{
@@ -67,5 +67,5 @@ func renderRedirectBlocked(httpHelper HttpHelper, w http.ResponseWriter, r *http
 		bind["clientNameUnverified"] = unverified
 	}
 
-	return httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html", bind)
+	return pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html", bind)
 }

@@ -32,7 +32,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		"The max_age parameter must be a non-negative integer.", http.StatusBadRequest)
 
 	type fixture struct {
-		httpHelper         *mocks_handlers.HttpHelper
+		pageRenderer       *mocks_handlers.PageRenderer
 		authHelper         *mocks_handlers.AuthHelper
 		userSessionManager *mocks_handlers.UserSessionManager
 		database           *mocks_data.Database
@@ -47,13 +47,13 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	// and the stubs every row shares up to the session predicate.
 	arrange := func(t *testing.T, query string) *fixture {
 		f := &fixture{
-			httpHelper:         mocks_handlers.NewHttpHelper(t),
+			pageRenderer:       mocks_handlers.NewPageRenderer(t),
 			authHelper:         mocks_handlers.NewAuthHelper(t),
 			userSessionManager: mocks_handlers.NewUserSessionManager(t),
 			database:           mocks_data.NewDatabase(t),
 			authorizeValidator: mocks_handlers.NewAuthorizeValidator(t),
 		}
-		f.handler = HandleAuthorizeGet(f.httpHelper, f.authHelper, f.userSessionManager, f.database, nil,
+		f.handler = HandleAuthorizeGet(f.pageRenderer, f.authHelper, f.userSessionManager, f.database, nil,
 			f.authorizeValidator, mocks_handlers.NewAuditLogger(t), mocks_handlers.NewPermissionChecker(t),
 			mocks_handlers.NewTokenParser(t), testBaseURL)
 

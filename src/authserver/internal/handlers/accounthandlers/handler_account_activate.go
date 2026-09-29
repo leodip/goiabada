@@ -54,9 +54,9 @@ const (
 //
 // Genuine server faults must NOT come here: a stored code that will not decrypt, a database
 // failure and a session store that cannot be read stay InternalServerError.
-func refuseActivationLink(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, reason string) {
+func refuseActivationLink(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, reason string) {
 	slog.WarnContext(r.Context(), "account activation link refused", "reason", reason)
-	renderActivationLinkExpired(httpHelper, w, r)
+	renderActivationLinkExpired(pageRenderer, w, r)
 }
 
 // renderActivationLinkExpired renders the "this link is no longer usable, register again"
@@ -71,13 +71,13 @@ func refuseActivationLink(httpHelper HttpHelper, w http.ResponseWriter, r *http.
 //
 // It is an existing rendering rather than a new state on purpose: the page already tells the
 // reader to register again, which is the right instruction for every one of them (#112).
-func renderActivationLinkExpired(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) {
+func renderActivationLinkExpired(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
 	bind := map[string]interface{}{
 		"linkHasExpired": true,
 	}
 
-	if err := httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind); err != nil {
-		httpHelper.InternalServerError(w, r, err)
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }
 
@@ -111,7 +111,7 @@ type accountActivateDatabase interface {
 // while registration was on must not create an account after an administrator has turned it off
 // (#425 decision 6).
 func HandleAccountActivateGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	httpSession sessionstore.Store,
 	database accountActivateDatabase,
 	userCreator UserCreator,
@@ -124,20 +124,20 @@ func HandleAccountActivateGet(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		if !settings.SelfRegistrationEnabled {
-			refuseSelfRegistrationDisabled(httpHelper, w, r)
+			refuseSelfRegistrationDisabled(pageRenderer, w, r)
 			return
 		}
 
 		if code := r.URL.Query().Get("code"); len(code) > 0 {
-			handleActivationLinkFollowed(httpHelper, httpSession, database, dataCipher, w, r, code)
+			handleActivationLinkFollowed(pageRenderer, httpSession, database, dataCipher, w, r, code)
 			return
 		}
 
-		handleActivationCleanHop(httpHelper, httpSession, database, userCreator, auditLogger, adminConsoleBaseURL, w, r)
+		handleActivationCleanHop(pageRenderer, httpSession, database, userCreator, auditLogger, adminConsoleBaseURL, w, r)
 	}
 }
 
@@ -146,7 +146,7 @@ func HandleAccountActivateGet(
 // It validates but does not consume the code (#112 decision 7). A mail scanner that prefetches
 // the URL writes a marker into its own throwaway cookie jar and leaves the code usable for the
 // real user.
-func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstore.Store,
+func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession sessionstore.Store,
 	database accountActivateDatabase, dataCipher *encryption.DataCipher, w http.ResponseWriter, r *http.Request,
 	code string) {
 
@@ -154,20 +154,20 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 
 	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(r.Context(), nil, codeHash)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
 	// An unknown code is also a consumed one: the activation deletes the row, so a link clicked
 	// twice lands here.
 	if preRegistration == nil {
-		refuseActivationLink(httpHelper, w, r, activationReasonUnknownCode)
+		refuseActivationLink(pageRenderer, w, r, activationReasonUnknownCode)
 		return
 	}
 
 	verificationCode, err := dataCipher.Decrypt(preRegistration.VerificationCodeEncrypted)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt verification code"))
+		pageRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt verification code"))
 		return
 	}
 
@@ -175,18 +175,18 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 	// that the row is located by hash, and kept so the comparison stays load-bearing rather than
 	// decorative. Answered as an unknown code, as the reset twin answers its own mismatch.
 	if verificationCode != code {
-		refuseActivationLink(httpHelper, w, r, activationReasonUnknownCode)
+		refuseActivationLink(pageRenderer, w, r, activationReasonUnknownCode)
 		return
 	}
 
 	if isVerificationCodeExpired(preRegistration) {
 		// The code has expired: delete the pre-registration and ask the user to register again.
 		if deletePreRegistrationErr := database.DeletePreRegistration(r.Context(), nil, preRegistration.Id); deletePreRegistrationErr != nil {
-			httpHelper.InternalServerError(w, r, deletePreRegistrationErr)
+			pageRenderer.InternalServerError(w, r, deletePreRegistrationErr)
 			return
 		}
 
-		refuseActivationLink(httpHelper, w, r, activationReasonCodeExpired)
+		refuseActivationLink(pageRenderer, w, r, activationReasonCodeExpired)
 		return
 	}
 
@@ -196,7 +196,7 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 	rejection, err := emaillinks.SaveLinkMarker(httpSession, w, r, emaillinks.LinkMarkerFlowAccountActivate,
 		preRegistration.Id, codeHash)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -211,7 +211,7 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 	// browser following a 303 with no page in between, so there is nothing on screen to be
 	// retargeted later and nowhere to put an id that would not go back into the URL.
 	if rejection != "" {
-		refuseActivationLink(httpHelper, w, r, string(rejection))
+		refuseActivationLink(pageRenderer, w, r, string(rejection))
 		return
 	}
 
@@ -235,17 +235,17 @@ func isVerificationCodeExpired(preRegistration *models.PreRegistration) bool {
 // to nothing. Clearing the session now reaches every copy of the marker, since the session
 // is a database row rather than a browser cookie, so this is defence in depth rather than
 // the whole boundary it was written as (#112, #266).
-func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.Store,
+func handleActivationCleanHop(pageRenderer PageRenderer, httpSession sessionstore.Store,
 	database accountActivateDatabase, userCreator UserCreator, auditLogger AuditLogger,
 	adminConsoleBaseURL string, w http.ResponseWriter, r *http.Request) {
 
 	marker, rejection, err := emaillinks.GetLinkMarker(httpSession, r, emaillinks.LinkMarkerFlowAccountActivate)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 	if rejection != "" {
-		refuseActivationLink(httpHelper, w, r, string(rejection))
+		refuseActivationLink(pageRenderer, w, r, string(rejection))
 		return
 	}
 
@@ -254,11 +254,11 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 	// request established.
 	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(r.Context(), nil, marker.CodeHash)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 	if preRegistration == nil {
-		refuseActivationLink(httpHelper, w, r, activationReasonCodeNoLongerOutstanding)
+		refuseActivationLink(pageRenderer, w, r, activationReasonCodeNoLongerOutstanding)
 		return
 	}
 
@@ -268,7 +268,7 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 		PasswordHash:  preRegistration.PasswordHash,
 	})
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -282,7 +282,7 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 	// the second insert, so exactly one account exists either way.
 	err = database.DeletePreRegistration(r.Context(), nil, preRegistration.Id)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
@@ -302,8 +302,8 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 		"adminConsoleBaseUrl": adminConsoleBaseURL,
 	}
 
-	err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind)
+	err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }

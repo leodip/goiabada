@@ -319,13 +319,13 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 // comes back, since the link carries the code and no email address (#112), so a hash of
 // anything else leaves the new user unable to set a password at all.
 func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_handlers.NewEmailSender(t)
 
-	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
@@ -351,7 +351,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)
 	auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.Anything).Return()
 	var emailedLink string
-	httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 		"/emails/email_newuser_set_password.html", mock.Anything).
 		Run(func(args mock.Arguments) {
 			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
@@ -379,7 +379,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
 		"the emailed link must be the shared builder's output for the code that was issued")
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	emailSender.AssertExpectations(t)
 }
@@ -400,13 +400,13 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 // wraps, the user creator wraps -- because a bare type assertion or a comparison against the
 // outermost error would pass on an untouched sentinel and fail on the real one.
 func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_handlers.NewEmailSender(t)
 
-	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
@@ -444,7 +444,7 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	assert.Equal(t, "EMAIL_ALREADY_EXISTS", resp["error_code"],
 		"the caller routes on the status, but the code is what tells it which field to change")
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	userCreator.AssertExpectations(t)
 }
@@ -454,13 +454,13 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 // retry with a different address; told 500, it reports the failure, which is the right thing to do
 // when the write failed for a reason no address change fixes.
 func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_handlers.NewEmailSender(t)
 
-	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
@@ -491,7 +491,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", resp["error_code"])
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
 	userCreator.AssertExpectations(t)
 }
@@ -577,13 +577,13 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			wantMessage: "setPasswordType"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			database := mocks_data.NewDatabase(t)
 			userCreator := mocks_accounthandlers.NewUserCreator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			emailSender := mocks_handlers.NewEmailSender(t)
 
-			handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+			handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
 				accountvalidation.NewEmailValidator(database),
 				accountvalidation.NewProfileValidator(database),
 				accountvalidation.NewPasswordValidator(),
@@ -621,7 +621,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			}
 			if tc.wantEmail {
 				database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)
-				httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 					"/emails/email_newuser_set_password.html", mock.Anything).
 					Return(&bytes.Buffer{}, nil)
 				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -654,7 +654,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			// The refusals must not have created anything, and the password arm must not have
 			// sent mail. Both are what mockery's strict expectations assert here: a call this
 			// table did not register fails the case.
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			database.AssertExpectations(t)
 			userCreator.AssertExpectations(t)
 			emailSender.AssertExpectations(t)

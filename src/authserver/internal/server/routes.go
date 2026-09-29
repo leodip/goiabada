@@ -48,6 +48,8 @@ func (s *Server) initRoutes(root chi.Router) {
 	userCreator := usercreation.NewUserCreator(s.database)
 	emailSender := emaildelivery.NewSender(s.dataCipher)
 
+	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
+	// or handlers.JSONWriter (#435).
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, sessionkeys.AuthServerSessionName)
 
@@ -122,8 +124,8 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
 		// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force)
 		r.With(rateLimiter.LimitROPC).Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
-		r.Get("/logout", handlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
-		r.Post("/logout", handlers.HandleAccountLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
+		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
+		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
 	})
 
 	root.Route("/account", func(r chi.Router) {

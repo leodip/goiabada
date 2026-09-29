@@ -287,7 +287,7 @@ func HandleAPIUserOTPPut(
 
 // HandleAPIUserCreatePost - POST /api/v1/admin/users/create
 func HandleAPIUserCreatePost(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	database usersCrudDatabase,
 	userCreator UserCreator,
 	emailValidator EmailValidator,
@@ -500,7 +500,7 @@ func HandleAPIUserCreatePost(
 			// "set your password" email in English. Once the user logs in
 			// and chooses a locale, subsequent emails honor it.
 			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, createdUser.Locale, "en"))
-			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
+			buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
