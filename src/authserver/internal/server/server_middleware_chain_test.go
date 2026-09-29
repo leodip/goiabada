@@ -18,11 +18,14 @@ import (
 // chain's eight adjacencies have no other observable watching them (#335).
 func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	s := newStaticBranchTestServer(mocks_data.NewDatabase(t))
-	app := s.initMiddleware()
+	branches := s.initMiddleware()
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
-	app.Get("/auth/authorize", func(w http.ResponseWriter, _ *http.Request) {
+	probe := func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}
+	branches.pages.Get("/auth/authorize", probe)
+	branches.protocol.Post("/auth/token", probe)
+	branches.api.Get("/api/public/settings", probe)
 
 	chains := make(map[string][]string)
 	err := chi.Walk(s.router, func(_ string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
@@ -48,7 +51,9 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/middleware.MiddlewareSkipCsrf.func1",
 		"github.com/leodip/goiabada/core/middleware.MiddlewareCsrf.func1",
 	}
+	// The same chain on all three branches, which differ only in how its faults are answered.
 	wantApp := append(append([]string{}, wantRoot...),
+		"github.com/leodip/goiabada/authserver/internal/middleware.ServerFaults.Recoverer-fm",
 		"github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareSettings.func1",
 		"github.com/leodip/goiabada/core/middleware.MiddlewareCookieReset.func1",
 		"github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareSessionIdentifier.func1",
@@ -56,7 +61,9 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	)
 
 	require.Contains(t, chains, "/static/*", "the static route must have been walked")
-	require.Contains(t, chains, "/auth/authorize", "the application route must have been walked")
 	assert.Equal(t, wantRoot, chains["/static/*"])
-	assert.Equal(t, wantApp, chains["/auth/authorize"])
+	for _, route := range []string{"/auth/authorize", "/auth/token", "/api/public/settings"} {
+		require.Contains(t, chains, route, "the application route must have been walked")
+		assert.Equal(t, wantApp, chains[route], route)
+	}
 }

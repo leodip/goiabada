@@ -43,7 +43,7 @@ func TestMiddlewareSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 		Return(&models.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
 
 	reached := false
-	handler := MiddlewareSettings(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := MiddlewareSettings(db, PageFaults())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reached = true
 	}))
 

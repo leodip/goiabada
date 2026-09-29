@@ -22,7 +22,7 @@ func TestMiddlewareSettings(t *testing.T) {
 		}
 		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(expectedSettings, nil)
 
-		middleware := MiddlewareSettings(mockDB)
+		middleware := MiddlewareSettings(mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -40,7 +40,7 @@ func TestMiddlewareSettings(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
-		middleware := MiddlewareSettings(mockDB)
+		middleware := MiddlewareSettings(mockDB, PageFaults())
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()

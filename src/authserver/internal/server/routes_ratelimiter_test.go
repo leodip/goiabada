@@ -167,7 +167,9 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 		templateFS:   web.TemplateFS(),
 		cfg:          cfg,
 	}
-	s.initRoutes(s.router)
+	// Every branch is the bare router: these tests drive the registrations rather than the
+	// application chain, and put the settings on each request's context themselves.
+	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router})
 	return s
 }
 

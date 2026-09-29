@@ -26,7 +26,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(MiddlewareSettings(mockDB)(http.HandlerFunc(
+	chimiddleware.RequestID(MiddlewareSettings(mockDB, PageFaults())(http.HandlerFunc(
 		func(http.ResponseWriter, *http.Request) {
 			t.Error("the handler must not be reached when the settings cannot be read")
 		}))).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
