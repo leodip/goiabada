@@ -63,6 +63,13 @@ const invalidTokenDescription = "The access token is invalid."
 //
 // What each request is answered, and why (#435):
 //
+//   - A form body that does not parse answers 400 invalid_request, before either method is
+//     looked at. Section 3.1 names a request that "is otherwise malformed" invalid_request, and a
+//     body that cannot be read cannot say whether it carries a second token: url.ParseQuery keeps
+//     the pairs it could read, so admitting the header beside it admitted a request that sent the
+//     token by two methods, and admitting a readable access_token beside it acted on half a body.
+//     The token endpoint answers the same body the same way, a body cut at the request-body limit
+//     included (#426).
 //   - An access_token body parameter sent more than once answers 400 invalid_request, which
 //     section 3.1 defines for a request that "repeats the same parameter". Before #435 the first
 //     copy silently won.
@@ -81,8 +88,13 @@ func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Hand
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			headerToken, inHeader := bearerTokenFromHeader(r.Header.Get("Authorization"))
-			bodyToken, inBody, repeated := bearerTokenFromForm(r)
+			bodyToken, inBody, repeated, err := bearerTokenFromForm(r)
 
+			if err != nil {
+				slog.WarnContext(r.Context(), "rejecting bearer request: the request body could not be parsed", "error", err)
+				m.refusals.invalidRequest(w, r, "The request body could not be parsed.")
+				return
+			}
 			if repeated {
 				slog.WarnContext(r.Context(), "rejecting bearer request: the access_token parameter was repeated")
 				m.refusals.invalidRequest(w, r, "The access_token parameter must be sent once.")
@@ -139,20 +151,21 @@ func bearerTokenFromHeader(authorization string) (string, bool) {
 // POST whose body is application/x-www-form-urlencoded, and reports whether the parameter was
 // present, empty included, and whether it was sent more than once. The body alone is read, never
 // the query: r.PostForm, not r.Form, since a token in the URL is section 2.3's method, which this
-// server does not support. A body that does not parse presents nothing, as before #435.
-func bearerTokenFromForm(r *http.Request) (token string, present bool, repeated bool) {
+// server does not support. A body that does not parse is returned as the error and nothing else,
+// never as the pairs ParseForm managed to read.
+func bearerTokenFromForm(r *http.Request) (token string, present bool, repeated bool, err error) {
 	if r.Method != http.MethodPost ||
 		!strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
-		return "", false, false
+		return "", false, false, nil
 	}
 	if err := r.ParseForm(); err != nil {
-		return "", false, false
+		return "", false, false, err
 	}
 	values := r.PostForm["access_token"]
 	if len(values) == 0 {
-		return "", false, false
+		return "", false, false, nil
 	}
-	return values[0], true, len(values) > 1
+	return values[0], true, len(values) > 1, nil
 }
 
 // isAccessTokenForAuthServer admits a validly signed token as a bearer credential only when it
