@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -33,7 +34,6 @@ type dynamicClientRegistrationDatabase interface {
 
 // HandleDynamicClientRegistrationPost implements RFC 7591 §3 Client Registration Endpoint
 func HandleDynamicClientRegistrationPost(
-	httpHelper HttpHelper,
 	database dynamicClientRegistrationDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
@@ -188,11 +188,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 13. Send response
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Pragma", "no-cache")
-		w.WriteHeader(http.StatusCreated)
-		httpHelper.EncodeJson(w, r, response)
+		writeDCRResponse(w, r, response)
 	}
 }
 
@@ -460,4 +456,27 @@ func writeDCRError(w http.ResponseWriter, errorCode, description string, statusC
 		ErrorDescription: customerrors.ConformErrorDescription(description),
 	}
 	_ = json.NewEncoder(w).Encode(errorResp)
+}
+
+// writeDCRResponse writes RFC 7591 section 3.2.1's 201 with the registered metadata.
+//
+// The body is encoded before anything is written, so an encoding failure can still be answered in
+// section 3.2.2's envelope with a 500 rather than after a committed 201, where it could only have
+// been logged. Once the 201 is out a failed write has nothing left to answer, so it is recorded at
+// Debug, as the health check records its own (#435).
+func writeDCRResponse(w http.ResponseWriter, r *http.Request, response any) {
+	body, err := json.Marshal(response)
+	if err != nil {
+		apiresponse.LogInternalServerError(r, errs.Wrap(err, "unable to encode the registration response"))
+		writeDCRError(w, "server_error", "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	w.WriteHeader(http.StatusCreated)
+	if _, err := w.Write(append(body, '\n')); err != nil {
+		slog.DebugContext(r.Context(), "unable to write the registration response", "error", err)
+	}
 }

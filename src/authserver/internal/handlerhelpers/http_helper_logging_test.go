@@ -303,17 +303,16 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 		"the id on the wire and the id on the log line have to be the same string")
 }
 
-// The silence is scoped to a status somebody chose. A 4xx detail is a client's mistake and stays
-// silent, which is the row below; an explicit 500 stays silent too, because its one production
-// builder is handler_token.go's jsonErrorConformed, which writes the record and puts the request id
-// in the description before it ever reaches here. Logging it a second time here is the defect this
-// row exists to catch.
-func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
+// An explicit 500 is recorded here like every other 500. This row reverses the one it replaces on
+// purpose: an explicit 500 detail used to be silent because the token endpoint's jsonErrorConformed
+// logged it and put the request id in its sentence before handing it over, and #435 deleted that
+// wrapper, so a silent explicit 500 would now be a server fault with no log line at all. The id on
+// the record and the id on the wire have to be the same string (#279 decision 9, #435).
+func TestJsonError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error",
-		"An unexpected server error has occurred. Request Id: already-in-the-sentence",
+	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "The operation failed.",
 		http.StatusInternalServerError)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -324,12 +323,167 @@ func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Empty(t, logs.Records(), "the caller that chose this status owns the record")
+
+	record, ok := theOneErrorRecord(t, logs)
+	if !ok {
+		return
+	}
+	assert.Equal(t, "internal server error", record.Message)
+	if _, isError := loggedErrorOf(t, record); !isError {
+		return
+	}
+	requestId, isString := record.Attrs["request_id"].(string)
+	require.True(t, isString, "request_id must be a string attribute")
+	require.NotEmpty(t, requestId)
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	assert.Equal(t, "An unexpected server error has occurred. Request Id: already-in-the-sentence",
-		response["error_description"], "and owns the sentence, so nothing is appended to it")
+	assert.Equal(t, "server_error", response["error"])
+	assert.Equal(t, "The operation failed. Request Id: "+requestId, response["error_description"],
+		"the id on the wire and the id on the log line have to be the same string")
+}
+
+// assertConformsToNQSCHAR fails on any byte RFC 6749 Appendix A.8 excludes from an
+// error_description: error-description = 1*NQSCHAR, NQSCHAR = %x20-21 / %x23-5B / %x5D-7E.
+func assertConformsToNQSCHAR(t *testing.T, description string) {
+	t.Helper()
+
+	for i := 0; i < len(description); i++ {
+		b := description[i]
+		conforming := (b >= 0x20 && b <= 0x21) || (b >= 0x23 && b <= 0x5B) || (b >= 0x5D && b <= 0x7E)
+		assert.True(t, conforming,
+			"byte %d of %q is 0x%02x, which RFC 6749 Appendix A.8 excludes from error-description",
+			i, description, b)
+	}
+}
+
+// The writer's conformance table. Every caller of JsonError is a protocol endpoint, and both of its
+// branches interpolate text somebody else chose: a detail's description carries request text, and
+// the request id is whatever the caller sent as X-Request-Id, which chi's RequestID adopts verbatim
+// and which a caller need not authenticate to send. So one conform call runs on the final
+// description, after the id is appended, and these rows hold it there (#213, #435).
+//
+// In the generic row every byte of the header survives to the handler: U+1F4A3 and the Cyrillic
+// pair are above 0x7E, the double quote is 0x22 and the backslash is 0x5C, and all four are outside
+// NQSCHAR. One '?' per offending rune, not per byte, and the ASCII around them is untouched, so the
+// id still correlates the response with the log. The last row is the one that fails if conformance
+// rewrites a description that already conforms.
+func TestJsonError_ConformsTheFinalDescription(t *testing.T) {
+	const genericSentence = "An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: "
+
+	tests := []struct {
+		name            string
+		requestId       string
+		err             error
+		wantStatus      int
+		wantCode        string
+		wantDescription string
+	}{
+		{
+			name:            "the generic branch conforms the adopted request id",
+			requestId:       "caller\U0001F4A3id\"x\\yаб",
+			err:             errors.New("malformed form body"),
+			wantStatus:      http.StatusInternalServerError,
+			wantCode:        "server_error",
+			wantDescription: genericSentence + "caller?id?x?y??",
+		},
+		{
+			name:      "a chosen 400 detail's description is conformed",
+			requestId: "goiabada/abc123-000042",
+			err: customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				"Scope \"café\\x\" is not recognised.", http.StatusBadRequest),
+			wantStatus:      http.StatusBadRequest,
+			wantCode:        "invalid_scope",
+			wantDescription: "Scope ?caf??x? is not recognised.",
+		},
+		{
+			name:            "a status-less detail is conformed after the request id is appended",
+			requestId:       "id\"1",
+			err:             customerrors.NewErrorDetail("server_error", "The operation failed."),
+			wantStatus:      http.StatusInternalServerError,
+			wantCode:        "server_error",
+			wantDescription: "The operation failed. Request Id: id?1",
+		},
+		{
+			name:      "a description over 512 bytes is cut to 512",
+			requestId: "goiabada/abc123-000042",
+			err: customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				strings.Repeat("a", 600), http.StatusBadRequest),
+			wantStatus:      http.StatusBadRequest,
+			wantCode:        "invalid_request",
+			wantDescription: strings.Repeat("a", 509) + "...",
+		},
+		{
+			name:            "a conforming request id passes byte for byte",
+			requestId:       "goiabada/abc123-000042",
+			err:             errors.New("something the endpoint did not expect"),
+			wantStatus:      http.StatusInternalServerError,
+			wantCode:        "server_error",
+			wantDescription: genericSentence + "goiabada/abc123-000042",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			httpHelper := NewHttpHelper(fstest.MapFS{})
+			router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, test.requestId, middleware.GetReqID(r.Context()),
+					"chi must adopt the inbound header verbatim, otherwise this row proves nothing")
+				httpHelper.JsonError(w, r, test.err)
+			})
+
+			req := newRequest("GET", "/", nil)
+			req.Header.Set(middleware.RequestIDHeader, test.requestId)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, test.wantStatus, w.Code)
+			assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+			assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+			assert.Equal(t, "no-cache", w.Header().Get("Pragma"))
+
+			var response map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+			assert.Equal(t, test.wantCode, response["error"])
+			assert.Equal(t, test.wantDescription, response["error_description"])
+			assertConformsToNQSCHAR(t, response["error_description"])
+		})
+	}
+}
+
+// The token endpoint's half of RFC 6749 section 5.2: a confidential client that presented Basic
+// credentials and failed must be answered 401 with a WWW-Authenticate header, and the sites in
+// token_validator.go that build that refusal reach the wire through this writer. Built with
+// customerrors directly, byte for byte what the validator returns, and wrapped the way the token
+// endpoint's validator error arrives. A chosen 401 is a client's mistake, so nothing is logged.
+func TestJsonError_CarriesTheBasicChallengeThrough(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	httpHelper := NewHttpHelper(fstest.MapFS{})
+
+	refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+		"Client authentication failed. Please review your client_secret.",
+		http.StatusUnauthorized).WithWWWAuthenticate("Basic")
+
+	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.JsonError(w, r, errs.Wrap(refusal, "unable to validate the token request"))
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, newRequest("GET", "/", nil))
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
+	assert.Equal(t, "Basic", res.Header.Get("WWW-Authenticate"),
+		"a failed Basic credential must still carry the challenge RFC 6749 section 5.2 requires")
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, "invalid_client", response["error"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.",
+		response["error_description"])
+	assert.Empty(t, logs.Records(), "a refused credential is not a server fault")
 }
 
 // Decision 6's regression guard at this writer. An *ErrorDetail that something wrapped on the way

@@ -37,19 +37,19 @@ func HandleUserInfoGetPost(
 		// Authentication and authorization handled by middleware
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("unable to get validated token from context"))
+			httpHelper.JsonError(w, r, errs.New("unable to get validated token from context"))
 			return
 		}
 
 		sub := jwtToken.GetStringClaim("sub")
 		if len(sub) == 0 {
-			httpHelper.InternalServerError(w, r, errs.New("unable to get the sub claim from the access token"))
+			httpHelper.JsonError(w, r, errs.New("unable to get the sub claim from the access token"))
 			return
 		}
 
 		user, err := database.GetUserBySubject(r.Context(), nil, sub)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -83,19 +83,19 @@ func HandleUserInfoGetPost(
 
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		err = database.GroupsLoadAttributes(r.Context(), nil, user.Groups)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
 		err = database.UserLoadAttributes(r.Context(), nil, user)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			httpHelper.JsonError(w, r, err)
 			return
 		}
 
@@ -108,8 +108,9 @@ func HandleUserInfoGetPost(
 		scopes := strings.Split(jwtToken.GetStringClaim("scope"), " ")
 
 		// The two fields after the port are this endpoint's side of the two divergences
-		// userclaims keeps as inputs: the base URL is read from the global configuration here
-		// and injected in issuance, and all three filter sites read the ID token's include flag
+		// userclaims keeps as inputs: the base URL is this handler's parameter, which routes.go
+		// supplies from the loaded configuration (#434), and is injected in issuance too, and all
+		// three filter sites read the ID token's include flag
 		// (#387 decision 5). updated_at was a third until it turned out to be a defect rather
 		// than a difference: it now rides with the profile scope at every site, which is what
 		// this endpoint already did.

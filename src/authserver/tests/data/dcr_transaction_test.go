@@ -46,7 +46,7 @@ func (d *dcrWriteRecorder) CreateRedirectURI(ctx context.Context, tx *sql.Tx, re
 	return d.Database.CreateRedirectURI(ctx, tx, redirectURI)
 }
 
-func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder, httpHelper *mocks_handlers.HttpHelper,
+func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder,
 	auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
 
 	t.Helper()
@@ -62,7 +62,7 @@ func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder, httpHelper *m
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
-	handlers.HandleDynamicClientRegistrationPost(httpHelper, db, auditLogger, dataCipher).ServeHTTP(rr, req)
+	handlers.HandleDynamicClientRegistrationPost(db, auditLogger, dataCipher).ServeHTTP(rr, req)
 	return rr
 }
 
@@ -73,8 +73,8 @@ func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder, httpHelper *m
 func TestDCR_AFailedSecondRedirectURIWriteLeavesNoClientAndNoRedirectURI(t *testing.T) {
 	db := &dcrWriteRecorder{Database: database, failAt: 2}
 
-	// Strict mocks with no expectations: neither the audit event nor the 201 may happen.
-	rr := registerThroughTheHandler(t, db, mocks_handlers.NewHttpHelper(t), mocks_handlers.NewAuditLogger(t))
+	// A strict mock with no expectations: the audit event may not happen, and the status says no 201 did.
+	rr := registerThroughTheHandler(t, db, mocks_handlers.NewAuditLogger(t))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	require.NotNil(t, db.created, "the client write was reached")
@@ -94,12 +94,10 @@ func TestDCR_AFailedSecondRedirectURIWriteLeavesNoClientAndNoRedirectURI(t *test
 func TestDCR_ARegistrationWithNoFailureCommitsTheClientAndItsRedirectURIs(t *testing.T) {
 	db := &dcrWriteRecorder{Database: database}
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
 
-	rr := registerThroughTheHandler(t, db, httpHelper, auditLogger)
+	rr := registerThroughTheHandler(t, db, auditLogger)
 
 	assert.Equal(t, http.StatusCreated, rr.Code)
 	require.NotNil(t, db.created)

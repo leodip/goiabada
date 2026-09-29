@@ -40,14 +40,14 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	serve := func(t *testing.T, limit int, httpHelper *mocks_handlers.HttpHelper, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
+	serve := func(t *testing.T, limit int, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/connect/register", nil)
 		req.Body = cutBody(rr, string(body), limit)
 		req.Header.Set("Content-Type", "application/json")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
-		HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger, testDataCipher).ServeHTTP(rr, req)
+		HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 		return rr
 	}
 
@@ -59,20 +59,18 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
 
-		httpHelper := mocks_handlers.NewHttpHelper(t)
-		httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.MatchedBy(func(response oidc.DynamicClientRegistrationResponse) bool {
-			return response.ClientName == "A Test Client"
-		})).Return().Once()
-
-		rr := serve(t, len(body), httpHelper, database, auditLogger)
+		rr := serve(t, len(body), database, auditLogger)
 
 		assert.Equal(t, http.StatusCreated, rr.Code)
+		var response oidc.DynamicClientRegistrationResponse
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+		assert.Equal(t, "A Test Client", response.ClientName)
 	})
 
 	t.Run("one byte short it is refused and nothing is written", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		rr := serve(t, len(body)-1, mocks_handlers.NewHttpHelper(t), database, mocks_handlers.NewAuditLogger(t))
+		rr := serve(t, len(body)-1, database, mocks_handlers.NewAuditLogger(t))
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		var envelope oidc.DynamicClientRegistrationError

@@ -32,7 +32,6 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	mocks_data.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
@@ -52,7 +51,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
-	HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger, testDataCipher).ServeHTTP(rr, req)
+	HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 
 	// The envelope is DCR's own, not the API's: "error" and "error_description", as RFC 7591
 	// section 3.2.2 spells them, and no error_code.

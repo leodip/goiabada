@@ -246,15 +246,14 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 		w.WriteHeader(statusCode)
 		errorStr = errorDetail.GetCode()
 		errorDescriptionStr = errorDetail.GetDescription()
-		// A detail that names no status at all is not a wire status anybody chose: it defaulted to
-		// 500 above, and a 500 is a server fault whichever branch of this writer produced it. It
-		// therefore owes the same single record and the same request id as the generic branch
-		// below, or it is a 500 nobody can find a log line for. Every status somebody did choose
-		// stays silent: a 4xx because that is the whole of answering a client's mistake as a
-		// client's mistake, and an explicit 500 because its one production builder,
-		// handler_token.go's jsonErrorConformed, has already written the record and already put
-		// the request id in the description it hands over (#279 decisions 9 and 12).
-		if errorDetail.GetHttpStatusCode() == 0 {
+		// A detail answered 500 is a server fault whichever branch of this writer produced it, and
+		// whether its status was chosen or defaulted from none above. It therefore owes the same
+		// single record and the same request id as the generic branch below, or it is a 500 nobody
+		// can find a log line for. A chosen 4xx stays silent, because that is the whole of answering
+		// a client's mistake as a client's mistake. An explicit 500 was silent until #435, because
+		// the token endpoint's own wrapper logged it before handing it over; that wrapper is gone and
+		// this is the one place a 500 is recorded (#279 decisions 9 and 12, #435).
+		if statusCode == http.StatusInternalServerError {
 			slog.ErrorContext(r.Context(), "internal server error", "error", errs.WithStack(err))
 			errorDescriptionStr = fmt.Sprintf("%s Request Id: %v", errorDescriptionStr, requestId)
 		}
@@ -266,9 +265,16 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
 	}
 
+	// Every caller of this writer is a protocol endpoint (token, userinfo, JWKS, discovery), and RFC
+	// 6749 Appendix A.8 confines error_description to NQSCHAR there. Both branches interpolate text
+	// somebody else chose: a validator's description carries request text, and the request id is
+	// chi's RequestID adopting an inbound X-Request-Id verbatim, so a request carrying
+	// `X-Request-Id: a"b` would put 0x22 on the wire with no validator involved. One call, on the
+	// final description after the id is appended, so no branch reaches the wire unfiltered (#213,
+	// #435).
 	values := map[string]string{
 		"error":             errorStr,
-		"error_description": errorDescriptionStr,
+		"error_description": customerrors.ConformErrorDescription(errorDescriptionStr),
 	}
 	err = json.NewEncoder(w).Encode(values)
 	if err != nil {

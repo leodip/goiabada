@@ -303,17 +303,16 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 		"the id on the wire and the id on the log line have to be the same string")
 }
 
-// The silence is scoped to a status somebody chose. A 4xx detail is a client's mistake and stays
-// silent, which is the row below; an explicit 500 stays silent too, because its one production
-// builder is handler_token.go's jsonErrorConformed, which writes the record and puts the request id
-// in the description before it ever reaches here. Logging it a second time here is the defect this
-// row exists to catch.
-func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
+// An explicit 500 is recorded here like every other 500. This row reverses the one it replaces on
+// purpose: an explicit 500 detail was silent because the auth server's token endpoint logged it
+// before handing it over, a builder this binary has not reached since #385 and which #435 deleted,
+// so a silent explicit 500 would be a server fault with no log line at all. The id on the record
+// and the id on the wire have to be the same string (#279 decision 9, #435).
+func TestJsonError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error",
-		"An unexpected server error has occurred. Request Id: already-in-the-sentence",
+	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "The operation failed.",
 		http.StatusInternalServerError)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -324,12 +323,24 @@ func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 	router.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Empty(t, logs.Records(), "the caller that chose this status owns the record")
+
+	record, ok := theOneErrorRecord(t, logs)
+	if !ok {
+		return
+	}
+	assert.Equal(t, "internal server error", record.Message)
+	if _, isError := loggedErrorOf(t, record); !isError {
+		return
+	}
+	requestId, isString := record.Attrs["request_id"].(string)
+	require.True(t, isString, "request_id must be a string attribute")
+	require.NotEmpty(t, requestId)
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	assert.Equal(t, "An unexpected server error has occurred. Request Id: already-in-the-sentence",
-		response["error_description"], "and owns the sentence, so nothing is appended to it")
+	assert.Equal(t, "server_error", response["error"])
+	assert.Equal(t, "The operation failed. Request Id: "+requestId, response["error_description"],
+		"the id on the wire and the id on the log line have to be the same string")
 }
 
 // Decision 6's regression guard at this writer. An *ErrorDetail that something wrapped on the way

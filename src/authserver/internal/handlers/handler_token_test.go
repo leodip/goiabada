@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -13,9 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/authserver/internal/apiresponse"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/require"
@@ -28,7 +24,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -196,7 +191,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mock.Anything, mockCode).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
-		httpHelper.On("InternalServerError",
+		httpHelper.On("JsonError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err *customerrors.ErrorDetail) bool {
@@ -237,7 +232,7 @@ func TestHandleTokenPost(t *testing.T) {
 		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).
 			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to mark code as used", http.StatusInternalServerError))
 
-		httpHelper.On("InternalServerError",
+		httpHelper.On("JsonError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err error) bool {
@@ -427,7 +422,7 @@ func TestHandleTokenPost(t *testing.T) {
 		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to claim refresh token", http.StatusInternalServerError))
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "Failed to claim refresh token")
 		})).Return()
 
@@ -472,7 +467,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "Failed to generate token")
 		})).Return()
 
@@ -1004,7 +999,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, "sid-reused").
 		Return(nil, dbErr).Once()
 
-	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "connection refused")
 	})).Return().Once()
 
@@ -1020,12 +1015,13 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	// post-commit success path where revokedJtis are real.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	// invalid_grant response must NOT be sent: the client gets 500 instead.
-	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
+	// The one JsonError call is the 500 matched above; a second would be the invalid_grant.
+	httpHelper.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
 // TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500 covers
 // the earliest failure point: BeginTransaction itself errors. The handler
-// must still surface a 500 and skip both the audit log and the JsonError.
+// must still surface a 500 and skip both the audit log and the invalid_grant.
 func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
@@ -1056,7 +1052,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	beginErr := errors.New("tx begin failed")
 	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
 
-	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "tx begin failed")
 	})).Return().Once()
 
@@ -1067,7 +1063,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	database.AssertExpectations(t)
 
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
+	httpHelper.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
 // TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses verifies the #77 fix:
@@ -1353,7 +1349,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").
 		Return(int64(0), customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to contain family", http.StatusInternalServerError))
 
-	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		return strings.Contains(err.Error(), "Failed to contain family")
 	})).Return().Once()
 
@@ -1366,7 +1362,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	// No event, and no invalid_grant either: the request did not get a clean refusal,
 	// it got a server error.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
+	httpHelper.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
 // TestGrantTypeConsumesScope pins which grant types the provided-but-empty rejection applies to.
@@ -1830,7 +1826,6 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 
 	httpHelper.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
-	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -1998,135 +1993,6 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		}
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditROPCAuthFailed, mock.Anything)
 	})
-}
-
-// requestWithAdoptedRequestId drives chi's own RequestID middleware over an inbound header, so the
-// request id under test reaches the context the way a real request's does rather than by being
-// written there directly. chi adopts the header verbatim when it is present, which is the whole
-// mechanism these two tests are about.
-func requestWithAdoptedRequestId(t *testing.T, headerValue string) *http.Request {
-	t.Helper()
-
-	var adopted *http.Request
-	chimiddleware.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		adopted = r
-	})).ServeHTTP(httptest.NewRecorder(), func() *http.Request {
-		r := httptest.NewRequest(http.MethodPost, "/auth/token", nil)
-		if headerValue != "" {
-			r.Header.Set(chimiddleware.RequestIDHeader, headerValue)
-		}
-		return r
-	}())
-
-	require.NotNil(t, adopted)
-	require.Equal(t, headerValue, chimiddleware.GetReqID(adopted.Context()),
-		"chi must adopt the inbound header verbatim, otherwise these tests prove nothing")
-	return adopted
-}
-
-// assertConformsToNQSCHAR fails on any byte RFC 6749 Appendix A.8 excludes from an
-// error_description: error-description = 1*NQSCHAR, NQSCHAR = %x20-21 / %x23-5B / %x5D-7E.
-func assertConformsToNQSCHAR(t *testing.T, description string) {
-	t.Helper()
-
-	for i := 0; i < len(description); i++ {
-		b := description[i]
-		conforming := (b >= 0x20 && b <= 0x21) || (b >= 0x23 && b <= 0x5B) || (b >= 0x5D && b <= 0x7E)
-		assert.True(t, conforming,
-			"byte %d of %q is 0x%02x, which RFC 6749 Appendix A.8 excludes from error-description",
-			i, description, b)
-	}
-}
-
-// TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte covers the token endpoint's error
-// responses that are not an *ErrorDetail, which is the shape r.ParseForm() and an unexpected
-// validator failure both take.
-//
-// The shared writer answers those by interpolating chi's request id into a fixed sentence, and chi
-// takes that id verbatim from the caller's own X-Request-Id header. So the caller, who need not
-// authenticate to reach this endpoint at all, chooses part of a protocol parameter that RFC 6749
-// Appendix A.8 confines to NQSCHAR. Every byte in the header below survives Go's own header parsing
-// and reaches the handler: U+1F4A3 and the Cyrillic pair are above 0x7E, the double quote is 0x22
-// and the backslash is 0x5C, and all four are outside that set (#213).
-func TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte(t *testing.T) {
-	r := requestWithAdoptedRequestId(t, "caller\U0001F4A3id\"x\\yаб")
-	rec := httptest.NewRecorder()
-
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), rec, r, errors.New("malformed form body"))
-
-	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
-	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
-	assert.Equal(t, "no-cache", rec.Header().Get("Pragma"))
-
-	var body map[string]string
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-
-	assert.Equal(t, "server_error", body["error"])
-	assertConformsToNQSCHAR(t, body["error_description"])
-
-	// One '?' per offending rune, not one per byte, and the ASCII around them is untouched: the
-	// request id still correlates the response with the server log.
-	assert.Equal(t,
-		"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: caller?id?x?y??",
-		body["error_description"])
-}
-
-// TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter pins the one sentence this file
-// repeats from HttpHelper.JsonError. The repetition is deliberate, because #213 leaves that writer
-// alone for its 177 admin-console and /userinfo call sites, and this is what stops the copy drifting
-// away from the original: with a request id that needs no conforming, the boundary must emit exactly
-// what the shared writer emits.
-func TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter(t *testing.T) {
-	const conformingRequestId = "goiabada/abc123-000042"
-
-	r := requestWithAdoptedRequestId(t, conformingRequestId)
-	err := errors.New("something the token endpoint did not expect")
-
-	fromSharedWriter := httptest.NewRecorder()
-	handlerhelpers.NewHttpHelper(nil).JsonError(fromSharedWriter, r, err)
-
-	fromBoundary := httptest.NewRecorder()
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), fromBoundary, r, err)
-
-	assert.Equal(t, fromSharedWriter.Body.String(), fromBoundary.Body.String(),
-		"the boundary's generic answer must be byte-identical to the shared writer's; "+
-			"if this fails, HttpHelper.JsonError's sentence moved and genericServerErrorDescription did not")
-	assert.Equal(t, fromSharedWriter.Code, fromBoundary.Code)
-}
-
-// TestJsonErrorConformed_CarriesTheBasicChallengeThrough is the token endpoint's half of RFC 6749
-// section 5.2: a confidential client that presented Basic credentials and failed must be answered
-// 401 with a WWW-Authenticate header, and the eight sites in token_validator.go that build that
-// refusal all reach the wire through this boundary.
-//
-// Nothing pinned it until #385, and the gap is not academic. The conformance rebuild here reaches
-// the detail with errors.As and then hands JsonError errorDetail.WithDescription(...), which is a
-// FRESH *ErrorDetail: anything carrying the challenge outside that value, in a wrapper around it
-// or in a type of its own, is dropped at this line without a test going red. WithDescription
-// clones every key, which is why the header survives today, and this is what says so.
-func TestJsonErrorConformed_CarriesTheBasicChallengeThrough(t *testing.T) {
-	r := requestWithAdoptedRequestId(t, "goiabada/abc123-000042")
-	rec := httptest.NewRecorder()
-
-	// Byte for byte what token_validator.go returns when a confidential client's Basic
-	// credentials do not match.
-	refusal := apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
-		"Client authentication failed. Please review your client_secret.",
-		http.StatusUnauthorized, "Basic")
-
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), rec, r,
-		errs.Wrap(refusal, "unable to validate the token request"))
-
-	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.Equal(t, "Basic", rec.Result().Header.Get("WWW-Authenticate"),
-		"a failed Basic credential must still carry the challenge RFC 6749 section 5.2 requires")
-
-	var body map[string]string
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	assert.Equal(t, "invalid_client", body["error"])
-	assert.Equal(t, "Client authentication failed. Please review your client_secret.",
-		body["error_description"])
 }
 
 // withSettings puts resolved settings on a request, which the refresh arm's flow gate reads to

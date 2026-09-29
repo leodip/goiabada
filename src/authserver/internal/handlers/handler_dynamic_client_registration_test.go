@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -320,7 +322,7 @@ func TestValidateDCRRedirectURIs_Bounds(t *testing.T) {
 // one made inside the transaction and not one moved back outside it.
 var dcrTx = &sql.Tx{}
 
-func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest, httpHelper *mocks_handlers.HttpHelper,
+func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest,
 	database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
 
 	t.Helper()
@@ -332,7 +334,7 @@ func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest, httpH
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
-	HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger, testDataCipher).ServeHTTP(rr, req)
+	HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 	return rr
 }
 
@@ -341,6 +343,18 @@ func decodeDCRError(t *testing.T, rr *httptest.ResponseRecorder) oidc.DynamicCli
 	var envelope oidc.DynamicClientRegistrationError
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &envelope))
 	return envelope
+}
+
+// decodeDCRResponse reads the 201 body the handler wrote, with the headers RFC 7591 section 3.2.1
+// and RFC 6749 section 5.1 require on a response carrying a client secret.
+func decodeDCRResponse(t *testing.T, rr *httptest.ResponseRecorder) oidc.DynamicClientRegistrationResponse {
+	t.Helper()
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
+	assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
+	var response oidc.DynamicClientRegistrationResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	return response
 }
 
 var confidentialTwoURIRegistration = oidc.DynamicClientRegistrationRequest{
@@ -353,7 +367,6 @@ var confidentialTwoURIRegistration = oidc.DynamicClientRegistrationRequest{
 func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	var events []string
 	note := func(event string) { events = append(events, event) }
@@ -371,12 +384,15 @@ func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsIn
 	}
 	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).
 		Run(func(mock.Arguments) { note("audit") }).Return().Once()
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-	rr := serveDCR(t, confidentialTwoURIRegistration, httpHelper, database, auditLogger)
+	rr := serveDCR(t, confidentialTwoURIRegistration, database, auditLogger)
 
 	assert.Equal(t, http.StatusCreated, rr.Code)
 	assert.Equal(t, []string{"begin", "client", "redirect uri", "redirect uri", "commit", "audit"}, events)
+	response := decodeDCRResponse(t, rr)
+	assert.NotEmpty(t, response.ClientID)
+	assert.NotEmpty(t, response.ClientSecret, "a confidential client is answered its secret")
+	assert.Equal(t, confidentialTwoURIRegistration.RedirectURIs, response.RedirectURIs)
 }
 
 // What the compensating delete used to stand for, now the transaction's: the second redirect URI
@@ -385,7 +401,6 @@ func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsIn
 func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	refused := errs.New("the engine refused the second redirect URI")
 	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
@@ -393,7 +408,7 @@ func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(refused).Once()
 
-	rr := serveDCR(t, confidentialTwoURIRegistration, httpHelper, database, auditLogger)
+	rr := serveDCR(t, confidentialTwoURIRegistration, database, auditLogger)
 
 	require.ErrorIs(t, stub.BodyErr, refused, "the body handed the helper the failure, so nothing was committed")
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -401,19 +416,18 @@ func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t
 	assert.Equal(t, "server_error", envelope.Error)
 	assert.Equal(t, "Failed to register client", envelope.ErrorDescription)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	httpHelper.AssertNotCalled(t, "EncodeJson", mock.Anything, mock.Anything, mock.Anything)
+	assert.NotContains(t, rr.Body.String(), "client_id", "no registration is answered")
 }
 
 func TestHandleDynamicClientRegistrationPost_AFailedClientInsertWritesNoRedirectURI(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	refused := errs.New("the engine refused the client")
 	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(refused).Once()
 
-	rr := serveDCR(t, confidentialTwoURIRegistration, httpHelper, database, auditLogger)
+	rr := serveDCR(t, confidentialTwoURIRegistration, database, auditLogger)
 
 	require.ErrorIs(t, stub.BodyErr, refused)
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -427,7 +441,6 @@ func TestHandleDynamicClientRegistrationPost_AFailedClientInsertWritesNoRedirect
 func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublicClientInvariants(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	mocks_data.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.MatchedBy(func(c *models.Client) bool {
@@ -435,16 +448,18 @@ func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublic
 	})).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
-	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
 		ClientName:              "A Public Client",
 		RedirectURIs:            []string{"http://127.0.0.1:8765/callback"},
 		TokenEndpointAuthMethod: "none",
 		GrantTypes:              []string{"authorization_code", "refresh_token"},
-	}, httpHelper, database, auditLogger)
+	}, database, auditLogger)
 
 	assert.Equal(t, http.StatusCreated, rr.Code)
+	response := decodeDCRResponse(t, rr)
+	assert.Equal(t, "none", response.TokenEndpointAuthMethod)
+	assert.Empty(t, response.ClientSecret, "a public client is answered no secret")
 }
 
 // Every refusal is decided before the transaction opens, so none reaches RunInTransaction: the
@@ -480,7 +495,7 @@ func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 
-			rr := serveDCR(t, tc.request, mocks_handlers.NewHttpHelper(t), database, mocks_handlers.NewAuditLogger(t))
+			rr := serveDCR(t, tc.request, database, mocks_handlers.NewAuditLogger(t))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.Equal(t, tc.code, decodeDCRError(t, rr).Error)
@@ -501,7 +516,7 @@ func TestHandleDynamicClientRegistrationPost_ADescriptionEchoingRequestTextIsCon
 	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{"https://client.example.com/cb"},
 		GrantTypes:   []string{grantType},
-	}, mocks_handlers.NewHttpHelper(t), mocks_data.NewDatabase(t), mocks_handlers.NewAuditLogger(t))
+	}, mocks_data.NewDatabase(t), mocks_handlers.NewAuditLogger(t))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	envelope := decodeDCRError(t, rr)
@@ -514,4 +529,50 @@ func TestHandleDynamicClientRegistrationPost_ADescriptionEchoingRequestTextIsCon
 		assert.True(t, b >= 0x20 && b <= 0x7E && b != '"' && b != '\\',
 			"byte %#x at %d is outside RFC 6749 Appendix A.8's NQSCHAR", b, i)
 	}
+}
+
+// The two tests below drive writeDCRResponse directly, the only tests in this file below the
+// handler seam. DynamicClientRegistrationResponse holds strings, ints and string slices and cannot
+// fail to marshal, so no request reaches either branch through the handler (#435).
+
+// A body that cannot be encoded is answered in RFC 7591 section 3.2.2's envelope with a 500, one
+// record, and no 201: the encode runs before anything is written.
+func TestWriteDCRResponse_AnUnencodableBodyAnswersTheRFC7591Envelope(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	rr := httptest.NewRecorder()
+
+	writeDCRResponse(rr, httptest.NewRequest(http.MethodPost, "/connect/register", nil), func() {})
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	envelope := decodeDCRError(t, rr)
+	assert.Equal(t, "server_error", envelope.Error)
+	assert.Equal(t, "Internal server error", envelope.ErrorDescription)
+
+	records := logs.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelError, records[0].Level)
+	assert.Equal(t, "internal server error", records[0].Message)
+	logged, isError := records[0].Attrs["error"].(error)
+	require.True(t, isError, "the error attribute must carry the error value itself")
+	var unsupported *json.UnsupportedTypeError
+	assert.ErrorAs(t, logged, &unsupported)
+}
+
+// Once the 201 is committed a failed write has nothing left to answer, so it is a Debug record and
+// never an Error one.
+func TestWriteDCRResponse_AFailedWriteIsDebug(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	rr := failingBodyRecorder{httptest.NewRecorder()}
+
+	writeDCRResponse(rr, httptest.NewRequest(http.MethodPost, "/connect/register", nil),
+		oidc.DynamicClientRegistrationResponse{ClientID: "a-client"})
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	records := logs.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelDebug, records[0].Level)
+	assert.Equal(t, "unable to write the registration response", records[0].Message)
+	logged, isError := records[0].Attrs["error"].(error)
+	require.True(t, isError, "the error attribute must carry the error value itself")
+	assert.ErrorIs(t, logged, errBodyWriteRefused)
 }
