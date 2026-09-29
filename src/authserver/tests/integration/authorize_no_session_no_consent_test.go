@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/pquerna/otp/totp"
@@ -120,7 +120,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, models.AcrLevel1, code.AcrLevel)
-	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 }
 
@@ -232,7 +232,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
-	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 }
 
@@ -365,7 +365,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 }
 
@@ -490,7 +490,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 }
 
@@ -623,7 +623,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
 	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 }
 

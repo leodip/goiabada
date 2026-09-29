@@ -1,8 +1,10 @@
-package ceremony
+package oidc
 
-// AuthMethod is one factor a ceremony completed, rendered into the amr claim. It is here beside
-// AuthContext.AuthMethods, the space-separated accumulator that is the only thing in the tree that
-// collects one, and out of core because the admin console authenticates nobody (#385).
+// AuthMethod is one authentication method in the amr claim's vocabulary (OIDC Core 1.0 section 2).
+// Two places produce one: the ceremony's accumulator, AuthContext.AuthMethods, and the password
+// grant, which mints its tokens with pwd. It is here rather than in ceremony because #385's reason
+// for putting it there, that the ceremony was the one collector, stopped holding when the password
+// grant began naming it, and issuance should not import the ceremony for a claim value (#437).
 type AuthMethod int
 
 const (

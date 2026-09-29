@@ -66,7 +66,7 @@ func HandleTokenPost(
 			return
 		}
 
-		grantType := r.PostForm.Get("grant_type")
+		grantType := oidc.GrantType(r.PostForm.Get("grant_type"))
 
 		// Normalize the scope HERE, at the entry point, and not inside the validator. The
 		// placement is load-bearing in both directions:
@@ -101,7 +101,7 @@ func HandleTokenPost(
 		// omitted-scope behaviour differs (client credentials grants everything the client holds,
 		// refresh preserves the original token's scope, ROPC defaults to "openid"), so naming any
 		// one of those would be wrong for the other two.
-		if rawScope != "" && normalizedScope == "" && grantTypeConsumesScope(grantType) {
+		if rawScope != "" && normalizedScope == "" && grantType.ReadsScope() {
 			jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				"The 'scope' parameter was provided but contains no scopes. Either omit it entirely or supply one or more scopes separated by spaces.",
 				http.StatusBadRequest))
@@ -230,7 +230,7 @@ func HandleTokenPost(
 			// credential is read, so it is an invalid_grant that guessed nothing.
 			var errDetail *customerrors.ErrorDetail
 			if errors.As(err, &errDetail) &&
-				input.GrantType == "password" && errDetail.GetCode() == "invalid_grant" &&
+				input.GrantType == oidc.GrantTypePassword && errDetail.GetCode() == "invalid_grant" &&
 				!errors.Is(err, protocolvalidation.ErrClientDisabled) {
 
 				credentialFailures.RecordCredentialFailure(r)
@@ -252,7 +252,7 @@ func HandleTokenPost(
 					// issuance events use: the validator discards the client model on failure. See
 					// the constant's doc comment for what this attests to per grant type.
 					"clientIdentifier": input.ClientId,
-					"grantType":        input.GrantType,
+					"grantType":        input.GrantType.String(),
 					"scope":            input.Scope,
 				})
 			}
@@ -262,7 +262,7 @@ func HandleTokenPost(
 		}
 
 		switch input.GrantType {
-		case "authorization_code":
+		case oidc.GrantTypeAuthorizationCode:
 			// Atomically claim the code (compare-and-set on `used`) BEFORE issuing
 			// any tokens. Redemption spans a read in the validator and this mark, so
 			// a plain read-then-unconditional-update leaves a window where two
@@ -296,7 +296,7 @@ func HandleTokenPost(
 				// already-used code is still detected and fully revoked by the
 				// sequential-reuse path in the validator above (#77).
 				slog.DebugContext(r.Context(), "code could not be claimed, rejecting the redemption",
-					"grant_type", "authorization_code",
+					"grant_type", oidc.GrantTypeAuthorizationCode.String(),
 					"code_id", validateResult.CodeEntity.Id)
 				jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"Code is invalid.", http.StatusBadRequest))
@@ -318,7 +318,7 @@ func HandleTokenPost(
 			jsonWriter.EncodeJson(w, r, tokenResp)
 			return
 
-		case "client_credentials":
+		case oidc.GrantTypeClientCredentials:
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(), settings, validateResult.Client, validateResult.Scope)
 			if err != nil {
 				jsonWriter.JsonError(w, r, err)
@@ -338,7 +338,7 @@ func HandleTokenPost(
 			jsonWriter.EncodeJson(w, r, tokenResp)
 			return
 
-		case "refresh_token":
+		case oidc.GrantTypeRefreshToken:
 			refreshToken := validateResult.RefreshToken
 			if refreshToken.Revoked {
 				// The validation-time read observed this token already revoked, so it is
@@ -395,7 +395,7 @@ func HandleTokenPost(
 					})
 				} else {
 					slog.DebugContext(r.Context(), "revoked refresh token presented, with no live family members to revoke",
-						"grant_type", "refresh_token",
+						"grant_type", oidc.GrantTypeRefreshToken.String(),
 						"refresh_token_id", refreshToken.Id)
 				}
 
@@ -474,7 +474,7 @@ func HandleTokenPost(
 			}
 			if !claimed {
 				slog.DebugContext(r.Context(), "refresh token was no longer live at claim time, rejecting",
-					"grant_type", "refresh_token",
+					"grant_type", oidc.GrantTypeRefreshToken.String(),
 					"refresh_token_id", refreshToken.Id)
 				jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"This refresh token has been revoked.", http.StatusBadRequest))
@@ -551,7 +551,7 @@ func HandleTokenPost(
 			jsonWriter.EncodeJson(w, r, tokenResp)
 			return
 
-		case "password":
+		case oidc.GrantTypePassword:
 			// RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
 			// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 
@@ -649,20 +649,4 @@ func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool) 
 	}
 
 	return credentials[:colonIdx], credentials[colonIdx+1:], true
-}
-
-// grantTypeConsumesScope reports whether a grant type reads the `scope` request parameter.
-//
-// Verified against every use of ValidateTokenRequestInput.Scope in the validator: client
-// credentials, refresh and ROPC read it; the authorization code grant never does, because the
-// scope comes from the stored code. RFC 6749 §4.1.3 does not define `scope` on that request in the
-// first place, so rejecting a malformed one there would break an otherwise valid token exchange
-// for no benefit.
-func grantTypeConsumesScope(grantType string) bool {
-	switch grantType {
-	case "client_credentials", "refresh_token", "password":
-		return true
-	default:
-		return false
-	}
 }

@@ -2253,8 +2253,11 @@ func TestLimitROPC_PerIP(t *testing.T) {
 		// limiter that reached either tier for these would refuse long before the end. The
 		// other grants carry no resource-owner password, so this limiter has nothing to
 		// bound on them; counting them would throttle every token refresh in the deployment
-		// from one host.
-		for _, grant := range []string{"refresh_token", "authorization_code", "client_credentials"} {
+		// from one host. implicit, PASSWORD and the empty grant pin the exact, case-sensitive
+		// match against oidc.GrantTypePassword, the comparison the validator's grant table
+		// applies too (#437).
+		for _, grant := range []string{"refresh_token", "authorization_code", "client_credentials",
+			"implicit", "PASSWORD", ""} {
 			for i := 0; i < ipBudget*2; i++ {
 				code, reached, _ := runROPC(m, grant, "victim@example.com", "app", "203.0.113.7:5000", true)
 				if code != http.StatusTeapot || !reached {

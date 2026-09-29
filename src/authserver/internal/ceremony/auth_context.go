@@ -231,7 +231,7 @@ func (ac *AuthContext) Restart() {
 // the amr claim, once: a method already listed is not added again. It takes an AuthMethod rather
 // than a string, so every value it can store is one String() spells; an out-of-range value, whose
 // String() is "", adds nothing (#436).
-func (ac *AuthContext) AddAuthMethod(method AuthMethod) {
+func (ac *AuthContext) AddAuthMethod(method oidc.AuthMethod) {
 	value := method.String()
 	if value == "" {
 		return

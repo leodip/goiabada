@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -791,7 +792,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.UserId == 1 &&
 				ac.AuthState == ceremony.AuthStateLevel1PasswordCompleted &&
-				ac.AuthMethods == ceremony.AuthMethodPassword.String() &&
+				ac.AuthMethods == oidc.AuthMethodPassword.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// This handler is the only writer of Level1AuthCompleted, so this is the
 				// only unit case that fails if the write is dropped. Without it the gate in

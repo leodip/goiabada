@@ -1422,29 +1422,6 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
-// TestGrantTypeConsumesScope pins which grant types the provided-but-empty rejection applies to.
-// The authorization_code row is the one that matters: it never reads the scope parameter, so
-// rejecting on it would break a valid token exchange.
-func TestGrantTypeConsumesScope(t *testing.T) {
-	testCases := []struct {
-		grantType string
-		want      bool
-	}{
-		{"client_credentials", true},
-		{"refresh_token", true},
-		{"password", true},
-		{"authorization_code", false},
-		{"", false},
-		{"urn:ietf:params:oauth:grant-type:device_code", false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.grantType, func(t *testing.T) {
-			assert.Equal(t, tc.want, grantTypeConsumesScope(tc.grantType))
-		})
-	}
-}
-
 // TestHandleTokenPost_ScopeNormalizationWiring proves the handler normalizes the scope with
 // oidc.NormalizeScope and passes its OUTPUT to the validator, which oidc's own whitespace table
 // cannot show. That table is where the rule is pinned; the rows here are the consumer's (#116).
@@ -1452,6 +1429,10 @@ func TestGrantTypeConsumesScope(t *testing.T) {
 // The validator is mocked with mock.MatchedBy so the scope it receives is captured rather than
 // merely type-checked. Every accepting row returns a validation error afterwards, because what is
 // under test is the input handed over, not what happens next.
+//
+// It is also the handler's consumer test for oidc.GrantType.ReadsScope, whose rows are pinned in
+// oidc's grant table test: the three refusing rows (client_credentials, refresh_token, password)
+// and the authorization_code row that must pass the malformed scope through (#437).
 func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 	// omittedScope distinguishes "no scope parameter in the form" from "scope=<something>".
 	const omittedScope = "\x00omitted\x00"

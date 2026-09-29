@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/oauth"
@@ -175,9 +175,9 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel models.AcrLevel,
 	// anything while it differs from B's "pwd". If a change to this fixture ever stopped A presenting
 	// a second factor, those assertions would keep passing while proving nothing, so the fixture says
 	// out loud what it set up.
-	expectedMethodsA := ceremony.AuthMethodPassword.String()
+	expectedMethodsA := oidc.AuthMethodPassword.String()
 	if aPresentsOtp {
-		expectedMethodsA += " " + ceremony.AuthMethodOTP.String()
+		expectedMethodsA += " " + oidc.AuthMethodOTP.String()
 	}
 	require.Equal(t, expectedMethodsA, sessionsA[0].AuthMethods,
 		"the fixture's whole value is that the previous user's session records methods of its own")
@@ -320,7 +320,7 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 	// provenance: the forbidden value is a value that actually exists in this database, on the row the
 	// ceremony was cookied to. Exact equality rather than Contains, since the failure being pinned is
 	// an extra method arriving from somewhere else.
-	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods,
+	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods,
 		"the code's methods must be what this ceremony proved, not what the browser's previous session held")
 
 	tokenData := redeemCrossUserCode(t, b, b.jar, codeVal)
@@ -345,7 +345,7 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 		{"id_token", idClaims},
 		{"access_token", accessClaims},
 	} {
-		assert.Equal(t, []interface{}{ceremony.AuthMethodPassword.String()}, token.claims["amr"],
+		assert.Equal(t, []interface{}{oidc.AuthMethodPassword.String()}, token.claims["amr"],
 			"%s must carry only the methods this ceremony proved", token.name)
 		assert.Equal(t, code.AcrLevel.String(), token.claims["acr"],
 			"%s must carry the acr the ceremony recorded on its own code", token.name)

@@ -505,6 +505,16 @@ func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(
 			TokenEndpointAuthMethod: "none",
 			GrantTypes:              []string{"authorization_code", "client_credentials"},
 		}, oidc.DCRErrorInvalidClientMetadata},
+		// The two grants oidc's grant table knows but marks not registrable; the table's rows are
+		// pinned in grant_type_test.go, and these show DCR consults it (#437).
+		{"the password grant", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: []string{"https://client.example.com/cb"},
+			GrantTypes:   []string{"authorization_code", "password"},
+		}, oidc.DCRErrorInvalidClientMetadata},
+		{"the implicit grant", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: []string{"https://client.example.com/cb"},
+			GrantTypes:   []string{"implicit"},
+		}, oidc.DCRErrorInvalidClientMetadata},
 		{"one redirect URI past the count", oidc.DynamicClientRegistrationRequest{
 			RedirectURIs: manyURIs,
 		}, oidc.DCRErrorInvalidRedirectURI},

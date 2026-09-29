@@ -117,8 +117,8 @@ func HandleDynamicClientRegistrationPost(
 			// Set here and nowhere else. Nothing on the update path can change it, deliberately:
 			// it is a fact about where the client came from, not a trust setting (#108).
 			CreatedViaDCR:                           true,
-			AuthorizationCodeEnabled:                containsGrantType(req.GrantTypes, "authorization_code"),
-			ClientCredentialsEnabled:                containsGrantType(req.GrantTypes, "client_credentials"),
+			AuthorizationCodeEnabled:                containsGrantType(req.GrantTypes, oidc.GrantTypeAuthorizationCode),
+			ClientCredentialsEnabled:                containsGrantType(req.GrantTypes, oidc.GrantTypeClientCredentials),
 			DefaultAcrLevel:                         models.AcrLevel2Optional,
 			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
 			// Token expiration settings use global defaults from settings
@@ -202,7 +202,7 @@ func applyDCRDefaults(req *oidc.DynamicClientRegistrationRequest) {
 
 	// Default grant_types (RFC 7591 §2)
 	if len(req.GrantTypes) == 0 {
-		req.GrantTypes = []string{"authorization_code"}
+		req.GrantTypes = []string{oidc.GrantTypeAuthorizationCode.String()}
 	}
 }
 
@@ -218,14 +218,9 @@ func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 		return errs.Errorf("unsupported token_endpoint_auth_method: %s", req.TokenEndpointAuthMethod)
 	}
 
-	// Validate grant_types
-	supportedGrants := map[string]bool{
-		"authorization_code": true,
-		"client_credentials": true,
-		"refresh_token":      true,
-	}
+	// Validate grant_types against the grant table's registrable trait (#437)
 	for _, gt := range req.GrantTypes {
-		if !supportedGrants[gt] {
+		if !oidc.GrantType(gt).Registrable() {
 			return errs.Errorf("unsupported grant_type: %s", gt)
 		}
 	}
@@ -237,7 +232,7 @@ func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 	// holding no usable grant, a silent success hiding the registrant's bug. The token endpoint
 	// refuses the grant for a public client anyway; this keeps the row from saying otherwise
 	// (#428).
-	if req.TokenEndpointAuthMethod == "none" && containsGrantType(req.GrantTypes, "client_credentials") {
+	if req.TokenEndpointAuthMethod == "none" && containsGrantType(req.GrantTypes, oidc.GrantTypeClientCredentials) {
 		return errs.Errorf("a public client (token_endpoint_auth_method none) cannot use the client_credentials grant")
 	}
 
@@ -262,7 +257,7 @@ func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 // validateDCRRedirectURIs validates redirect URIs per RFC 7591 §5
 func validateDCRRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 	// Check if redirect URIs are required
-	requiresRedirectURIs := containsGrantType(req.GrantTypes, "authorization_code")
+	requiresRedirectURIs := containsGrantType(req.GrantTypes, oidc.GrantTypeAuthorizationCode)
 
 	if requiresRedirectURIs && len(req.RedirectURIs) == 0 {
 		return errs.Errorf("redirect_uris required for authorization_code grant type")
@@ -423,9 +418,9 @@ func generateDCRClientIdentifier() string {
 }
 
 // containsGrantType checks if grant type is in the list
-func containsGrantType(grantTypes []string, grantType string) bool {
+func containsGrantType(grantTypes []string, want oidc.GrantType) bool {
 	for _, gt := range grantTypes {
-		if gt == grantType {
+		if gt == want.String() {
 			return true
 		}
 	}

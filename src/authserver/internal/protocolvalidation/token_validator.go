@@ -74,7 +74,7 @@ func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
 }
 
 type ValidateTokenRequestInput struct {
-	GrantType    string
+	GrantType    oidc.GrantType
 	Code         string
 	RedirectURI  string
 	CodeVerifier string
@@ -153,8 +153,15 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 	// into three spellings of one fact (#245).
 	const clientSecretNotRequiredErrorMsg = "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request."
 
+	// Whether the grant is redeemed here at all is the grant table's answer, read after the
+	// client checks above so an unknown client is still answered first, as it always was (#437).
+	if !input.GrantType.AcceptedAtTokenEndpoint() {
+		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type", "Unsupported grant_type.",
+			http.StatusBadRequest)
+	}
+
 	switch input.GrantType {
-	case "authorization_code":
+	case oidc.GrantTypeAuthorizationCode:
 		if !client.AuthorizationCodeEnabled {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
 				"The client associated with the provided client_id does not support authorization code flow.",
@@ -436,7 +443,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 		return &ValidateTokenRequestResult{
 			CodeEntity: codeEntity,
 		}, nil
-	case "client_credentials":
+	case oidc.GrantTypeClientCredentials:
 		if !client.ClientCredentialsEnabled {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
 				"The client associated with the provided client_id does not support client credentials flow.",
@@ -530,7 +537,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			Client: client,
 			Scope:  input.Scope,
 		}, nil
-	case "refresh_token":
+	case oidc.GrantTypeRefreshToken:
 		// No flow rule lives on this arm, deliberately. A refresh is governed by the switch
 		// of the flow that ISSUED the token, and which flow that was is not known here: the
 		// arm reads the presented token's linkage eighty lines below, and the client's flags
@@ -975,7 +982,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			RefreshToken:     refreshToken,
 			RefreshTokenInfo: refreshTokenInfo,
 		}, nil
-	case "password":
+	case oidc.GrantTypePassword:
 		// RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
 		// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 
@@ -1093,8 +1100,9 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			Scope:  validatedScope,
 		}, nil
 	default:
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type", "Unsupported grant_type.",
-			http.StatusBadRequest)
+		// Reachable only if the grant table accepts a grant this switch has no arm for; the
+		// validator's tests hold the two in agreement.
+		return nil, errs.Errorf("grant type %q is accepted at the token endpoint but has no validation", input.GrantType)
 	}
 }
 

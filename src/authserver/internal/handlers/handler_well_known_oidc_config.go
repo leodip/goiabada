@@ -20,12 +20,6 @@ func HandleWellKnownOIDCConfigGet(
 			return
 		}
 
-		// Build grant types - always include base types
-		grantTypes := []string{"authorization_code", "refresh_token", "client_credentials"}
-		if settings.ImplicitFlowEnabled {
-			grantTypes = append(grantTypes, "implicit")
-		}
-
 		// Build response types - always include code
 		responseTypes := []string{"code"}
 		if settings.ImplicitFlowEnabled {
@@ -43,7 +37,7 @@ func HandleWellKnownOIDCConfigGet(
 			UserInfoEndpoint:                 baseURL + "/userinfo",
 			EndSessionEndpoint:               baseURL + "/auth/logout",
 			JWKsURI:                          baseURL + "/certs",
-			GrantTypesSupported:              grantTypes,
+			GrantTypesSupported:              oidc.GrantTypesSupported(settings.ImplicitFlowEnabled),
 			ResponseTypesSupported:           responseTypes,
 			ResponseModesSupported:           responseModes,
 			PromptValuesSupported:            []string{"none", "login", "consent"},

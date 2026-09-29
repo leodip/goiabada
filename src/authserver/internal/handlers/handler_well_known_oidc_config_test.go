@@ -40,7 +40,9 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 			assert.Equal(t, testBaseURL+"/userinfo", wellKnownConfig.UserInfoEndpoint)
 			assert.Equal(t, testBaseURL+"/auth/logout", wellKnownConfig.EndSessionEndpoint)
 			assert.Equal(t, testBaseURL+"/certs", wellKnownConfig.JWKsURI)
-			assert.ElementsMatch(t, []string{"authorization_code", "refresh_token", "client_credentials"}, wellKnownConfig.GrantTypesSupported)
+			// Equal, not ElementsMatch: the JSON array's order is observable. The list is oidc's
+			// grant table, whose rows are pinned in grant_type_test.go (#437).
+			assert.Equal(t, []string{"authorization_code", "refresh_token", "client_credentials"}, wellKnownConfig.GrantTypesSupported)
 			assert.ElementsMatch(t, []string{"code"}, wellKnownConfig.ResponseTypesSupported)
 			assert.ElementsMatch(t, []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"}, wellKnownConfig.ACRValuesSupported)
 			assert.ElementsMatch(t, []string{"public"}, wellKnownConfig.SubjectTypesSupported)
@@ -63,5 +65,35 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 
 		jsonWriter.AssertExpectations(t)
+	})
+
+	// The implicit flow switched on globally adds implicit to the grant list and the three implicit
+	// response types, each in order. password stays absent: discovery has never listed it (#437).
+	t.Run("Implicit flow enabled adds implicit and its response types", func(t *testing.T) {
+		jsonWriter := mocks_handlers.NewJSONWriter(t)
+
+		handler := HandleWellKnownOIDCConfigGet(jsonWriter, testBaseURL)
+
+		req, err := http.NewRequest("GET", "/.well-known/openid-configuration", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			Issuer:              "https://example.com",
+			ImplicitFlowEnabled: true,
+		}
+		req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
+
+		rr := httptest.NewRecorder()
+
+		var published oidc.WellKnownConfig
+		jsonWriter.On("EncodeJson", rr, req, mock.AnythingOfType("oidc.WellKnownConfig")).Run(func(args mock.Arguments) {
+			published = args.Get(2).(oidc.WellKnownConfig)
+		}).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, []string{"authorization_code", "refresh_token", "client_credentials", "implicit"}, published.GrantTypesSupported)
+		assert.Equal(t, []string{"code", "token", "id_token", "id_token token"}, published.ResponseTypesSupported)
 	})
 }

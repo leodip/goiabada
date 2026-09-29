@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -1004,7 +1005,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&
-				ac.AuthMethods == ceremony.AuthMethodOTP.String() &&
+				ac.AuthMethods == oidc.AuthMethodOTP.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// OTP is level 2 and must not claim level 1: a ceremony can reach here by
 				// reusing a session rather than by entering a password, so setting this
@@ -1109,7 +1110,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&
-				ac.AuthMethods == ceremony.AuthMethodOTP.String() &&
+				ac.AuthMethods == oidc.AuthMethodOTP.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// The value the increment returned, not the pre-enrollment value /auth/level2
 				// captured. This ceremony answered the level 2 question by MOVING the counter,

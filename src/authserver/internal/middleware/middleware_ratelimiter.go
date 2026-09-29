@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
@@ -983,7 +984,7 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		// The other grants carry no resource-owner password, so this limiter has nothing to
 		// bound on them and counting them would throttle every token refresh a busy client
 		// makes.
-		if r.PostFormValue("grant_type") != "password" {
+		if oidc.GrantType(r.PostFormValue("grant_type")) != oidc.GrantTypePassword {
 			next.ServeHTTP(w, r)
 			return
 		}
