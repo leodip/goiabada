@@ -234,7 +234,10 @@ func HandleAuthCompletedGet(
 			// from the session it reused, and while it goes straight to /auth/issue and
 			// never arrives here, it would be stopped rather than let through if it ever did.
 			if !authContext.Level1AuthCompleted {
-				authContext.AuthState = ceremony.AuthStateRequiresLevel1
+				// Restart route 1. The attempt is discarded with it, so methods and the user
+				// carried in from the session that ended do not reach the session the second
+				// pass creates (#140, #436).
+				authContext.Restart()
 				err = ceremonyStore.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)

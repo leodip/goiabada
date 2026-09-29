@@ -630,7 +630,9 @@ func refuseIssuanceUnusableSession(
 		slog.WarnContext(r.Context(), "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier)
 	}
-	authContext.AuthState = ceremony.AuthStateRequiresLevel1
+	// Restart route 2. Whoever signs in next may not be the user this attempt authenticated, so
+	// their methods, scope and consent are computed afresh from the request (#140, #436).
+	authContext.Restart()
 	err := ceremonyStore.SaveAuthContext(w, r, authContext)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)

@@ -182,10 +182,50 @@ type AuthContext struct {
 	// deploy finishes at that answer rather than at a 500 and the window closes as the session
 	// cookies age out (#240).
 	TargetAcrLevel string
+	// RequestedScope is the scope as SetScope normalized it when /auth/authorize accepted the
+	// request, and it is never narrowed. Scope is the working copy: /auth/completed and /auth/issue
+	// narrow it in place to what the authenticated user holds, so after a restart it describes the
+	// abandoned attempt's user rather than the request. Restart puts Scope back from this field, so
+	// whoever completes the second pass is filtered against what the client asked for (#436).
+	//
+	// Absent from a context written by an older binary it unmarshals as "", and a restart of such a
+	// context ends with an empty scope, which /auth/completed answers access_denied. There is no
+	// fallback to the narrowed Scope: keeping it is the defect this field exists to remove, and the
+	// window is one ceremony per browser across the deploy.
+	RequestedScope string
 }
 
 func (ac *AuthContext) SetScope(scope string) {
 	ac.Scope = oidc.NormalizeScope(scope)
+}
+
+// Restart sends the ceremony back to requires_level_1 keeping the request and discarding the
+// attempt. The request is what /auth/authorize accepted and is left untouched; everything an
+// authentication wrote is set to its zero value, and Scope is put back to RequestedScope. The
+// caller saves the context and redirects to /auth/level1.
+//
+// Discarding rather than relying on each field being overwritten before its next read is what
+// keeps an abandoned attempt out of the second pass. AuthMethods is the field that proved it:
+// AddAuthMethod appends and nothing recomputes it, so an otp from the attempt reached the session
+// the second pass created and the amr of its tokens, although OIDC Core 1.0 section 2 has amr, like
+// auth_time, describe the authentication that was performed (#140). Scope and ConsentedScope carried
+// the first user's narrowing and consent to whoever signed in next.
+//
+// Which fields are request and which attempt is held by the classification test beside this file,
+// which fails on a field in neither list, so a new field cannot pass the unit tier until it is
+// placed in one (#436).
+func (ac *AuthContext) Restart() {
+	ac.AuthState = AuthStateRequiresLevel1
+	ac.Scope = ac.RequestedScope
+	ac.ConsentedScope = ""
+	ac.UserId = 0
+	ac.AcrLevel = ""
+	ac.AuthMethods = ""
+	ac.AuthenticatedAt = nil
+	ac.Level1AuthCompleted = false
+	ac.AuthStateGeneration = 0
+	ac.OtpConfigGeneration = nil
+	ac.OTPKeyURL = ""
 }
 
 func (ac *AuthContext) AddAuthMethod(method string) {

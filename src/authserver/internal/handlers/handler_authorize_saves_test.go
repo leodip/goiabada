@@ -242,6 +242,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			assert.Equal(t, "https://example.com", saved.RedirectURI)
 			assert.Equal(t, "code", saved.ResponseType)
 			assert.Equal(t, "openid", saved.Scope)
+			assert.Equal(t, "openid", saved.RequestedScope, "what a restart puts Scope back to")
 			assert.Equal(t, "the-state", saved.State)
 			assert.Equal(t, "the-nonce", saved.Nonce)
 			assert.Equal(t, tc.hint, saved.IdTokenHintSub)

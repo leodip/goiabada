@@ -982,7 +982,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-			assertWarnedForeignSession(t, logs, authContext.UserId)
+			// The literal, not authContext.UserId: the restart has since discarded the user from
+			// the context, and the warning was written before it did (#436).
+			assertWarnedForeignSession(t, logs, int64(123))
+			assert.Zero(t, savedAuthContext.UserId, "the restart discards the user this attempt authenticated")
 
 			// The ceremony is restarted rather than ended, so the context survives to be
 			// rebuilt at /auth/level1.

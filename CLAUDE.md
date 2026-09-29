@@ -154,8 +154,8 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | State | Assigned by | When |
 |---|---|---|
 | `requires_level_1` | `HandleAuthorizeGet` | four sites: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
-| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted` (restart route 1) |
-| | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, and not `prompt=none` (restart route 2) |
+| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted` (restart route 1, through `Restart()`) |
+| | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
 | `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
 | `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
@@ -202,23 +202,18 @@ not one it accepts:
 | `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
 
 ### AuthContext field rule
-A field on `AuthContext` that accumulates across hops and is not overwritten before it is next read
-must be discarded when the ceremony restarts, because a restart sends the browser back to `requires_level_1`
-with the abandoned attempt's values still on the context. There are two restart routes:
-`HandleAuthCompletedGet` when no session is reusable and level 1 was never completed, and
-`refuseIssuanceUnusableSession` at `/auth/issue` when the bound session is gone, expired or foreign
-and the request is not `prompt=none`. `AuthMethods` is the one field breaking the rule today:
-`AddAuthMethod` appends to it, nothing recomputes it, and it survives both routes onto the session
-row the second pass creates, so a restarted ceremony can mint `amr` values the second pass never
-earned (#140 fixes this; delete this sentence when it lands). No other field is recomputed at every hop
-either; each is instead overwritten before anything reads it again on every path out of a restart —
-`AuthenticatedAt`, `OtpConfigGeneration` and `AuthStateGeneration` at `/auth/pwd`, `AcrLevel` by
-`SetAcrLevel` at `/auth/completed` — while `ConsentedScope` is coherent by construction rather than by rule, and
-`OTPKeyURL` by reachability: the enrolment arm of `HandleAuthOtpGet` deliberately keeps a parseable
-key rather than replacing it (#242 part 3), but it is set only while the ceremony sits at
-`level2_otp`, and the one transition out of that state clears it. The request-derived fields are
-written once and only at `/auth/authorize` — the composite literal in `HandleAuthorizeGet` plus
-`TargetAcrLevel`, set immediately after validation and nowhere else — which #248 pins with a test.
+Every field on `AuthContext` is either request or attempt. The request is what `/auth/authorize`
+accepted, including `RequestedScope`, the scope as asked for before any hop narrows `Scope` to what a
+user holds; the attempt is everything an authentication writes. A restart keeps the request and
+discards the attempt: `AuthContext.Restart()` zeroes every attempt field, puts `Scope` back from
+`RequestedScope` and sets `requires_level_1`, so the second pass earns its own `amr`, scope and
+consent (#140, #436). There are two restart routes: `HandleAuthCompletedGet` when no session is
+reusable and level 1 was never completed, and `refuseIssuanceUnusableSession` at `/auth/issue` when the
+bound session is gone, expired or foreign and the request is not `prompt=none`. The split is held by
+`TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
+list. The request-derived fields are written once and only at `/auth/authorize` — the composite
+literal in `HandleAuthorizeGet` plus `TargetAcrLevel` and `RequestedScope`, set immediately after
+validation and nowhere else — which #248 pins with a test.
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
