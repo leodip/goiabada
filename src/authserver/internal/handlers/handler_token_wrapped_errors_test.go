@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"context"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,12 +9,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -89,11 +85,12 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	// The handler hands the wrapped error through as it arrived; the writer reads the detail out of
+	// it with errors.As, which is how it reaches the wire (#435).
+	var detail *customerrors.ErrorDetail
+	require.ErrorAs(t, *captured, &detail)
 	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
 	assert.Equal(t, "The user account is disabled.", detail.GetDescription())
-	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // The same for the deregistered-redirect-URI sentinel, the other by-value comparison this handler
@@ -113,10 +110,9 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 
 	handler.ServeHTTP(rr, req)
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	var detail *customerrors.ErrorDetail
+	require.ErrorAs(t, *captured, &detail)
 	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
-	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A wrapped *AuthCodeReusedError still reaches the revocation branch, which is asserted from the far
@@ -149,52 +145,13 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, int64(7), auditedCodeId, "the reuse row must name the replayed code")
-	// Equal rather than the same pointer: jsonErrorConformed rebuilds the detail through
-	// WithDescription so the sentence is conformed before it reaches the wire (#213).
+	// The same pointer: the handler hands the validator's own detail through unrebuilt, and the
+	// writer conforms the sentence on its way to the wire (#213, #435).
 	answered, ok := (*captured).(*customerrors.ErrorDetail)
 	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	assert.Same(t, reuse.Detail, answered)
 	assert.Equal(t, http.StatusBadRequest, answered.GetHttpStatusCode())
 	assert.Equal(t, "invalid_grant", answered.GetCode())
 	assert.Equal(t, "Code is invalid.", answered.GetDescription())
 	database.AssertExpectations(t)
-	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
-}
-
-// jsonErrorConformed is the third 500 writer and the only one outside core, so decision 9's line is
-// owed here too: an operator filtering on request_id has to be able to join a client's report to it,
-// and the stack has to ride on the error attribute rather than be glued into the message.
-func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
-	logs := logtest.CaptureSlog(t)
-
-	httpHelper := mocks_handlers.NewHttpHelper(t)
-	req := httptest.NewRequest("POST", "/token", nil)
-	// The id goes on the context, where chi's RequestID middleware puts it in the running
-	// server, because that is the only place the writer can read it from now: the call site
-	// stopped naming request_id and the installed handler injects it (#320 decision 2).
-	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, "req-token-500"))
-	rr := httptest.NewRecorder()
-	captured := expectJsonErrorWithDetail(httpHelper)
-
-	jsonErrorConformed(httpHelper, rr, req, errs.New("the key store is unreachable"))
-
-	var errorRecords []logtest.CapturedRecord
-	for _, record := range logs.Records() {
-		if record.Level == slog.LevelError {
-			errorRecords = append(errorRecords, record)
-		}
-	}
-	require.Len(t, errorRecords, 1, "the generic branch logs exactly once")
-	assert.Equal(t, "internal server error", errorRecords[0].Message)
-
-	attrs := errorRecords[0].Attrs
-	logged, ok := attrs["error"].(error)
-	require.True(t, ok, "the error travels as an error value, not as text: got %T", attrs["error"])
-	assert.Contains(t, logged.Error(), "the key store is unreachable")
-	assert.Equal(t, "req-token-500", attrs["request_id"],
-		"injected by the handler from the request's context, with no call site naming it")
-
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, http.StatusInternalServerError, detail.GetHttpStatusCode())
-	assert.Equal(t, "server_error", detail.GetCode())
 }

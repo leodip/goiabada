@@ -91,7 +91,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	// them leaves the other reachable.
 	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
 	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
-	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
+	root.Get("/health", handlers.HandleHealthCheckGet())
 	root.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	root.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	root.Get("/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
@@ -99,7 +99,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
 	root.With(rateLimiter.LimitDCR).Post("/connect/register",
-		handlers.HandleDynamicClientRegistrationPost(httpHelper, s.database, auditLogger, s.dataCipher))
+		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
 	publicSettingsHandler := handlers.NewHandlerPublicSettings(s.database)

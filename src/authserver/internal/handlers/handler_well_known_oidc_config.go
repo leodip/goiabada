@@ -16,7 +16,7 @@ func HandleWellKnownOIDCConfigGet(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			httpHelper.JsonError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 

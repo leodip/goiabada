@@ -74,7 +74,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 // was how #213 reached that arm from outside, with a hostile X-Request-Id the description
 // interpolated. The header is still sent: the answer is now a fixed sentence that carries no
 // request id at all. The generic arm's own conformance is pinned by
-// TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte, since no request from outside reaches
+// TestJsonError_ConformsTheFinalDescription in handlerhelpers, since no request from outside reaches
 // it through this path any more.
 func TestToken_UnparseableForm_IsInvalidRequest(t *testing.T) {
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"

@@ -51,8 +51,9 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// The token endpoint's 500 is the same page until #435 gives it a JSON writer, and it is refused
-// before the validator sees the request.
+// The token endpoint answers its 500 through the JSON writer, RFC 6749 section 5.2's shape, as
+// every other failure there is answered, and it is refused before the validator sees the request
+// (#435).
 func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
@@ -62,7 +63,7 @@ func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
-	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+	httpHelper.On("JsonError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
 	HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), mocks_data.NewDatabase(t),
 		mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t),
@@ -87,7 +88,7 @@ func TestMissingSettings_DynamicClientRegistrationAnswersTheRFC7591Envelope(t *t
 	rr := httptest.NewRecorder()
 
 	capture := logtest.CaptureSlog(t)
-	HandleDynamicClientRegistrationPost(mocks_handlers.NewHttpHelper(t), database,
+	HandleDynamicClientRegistrationPost(database,
 		mocks_handlers.NewAuditLogger(t), testDataCipher).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)

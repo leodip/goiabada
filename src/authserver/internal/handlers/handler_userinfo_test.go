@@ -35,7 +35,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "unable to get validated token from context"
 		})).Return()
 
@@ -63,7 +63,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("InternalServerError",
+		httpHelper.On("JsonError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err error) bool {

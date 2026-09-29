@@ -105,7 +105,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(nil, errors.New("database error"))
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "database error"
 		})).Return()
 
@@ -135,7 +135,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid key state invalid"
 		})).Return()
 
@@ -165,7 +165,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid character 'i' looking for beginning of value"
 		})).Return()
 
