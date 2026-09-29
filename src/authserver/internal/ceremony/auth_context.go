@@ -18,14 +18,12 @@ import (
 type AuthState string
 
 const (
-	AuthStateInitial                 AuthState = "initial"
 	AuthStateRequiresLevel1          AuthState = "requires_level_1"
 	AuthStateRequiresLevel2          AuthState = "requires_level_2"
 	AuthStateLevel1Password          AuthState = "level1_password"
 	AuthStateLevel1PasswordCompleted AuthState = "level1_password_completed"
 	AuthStateLevel1ExistingSession   AuthState = "level1_existing_session"
 	AuthStateLevel2OTP               AuthState = "level2_otp"
-	AuthStateLevel2OTPCompleted      AuthState = "level2_otp_completed"
 	AuthStateAuthenticationCompleted AuthState = "authentication_completed"
 	AuthStateRequiresConsent         AuthState = "requires_consent"
 	AuthStateReadyToIssueCode        AuthState = "ready_to_issue_code"

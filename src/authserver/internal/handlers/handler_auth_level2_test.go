@@ -50,7 +50,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateInitial,
+			AuthState: ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 

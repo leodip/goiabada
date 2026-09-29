@@ -91,14 +91,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "code" &&
-				ac.Scope == "openid"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -180,14 +172,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "code" &&
-				ac.Scope == "openid"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -243,14 +227,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "invalid-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "code" &&
-				ac.Scope == "openid"
-		})).Return(nil)
-
 		// A LocalizedError, which is what this validator returns for all seven of its
 		// conditions since #213: the refusal page is rendered rather than redirected, so it
 		// is the one authorize surface that answers in the visitor's locale. Both bind
@@ -300,7 +276,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 
 		// _httpStatus is what RenderTemplate turns into the response code, so it is asserted here
@@ -364,7 +339,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -397,9 +371,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// can be minted. Every bound form renders it and every bound POST checks it, so a context
 	// saved without one would render forms whose every submission is refused (#79).
 	//
-	// The request is deliberately made to fail validation straight afterwards: what is under test
-	// is the id on the FIRST context saved, and stopping there keeps the setup to the two calls
-	// that matter.
+	// The request takes the no-session path, the commonest exit that saves: a refused request saves
+	// nothing since #436, so the id is read off the one context the ceremony's first hop stores.
 	t.Run("The saved auth context names a fresh ceremony", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
@@ -412,23 +385,33 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
+		stubRegisteredRedirectURI(database, "https://example.com")
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
 		seen := map[string]bool{}
 		for i := 0; i < 2; i++ {
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 			assert.NoError(t, err)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 			rr := httptest.NewRecorder()
 
 			var saved *ceremony.AuthContext
 			ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				saved = ac
-				return true
+				return ac.AuthState == ceremony.AuthStateRequiresLevel1
 			})).Return(nil).Once()
 
-			validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
-			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(validationError).Once()
-			pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).Return(nil).Once()
-
 			handler.ServeHTTP(rr, req)
+			assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
 			if assert.NotNil(t, saved) {
 				assert.Len(t, saved.CeremonyId, ceremonyIdLength,
@@ -440,7 +423,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			}
 		}
 
-		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
@@ -469,14 +451,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "invalid" &&
-				ac.Scope == "openid"
-		})).Return(nil)
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -528,14 +502,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "code" &&
-				ac.Scope == "invalid"
-		})).Return(nil)
 
 		// The clear has to reach the browser, so it must happen before the response is
 		// committed. rr.Header() is the live map the handler and this stub share, so it shows
@@ -596,8 +562,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
@@ -663,7 +627,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
@@ -725,8 +688,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
-
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the closure's second and pre-existing 500,
 		// pinned separately so a future edit cannot delete either copy unnoticed.
@@ -782,14 +743,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "code" &&
-				ac.Scope == "openid"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -837,7 +790,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("Missing auth context", func(t *testing.T) {
+	t.Run("A failed save answers 500 and sends the browser nowhere", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
@@ -851,17 +804,32 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(ceremony.ErrNoAuthContext)
+		stubRegisteredRedirectURI(database, "https://example.com")
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		// Expect the InternalServerError call
+		saveErr := errors.New("the session store is unreachable")
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(saveErr).Once()
+
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == ceremony.ErrNoAuthContext
+			return errors.Is(err, saveErr)
 		})).Once()
 
 		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Header().Get("Location"))
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
 	})
@@ -889,14 +857,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "code" &&
-				ac.Scope == "openid"
-		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -980,14 +940,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "code" &&
-				ac.Scope == "openid"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -1055,15 +1007,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "invalid" &&
-				ac.State == "abc123" &&
-				ac.Scope == "openid"
-		})).Return(nil)
-
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -1126,14 +1069,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return len(ac.UILocales) == 2 && ac.UILocales[0] == "pt-BR" && ac.UILocales[1] == "es"
 		}
 
-		// First save: AuthContext just constructed; UILocales must be captured here.
-		// The request pointer changes when the handler refines the localizer to
-		// the ui_locales it just captured, so we use
-		// mock.Anything for the request slot.
-		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && hasUILocales(ac)
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
@@ -1144,11 +1079,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		// Second save: AuthState advances after id_token_hint validation —
-		// UILocales must still be present (preserved across saves).
+		// The one save, on the way to /auth/level1, carries the captured UILocales. The request
+		// pointer changes when the handler refines the localizer to the ui_locales it just
+		// captured, so mock.Anything stands in the request slot.
 		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return hasUILocales(ac)
-		})).Return(nil)
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && hasUILocales(ac)
+		})).Return(nil).Once()
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
@@ -1203,10 +1139,6 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return len(ac.UILocales) == 2 && ac.UILocales[0] == "pt-BR" && ac.UILocales[1] == "es"
 		}
 
-		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && hasUILocales(ac)
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
@@ -1218,8 +1150,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return hasUILocales(ac)
-		})).Return(nil)
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && hasUILocales(ac)
+		})).Return(nil).Once()
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
@@ -2231,14 +2163,6 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ClientId == "test-client" &&
-				ac.RedirectURI == "https://example.com" &&
-				ac.ResponseType == "token" &&
-				ac.Scope == "openid"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateClientAndRedirectURIInput) bool {
 			return input.ResponseType == "token"
 		})).Return(nil)
@@ -2305,11 +2229,6 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial &&
-				ac.ResponseType == "id_token token"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateClientAndRedirectURIInput) bool {
 			return input.ResponseType == "id_token token"
 		})).Return(nil)
@@ -2375,10 +2294,6 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ResponseType == "token"
-		})).Return(nil)
-
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2437,10 +2352,6 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ResponseType == "token"
-		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -2556,10 +2467,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -2618,10 +2525,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -2690,10 +2593,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -2764,10 +2663,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -2834,10 +2729,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -2861,10 +2752,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired-jwt-token", false).Return(expiredToken, nil)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.IdTokenHintSub == userSubject
-		})).Return(nil)
-
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
@@ -2882,7 +2769,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123
+			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123 && ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -2926,10 +2813,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -2953,10 +2836,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.IdTokenHintSub == userSubject
-		})).Return(nil)
-
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
@@ -2974,7 +2853,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123
+			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123 && ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -3020,10 +2899,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -3047,10 +2922,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.IdTokenHintSub == hintSubject
-		})).Return(nil)
-
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      456,
@@ -3068,7 +2939,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateRequiresLevel1
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.IdTokenHintSub == hintSubject
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -3116,11 +2987,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		// The context's address, which the authorization code is later written with, is read by
 		// the same reader as the session's: the IP without the port, not r.RemoteAddr as is (#435).
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client" &&
-				ac.IpAddress == "203.0.113.7"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -3143,15 +3009,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
-		})).Return(nil)
-		// The silent-issue path sets the AuthContext again just before code issuance; this
-		// is the assertion that it inherits the session's generation and not the user's.
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.UserId == 789 && ac.AuthStateGeneration == 7
-		})).Return(nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -3184,9 +3041,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
 		})).Return()
 
+		// The one save the silent path makes, just before code issuance. It carries the hint and
+		// the prompt, and it inherits the session's generation rather than the user's.
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
-		})).Return(nil)
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
+				ac.IdTokenHintSub == userSubject && ac.Prompt == "none" &&
+				ac.UserId == 789 && ac.AuthStateGeneration == 7
+		})).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
 
@@ -3239,10 +3100,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -3266,10 +3123,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
-		})).Return(nil)
 
 		userSession := &models.UserSession{
 			Id:                  1,
@@ -3300,8 +3153,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		})).Return()
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.Scope == requestedScope
-		})).Return(nil)
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.Scope == requestedScope &&
+				ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
+		})).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
 
@@ -3349,10 +3203,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
-		})).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -3375,10 +3225,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			},
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.IdTokenHintSub == hintSubject && ac.Prompt == "none"
-		})).Return(nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -3450,8 +3296,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -3551,8 +3395,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -3643,8 +3485,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
-
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
@@ -3728,7 +3568,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3778,7 +3617,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3827,7 +3665,6 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -4015,8 +3852,6 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 			rr := httptest.NewRecorder()
 
-			ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
-
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
@@ -4045,7 +3880,11 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 
-			if tc.want != deferToLogin {
+			if tc.want == deferToLogin {
+				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+					return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.DeferredErrorCode == "invalid_scope"
+				})).Return(nil).Once()
+			} else {
 				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 			}
 			if tc.want == blockedPage {
@@ -4133,7 +3972,6 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 			rr := httptest.NewRecorder()
 
-			ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
@@ -4157,6 +3995,10 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			switch tc.want {
 			case "client":
 				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+			case "level1":
+				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+					return ac.AuthState == ceremony.AuthStateRequiresLevel1
+				})).Return(nil).Once()
 			case "500":
 				pageRenderer.On("InternalServerError", rr, req, lookupErr).Return()
 			}
@@ -4213,11 +4055,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 	rr := httptest.NewRecorder()
 
-	// The first save carries no parked error; the second is the deferral.
-	ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-		return ac.DeferredErrorCode == ""
-	})).Return(nil).Once()
-
+	// The one save is the deferral.
 	var parked string
 	ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 		return ac.DeferredErrorCode == "invalid_scope"
@@ -4326,7 +4164,6 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
 			rr := httptest.NewRecorder()
 
-			ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,

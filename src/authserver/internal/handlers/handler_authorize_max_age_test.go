@@ -67,7 +67,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 			Run(func(args mock.Arguments) {
 				saved := *args.Get(2).(*ceremony.AuthContext)
 				f.saved = &saved
-			}).Return(nil)
+			}).Return(nil).Maybe()
 		f.authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		f.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
@@ -108,6 +108,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		assert.Equal(t, "invalid_request", location.Query().Get("error"))
 		assert.Equal(t, maxAgeRefusal.GetDescription(), location.Query().Get("error_description"))
 		assert.Equal(t, "s1", location.Query().Get("state"))
+		assert.Nil(t, f.saved, "a request answered at once writes no auth context")
 	})
 
 	t.Run("a silent request's malformed max_age is refused at once, with no session read", func(t *testing.T) {
@@ -123,6 +124,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		assert.Equal(t, "legit.example", location.Host)
 		assert.Equal(t, "invalid_request", location.Query().Get("error"))
 		f.database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
+		assert.Nil(t, f.saved, "a request answered at once writes no auth context")
 	})
 
 	t.Run("an anonymous browser's malformed max_age is parked and the visitor sent to log in", func(t *testing.T) {
@@ -172,5 +174,6 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "login_required", location.Query().Get("error"))
 		assert.Equal(t, "Session age exceeds max_age", location.Query().Get("error_description"))
+		assert.Nil(t, f.saved, "a silent refusal writes no auth context")
 	})
 }

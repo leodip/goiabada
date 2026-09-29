@@ -113,8 +113,10 @@ func HandleAuthorizeGet(
 		// request that replaced it (#79).
 		ceremonyId := stringutil.GenerateSecurityRandomString(ceremonyIdLength)
 
+		// The literal carries no AuthState, and nothing below saves it until an exit has assigned
+		// one. A request refused for its client, redirect URI or response mode therefore writes no
+		// record, so a sign-in in progress in the same browser survives a malformed link (#436).
 		authContext := ceremony.AuthContext{
-			AuthState:                     ceremony.AuthStateInitial,
 			CeremonyId:                    ceremonyId,
 			ClientId:                      r.FormValue("client_id"),
 			RedirectURI:                   r.FormValue("redirect_uri"),
@@ -150,12 +152,6 @@ func HandleAuthorizeGet(
 			r = r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
 		}
 
-		err := ceremonyStore.SaveAuthContext(w, r, &authContext)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-
 		// The refusal page, which is how this handler answers anything it must not send to the
 		// client. The status is a parameter because the two conditions that reach it differ on it:
 		// a bad client_id or redirect_uri has always answered 200, and an unsupported
@@ -173,7 +169,7 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &protocolvalidation.ValidateClientAndRedirectURIInput{
+		err := authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &protocolvalidation.ValidateClientAndRedirectURIInput{
 			RequestId:    requestId,
 			ClientId:     authContext.ClientId,
 			RedirectURI:  authContext.RedirectURI,
@@ -367,9 +363,8 @@ func HandleAuthorizeGet(
 
 		// answerClientImmediately answers the client with an error now, whoever is at the browser.
 		//
-		// Read from the request rather than from authContext: this closure runs before the
-		// second SaveAuthContext below, and two of its call sites run before the context
-		// has been populated with the validated values at all. answerClientWithError then
+		// Read from the request rather than from authContext, because two of its call sites run
+		// before the context has been populated with the validated values. answerClientWithError then
 		// clears the context before answering, and derives its own server_error fallback
 		// from this same request-sourced input (#141).
 		answerClientImmediately := func(validationError *customerrors.ErrorDetail) {
@@ -526,14 +521,6 @@ func HandleAuthorizeGet(
 		// its switch and answers 500. This is also the last point before handlePromptNone below
 		// reads the target (#240).
 		authContext.SetTargetAcrLevel(client.DefaultAcrLevel)
-
-		// Save AuthContext with the validated hint sub and the target ACR snapshot, for use in
-		// downstream handlers
-		err = ceremonyStore.SaveAuthContext(w, r, &authContext)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
 
 		// Handle prompt=none: silent authentication without any UI
 		if authContext.HasPromptValue("none") {
@@ -897,8 +884,7 @@ func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *mod
 // redirectErrorFromRequest builds the input for an error redirect whose response parameters come
 // from the HTTP request rather than from the stored ceremony. It is the twin of
 // redirectErrorFromAuthContext, and it exists because HandleAuthorizeGet answers errors that arise
-// before the context holds the validated values: two of its sites run before the second
-// SaveAuthContext, so the request is the only source that has them.
+// before the context holds the validated values, so the request is the only source that has them.
 func redirectErrorFromRequest(r *http.Request, client *models.Client,
 	code string, description string) redirectErrorInput {
 
