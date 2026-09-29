@@ -616,6 +616,7 @@ Request with scopes `openid`, `profile` and `email`:
 
 ### Error responses
 
+- **400 Bad Request** - `invalid_request`: the access token sent twice, or a malformed request
 - **401 Unauthorized** - Missing or invalid access token
 - **401 Unauthorized** - `invalid_token`: the user account is disabled or no longer exists
 - **401 Unauthorized** - `invalid_token`: the session the access token was issued in has ended

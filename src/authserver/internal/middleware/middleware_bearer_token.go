@@ -54,6 +54,10 @@ const bearerScheme = "Bearer"
 // and its audience, and naming which would tell a presenter which of those it got right.
 const invalidTokenDescription = "The access token is invalid."
 
+// formMediaType is the media type RFC 6750 section 2.2's body method requires, lowercase, which is
+// how mime.ParseMediaType returns every spelling of it.
+const formMediaType = "application/x-www-form-urlencoded"
+
 // JwtAuthorizationHeaderToContext is the one place that decides whether a bearer credential was
 // presented, and it decides it for every guard behind it. Two methods carry one, RFC 6750 section
 // 2.1's Authorization header and, for a POST with a form-encoded body, section 2.2's access_token
@@ -70,6 +74,11 @@ const invalidTokenDescription = "The access token is invalid."
 //     token by two methods, and admitting a readable access_token beside it acted on half a body.
 //     The token endpoint answers the same body the same way, a body cut at the request-body limit
 //     included (#426).
+//   - An Authorization header sent more than once answers 400 invalid_request. Its value is one
+//     credentials production, not a list (RFC 9110 section 11.6.2), so section 5.3 forbids a
+//     second field line, and section 3.1 names a request that "is otherwise malformed"
+//     invalid_request. Before #435 the first line silently won, so a Bearer token behind a Basic
+//     line read as no credential at all, and a second token behind a Bearer line was never seen.
 //   - An access_token body parameter sent more than once answers 400 invalid_request, which
 //     section 3.1 defines for a request that "repeats the same parameter". Before #435 the first
 //     copy silently won.
@@ -93,6 +102,11 @@ func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Hand
 			if err != nil {
 				slog.WarnContext(r.Context(), "rejecting bearer request: the request body could not be parsed", "error", err)
 				m.refusals.invalidRequest(w, r, "The request body could not be parsed.")
+				return
+			}
+			if len(r.Header.Values("Authorization")) > 1 {
+				slog.WarnContext(r.Context(), "rejecting bearer request: the authorization header was repeated")
+				m.refusals.invalidRequest(w, r, "The Authorization header must be sent once.")
 				return
 			}
 			if repeated {
@@ -153,9 +167,19 @@ func bearerTokenFromHeader(authorization string) (string, bool) {
 // the query: r.PostForm, not r.Form, since a token in the URL is section 2.3's method, which this
 // server does not support. A body that does not parse is returned as the error and nothing else,
 // never as the pairs ParseForm managed to read.
+//
+// Whether the body is a form is decided on the media type alone, normalized exactly as
+// mime.ParseMediaType normalizes it before net/http's ParseForm compares it: lowercased with
+// strings.ToLower, then trimmed. A media type is case-insensitive (RFC 9110 section 8.3.1), and a
+// case-sensitive prefix match read APPLICATION/X-WWW-FORM-URLENCODED as no form while ParseForm read
+// its body, so a second token sent there beside the header was never seen and the header was
+// admitted (#435). strings.EqualFold is not the same rule: strings.ToLower folds a dotted capital I
+// to i and EqualFold does not, and ParseForm reads that body too. The parameters are left to
+// ParseForm, so a form whose parameters do not parse is refused as a body that does not parse rather
+// than passed over: ParseForm returns that error, having read the body or not.
 func bearerTokenFromForm(r *http.Request) (token string, present bool, repeated bool, err error) {
-	if r.Method != http.MethodPost ||
-		!strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+	mediaType, _, _ := strings.Cut(r.Header.Get("Content-Type"), ";")
+	if r.Method != http.MethodPost || strings.TrimSpace(strings.ToLower(mediaType)) != formMediaType {
 		return "", false, false, nil
 	}
 	if err := r.ParseForm(); err != nil {

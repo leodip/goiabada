@@ -14,8 +14,9 @@ import (
 // The bearer guards answer RFC 6750 on both surfaces they guard, each in its own body (#435). The
 // middleware's own table owns every row; this tier shows the few that prove routes.go hands each
 // surface the right guard set: /userinfo and one admin route each, the realm-only challenge with no
-// credential, a lowercase scheme admitted, a token sent twice refused, and a form body that does not
-// parse refused beside a valid header. It is deliberately thin.
+// credential, a lowercase scheme admitted, a token sent twice refused, a form labelled in capitals
+// read as a form, a repeated Authorization header refused, and a form body that does not parse
+// refused beside a valid header. It is deliberately thin.
 
 // bearerRFC6750Response is what a caller observes of one request.
 type bearerRFC6750Response struct {
@@ -29,6 +30,17 @@ type bearerRFC6750Response struct {
 // sent as written, so a caller can send a body that does not parse.
 func sendBearerRequest(t *testing.T, method, path, authorization string, form string) bearerRFC6750Response {
 	t.Helper()
+	var authorizations []string
+	if authorization != "" {
+		authorizations = []string{authorization}
+	}
+	return sendBearerRequestAs(t, method, path, authorizations, "application/x-www-form-urlencoded", form)
+}
+
+// sendBearerRequestAs is sendBearerRequest with one Authorization field line per entry of
+// authorizations, and form labelled contentType, written as given.
+func sendBearerRequestAs(t *testing.T, method, path string, authorizations []string, contentType, form string) bearerRFC6750Response {
+	t.Helper()
 	var body io.Reader
 	if form != "" {
 		body = strings.NewReader(form)
@@ -36,10 +48,10 @@ func sendBearerRequest(t *testing.T, method, path, authorization string, form st
 	req, err := http.NewRequest(method, appConfig.AuthServer.BaseURL+path, body)
 	require.NoError(t, err)
 	if form != "" {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Content-Type", contentType)
 	}
-	if authorization != "" {
-		req.Header.Set("Authorization", authorization)
+	for _, authorization := range authorizations {
+		req.Header.Add("Authorization", authorization)
 	}
 	resp, err := createHttpClient(t).Do(req)
 	require.NoError(t, err)
@@ -103,6 +115,40 @@ func TestBearerRFC6750_ATokenSentTwiceIsInvalidRequest(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, admin.status, admin.body)
 	assert.Equal(t, challenge, admin.challenge)
 	assert.JSONEq(t, `{"error_code":"INVALID_REQUEST","error_description":"The access token must be sent by one method only."}`, admin.body)
+}
+
+// A media type is case-insensitive (RFC 9110 section 8.3.1), so a form body labelled in capitals is
+// a form: a token in it beside the header is a token sent twice, and a token in it alone is admitted.
+// Before this, the capitals hid the body token and /userinfo answered the header's 200.
+func TestBearerRFC6750_TheFormMediaTypeIsCaseInsensitive(t *testing.T) {
+	const upper = "APPLICATION/X-WWW-FORM-URLENCODED"
+
+	userToken, user := createUserAccessTokenWithScope(t, "openid profile")
+	form := url.Values{"access_token": {userToken}}.Encode()
+	twice := sendBearerRequestAs(t, "POST", "/userinfo", []string{"Bearer " + userToken}, upper, form)
+	assert.Equal(t, http.StatusBadRequest, twice.status, twice.body)
+	assert.JSONEq(t, `{"error":"invalid_request","error_description":"The access token must be sent by one method only."}`, twice.body)
+
+	alone := sendBearerRequestAs(t, "POST", "/userinfo", nil, upper, form)
+	require.Equal(t, http.StatusOK, alone.status, alone.body)
+	assert.Contains(t, alone.body, user.Subject)
+
+	adminToken, _ := createAdminClientWithToken(t)
+	admin := sendBearerRequestAs(t, "POST", "/api/v1/admin/resources", []string{"Bearer " + adminToken}, upper,
+		url.Values{"access_token": {adminToken}}.Encode())
+	assert.Equal(t, http.StatusBadRequest, admin.status, admin.body)
+	assert.JSONEq(t, `{"error_code":"INVALID_REQUEST","error_description":"The access token must be sent by one method only."}`, admin.body)
+}
+
+// Authorization is no list (RFC 9110 section 11.6.2), so a second field line makes the request
+// malformed, RFC 6750 section 3.1's invalid_request. This is the wire proof that the server hands
+// both lines to the guard rather than joining or dropping one.
+func TestBearerRFC6750_AnAuthorizationHeaderSentTwiceIsInvalidRequest(t *testing.T) {
+	userToken, _ := createUserAccessTokenWithScope(t, "openid profile")
+	userinfo := sendBearerRequestAs(t, "GET", "/userinfo", []string{"Basic dXNlcjpwYXNz", "Bearer " + userToken}, "", "")
+	assert.Equal(t, http.StatusBadRequest, userinfo.status, userinfo.body)
+	assert.Equal(t, `Bearer realm="goiabada", error="invalid_request", error_description="The Authorization header must be sent once."`, userinfo.challenge)
+	assert.JSONEq(t, `{"error":"invalid_request","error_description":"The Authorization header must be sent once."}`, userinfo.body)
 }
 
 // RFC 6750 section 3.1 names a request that "is otherwise malformed" invalid_request. A form body
