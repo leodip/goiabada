@@ -727,3 +727,74 @@ func TestSetScope_NormalizesWhitespaceAndDuplicates(t *testing.T) {
 		})
 	}
 }
+
+// The whole table for the gate's predicate. Every gated route asks it, so the handler cases each
+// need only one refused state and requireAuthState's own table needs no second copy of this one
+// (#436 seam 1).
+func TestInState(t *testing.T) {
+	testCases := []struct {
+		name     string
+		actual   AuthState
+		accepted []AuthState
+		want     bool
+	}{
+		{
+			name:     "the one accepted state",
+			actual:   AuthStateRequiresLevel1,
+			accepted: []AuthState{AuthStateRequiresLevel1},
+			want:     true,
+		},
+		{
+			name:     "a refused state",
+			actual:   AuthStateReadyToIssueCode,
+			accepted: []AuthState{AuthStateRequiresLevel1},
+			want:     false,
+		},
+		{
+			name:     "the first of several accepted states",
+			actual:   AuthStateLevel1PasswordCompleted,
+			accepted: []AuthState{AuthStateLevel1PasswordCompleted, AuthStateLevel1ExistingSession},
+			want:     true,
+		},
+		{
+			name:     "the last of several accepted states",
+			actual:   AuthStateLevel1ExistingSession,
+			accepted: []AuthState{AuthStateLevel1PasswordCompleted, AuthStateLevel1ExistingSession},
+			want:     true,
+		},
+		{
+			name:     "a state refused by several accepted states",
+			actual:   AuthStateLevel1Password,
+			accepted: []AuthState{AuthStateLevel1PasswordCompleted, AuthStateLevel1ExistingSession},
+			want:     false,
+		},
+		{
+			// What a context that never had a state carries: it is on no step, so no gate may
+			// take it for one.
+			name:     "the zero state",
+			actual:   "",
+			accepted: []AuthState{AuthStateRequiresLevel1},
+			want:     false,
+		},
+		{
+			name:     "no accepted state accepts nothing",
+			actual:   AuthStateRequiresLevel1,
+			accepted: nil,
+			want:     false,
+		},
+		{
+			name:     "no accepted state accepts nothing, the zero state included",
+			actual:   "",
+			accepted: nil,
+			want:     false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ac := &AuthContext{AuthState: tc.actual}
+
+			assert.Equal(t, tc.want, ac.InState(tc.accepted...))
+		})
+	}
+}

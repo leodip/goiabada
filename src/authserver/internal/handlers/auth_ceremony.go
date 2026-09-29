@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/subtle"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -91,29 +92,64 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 	}
 }
 
-// rejectAuthStateMismatch answers a request that arrives at a step of the authorization ceremony
-// the auth context is not on: render the error page at 400 and log the two states at warn.
+// loadAuthContext reads the ceremony's auth context for a gated route, and answers the request
+// itself when there is none to read: a missing context redirects to the account page with a warn
+// line, since a visitor who reaches a step after the ceremony ended has nothing to resume and
+// somewhere better to be, and any other failure is a 500. It reports false when it answered, and the
+// caller then returns without writing anything.
 //
-// It is a client's mistake and not a server fault, which is what changed. Every one of these sites
-// answered a 500 page with a stack and a request id, and the ordinary way to reach one is the Back
-// button: the browser returns to /auth/pwd after the password was accepted, the context has moved
-// on to level1_password_completed, and the visitor was told the server had broken. RFC 9110
-// section 15.5.1 is the fit, "the server cannot or will not process the request due to something
-// that is perceived to be a client error"; 15.6.1's 500 is for "an unexpected condition", and a
-// stale tab is not unexpected (#279 decision 21, #248 part 1).
+// It stops at loading. The three form posts check the submitted ceremony id between this and
+// requireAuthState, which is why the two are separate helpers rather than one (#436 decision 5).
+func loadAuthContext(pageRenderer PageRenderer, ceremonyStore CeremonyStore, w http.ResponseWriter,
+	r *http.Request, adminConsoleBaseURL string) (*ceremony.AuthContext, bool) {
+
+	authContext, err := ceremonyStore.GetAuthContext(r)
+	if err != nil {
+		if errors.Is(err, ceremony.ErrNoAuthContext) {
+			var profileUrl = profileURL(adminConsoleBaseURL)
+			slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
+			http.Redirect(w, r, profileUrl, http.StatusFound)
+		} else {
+			pageRenderer.InternalServerError(w, r, err)
+		}
+		return nil, false
+	}
+	return authContext, true
+}
+
+// requireAuthState is every gated route's check that the ceremony is on a step the route accepts.
+// When it is not, it renders the error page at 400, logs the accepted states and the actual one at
+// warn, and reports false; the caller then returns without writing anything.
 //
-// warn rather than error, and with both states named: the pair is the whole diagnosis, and an
+// A mismatch is a client's mistake and not a server fault. The ordinary way to reach one is the Back
+// button: the browser returns to /auth/pwd after the password was accepted, the context has moved on
+// to level1_password_completed, and a 500 page with a stack would tell the visitor the server had
+// broken. RFC 9110 section 15.5.1 is the fit, "the server cannot or will not process the request due
+// to something that is perceived to be a client error"; 15.6.1's 500 is for "an unexpected
+// condition", and a stale tab is not unexpected (#279 decision 21, #248 part 1). Every route answers
+// through here, /auth/level1completed with its two accepted states included, so no gate can drift
+// back to a 500 on its own (#436).
+//
+// warn rather than error, and with both sides named: the pair is the whole diagnosis, and an
 // operator watching error-level lines should not be paged by a Back button. There is no stack
 // because there is no failure to trace to a line of code.
 //
 // The auth context is deliberately NOT touched, for rejectCeremonyMismatch's reason: the state it
 // holds belongs to the step the user is actually on, and advancing or clearing it here would let a
 // stale page cancel a live authorization. The client is not told either, for the same reason.
-func rejectAuthStateMismatch(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
-	requiredState, actualState ceremony.AuthState) {
+func requireAuthState(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
+	authContext *ceremony.AuthContext, accepted ...ceremony.AuthState) bool {
 
+	if authContext.InState(accepted...) {
+		return true
+	}
+
+	acceptedStates := make([]string, len(accepted))
+	for i, state := range accepted {
+		acceptedStates[i] = string(state)
+	}
 	slog.WarnContext(r.Context(), "auth state mismatch, refusing the request",
-		"required_state", string(requiredState), "actual_state", string(actualState))
+		"accepted_states", acceptedStates, "actual_state", string(authContext.AuthState))
 
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.state_mismatch.title"),
@@ -124,4 +160,5 @@ func rejectAuthStateMismatch(pageRenderer PageRenderer, w http.ResponseWriter, r
 	if err := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}
+	return false
 }

@@ -325,6 +325,13 @@ func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient models.Ac
 	return defaultAcrLevelFromClient
 }
 
+// InState reports whether the ceremony is on one of the accepted states, the question every gated
+// route asks before it reads anything else from the context. No accepted state accepts nothing
+// (#436).
+func (ac *AuthContext) InState(accepted ...AuthState) bool {
+	return slices.Contains(accepted, ac.AuthState)
+}
+
 // HasPromptValue checks if a specific prompt value was requested.
 // The Prompt field contains normalized, space-delimited prompt values.
 func (ac *AuthContext) HasPromptValue(value string) bool {

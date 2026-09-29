@@ -3,8 +3,6 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -43,21 +41,12 @@ func HandleAuthOtpGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := ceremonyStore.GetAuthContext(r)
-		if err != nil {
-			if errors.Is(err, ceremony.ErrNoAuthContext) {
-				var profileUrl = profileURL(adminConsoleBaseURL)
-				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
-				http.Redirect(w, r, profileUrl, http.StatusFound)
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-			}
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		if !ok {
 			return
 		}
 
-		requiredState := ceremony.AuthStateLevel2OTP
-		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
+		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel2OTP) {
 			return
 		}
 
@@ -204,15 +193,8 @@ func HandleAuthOtpPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := ceremonyStore.GetAuthContext(r)
-		if err != nil {
-			if errors.Is(err, ceremony.ErrNoAuthContext) {
-				var profileUrl = profileURL(adminConsoleBaseURL)
-				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
-				http.Redirect(w, r, profileUrl, http.StatusFound)
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-			}
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		if !ok {
 			return
 		}
 
@@ -229,9 +211,7 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		requiredState := ceremony.AuthStateLevel2OTP
-		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
+		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel2OTP) {
 			return
 		}
 
@@ -246,6 +226,7 @@ func HandleAuthOtpPost(
 		keyURL := authContext.OTPKeyURL
 		var secretKey string
 		if keyURL != "" {
+			var err error
 			secretKey, err = otp.SecretFromKeyURL(keyURL)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)

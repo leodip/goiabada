@@ -712,10 +712,13 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 	errorMsg := doc.Find("p.text-error").Text()
 	assert.Equal(t, "Authentication failed.", errorMsg)
 
+	// Verify that the user can't proceed to the next step. 400 like every other gated step; this
+	// one answered 500 until #436 put it behind the same gate (#248 part 1).
 	resp = loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/level1completed")
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assertStateMismatchPage(t, resp)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsNotRequired_OtpCodeIsIncorrect(t *testing.T) {
