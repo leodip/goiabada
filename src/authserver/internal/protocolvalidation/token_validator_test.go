@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -114,6 +115,58 @@ func TestValidateTokenRequest(t *testing.T) {
 		assert.Equal(t, "invalid_grant", customErr.GetCode())
 		assert.Equal(t, "Client is disabled.", customErr.GetDescription())
 		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	})
+
+	// The rows below consult oidc's grant table through the exported method; the table's own rows
+	// are pinned in oidc/grant_type_test.go (#437). Before the table, unsupported_grant_type was
+	// asserted only by the integration tier.
+	enabledClient := &models.Client{Id: 42, ClientIdentifier: "grant_table_client", Enabled: true}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "grant_table_client").Return(enabledClient, nil)
+
+	for _, grantType := range []string{"implicit", "PASSWORD", "urn:ietf:params:oauth:grant-type:device_code"} {
+		t.Run("grant the table does not accept: "+grantType, func(t *testing.T) {
+			input := &ValidateTokenRequestInput{GrantType: oidc.GrantType(grantType), ClientId: "grant_table_client"}
+
+			result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, input)
+
+			assert.Nil(t, result)
+			var customErr *customerrors.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.Equal(t, "unsupported_grant_type", customErr.GetCode())
+			assert.Equal(t, "Unsupported grant_type.", customErr.GetDescription())
+			assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		})
+	}
+
+	// The table and the validator's arms agree: every grant the table accepts reaches an arm,
+	// which refuses this otherwise empty request on its own terms (a flow switched off, or no
+	// client secret), never as an unsupported grant and never as the no-arm internal error.
+	for _, grantType := range []oidc.GrantType{oidc.GrantTypeAuthorizationCode, oidc.GrantTypeRefreshToken,
+		oidc.GrantTypeClientCredentials, oidc.GrantTypePassword} {
+		t.Run("grant the table accepts reaches its arm: "+grantType.String(), func(t *testing.T) {
+			input := &ValidateTokenRequestInput{GrantType: grantType, ClientId: "grant_table_client"}
+
+			result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, input)
+
+			assert.Nil(t, result)
+			var customErr *customerrors.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.NotEqual(t, "unsupported_grant_type", customErr.GetCode())
+		})
+	}
+
+	// The client checks run before the grant check, as they did when the switch's default arm
+	// answered it: an unknown grant with no client_id is still the missing client_id.
+	t.Run("unknown grant with a missing client_id answers the client_id first", func(t *testing.T) {
+		input := &ValidateTokenRequestInput{GrantType: "urn:ietf:params:oauth:grant-type:device_code"}
+
+		result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, input)
+
+		assert.Nil(t, result)
+		var customErr *customerrors.ErrorDetail
+		require.ErrorAs(t, err, &customErr)
+		assert.Equal(t, "invalid_request", customErr.GetCode())
+		assert.Equal(t, "Missing required client_id parameter.", customErr.GetDescription())
 	})
 }
 

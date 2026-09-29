@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -387,7 +388,7 @@ func HandleAuthOtpPost(
 			"userId": user.Id,
 		})
 
-		authContext.AddAuthMethod(ceremony.AuthMethodOTP)
+		authContext.AddAuthMethod(oidc.AuthMethodOTP)
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.
 		//

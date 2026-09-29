@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
@@ -272,7 +273,7 @@ func HandleAuthPwdPost(
 		// answer was given against (#242 decision 3).
 		otpConfigGeneration := user.OtpConfigGeneration
 		authContext.OtpConfigGeneration = &otpConfigGeneration
-		authContext.AddAuthMethod(ceremony.AuthMethodPassword)
+		authContext.AddAuthMethod(oidc.AuthMethodPassword)
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.
 		utcNow := time.Now().UTC()

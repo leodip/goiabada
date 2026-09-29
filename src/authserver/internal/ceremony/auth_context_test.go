@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -662,20 +663,20 @@ func TestAddAuthMethod(t *testing.T) {
 	testCases := []struct {
 		name     string
 		existing string
-		add      []AuthMethod
+		add      []oidc.AuthMethod
 		want     string
 	}{
-		{"password on an empty list", "", []AuthMethod{AuthMethodPassword}, "pwd"},
-		{"otp on an empty list", "", []AuthMethod{AuthMethodOTP}, "otp"},
-		{"otp appended after password", "", []AuthMethod{AuthMethodPassword, AuthMethodOTP}, "pwd otp"},
-		{"a duplicate of the only method", "pwd", []AuthMethod{AuthMethodPassword}, "pwd"},
-		{"a duplicate of the first of two", "pwd otp", []AuthMethod{AuthMethodPassword}, "pwd otp"},
-		{"a duplicate of the second of two", "pwd otp", []AuthMethod{AuthMethodOTP}, "pwd otp"},
-		{"a method listed inside another's name is not a duplicate", "xotp", []AuthMethod{AuthMethodOTP}, "xotp otp"},
-		{"repeated calls stay idempotent", "", []AuthMethod{AuthMethodPassword, AuthMethodOTP,
-			AuthMethodPassword, AuthMethodOTP, AuthMethodOTP}, "pwd otp"},
-		{"an out-of-range value adds nothing to an empty list", "", []AuthMethod{AuthMethodOTP + 1}, ""},
-		{"an out-of-range value adds nothing to a list", "pwd", []AuthMethod{AuthMethod(-1)}, "pwd"},
+		{"password on an empty list", "", []oidc.AuthMethod{oidc.AuthMethodPassword}, "pwd"},
+		{"otp on an empty list", "", []oidc.AuthMethod{oidc.AuthMethodOTP}, "otp"},
+		{"otp appended after password", "", []oidc.AuthMethod{oidc.AuthMethodPassword, oidc.AuthMethodOTP}, "pwd otp"},
+		{"a duplicate of the only method", "pwd", []oidc.AuthMethod{oidc.AuthMethodPassword}, "pwd"},
+		{"a duplicate of the first of two", "pwd otp", []oidc.AuthMethod{oidc.AuthMethodPassword}, "pwd otp"},
+		{"a duplicate of the second of two", "pwd otp", []oidc.AuthMethod{oidc.AuthMethodOTP}, "pwd otp"},
+		{"a method listed inside another's name is not a duplicate", "xotp", []oidc.AuthMethod{oidc.AuthMethodOTP}, "xotp otp"},
+		{"repeated calls stay idempotent", "", []oidc.AuthMethod{oidc.AuthMethodPassword, oidc.AuthMethodOTP,
+			oidc.AuthMethodPassword, oidc.AuthMethodOTP, oidc.AuthMethodOTP}, "pwd otp"},
+		{"an out-of-range value adds nothing to an empty list", "", []oidc.AuthMethod{oidc.AuthMethodOTP + 1}, ""},
+		{"an out-of-range value adds nothing to a list", "pwd", []oidc.AuthMethod{oidc.AuthMethod(-1)}, "pwd"},
 	}
 
 	for _, tc := range testCases {

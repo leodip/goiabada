@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -895,7 +894,7 @@ func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput) *tokenGene
 		Client:            input.Client,
 		Scope:             input.Scope,
 		AcrLevel:          models.AcrLevel1,
-		AuthMethods:       []string{ceremony.AuthMethodPassword.String()},
+		AuthMethods:       []string{oidc.AuthMethodPassword.String()},
 		AuthenticatedAt:   input.AuthenticatedAt,
 		SessionIdentifier: "", // ROPC is sessionless: see ROPCGrantInput
 		Nonce:             "", // ROPC doesn't use nonce

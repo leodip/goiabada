@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -123,7 +123,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	assert.Equal(t, models.AcrLevel1, code.AcrLevel,
 		"the acr must describe the authentication this ceremony performed, not the policy that "+
 			"replaced the one it was accepted under")
-	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods,
+	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods,
 		"no second factor was presented, which is what makes a level2_mandatory acr a false claim")
 
 	// The session the ceremony bound to carries the same level, so the next request on this browser

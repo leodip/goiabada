@@ -1,4 +1,4 @@
-package ceremony
+package oidc
 
 import (
 	"testing"
