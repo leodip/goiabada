@@ -19,10 +19,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -402,7 +402,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// (an i18n.WithLocale call once a password has been checked), since
 	// identity is established at handler scope rather than at middleware
 	// scope.
-	i18nAuthHelper := authhandlerhelpers.NewAuthHelper(s.sessionStore, sessionkeys.AuthServerSessionName)
+	i18nCeremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
 	app := s.router.With(
 		// Adds settings to the request context
@@ -415,7 +415,7 @@ func (s *Server) initMiddleware() chi.Router {
 		// Adds the session identifier (if available) to the request context
 		authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database),
 
-		i18n.MiddlewareLocale(i18nAuthHelper),
+		i18n.MiddlewareLocale(i18nCeremonyStore),
 	)
 
 	slog.Info("finished initializing middleware")

@@ -61,7 +61,7 @@ type auditEvent struct {
 }
 
 // stubAuditLogger records what the limiter audited. Hand-written rather than generated,
-// which is the convention stubAuthHelper already sets in this file for a one-method
+// which is the convention stubCeremonyStore already sets in this file for a one-method
 // interface. The mutex is not decoration: the reservation cases in later stages drive the
 // middleware from several goroutines at once.
 type stubAuditLogger struct {
@@ -91,14 +91,14 @@ func (s *stubAuditLogger) count(name string) int {
 
 // newTestMiddleware builds the middleware with a real HttpHelper over testTemplateFS and a
 // throwaway audit logger, for the cases that do not look at what was audited.
-func newTestMiddleware(authHelper authContextGetter, enabled bool) *RateLimiterMiddleware {
-	m, _ := newAuditedTestMiddleware(authHelper, enabled)
+func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimiterMiddleware {
+	m, _ := newAuditedTestMiddleware(ceremonyStore, enabled)
 	return m
 }
 
-func newAuditedTestMiddleware(authHelper authContextGetter, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
+func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
-	return NewRateLimiterMiddleware(authHelper, handlerhelpers.NewHttpHelper(testTemplateFS), auditLog, enabled), auditLog
+	return NewRateLimiterMiddleware(ceremonyStore, handlerhelpers.NewHttpHelper(testTemplateFS), auditLog, enabled), auditLog
 }
 
 // limiterRequest builds the request a limited route actually receives. Settings are on the
@@ -137,16 +137,16 @@ func assertNoRateLimitHeaders(t *testing.T, rr *httptest.ResponseRecorder, when 
 	}
 }
 
-// stubAuthHelper stands in for the real AuthHelper, which needs a session store
+// stubCeremonyStore stands in for the real ceremony.Store, which needs a session store
 // and a cookie to answer. It reads the user id from the request's query string so
 // one middleware instance can be driven with several users, which is what shows
 // the OTP budget is keyed per user rather than globally. A non-nil err is
 // returned for every request, standing for an unreadable auth context.
-type stubAuthHelper struct {
+type stubCeremonyStore struct {
 	err error
 }
 
-func (s stubAuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
+func (s stubCeremonyStore) GetAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -1187,7 +1187,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	}
 
 	t.Run("unreadable auth context reaches the handler", func(t *testing.T) {
-		m := newTestMiddleware(stubAuthHelper{err: handlerhelpers.ErrNoAuthContext}, true)
+		m := newTestMiddleware(stubCeremonyStore{err: ceremony.ErrNoAuthContext}, true)
 		// Well past the budget: the pass-through is deliberately not
 		// bounded by this middleware, since there is no user to key a bucket on.
 		for i := 0; i < 20; i++ {
@@ -1200,7 +1200,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 
 	t.Run("the budget is exactly 5 failures", func(t *testing.T) {
-		m := newTestMiddleware(stubAuthHelper{}, true)
+		m := newTestMiddleware(stubCeremonyStore{}, true)
 		for i := 0; i < budget; i++ {
 			if code, reached := run(m, 42, true); code != http.StatusTeapot || !reached {
 				t.Fatalf("failure %d: got code %d, handler reached %v; want %d and true",
@@ -1214,7 +1214,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 
 	t.Run("a correct code spends nothing", func(t *testing.T) {
-		m := newTestMiddleware(stubAuthHelper{}, true)
+		m := newTestMiddleware(stubCeremonyStore{}, true)
 		// Well past the budget, all of them verified. A tier that still counted every
 		// request would refuse the sixth, which is what a user re-authenticating through
 		// a working authenticator would meet.
@@ -1237,7 +1237,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 
 	t.Run("each user id has its own budget", func(t *testing.T) {
-		m := newTestMiddleware(stubAuthHelper{}, true)
+		m := newTestMiddleware(stubCeremonyStore{}, true)
 		blocked := false
 		for i := 0; i < budget+1; i++ {
 			if code, _ := run(m, 42, true); code == http.StatusTooManyRequests {
@@ -1256,7 +1256,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	})
 
 	t.Run("disabled limiter never blocks", func(t *testing.T) {
-		m := newTestMiddleware(stubAuthHelper{}, false)
+		m := newTestMiddleware(stubCeremonyStore{}, false)
 		for i := 0; i < 60; i++ {
 			if code, reached := run(m, 42, true); code != http.StatusTeapot || !reached {
 				t.Fatalf("attempt %d: disabled limiter should never block, got code %d, handler reached %v",

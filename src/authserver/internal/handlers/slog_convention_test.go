@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
@@ -33,13 +33,13 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	logs := logtest.CaptureSlog(t)
 
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
+	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 	database := mocks_data.NewDatabase(t)
 
 	// The missing auth context is the shortest path from a request to a record: no database,
 	// no template, one Warn and a redirect. No InternalServerError expectation is set, so the
 	// mock fails this test if the handler takes the other branch.
-	authHelper.On("GetAuthContext", mock.Anything).Return(nil, handlerhelpers.ErrNoAuthContext)
+	ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, ceremony.ErrNoAuthContext)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/level2", nil)
 	// The id the middleware will adopt. chi's RequestID takes X-Request-Id from the caller
@@ -47,7 +47,7 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	req.Header.Set("X-Request-Id", "req-level2-e2e")
 	rr := httptest.NewRecorder()
 
-	chimiddleware.RequestID(HandleAuthLevel2Get(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
+	chimiddleware.RequestID(HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 
@@ -60,5 +60,5 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	assert.Equal(t, "req-level2-e2e", records[0].Attrs["request_id"],
 		"injected by the handler from chi's request id, with nothing in this file naming it")
 
-	authHelper.AssertExpectations(t)
+	ceremonyStore.AssertExpectations(t)
 }

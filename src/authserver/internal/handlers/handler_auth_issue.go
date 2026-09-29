@@ -15,7 +15,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -42,7 +41,7 @@ type authIssueDatabase interface {
 
 func HandleIssueGet(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	templateFS fs.FS,
 	codeIssuer CodeIssuer,
 	implicitTokenIssuer ImplicitTokenIssuer,
@@ -54,9 +53,9 @@ func HandleIssueGet(
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -135,7 +134,7 @@ func HandleIssueGet(
 			// persists the deletion through a Set-Cookie on w, and the render below commits the
 			// response, so clearing afterwards leaves the header on a response already written
 			// (#141).
-			err = authHelper.ClearAuthContext(w, r)
+			err = ceremonyStore.ClearAuthContext(w, r)
 			if err != nil {
 				// This is the ONE refusal in the file whose fallback is not "answer the client
 				// with server_error". Answering this client is precisely what the gate exists to
@@ -196,7 +195,7 @@ func HandleIssueGet(
 				// the one refusal that leaves the context in ready_to_issue_code, the state that
 				// mints codes, so a browser keeping it can replay this endpoint with only the
 				// comparison above standing between the replay and a code (#141).
-				refusalErr := authHelper.ClearAuthContext(w, r)
+				refusalErr := ceremonyStore.ClearAuthContext(w, r)
 				if refusalErr != nil {
 					// The clear failed, so Save wrote no cookie and the browser still holds the
 					// auth context. The client is owed an error response regardless: its redirect
@@ -334,7 +333,7 @@ func HandleIssueGet(
 			}
 
 			refuseIssuanceUnusableSession(w, r, shape, authContext, issuingClient, ambientSession,
-				sessionIdentifier, pageRenderer, authHelper, templateFS, database, auditLogger, baseURL)
+				sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
 			return
 		}
 
@@ -393,7 +392,7 @@ func HandleIssueGet(
 			// The clear goes FIRST, for the reason every refusal in this handler states: a
 			// Set-Cookie written after redirToClientWithError has committed never reaches the
 			// wire, so the browser would keep a replayable auth context (#141).
-			err = authHelper.ClearAuthContext(w, r)
+			err = ceremonyStore.ClearAuthContext(w, r)
 			if err != nil {
 				// The clear failed, so Save wrote no cookie and the browser still holds the
 				// auth context. The client is owed an error response regardless: its redirect
@@ -429,7 +428,7 @@ func HandleIssueGet(
 		*scopeField = effectiveScope
 
 		if isImplicitFlow {
-			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, user, settings, authHelper, implicitTokenIssuer, auditLogger)
+			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, user, settings, ceremonyStore, implicitTokenIssuer, auditLogger)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 			}
@@ -518,7 +517,7 @@ func HandleIssueGet(
 		})
 		if errors.Is(err, errIssuanceRefused) {
 			refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
-				sessionIdentifier, pageRenderer, authHelper, templateFS, database, auditLogger, baseURL)
+				sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
 			return
 		}
 
@@ -538,7 +537,7 @@ func HandleIssueGet(
 			"codeId":   code.Id,
 		})
 
-		err = authHelper.ClearAuthContext(w, r)
+		err = ceremonyStore.ClearAuthContext(w, r)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -605,7 +604,7 @@ func refuseIssuanceUnusableSession(
 	ambientSession *models.UserSession,
 	sessionIdentifier string,
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	templateFS fs.FS,
 	database authIssueDatabase,
 	auditLogger AuditLogger,
@@ -655,7 +654,7 @@ func refuseIssuanceUnusableSession(
 		// Provenance is resolved before the dispatch, for the same reason as at the id_token_hint
 		// refusal (#108). The registration gate at the top of the handler loaded the client and
 		// refused a nil, so issuingClient is it.
-		err := authHelper.ClearAuthContext(w, r)
+		err := ceremonyStore.ClearAuthContext(w, r)
 		if err != nil {
 			// A failed clear leaves the auth context either wholly there or wholly gone, never
 			// half, so withholding the client's response buys nothing whichever way it failed.
@@ -705,7 +704,7 @@ func refuseIssuanceUnusableSession(
 			"session_identifier", sessionIdentifier)
 	}
 	authContext.AuthState = ceremony.AuthStateRequiresLevel1
-	err := authHelper.SaveAuthContext(w, r, authContext)
+	err := ceremonyStore.SaveAuthContext(w, r, authContext)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return
@@ -727,7 +726,7 @@ func handleImplicitFlow(
 	client *models.Client,
 	user *models.User,
 	settings *models.Settings,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	implicitTokenIssuer ImplicitTokenIssuer,
 	auditLogger AuditLogger,
 ) error {
@@ -779,7 +778,7 @@ func handleImplicitFlow(
 	})
 
 	// Clear auth context
-	err = authHelper.ClearAuthContext(w, r)
+	err = ceremonyStore.ClearAuthContext(w, r)
 	if err != nil {
 		return err
 	}

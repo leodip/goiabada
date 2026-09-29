@@ -38,7 +38,10 @@ type JSONWriter interface {
 	EncodeJson(w http.ResponseWriter, r *http.Request, data interface{})
 }
 
-type AuthHelper interface {
+// CeremonyStore is what the ceremony handlers call on ceremony.Store, which keeps the
+// AuthContext in the browser session between hops. UILocales is on the concrete type and not
+// here: only the locale middleware reads it, and no handler does (#435).
+type CeremonyStore interface {
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
 	ClearAuthContext(w http.ResponseWriter, r *http.Request) error

@@ -1,4 +1,4 @@
-package handlerhelpers
+package ceremony
 
 import "github.com/leodip/goiabada/core/customerrors"
 
@@ -7,6 +7,6 @@ import "github.com/leodip/goiabada/core/customerrors"
 // as through ErrorDetail.Is.
 //
 // It declares the auth server's own failure: the admin console has no authorization ceremony and
-// never reads one, which is why #385 moved it out of core/customerrors and beside the helper that
-// returns it.
+// never reads one, which is why #385 moved it out of core/customerrors, and #435 moved it with the
+// Store that returns it.
 var ErrNoAuthContext = customerrors.NewErrorDetail("no_auth_context", "no auth context in session")

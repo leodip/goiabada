@@ -161,6 +161,13 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
 	settings := h.settings.LayoutSettings(r.Context())
+	// The layout's values are written into the caller's map rather than a copy, and
+	// TestRenderTemplateToBuffer reads isAdmin back out of it; a nil map is therefore allocated
+	// here rather than panicking on the first write below. No caller passes nil today, so this
+	// closes a latent panic, and the auth server's twin carries the same guard (#435).
+	if data == nil {
+		data = map[string]interface{}{}
+	}
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path

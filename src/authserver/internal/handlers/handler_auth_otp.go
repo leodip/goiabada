@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
@@ -36,7 +35,7 @@ type authOTPDatabase interface {
 
 func HandleAuthOtpGet(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	database authOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
 	adminConsoleBaseURL string,
@@ -44,9 +43,9 @@ func HandleAuthOtpGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -94,7 +93,7 @@ func HandleAuthOtpGet(
 			// when the seed and its image lived in two slots on the browser session (#242).
 			authContext.OTPKeyURL = ""
 
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -164,7 +163,7 @@ func HandleAuthOtpGet(
 				return
 			}
 
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -194,7 +193,7 @@ func HandleAuthOtpGet(
 
 func HandleAuthOtpPost(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	database authOTPDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
@@ -205,9 +204,9 @@ func HandleAuthOtpPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -443,12 +442,12 @@ func HandleAuthOtpPost(
 		// rotation persists the contents as they are now, so a failure between the two
 		// leaves a fresh identifier on a session that has not been marked
 		// authentication_completed (#266).
-		if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
+		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r); regenerateSessionErr != nil {
 			pageRenderer.InternalServerError(w, r, regenerateSessionErr)
 			return
 		}
 
-		err = authHelper.SaveAuthContext(w, r, authContext)
+		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

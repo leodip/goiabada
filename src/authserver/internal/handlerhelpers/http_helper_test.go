@@ -270,6 +270,22 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	})
 }
 
+// A nil bind map is allocated rather than written into, which would panic. The render still binds
+// the layout's values, so the page sees the settings as it would through a caller's own map (#435).
+func TestRenderTemplateToBuffer_NilDataMap(t *testing.T) {
+	templateFS := fstest.MapFS{
+		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.urlPath}}{{end}}")},
+	}
+	req := httptest.NewRequest("GET", "/some/page", nil)
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "sentinel app"}))
+
+	buf, err := NewHttpHelper(templateFS).RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "<html>sentinel app|/some/page</html>", buf.String())
+}
+
 // Every file under partials/ is parsed beside the layout and the page, which is how a page calls a
 // fragment it does not define. The second case is the first one's tree without the fragment, so a
 // pass there cannot come from anything but the partials branch (#431).

@@ -22,9 +22,9 @@ import (
 func TestHandleAuthLevel1Get(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 
-		handler := HandleAuthLevel1Get(pageRenderer, authHelper, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1", nil)
 		assert.NoError(t, err)
@@ -34,7 +34,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{} // You may want to customize this error
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
@@ -43,14 +43,14 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 
-		handler := HandleAuthLevel1Get(pageRenderer, authHelper, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1", nil)
 		assert.NoError(t, err)
@@ -62,21 +62,21 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		authContext := &ceremony.AuthContext{
 			AuthState: ceremony.AuthStateInitial, // This is an unexpected state
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Successful flow", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 
-		handler := HandleAuthLevel1Get(pageRenderer, authHelper, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1", nil)
 		assert.NoError(t, err)
@@ -88,9 +88,9 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		authContext := &ceremony.AuthContext{
 			AuthState: ceremony.AuthStateRequiresLevel1,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1Password
 		})).Return(nil)
 
@@ -100,18 +100,18 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/pwd", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 }
 
 func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -120,7 +120,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, assert.AnError)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, assert.AnError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == assert.AnError
@@ -129,16 +129,16 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -150,7 +150,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		authContext := &ceremony.AuthContext{
 			AuthState: ceremony.AuthStateInitial,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "authContext.AuthState 'initial' does not match any required state"
@@ -159,16 +159,16 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Successful flow, redirect to level2", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -182,7 +182,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientId:  "test-client",
 			UserId:    1,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
@@ -205,7 +205,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel2
 		})).Return(nil)
 
@@ -215,18 +215,18 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/level2", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Successful flow, redirect to completed", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
 		assert.NoError(t, err)
@@ -240,7 +240,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientId:  "test-client",
 			UserId:    1,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
@@ -263,7 +263,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted
 		})).Return(nil)
 
@@ -273,18 +273,18 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("No session, auth completed", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		req = withSessionSettings(req)
@@ -295,7 +295,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientId:  "test-client",
 			UserId:    1,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
@@ -318,7 +318,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted
 		})).Return(nil)
 
@@ -328,7 +328,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
@@ -339,11 +339,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	// below says so in its own words, because that deletion is the whole of part 1.1 (#242).
 	t.Run("OTP config generation has moved since the session answered", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		req = withSessionSettings(req)
@@ -354,7 +354,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientId:  "test-client",
 			UserId:    1,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
@@ -381,7 +381,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel2
 		})).Return(nil)
 
@@ -399,7 +399,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			"the session's snapshot must not move in memory either")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
@@ -485,11 +485,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
+				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 				userSessionManager := mocks_handlers.NewUserSessionManager(t)
 				database := mocks_data.NewDatabase(t)
 
-				handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 				req = withSessionSettings(req)
@@ -500,7 +500,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					ClientId:  "test-client",
 					UserId:    1,
 				}
-				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				sessionIdentifier := "test-session"
 				ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
@@ -537,7 +537,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					expectedAuthState = ceremony.AuthStateRequiresLevel2
 				}
 
-				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == expectedAuthState
 				})).Return(nil)
 
@@ -551,7 +551,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 
 				pageRenderer.AssertExpectations(t)
-				authHelper.AssertExpectations(t)
+				ceremonyStore.AssertExpectations(t)
 				userSessionManager.AssertExpectations(t)
 				database.AssertExpectations(t)
 			})
@@ -612,11 +612,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
+				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 				userSessionManager := mocks_handlers.NewUserSessionManager(t)
 				database := mocks_data.NewDatabase(t)
 
-				handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 				req = withSessionSettings(req)
@@ -627,7 +627,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					ClientId:  "test-client",
 					UserId:    2,
 				}
-				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				sessionIdentifier := "test-session"
 				ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
@@ -664,7 +664,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					expectedAuthState = ceremony.AuthStateRequiresLevel2
 				}
 
-				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == expectedAuthState
 				})).Return(nil)
 
@@ -677,7 +677,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 
 				pageRenderer.AssertExpectations(t)
-				authHelper.AssertExpectations(t)
+				ceremonyStore.AssertExpectations(t)
 				userSessionManager.AssertExpectations(t)
 				database.AssertExpectations(t)
 			})
@@ -715,23 +715,23 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	} {
 		t.Run("answers the client on "+state, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			authHelper := mocks_handlers.NewAuthHelper(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 
-			handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 			req := httptest.NewRequest("GET", "/auth/level1completed", nil)
 			req = withSessionSettings(req)
 			rr := httptest.NewRecorder()
 
-			authHelper.On("GetAuthContext", mock.Anything).Return(newParkedContext(state), nil)
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(newParkedContext(state), nil)
 
 			// The clear goes first, and it has to reach the browser: ClearAuthContext persists the
 			// deletion through a Set-Cookie on w, and the answer commits the response, so a clear
 			// afterwards would leave the browser holding a context it could replay (#141).
 			const clearedContextCookie = "cleared-auth-context"
-			authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+			ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
 				args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 			}).Return(nil)
 
@@ -750,7 +750,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 				"the auth context must be cleared before the client response is committed")
 
 			pageRenderer.AssertExpectations(t)
-			authHelper.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
 			database.AssertExpectations(t)
 		})
 	}
@@ -760,11 +760,11 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	// RequestedMaxAge reading such a value as 0 is never what answers this ceremony (#243).
 	t.Run("a parked max_age refusal is delivered without asking about a session", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req := withSessionSettings(httptest.NewRequest("GET", "/auth/level1completed", nil))
 		rr := httptest.NewRecorder()
@@ -773,8 +773,8 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		parked.MaxAge = "abc"
 		parked.DeferredErrorCode = "invalid_request"
 		parked.DeferredErrorDescription = "The max_age parameter must be a non-negative integer."
-		authHelper.On("GetAuthContext", mock.Anything).Return(parked, nil)
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(parked, nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -793,19 +793,19 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
 	t.Run("a failing clear still answers the client, with server_error", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
-		authHelper.On("GetAuthContext", mock.Anything).Return(
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
-		authHelper.On("ClearAuthContext", rr, req).Return(assert.AnError)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(assert.AnError)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -822,12 +822,12 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		assert.NotContains(t, location, "invalid_scope")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("an unusable form_post template answers 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -839,7 +839,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, templateFS, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
 		req = withSessionSettings(req)
@@ -847,8 +847,8 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
 		authContext := newParkedContext(ceremony.AuthStateLevel1PasswordCompleted)
 		authContext.ResponseMode = "form_post"
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -859,24 +859,24 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("a self-registered client gets the refusal page, not the redirect", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
-		authHelper.On("GetAuthContext", mock.Anything).Return(
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
@@ -895,11 +895,11 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
 	t.Run("no parked error leaves today's step-up decision alone", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, authHelper, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
 
 		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
 		req = withSessionSettings(req)
@@ -911,13 +911,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			ClientId:  "test-client",
 			UserId:    1,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sess-1").Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(false)
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted
 		})).Return(nil)
 
@@ -929,6 +929,6 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 }

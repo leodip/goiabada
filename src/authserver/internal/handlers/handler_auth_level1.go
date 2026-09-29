@@ -11,7 +11,6 @@ import (
 	"slices"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
@@ -19,15 +18,15 @@ import (
 
 func HandleAuthLevel1Get(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -47,7 +46,7 @@ func HandleAuthLevel1Get(
 		// today we only support pwd, other types will be added in the future
 
 		authContext.AuthState = ceremony.AuthStateLevel1Password
-		err = authHelper.SaveAuthContext(w, r, authContext)
+		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -71,7 +70,7 @@ type authLevel1Database interface {
 
 func HandleAuthLevel1CompletedGet(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	userSessionManager UserSessionManager,
 	database authLevel1Database,
 	templateFS fs.FS,
@@ -80,9 +79,9 @@ func HandleAuthLevel1CompletedGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -117,7 +116,7 @@ func HandleAuthLevel1CompletedGet(
 		// shortcut is reached only with a valid session and that request was answered at once, but
 		// the delivery does not depend on which one it is.
 		if authContext.DeferredErrorCode != "" {
-			answerClientWithError(w, r, database, pageRenderer, authHelper, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 				redirectErrorFromAuthContext(authContext,
 					clientProvenance(r.Context(), database, authContext.ClientId),
 					authContext.DeferredErrorCode, authContext.DeferredErrorDescription))
@@ -207,7 +206,7 @@ func HandleAuthLevel1CompletedGet(
 		if shouldRedirectToLevel2 {
 			// We need to redirect to level 2
 			authContext.AuthState = ceremony.AuthStateRequiresLevel2
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -217,7 +216,7 @@ func HandleAuthLevel1CompletedGet(
 		} else {
 			// Auth is completed
 			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return

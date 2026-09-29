@@ -131,16 +131,16 @@ func TestBuildScopeInfoArray(t *testing.T) {
 func TestHandleConsentGet(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{}
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
@@ -149,15 +149,15 @@ func TestHandleConsentGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -165,22 +165,22 @@ func TestHandleConsentGet(t *testing.T) {
 		authContext := &ceremony.AuthContext{
 			AuthState: ceremony.AuthStateInitial,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("User not found", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -189,7 +189,7 @@ func TestHandleConsentGet(t *testing.T) {
 			AuthState: ceremony.AuthStateRequiresConsent,
 			UserId:    1,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 
@@ -200,16 +200,16 @@ func TestHandleConsentGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Client not found", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -219,7 +219,7 @@ func TestHandleConsentGet(t *testing.T) {
 			UserId:    1,
 			ClientId:  "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -233,16 +233,16 @@ func TestHandleConsentGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Successful consent page rendering", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -253,7 +253,7 @@ func TestHandleConsentGet(t *testing.T) {
 			ClientId:  "test-client",
 			Scope:     "openid profile email",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -290,16 +290,16 @@ func TestHandleConsentGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Fully consented scopes, redirect to issue", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -310,7 +310,7 @@ func TestHandleConsentGet(t *testing.T) {
 			ClientId:  "test-client",
 			Scope:     "openid profile",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -329,7 +329,7 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(consent, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
 		})).Return(nil)
 
@@ -339,16 +339,16 @@ func TestHandleConsentGet(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Partial consent, render consent page", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -359,7 +359,7 @@ func TestHandleConsentGet(t *testing.T) {
 			ClientId:  "test-client",
 			Scope:     "openid profile email",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -395,7 +395,7 @@ func TestHandleConsentGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
@@ -404,10 +404,10 @@ func TestHandleConsentGet(t *testing.T) {
 	// because the value has to be THIS ceremony's (#79 seam 4).
 	t.Run("The render names the ceremony", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -419,7 +419,7 @@ func TestHandleConsentGet(t *testing.T) {
 			ClientId:   "test-client",
 			Scope:      "openid profile email",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -440,7 +440,7 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 }
@@ -448,19 +448,19 @@ func TestHandleConsentGet(t *testing.T) {
 func TestHandleConsentPost(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{}
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
@@ -469,18 +469,18 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -494,14 +494,14 @@ func TestHandleConsentPost(t *testing.T) {
 			AuthState:  ceremony.AuthStateInitial,
 			CeremonyId: testCeremonyId,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	// A form left open in another tab, submitted after a second /auth/authorize replaced the
@@ -568,13 +568,13 @@ func TestHandleConsentPost(t *testing.T) {
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
+				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				form := url.Values{}
 				if tc.btn == "btnSubmit" {
@@ -605,7 +605,7 @@ func TestHandleConsentPost(t *testing.T) {
 					RedirectURI:  "https://example.com/callback",
 					State:        "test-state",
 				}
-				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
 
@@ -616,7 +616,7 @@ func TestHandleConsentPost(t *testing.T) {
 				assert.Empty(t, rr.Header().Get("Location"))
 
 				pageRenderer.AssertExpectations(t)
-				authHelper.AssertExpectations(t)
+				ceremonyStore.AssertExpectations(t)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
 			})
@@ -625,14 +625,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("User cancels consent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -648,7 +648,7 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// The clear has to reach the browser, so it must happen before the response is
@@ -656,7 +656,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// the sentinel under either ordering; rr.Result() reads the snapshot taken when the
 		// status line was written, which is the only unit-tier view that tells them apart.
 		const clearedContextCookie = "cleared-auth-context"
-		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -669,19 +669,19 @@ func TestHandleConsentPost(t *testing.T) {
 			"the auth context must be cleared before the client response is committed")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("User cancels consent, failing clear - server_error to the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -697,13 +697,13 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -716,12 +716,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.NotContains(t, location, "access_denied")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("User cancels consent, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -736,7 +736,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -752,10 +752,10 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
@@ -771,12 +771,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("User cancels consent, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -787,7 +787,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -803,13 +803,13 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the site's second and pre-existing 500,
 		// pinned separately so a future edit cannot delete either copy unnoticed.
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -820,18 +820,18 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("User provides consent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -851,7 +851,7 @@ func TestHandleConsentPost(t *testing.T) {
 			ClientId:   "test-client",
 			Scope:      "openid profile email",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -870,7 +870,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
 		})).Return(nil)
 
@@ -880,20 +880,20 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("Partial consent given", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -913,7 +913,7 @@ func TestHandleConsentPost(t *testing.T) {
 			ClientId:   "test-client",
 			Scope:      "openid profile email",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -938,7 +938,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
 		})).Return(nil)
 
@@ -948,7 +948,7 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -959,13 +959,13 @@ func TestHandleConsentPost(t *testing.T) {
 	// it (#241 decision 3).
 	t.Run("A ticked scope the user no longer holds is not recorded", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -984,7 +984,7 @@ func TestHandleConsentPost(t *testing.T) {
 			ClientId:   "test-client",
 			Scope:      "openid backend:read backend:write",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1009,7 +1009,7 @@ func TestHandleConsentPost(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
 		var saved *ceremony.AuthContext
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			saved = ac
 			return true
 		})).Return(nil)
@@ -1029,7 +1029,7 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -1047,12 +1047,12 @@ func TestHandleConsentPost(t *testing.T) {
 	// context save, so a call reaching any of them fails the case. That absence IS the assertion.
 	t.Run("The filter failing closed records nothing", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1070,7 +1070,7 @@ func TestHandleConsentPost(t *testing.T) {
 			ClientId:   "test-client",
 			Scope:      "openid backend:read",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1091,7 +1091,7 @@ func TestHandleConsentPost(t *testing.T) {
 			"a filter that could not answer must not send the ceremony on to /auth/issue")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 		permissionChecker.AssertExpectations(t)
@@ -1102,14 +1102,14 @@ func TestHandleConsentPost(t *testing.T) {
 	// emptied, which is not. Both are access_denied and the descriptions are what tell them apart.
 	t.Run("A selection the filter empties is refused, and says so differently", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1129,7 +1129,7 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1143,7 +1143,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// The clear has to land on the wire before the redirect commits, so the sentinel is the
 		// same one the two older refusals use (#141).
 		const clearedContextCookie = "cleared-auth-context"
-		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -1164,7 +1164,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// No consent row is read and none is written, which the mock enforces by having no
 		// expectation for either call.
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -1177,14 +1177,14 @@ func TestHandleConsentPost(t *testing.T) {
 	// and each of the two 500s deleted.
 	t.Run("A selection the filter empties, failing clear - server_error to the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1204,7 +1204,7 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1218,7 +1218,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever happens
 		// next. The client is still owed its error response, and server_error is what RFC 6749
 		// 4.1.2.1 mints for a fault that cannot travel as a 500.
-		authHelper.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req).
 			Return(errors.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
@@ -1235,14 +1235,14 @@ func TestHandleConsentPost(t *testing.T) {
 		// Still no consent row read and none written: a failed clear does not turn the refusal
 		// into a grant. The mock enforces it by having no expectation for either call.
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("A selection the filter empties, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1257,7 +1257,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1277,7 +1277,7 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1288,7 +1288,7 @@ func TestHandleConsentPost(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
 
-		authHelper.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req).
 			Return(errors.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
@@ -1303,14 +1303,14 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("A selection the filter empties, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1321,7 +1321,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1341,7 +1341,7 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1355,7 +1355,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// access_denied refusal that cannot be committed. This is the site's second and separate
 		// 500, pinned on its own so a future edit cannot delete either copy unnoticed.
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "unable to parse template")
@@ -1366,21 +1366,21 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("No consent given", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1396,13 +1396,13 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// Same sentinel as the cancel case, for the second refusal in this handler. This one is
 		// reached with btnSubmit and no consent boxes ticked rather than with btnCancel.
 		const clearedContextCookie = "cleared-auth-context"
-		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -1422,19 +1422,19 @@ func TestHandleConsentPost(t *testing.T) {
 			"the auth context must be cleared before the client response is committed")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("No consent given, failing clear - server_error to the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1450,10 +1450,10 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -1466,12 +1466,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.NotContains(t, location, "access_denied")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("No consent given, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1482,7 +1482,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1498,10 +1498,10 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -1512,12 +1512,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("No consent given, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -1528,7 +1528,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1544,13 +1544,13 @@ func TestHandleConsentPost(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// The clear succeeds here and the ordinary refusal is what cannot be committed, which
 		// is this site's pre-existing 500. It is pinned separately from the last-resort one so
 		// a future edit cannot delete either copy unnoticed.
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -1561,7 +1561,7 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	// The consent checkboxes are named positionally, consent0 .. consentN, and the handler used
@@ -1782,13 +1782,13 @@ func TestHandleConsentPost(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
+				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				scopes := scopeList(tc.scopeCount)
 
@@ -1818,7 +1818,7 @@ func TestHandleConsentPost(t *testing.T) {
 					RedirectURI:  "https://example.com/callback",
 					State:        "test-state",
 				}
-				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				if tc.ceremonyMismatch {
 					expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
@@ -1834,7 +1834,7 @@ func TestHandleConsentPost(t *testing.T) {
 					// registration read. Stubbing it above the split would leave the approving
 					// rows carrying an expectation nothing calls.
 					stubRegisteredRedirectURI(database, "https://example.com/callback")
-					authHelper.On("ClearAuthContext", rr, req).Return(nil)
+					ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 					handler.ServeHTTP(rr, req)
 
@@ -1867,7 +1867,7 @@ func TestHandleConsentPost(t *testing.T) {
 					auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
 					var saved *ceremony.AuthContext
-					authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+					ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 						saved = ac
 						return true
 					})).Return(nil)
@@ -1889,7 +1889,7 @@ func TestHandleConsentPost(t *testing.T) {
 				}
 
 				pageRenderer.AssertExpectations(t)
-				authHelper.AssertExpectations(t)
+				ceremonyStore.AssertExpectations(t)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
 			})
@@ -1900,13 +1900,13 @@ func TestHandleConsentPost(t *testing.T) {
 	// what the now-deleted consent.Scope = "" blanking used to ensure (#79).
 	t.Run("Existing consent is replaced, not appended to", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -1925,7 +1925,7 @@ func TestHandleConsentPost(t *testing.T) {
 			ClientId:   "test-client",
 			Scope:      "openid profile email",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
@@ -1939,7 +1939,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.ConsentedScope == "email"
 		})).Return(nil)
 
@@ -1949,7 +1949,7 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})

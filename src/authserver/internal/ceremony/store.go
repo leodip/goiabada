@@ -1,15 +1,14 @@
-package handlerhelpers
+package ceremony
 
 import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// authSessionStore is what AuthHelper calls on the browser session store. Regenerate is in
+// authSessionStore is what Store calls on the browser session store. Regenerate is in
 // it, so a store that cannot rotate does not compile here, where it used to make
 // RegenerateSession a silent no-op (#431).
 type authSessionStore interface {
@@ -18,19 +17,23 @@ type authSessionStore interface {
 	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
 }
 
-type AuthHelper struct {
+// Store keeps a browser's AuthContext in the server-side session, under
+// sessionkeys.SessionKeyAuthContext, between the hops of one authorization ceremony. It was
+// handlerhelpers.AuthHelper until #435 moved it beside the type it persists; the handlers reach it
+// through their CeremonyStore port, and server.go's locale middleware through UILocales.
+type Store struct {
 	sessionStore authSessionStore
 	sessionName  string
 }
 
-func NewAuthHelper(sessionStore authSessionStore, sessionName string) *AuthHelper {
-	return &AuthHelper{
+func NewStore(sessionStore authSessionStore, sessionName string) *Store {
+	return &Store{
 		sessionStore: sessionStore,
 		sessionName:  sessionName,
 	}
 }
 
-func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
+func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return nil, err
@@ -40,7 +43,7 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, err
 		return nil, ErrNoAuthContext
 	}
 
-	var authContext ceremony.AuthContext
+	var authContext AuthContext
 	err = json.Unmarshal([]byte(jsonData), &authContext)
 	if err != nil {
 		return nil, err
@@ -48,7 +51,7 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, err
 	return &authContext, nil
 }
 
-func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error {
+func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
 
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
@@ -68,7 +71,7 @@ func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, aut
 	return nil
 }
 
-func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {
+func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {
 
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
@@ -86,9 +89,9 @@ func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) er
 // RegenerateSession replaces the browser session's identifier, keeping its contents.
 //
 // Handlers reach rotation through here rather than through the store, so the one port that
-// names Regenerate is this helper's and sessionstore.Store stays Get and Save for the
+// names Regenerate is this type's and sessionstore.Store stays Get and Save for the
 // hundred places that take it (#266, #431).
-func (s *AuthHelper) RegenerateSession(w http.ResponseWriter, r *http.Request) error {
+func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request) error {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
@@ -97,7 +100,7 @@ func (s *AuthHelper) RegenerateSession(w http.ResponseWriter, r *http.Request) e
 	return s.sessionStore.Regenerate(w, r, sess)
 }
 
-func (s *AuthHelper) UILocales(r *http.Request) []string {
+func (s *Store) UILocales(r *http.Request) []string {
 	authContext, err := s.GetAuthContext(r)
 	if err != nil || authContext == nil || len(authContext.UILocales) == 0 {
 		return nil

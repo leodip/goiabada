@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -33,16 +32,16 @@ type authPwdDatabase interface {
 
 func HandleAuthPwdGet(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	database authPwdDatabase,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -122,7 +121,7 @@ func HandleAuthPwdGet(
 
 func HandleAuthPwdPost(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	database authPwdDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
@@ -132,9 +131,9 @@ func HandleAuthPwdPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -343,12 +342,12 @@ func HandleAuthPwdPost(
 		// planted identifier naming a row that IS password-completed, which is exactly the
 		// state the attacker needs. Same ordering, and the same reason, as the step-up arm
 		// in handler_auth_completed.
-		if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
+		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r); regenerateSessionErr != nil {
 			pageRenderer.InternalServerError(w, r, regenerateSessionErr)
 			return
 		}
 
-		err = authHelper.SaveAuthContext(w, r, authContext)
+		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

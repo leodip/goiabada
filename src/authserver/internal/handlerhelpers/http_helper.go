@@ -21,17 +21,6 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 )
 
-// This renderer is one of two. The admin console has its own copy in
-// adminconsole/internal/handlerhelpers, and about 238 of the lines below are the same in both.
-//
-// The duplication is deliberate and is what owning a renderer costs. The single copy this
-// replaced lived in core and hid two things only one binary ever reached: the loggedInUser and
-// isAdmin page data, which no auth server template binds, and a template FuncMap of which this
-// application calls four entries out of twenty-two. Passing either in as a parameter would have
-// left one shared package behaving differently for its two callers, which is the shape #385
-// exists to remove. Drift between the two copies is the accepted price; a change worth making in
-// one is worth reading the other for (#385).
-
 type HttpHelper struct {
 	templateFS fs.FS
 }
@@ -149,6 +138,13 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {
 		return nil, reqctx.ErrNoSettings
+	}
+	// The layout's values are written into the caller's map rather than a copy, which the
+	// admin console's twin relies on and its tests read back; a nil map is therefore allocated
+	// here rather than panicking on the first write below. No caller passes nil today, so this
+	// closes a latent panic, and the twin carries the same guard (#435).
+	if data == nil {
+		data = map[string]interface{}{}
 	}
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
