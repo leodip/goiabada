@@ -21,55 +21,138 @@ type tokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
+// MiddlewareBearerToken is the bearer guard set for one surface: the parse guard, the scope guards,
+// the user-bound guard and the session guard, answering every refusal through that surface's
+// writer. routes.go builds one for the admin and account APIs and one for /userinfo, so which body a
+// refusal carries is fixed at construction and never inferred from the request (#435).
 type MiddlewareBearerToken struct {
 	tokenParser tokenParser
+	refusals    bearerRefusals
 }
 
-// NewMiddlewareBearerToken constructs middleware that extracts bearer tokens from requests.
-func NewMiddlewareBearerToken(tokenParser tokenParser) *MiddlewareBearerToken {
-	return &MiddlewareBearerToken{tokenParser: tokenParser}
+// NewMiddlewareBearerTokenForAPI builds the guard set for /api/v1/*, whose refusals answer the
+// admin and account API's {error_code, error_description} envelope.
+func NewMiddlewareBearerTokenForAPI(tokenParser tokenParser) *MiddlewareBearerToken {
+	return &MiddlewareBearerToken{tokenParser: tokenParser, refusals: apiBearerRefusals{}}
 }
 
-// JwtAuthorizationHeaderToContext is a middleware that extracts the JWT token from the Authorization header
-// or from the POST body (access_token parameter) and stores it in the context.
-// Per RFC 6750, the Authorization header takes precedence over the POST body.
-// POST body token extraction is supported per OIDC Core 1.0 Section 5.3.1 for the UserInfo endpoint.
+// NewMiddlewareBearerTokenForUserInfo builds the guard set for /userinfo, whose refusals answer
+// {error, error_description} through jsonWriter, the writer the userinfo handler answers through.
+func NewMiddlewareBearerTokenForUserInfo(tokenParser tokenParser, jsonWriter jsonErrorWriter) *MiddlewareBearerToken {
+	return &MiddlewareBearerToken{tokenParser: tokenParser, refusals: userinfoBearerRefusals{jsonWriter: jsonWriter}}
+}
+
+// bearerScheme is the auth-scheme RFC 6750 section 2.1 defines. It is compared case-insensitively:
+// that section's `credentials = "Bearer" 1*SP b64token` is ABNF, whose quoted strings are case
+// insensitive (RFC 5234 section 2.3), and RFC 9110 section 11.1 calls the auth-scheme a
+// "case-insensitive token". Before #435 only "Bearer " matched, so a client sending "bearer" was
+// refused as if it had sent nothing, where section 2.1 says resource servers MUST support the method.
+const bearerScheme = "Bearer"
+
+// invalidTokenDescription is what a presented token that is refused is told, whatever the reason.
+// One sentence for every reason, since the reasons are the signature, the expiry, the token's kind
+// and its audience, and naming which would tell a presenter which of those it got right.
+const invalidTokenDescription = "The access token is invalid."
+
+// JwtAuthorizationHeaderToContext is the one place that decides whether a bearer credential was
+// presented, and it decides it for every guard behind it. Two methods carry one, RFC 6750 section
+// 2.1's Authorization header and, for a POST with a form-encoded body, section 2.2's access_token
+// body parameter, which OIDC Core 1.0 section 5.3.1 lets the UserInfo endpoint accept. A token in
+// the URL query is section 2.3's method, which this server does not support, so it is no
+// credential at all.
+//
+// What each request is answered, and why (#435):
+//
+//   - An access_token body parameter sent more than once answers 400 invalid_request, which
+//     section 3.1 defines for a request that "repeats the same parameter". Before #435 the first
+//     copy silently won.
+//   - Both methods at once answers 400 invalid_request. RFC 6750 section 2: "Clients MUST NOT use
+//     more than one method to transmit the token in each request", and section 3.1 names that
+//     request invalid_request. Before #435 the header silently won.
+//   - A presented token that is empty, fails validation, or is not an access token for this server
+//     (isAccessTokenForAuthServer, #401) answers 401 invalid_token here and now. Every route group
+//     mounting this guard requires a token, so none is handed a refused one as though it were
+//     optional, and a refused token no longer reads as a missing one.
+//   - No credential, which includes another scheme such as Basic, passes through with nothing in the
+//     context; the scope guard behind it answers the realm-only challenge.
+//
+// A validated token is stored with reqctx.WithBearerToken, which every guard behind this reads.
 func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
+			headerToken, inHeader := bearerTokenFromHeader(r.Header.Get("Authorization"))
+			bodyToken, inBody, repeated := bearerTokenFromForm(r)
 
-			var tokenStr string
-
-			// First, try to extract token from Authorization header (takes precedence per RFC 6750)
-			const BEARER_SCHEMA = "Bearer "
-			authHeader := r.Header.Get("Authorization")
-			if strings.HasPrefix(authHeader, BEARER_SCHEMA) && len(authHeader) > len(BEARER_SCHEMA) {
-				tokenStr = authHeader[len(BEARER_SCHEMA):]
+			if repeated {
+				slog.WarnContext(r.Context(), "rejecting bearer request: the access_token parameter was repeated")
+				m.refusals.invalidRequest(w, r, "The access_token parameter must be sent once.")
+				return
+			}
+			if inHeader && inBody {
+				slog.WarnContext(r.Context(), "rejecting bearer request: the token was sent in the header and in the body")
+				m.refusals.invalidRequest(w, r, "The access token must be sent by one method only.")
+				return
+			}
+			if !inHeader && !inBody {
+				next.ServeHTTP(w, r)
+				return
 			}
 
-			// If no token in header and this is a POST request with form content type,
-			// try to extract from POST body (OIDC Core 1.0 Section 5.3.1)
-			if tokenStr == "" && r.Method == http.MethodPost {
-				contentType := r.Header.Get("Content-Type")
-				if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
-					if err := r.ParseForm(); err == nil {
-						tokenStr = r.PostFormValue("access_token")
-					}
-				}
+			tokenStr := headerToken
+			if inBody {
+				tokenStr = bodyToken
+			}
+			if tokenStr == "" {
+				slog.WarnContext(r.Context(), "rejecting bearer token: the token is empty")
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			}
+			token, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenStr, true)
+			if err != nil {
+				slog.WarnContext(r.Context(), "rejecting bearer token: the token did not validate", "error", err)
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			}
+			if !isAccessTokenForAuthServer(r.Context(), token) {
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
 			}
 
-			// Validate and store the token if found
-			if tokenStr != "" {
-				token, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenStr, true)
-				if err == nil && isAccessTokenForAuthServer(r.Context(), token) {
-					ctx = reqctx.WithBearerToken(ctx, *token)
-				}
-			}
-
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r.WithContext(reqctx.WithBearerToken(r.Context(), *token)))
 		})
 	}
+}
+
+// bearerTokenFromHeader reads RFC 6750 section 2.1's credentials, `"Bearer" 1*SP b64token`, and
+// reports whether the header presents a Bearer credential at all. The scheme alone, or followed by
+// spaces only, presents an empty one, which the caller refuses as invalid rather than treating as
+// absent. Any other scheme, and a header that is absent, present nothing.
+func bearerTokenFromHeader(authorization string) (string, bool) {
+	scheme, rest, _ := strings.Cut(authorization, " ")
+	if !strings.EqualFold(scheme, bearerScheme) {
+		return "", false
+	}
+	return strings.TrimLeft(rest, " "), true
+}
+
+// bearerTokenFromForm reads RFC 6750 section 2.2's access_token body parameter, which applies to a
+// POST whose body is application/x-www-form-urlencoded, and reports whether the parameter was
+// present, empty included, and whether it was sent more than once. The body alone is read, never
+// the query: r.PostForm, not r.Form, since a token in the URL is section 2.3's method, which this
+// server does not support. A body that does not parse presents nothing, as before #435.
+func bearerTokenFromForm(r *http.Request) (token string, present bool, repeated bool) {
+	if r.Method != http.MethodPost ||
+		!strings.HasPrefix(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
+		return "", false, false
+	}
+	if err := r.ParseForm(); err != nil {
+		return "", false, false
+	}
+	values := r.PostForm["access_token"]
+	if len(values) == 0 {
+		return "", false, false
+	}
+	return values[0], true, len(values) > 1
 }
 
 // isAccessTokenForAuthServer admits a validly signed token as a bearer credential only when it
@@ -85,8 +168,8 @@ func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Hand
 // bearer-guarded route serves already does. GetAudience is the parser's own StringOrURI reading:
 // a single string, or an array of strings, which arrives from a parsed token as []interface{}.
 //
-// A refused token is treated as absent, so the route answers exactly as it does for a token that
-// does not parse, which is what #401 asks for.
+// A refused token is answered exactly as a token that does not parse, which is what #401 asks for:
+// 401 invalid_token since #435, where both used to read as a missing token.
 func isAccessTokenForAuthServer(ctx context.Context, token *oauth.JwtToken) bool {
 	if typ := token.GetStringClaim("typ"); typ != issuance.TokenTypeBearer.String() {
 		slog.WarnContext(ctx, "rejecting bearer token: not an access token", "typ", typ)

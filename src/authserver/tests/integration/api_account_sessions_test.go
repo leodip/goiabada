@@ -263,7 +263,7 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
-	assert.Contains(t, string(body2), "Access token required.")
+	assert.Contains(t, string(body2), "The access token is invalid.")
 
 	// Insufficient scope
 	tok := createClientCredentialsTokenWithoutRouteScope(t)

@@ -41,7 +41,7 @@ import "net/http"
 //
 // Mount it FIRST in each group, ahead of the debug middleware and every auth
 // guard. That is a requirement rather than a preference: the 401 and 403
-// refusals are written by emitAuthError, which sets its own Content-Type and
+// refusals are written by the guard set's refusal writer, which sets its own Content-Type and
 // calls WriteHeader, so anything mounted behind the guards would never write
 // the pair on a refusal, and a refusal body is within RFC 6749 section 5.1's
 // "other sensitive information" too.

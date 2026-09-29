@@ -494,7 +494,8 @@ func userInfoRequestForScopes(t *testing.T, sub string, oidcScopes string) *http
 }
 
 // isUserInfoInvalidToken is what both refusal branches of /userinfo now carry: RFC 6750 section
-// 3.1's invalid_token, 401, and the challenge that tells the client which error it is.
+// 3.1's invalid_token, 401, and the challenge that tells the client which error it is, with the
+// realm every bearer challenge on this server carries (#435).
 //
 // errors.As rather than the bare assertion these cases used, so a wrap on the way to JsonError
 // could not turn the whole expectation into a panic in a mock matcher (#279 decision 6).
@@ -506,7 +507,8 @@ func isUserInfoInvalidToken(err error, description string) bool {
 	return detail.GetCode() == "invalid_token" &&
 		detail.GetDescription() == description &&
 		detail.GetHttpStatusCode() == http.StatusUnauthorized &&
-		detail.GetWWWAuthenticate() == `Bearer error="invalid_token"`
+		detail.GetWWWAuthenticate() ==
+			`Bearer realm="goiabada", error="invalid_token", error_description="`+description+`"`
 }
 
 // The two cases above assert on the value handed to a mocked writer, which cannot say what a
@@ -561,7 +563,8 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusUnauthorized, rr.Code)
-			assert.Equal(t, `Bearer error="invalid_token"`, rr.Header().Get("WWW-Authenticate"))
+			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="`+test.description+`"`,
+				rr.Header().Get("WWW-Authenticate"))
 
 			var body map[string]interface{}
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))

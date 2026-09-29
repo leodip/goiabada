@@ -12,7 +12,6 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 
-	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -252,7 +251,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			if len(input.ClientSecret) == 0 {
 				// RFC 6749 Section 5.2: invalid_client for missing credentials
 				if input.UsedBasicAuth {
-					return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 						clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
 				}
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
@@ -266,7 +265,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			if subtle.ConstantTimeCompare([]byte(clientSecretDecrypted), []byte(input.ClientSecret)) != 1 {
 				// RFC 6749 Section 5.2: invalid_client for failed authentication
 				if input.UsedBasicAuth {
-					return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 						"Client authentication failed. Please review your client_secret.",
 						http.StatusUnauthorized, "Basic")
 				}
@@ -453,7 +452,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 		if len(input.ClientSecret) == 0 {
 			// RFC 6749 Section 5.2: invalid_client for missing credentials
 			if input.UsedBasicAuth {
-				return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+				return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
 			}
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
@@ -467,7 +466,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 		if subtle.ConstantTimeCompare([]byte(clientSecretDescrypted), []byte(input.ClientSecret)) != 1 {
 			// RFC 6749 Section 5.2: invalid_client for failed authentication
 			if input.UsedBasicAuth {
-				return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+				return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 					"Client authentication failed.", http.StatusUnauthorized, "Basic")
 			}
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
@@ -546,7 +545,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			if len(input.ClientSecret) == 0 {
 				// RFC 6749 Section 5.2: invalid_client for missing credentials
 				if input.UsedBasicAuth {
-					return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 						clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
 				}
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
@@ -560,7 +559,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			if subtle.ConstantTimeCompare([]byte(clientSecretDecrypted), []byte(input.ClientSecret)) != 1 {
 				// RFC 6749 Section 5.2: invalid_client for failed authentication
 				if input.UsedBasicAuth {
-					return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 						"Client authentication failed. Please review your client_secret.",
 						http.StatusUnauthorized, "Basic")
 				}
@@ -1002,7 +1001,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			if len(input.ClientSecret) == 0 {
 				// RFC 6749 Section 5.2: invalid_client for missing credentials
 				if input.UsedBasicAuth {
-					return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 						clientSecretRequiredErrorMsg, http.StatusUnauthorized, "Basic")
 				}
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
@@ -1016,7 +1015,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 			if subtle.ConstantTimeCompare([]byte(clientSecretDecrypted), []byte(input.ClientSecret)) != 1 {
 				// RFC 6749 Section 5.2: invalid_client for failed authentication
 				if input.UsedBasicAuth {
-					return nil, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+					return nil, NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
 						"Client authentication failed.", http.StatusUnauthorized, "Basic")
 				}
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",

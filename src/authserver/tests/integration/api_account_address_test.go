@@ -224,7 +224,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = respInvalid.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, respInvalid.StatusCode)
 	bodyInvalid, _ := io.ReadAll(respInvalid.Body)
-	assert.Contains(t, string(bodyInvalid), "Access token required.")
+	assert.Contains(t, string(bodyInvalid), "The access token is invalid.")
 
 	// Insufficient scope
 	tok := createClientCredentialsTokenWithoutRouteScope(t)

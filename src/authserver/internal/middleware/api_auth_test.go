@@ -25,9 +25,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// apiBearerForTest is the API surface's guard set. These tests drive the scope, user-bound and
+// session guards with a token already in the context, so the parser is never reached; the whole
+// chain from the header to the refusal, on both surfaces, is bearer_guard_chain_test.go's.
+var apiBearerForTest = NewMiddlewareBearerTokenForAPI(nil)
+
 func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("passes when token has required scope", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -52,7 +57,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	})
 
 	t.Run("passes when token has only the required scope", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -77,7 +82,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	})
 
 	t.Run("returns 403 when token lacks required scope", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -102,7 +107,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	})
 
 	t.Run("returns 403 when scope claim is empty string", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -127,7 +132,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	})
 
 	t.Run("returns 403 when scope claim is missing", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -152,7 +157,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	})
 
 	t.Run("returns 401 when token is missing", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 
@@ -169,7 +174,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	})
 
 	t.Run("does not match partial scope names", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -194,7 +199,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	})
 
 	t.Run("adds validated token to context", func(t *testing.T) {
-		handler := RequireBearerTokenScope("authserver:manage")
+		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -223,7 +228,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 
 func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	t.Run("passes when token has first scope", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -248,7 +253,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	})
 
 	t.Run("passes when token has second scope", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -273,7 +278,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	})
 
 	t.Run("passes when token has any of three scopes", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{
 			"authserver:admin-read",
 			"authserver:manage-users",
 			"authserver:manage",
@@ -302,7 +307,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	})
 
 	t.Run("returns 403 when token has none of the required scopes", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -327,7 +332,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	})
 
 	t.Run("returns 401 when token is missing", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 
@@ -344,7 +349,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	})
 
 	t.Run("adds validated token to context", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -373,7 +378,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 
 func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	t.Run("returns 403 when empty scope list is provided", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -398,7 +403,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("returns 403 when scope claim is empty string", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -423,7 +428,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("returns 403 when scope claim is missing", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -448,7 +453,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("does not match partial scope names", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -473,7 +478,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("passes with single scope in list", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -498,7 +503,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("passes when token has last scope in list", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{
 			"authserver:admin-read",
 			"authserver:manage-users",
 			"authserver:manage-clients",
@@ -528,7 +533,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("passes when token has multiple matching scopes", func(t *testing.T) {
-		handler := RequireBearerTokenScopeAnyOf([]string{
+		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{
 			"authserver:admin-read",
 			"authserver:manage",
 		})
@@ -601,7 +606,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should pass for read
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireBearerTokenScopeAnyOf(scopesUsersRead)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesUsersRead)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.True(t, nextCalled, "admin-read should access users read endpoints")
@@ -609,7 +614,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should fail for write
 		rr = httptest.NewRecorder()
 		nextCalled = false
-		RequireBearerTokenScopeAnyOf(scopesUsers)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesUsers)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.False(t, nextCalled, "admin-read should NOT access users write endpoints")
@@ -630,7 +635,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should pass for read
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireBearerTokenScopeAnyOf(scopesUsersRead)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesUsersRead)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.True(t, nextCalled, "manage-users should access users read endpoints")
@@ -638,7 +643,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should pass for write
 		rr = httptest.NewRecorder()
 		nextCalled = false
-		RequireBearerTokenScopeAnyOf(scopesUsers)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesUsers)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.True(t, nextCalled, "manage-users should access users write endpoints")
@@ -658,7 +663,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should fail for clients read
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireBearerTokenScopeAnyOf(scopesClientsRead)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesClientsRead)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.False(t, nextCalled, "manage-users should NOT access clients read endpoints")
@@ -667,7 +672,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should fail for clients write
 		rr = httptest.NewRecorder()
 		nextCalled = false
-		RequireBearerTokenScopeAnyOf(scopesClients)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesClients)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.False(t, nextCalled, "manage-users should NOT access clients write endpoints")
@@ -694,7 +699,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		for _, scopes := range allScopeSets {
 			rr := httptest.NewRecorder()
 			nextCalled := false
-			RequireBearerTokenScopeAnyOf(scopes)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			apiBearerForTest.RequireBearerTokenScopeAnyOf(scopes)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				nextCalled = true
 			})).ServeHTTP(rr, req)
 			assert.True(t, nextCalled, "manage should access all endpoints")
@@ -717,7 +722,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		for _, scopes := range readScopeSets {
 			rr := httptest.NewRecorder()
 			nextCalled := false
-			RequireBearerTokenScopeAnyOf(scopes)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			apiBearerForTest.RequireBearerTokenScopeAnyOf(scopes)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				nextCalled = true
 			})).ServeHTTP(rr, req)
 			assert.True(t, nextCalled, "admin-read should access all read endpoints")
@@ -740,7 +745,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		for _, scopes := range writeScopeSets {
 			rr := httptest.NewRecorder()
 			nextCalled := false
-			RequireBearerTokenScopeAnyOf(scopes)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			apiBearerForTest.RequireBearerTokenScopeAnyOf(scopes)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				nextCalled = true
 			})).ServeHTTP(rr, req)
 			assert.False(t, nextCalled, "admin-read should NOT access write endpoints")
@@ -762,7 +767,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should access users
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireBearerTokenScopeAnyOf(scopesUsers)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesUsers)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.True(t, nextCalled, "should access users")
@@ -770,7 +775,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should access clients
 		rr = httptest.NewRecorder()
 		nextCalled = false
-		RequireBearerTokenScopeAnyOf(scopesClients)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesClients)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.True(t, nextCalled, "should access clients")
@@ -778,7 +783,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		// Should NOT access settings
 		rr = httptest.NewRecorder()
 		nextCalled = false
-		RequireBearerTokenScopeAnyOf(scopesSettings)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireBearerTokenScopeAnyOf(scopesSettings)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 		assert.False(t, nextCalled, "should NOT access settings")
@@ -805,7 +810,7 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.True(t, nextCalled, "next handler should be called")
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -831,7 +836,7 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.True(t, nextCalled, "next handler should be called")
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -871,7 +876,7 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.True(t, nextCalled, "next handler should be called")
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -903,12 +908,12 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.False(t, nextCalled, "next handler should NOT be called")
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 		wwwAuth := rr.Header().Get("WWW-Authenticate")
-		assert.Contains(t, wwwAuth, `Bearer error="invalid_token"`)
+		assert.Contains(t, wwwAuth, `Bearer realm="goiabada", error="invalid_token"`)
 		assert.Contains(t, wwwAuth, "Session has been terminated")
 	})
 
@@ -945,12 +950,12 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.False(t, nextCalled, "next handler should NOT be called")
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 		wwwAuth := rr.Header().Get("WWW-Authenticate")
-		assert.Contains(t, wwwAuth, `Bearer error="invalid_token"`)
+		assert.Contains(t, wwwAuth, `Bearer realm="goiabada", error="invalid_token"`)
 		assert.Contains(t, wwwAuth, "Session has expired")
 	})
 
@@ -989,7 +994,7 @@ func TestRequireValidSession(t *testing.T) {
 		})
 
 		capture := logtest.CaptureSlog(t)
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.False(t, nextCalled, "next handler should NOT be called when settings are missing")
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -999,7 +1004,7 @@ func TestRequireValidSession(t *testing.T) {
 		logged, isError := records[0].Attrs["error"].(error)
 		require.True(t, isError, "the error attribute must carry the error value itself")
 		assert.ErrorIs(t, logged, reqctx.ErrNoSettings)
-		// 500 path uses http.Error, not the bearer-auth helper, so no WWW-Authenticate.
+		// The 500 path answers a server fault, not a challenge, so no WWW-Authenticate.
 		assert.Empty(t, rr.Header().Get("WWW-Authenticate"))
 	})
 
@@ -1036,7 +1041,7 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.False(t, nextCalled, "next handler should NOT be called when the settings are a nil pointer")
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -1068,11 +1073,11 @@ func TestRequireValidSession(t *testing.T) {
 			nextCalled = true
 		})
 
-		RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+		apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 		assert.False(t, nextCalled, "next handler should NOT be called")
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
-		// 500 path uses http.Error, not the bearer-auth helper, so no WWW-Authenticate.
+		// The 500 path answers a server fault, not a challenge, so no WWW-Authenticate.
 		assert.Empty(t, rr.Header().Get("WWW-Authenticate"))
 	})
 
@@ -1097,7 +1102,7 @@ func TestRequireValidSession(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-		RequireValidSession(mockDB)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).
+		apiBearerForTest.RequireValidSession(mockDB)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).
 			ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
@@ -1482,16 +1487,16 @@ func TestRequireValidSession_Table(t *testing.T) {
 			nextCalled := false
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { nextCalled = true })
 
-			RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+			apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 			assert.Equal(t, tc.wantStatus, rr.Code, "status")
 			assert.Equal(t, tc.wantNext, nextCalled, "next handler called")
 
 			if tc.wantDescription != "" {
-				// Both surfaces, because rejectInvalidToken writes the description twice
+				// Both surfaces, because the refusal writer writes the description twice
 				// and a specialised message could be introduced in either one alone.
 				assert.Equal(t,
-					`Bearer error="invalid_token", error_description="`+tc.wantDescription+`"`,
+					`Bearer realm="goiabada", error="invalid_token", error_description="`+tc.wantDescription+`"`,
 					rr.Header().Get("WWW-Authenticate"), "challenge")
 
 				var body api.ErrorResponse
@@ -1568,7 +1573,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 
@@ -1595,7 +1600,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 
@@ -1618,14 +1623,15 @@ func TestRequireUserBoundToken(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 
 		assert.False(t, nextCalled)
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 		assert.Equal(t, "ACCESS_TOKEN_REQUIRED", decodeErrorCode(t, rr))
-		assert.Contains(t, rr.Header().Get("WWW-Authenticate"), `error="invalid_token"`)
+		// RFC 6750 section 3.1: a request with no credential is told the realm and no error.
+		assert.Equal(t, `Bearer realm="goiabada"`, rr.Header().Get("WWW-Authenticate"))
 	})
 
 	t.Run("a zero auth_time is present and therefore accepted", func(t *testing.T) {
@@ -1645,7 +1651,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiBearerForTest.RequireUserBoundToken()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 
@@ -1679,7 +1685,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { nextCalled = true })
 
 	capture := logtest.CaptureSlog(t)
-	RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
+	apiBearerForTest.RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 	assert.False(t, nextCalled)
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -1741,7 +1747,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		apiBearerForTest.RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 
@@ -1760,7 +1766,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
-		RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		apiBearerForTest.RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		})).ServeHTTP(rr, req)
 

@@ -162,8 +162,15 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 	for _, route := range bearerKindRoutes() {
 		unparseable := sendBearer(t, route, "not-a-jwt")
 		require.Equal(t, http.StatusUnauthorized, unparseable.status, "%s: the baseline is a 401", route.name)
-		require.Contains(t, unparseable.wwwAuthenticate, `error="invalid_token"`)
-		require.Contains(t, unparseable.body, "ACCESS_TOKEN_REQUIRED")
+		require.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+			unparseable.wwwAuthenticate)
+		// A presented token that is refused is invalid_token, never read as a missing one, in each
+		// surface's own body (#435).
+		if strings.HasPrefix(route.path, "/userinfo") {
+			require.JSONEq(t, `{"error":"invalid_token","error_description":"The access token is invalid."}`, unparseable.body)
+		} else {
+			require.JSONEq(t, `{"error_code":"INVALID_TOKEN","error_description":"The access token is invalid."}`, unparseable.body)
+		}
 
 		for _, tc := range tokens {
 			t.Run(route.name+", "+tc.name, func(t *testing.T) {

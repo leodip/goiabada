@@ -154,7 +154,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 	//
 	// /userinfo gates on openid, which a client credentials token can never carry, since that
 	// grant refuses every OpenID Connect scope. So the token stops at the scope check, ahead of
-	// RequireUserBoundToken, and both subtests expect 403 INSUFFICIENT_SCOPE (#449 decision 3).
+	// RequireUserBoundToken, and both subtests expect 403 insufficient_scope (#449 decision 3, #435).
 	// The client holds manage-account for the same reason the first subtest's does: a real
 	// built-in, so the token is a valid one that is simply not a user's.
 	userinfoSubject := newUserSubjectValidAsClientIdentifier(t)
@@ -195,10 +195,11 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 		// Keep this: USER_CONTEXT_REQUIRED until #449, when the fixture client held the userinfo
 		// permission and so passed the scope check.
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		var errResp api.ErrorResponse
+		// /userinfo answers the RFC 6749 shape, insufficient_scope, not the API envelope (#435).
+		var errResp map[string]string
 		body, _ := io.ReadAll(resp.Body)
 		_ = json.Unmarshal(body, &errResp)
-		assert.Equal(t, "INSUFFICIENT_SCOPE", errResp.ErrorCode, "unexpected body: %s", string(body))
+		assert.Equal(t, "insufficient_scope", errResp["error"], "unexpected body: %s", string(body))
 	})
 
 	// GET and POST /userinfo are separate route registrations, so a guard added to only
@@ -218,10 +219,11 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 		// Keep this: USER_CONTEXT_REQUIRED until #449, when the fixture client held the userinfo
 		// permission and so passed the scope check.
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		var errResp api.ErrorResponse
+		// /userinfo answers the RFC 6749 shape, insufficient_scope, not the API envelope (#435).
+		var errResp map[string]string
 		body, _ := io.ReadAll(resp.Body)
 		_ = json.Unmarshal(body, &errResp)
-		assert.Equal(t, "INSUFFICIENT_SCOPE", errResp.ErrorCode, "unexpected body: %s", string(body))
+		assert.Equal(t, "insufficient_scope", errResp["error"], "unexpected body: %s", string(body))
 	})
 }
 

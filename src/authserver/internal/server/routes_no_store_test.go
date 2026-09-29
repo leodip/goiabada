@@ -26,7 +26,7 @@ import (
 //
 // Every route is called WITHOUT credentials, which is deliberate on two counts. It is the case the
 // mount position exists for, since RFC 6749 section 5.1's "other sensitive information" covers a
-// refusal body and emitAuthError commits its own status; and it means no handler is ever reached,
+// refusal body and the guards' refusal writer commits its own status; and it means no handler is ever reached,
 // so the database mock needs no expectations and this test does not break when a handler changes.
 //
 // WHAT THIS DOES NOT OWN, and must not be described as owning (decision 16). It builds initRoutes

@@ -83,7 +83,7 @@ func (e *ErrorDetail) WithDescription(description string) *ErrorDetail {
 //
 // Per RFC 6749 section 5.2, a client that attempted to authenticate through the Authorization
 // header and failed must be answered 401 with a WWW-Authenticate header; building that value is
-// the auth server's, in authserver/internal/apiresponse, because only a provider issues the
+// the auth server's, in authserver/internal/protocolvalidation, because only a provider issues the
 // challenge.
 func (e *ErrorDetail) WithWWWAuthenticate(wwwAuthenticate string) *ErrorDetail {
 	details := make(map[string]string, len(e.details)+1)
