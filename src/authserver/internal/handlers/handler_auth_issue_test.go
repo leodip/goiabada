@@ -64,7 +64,7 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handl
 func TestHandleIssueGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -73,7 +73,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -83,7 +83,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{} // Create an appropriate error
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
@@ -92,12 +92,12 @@ func TestHandleIssueGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -106,7 +106,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -118,7 +118,7 @@ func TestHandleIssueGet(t *testing.T) {
 		authContext := &ceremony.AuthContext{
 			AuthState: ceremony.AuthStateInitial, // Unexpected state
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
@@ -127,12 +127,12 @@ func TestHandleIssueGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Successfully issues a code", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -141,7 +141,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The positive control for the liveness check (#129 stage 6): the ordinary ceremony,
 		// with a session identifier in the context and a session row behind it. It fails
@@ -161,7 +161,7 @@ func TestHandleIssueGet(t *testing.T) {
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		stubLiveSession(database, 123)
 
@@ -190,7 +190,7 @@ func TestHandleIssueGet(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -203,7 +203,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// Verify that all expected actions were performed
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -224,7 +224,7 @@ func TestHandleIssueGet(t *testing.T) {
 	// forbids UI cannot be sent to a password form.
 	t.Run("No session identifier in the context, restarts level 1", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -233,7 +233,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// An empty identifier is the shape the terminated ceremony actually arrives in:
 		// MiddlewareSessionIdentifier finds the row gone, deletes the identifier from the
@@ -255,10 +255,10 @@ func TestHandleIssueGet(t *testing.T) {
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		var savedAuthContext *ceremony.AuthContext
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			savedAuthContext = ac
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
@@ -276,13 +276,13 @@ func TestHandleIssueGet(t *testing.T) {
 		database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
 
 	t.Run("Session identifier resolves to no session, restarts level 1", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -291,7 +291,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The narrower half of the same predicate: the middleware saw the session alive on
 		// this very request and the termination committed immediately afterwards, so the
@@ -309,11 +309,11 @@ func TestHandleIssueGet(t *testing.T) {
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
@@ -325,14 +325,14 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
 
 	t.Run("No session and prompt=none, returns login_required to the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -342,7 +342,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The same empty identifier as the row above, arriving from handlePromptNone rather
 		// than from the consent screen: it validated and bumped the session, redirected here,
@@ -365,7 +365,7 @@ func TestHandleIssueGet(t *testing.T) {
 			State:        "test-state",
 			Prompt:       "none",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// Asserting that ClearAuthContext was called says nothing about whether the clear
@@ -374,7 +374,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// is dropped. The stub writes a sentinel where the CookieStore would write that
 		// cookie, so the committed response is what carries the assertion below.
 		const clearedContextCookie = "cleared-auth-context"
-		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -398,16 +398,16 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// The ceremony ends here rather than being restarted, so the state the interactive
 		// rows assert is never saved.
-		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
 
 	t.Run("No session and prompt=none, failing clear - server_error to the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -417,7 +417,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -437,14 +437,14 @@ func TestHandleIssueGet(t *testing.T) {
 			State:        "test-state",
 			Prompt:       "none",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// This site's ordering was already correct, so what changes here is only the failure
 		// branch: a failed clear writes no cookie, so the browser keeps the auth context whether
 		// this answers 500 or redirects, and the client is owed its error response either way
 		// (#141 decision 7). It used to get nothing at all.
-		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -460,16 +460,16 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.NotContains(t, location, "login_required")
 		assert.NotContains(t, location, "/auth/level1")
 
-		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
 
 	t.Run("No session and prompt=none, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -484,7 +484,7 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -504,10 +504,10 @@ func TestHandleIssueGet(t *testing.T) {
 			State:        "test-state",
 			Prompt:       "none",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort.
@@ -522,13 +522,13 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
 
 	t.Run("No session and prompt=none, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -541,7 +541,7 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -561,13 +561,13 @@ func TestHandleIssueGet(t *testing.T) {
 			State:        "test-state",
 			Prompt:       "none",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// The other half of the same family: the clear succeeds and it is the ordinary
 		// login_required refusal that cannot be committed. This 500 predates #141 and is pinned
 		// separately so a future edit cannot delete either copy unnoticed.
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -580,13 +580,13 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
 
 	t.Run("Session lookup fails", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -595,7 +595,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -610,7 +610,7 @@ func TestHandleIssueGet(t *testing.T) {
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// A database fault must not read as a terminated session, and must not read as a
 		// live one either: no code is minted and no restart is offered.
@@ -628,12 +628,12 @@ func TestHandleIssueGet(t *testing.T) {
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
-		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("The commit fails, so no code reaches the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -642,7 +642,7 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -657,7 +657,7 @@ func TestHandleIssueGet(t *testing.T) {
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		stubLiveSession(database, 123)
 
@@ -692,7 +692,7 @@ func TestHandleIssueGet(t *testing.T) {
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 	})
 }
 
@@ -740,7 +740,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// takes these rows the other way round is answered by the helper rerunning this body (#301).
 	t.Run("The transaction is the acquisition then the insert, and nothing else", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -749,14 +749,14 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database,
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database,
 			auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := issuanceAuthContext("")
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubLiveSession(database, 123)
 
 		// Every statement on the transaction records itself, so the assertion below is about the
@@ -775,7 +775,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -791,14 +791,14 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		assert.Contains(t, rr.Header().Get("Location"), "code=test-code")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
 
 	t.Run("The row is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -807,13 +807,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := issuanceAuthContext("")
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubLiveSession(database, 123)
 
 		// The order of these two is the assertion, not a detail. Every path out of the refusal
@@ -830,7 +830,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 
 		var savedAuthContext *ceremony.AuthContext
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Run(func(args mock.Arguments) {
 			order = append(order, "save")
@@ -858,10 +858,10 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		// refusal sentinel, which is how it asks for a rollback rather than a commit.
 		assert.ErrorIs(t, stub.BodyErr, errIssuanceRefused)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
@@ -875,7 +875,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// wrong with this server, the application the browser was signing in to no longer exists.
 	t.Run("The client is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -884,13 +884,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := issuanceAuthContext("")
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubLiveSession(database, 123)
 
 		// The session is alive here, which is the point: this ceremony is refused for a reason
@@ -906,7 +906,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).
 			Return(nil, errs.WithStack(issuance.ErrIssuingClientGone)).Once()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Run(func(mock.Arguments) { order = append(order, "save") }).Return(nil)
 
@@ -931,7 +931,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
@@ -940,7 +940,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// this one condition rather than a blanket softening of the insert's errors.
 	t.Run("An ordinary insert failure is still a 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -949,13 +949,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := issuanceAuthContext("")
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubLiveSession(database, 123)
 
 		boom := errs.New("the insert failed")
@@ -972,7 +972,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 		assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
 		assert.NotContains(t, rr.Header().Get("Location"), "code=")
-		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assert.ErrorIs(t, stub.BodyErr, boom, "the body hands its error to the helper unchanged, which rolls back")
 
 		pageRenderer.AssertExpectations(t)
@@ -982,7 +982,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 	t.Run("The row is gone and the ceremony is silent, so the client is answered login_required", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -992,19 +992,19 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := issuanceAuthContext("none")
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 		stubLiveSession(database, 123)
 
 		stub := mocks_data.ExpectRunInTransaction(database, issuanceTx)
 		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1021,11 +1021,11 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		assert.NotContains(t, location, "code=")
 		assert.NotContains(t, location, "/auth/level1")
 
-		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assert.ErrorIs(t, stub.BodyErr, errIssuanceRefused)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 	})
@@ -1063,7 +1063,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
+				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 				templateFS := fstest.MapFS{}
 				codeIssuer := mocks_handlers.NewCodeIssuer(t)
 				implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1072,13 +1072,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				userSessionManager := mocks_handlers.NewUserSessionManager(t)
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 				rr := httptest.NewRecorder()
 
 				authContext := issuanceAuthContext("")
-				authHelper.On("GetAuthContext", req).Return(authContext, nil)
+				ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 				stubLiveSession(database, 123)
 				stub := tc.setup(database)
 
@@ -1094,8 +1094,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				// sent to the client.
 				assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
 				assert.NotContains(t, rr.Header().Get("Location"), "code=")
-				authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-				authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+				ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+				ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 				if stub != nil {
 					assert.ErrorIs(t, stub.BodyErr, boom, "the body hands its error to the helper unchanged, which rolls back")
@@ -1150,7 +1150,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	for _, family := range issuanceFamilies {
 		t.Run("Foreign ambient session restarts level 1: "+family.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			authHelper := mocks_handlers.NewAuthHelper(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1159,7 +1159,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1175,14 +1175,14 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 				RedirectURI:  "https://example.com/callback",
 				State:        "test-state",
 			}
-			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 			// The row resolves, so this is not the liveness case #129 closed. It simply
 			// belongs to someone else.
 			stubLiveSession(database, foreignSessionUserId)
 
 			var savedAuthContext *ceremony.AuthContext
-			authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				savedAuthContext = ac
 				return ac.AuthState == ceremony.AuthStateRequiresLevel1
 			})).Return(nil)
@@ -1209,10 +1209,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			// The ceremony is restarted rather than ended, so the context survives to be
 			// rebuilt at /auth/level1.
-			authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 
 			pageRenderer.AssertExpectations(t)
-			authHelper.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
 			database.AssertExpectations(t)
 			codeIssuer.AssertExpectations(t)
 			implicitTokenIssuer.AssertExpectations(t)
@@ -1237,7 +1237,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	for _, family := range promptNoneFamilies {
 		t.Run("Foreign ambient session and prompt=none returns login_required: "+family.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			authHelper := mocks_handlers.NewAuthHelper(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1247,7 +1247,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1264,11 +1264,11 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 				State:        "test-state",
 				Prompt:       "none",
 			}
-			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 			stubLiveSession(database, foreignSessionUserId)
 			stubClientProvenanceLookup(database)
-			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 			armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1290,10 +1290,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assertWarnedForeignSession(t, logs, authContext.UserId)
 
 			// A silent ceremony ends here rather than restarting, so no state is saved.
-			authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 			pageRenderer.AssertExpectations(t)
-			authHelper.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
 			database.AssertExpectations(t)
 			codeIssuer.AssertExpectations(t)
 			implicitTokenIssuer.AssertExpectations(t)
@@ -1306,7 +1306,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	// ceremony's own, which is what the whole change is careful not to break.
 	t.Run("Own ambient session still issues implicit tokens carrying its identifier", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1315,7 +1315,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -1331,7 +1331,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			State:        "test-state",
 			AuthMethods:  "pwd",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		stubLiveSession(database, 123)
 
@@ -1350,7 +1350,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1363,7 +1363,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		assert.NotContains(t, location, "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		implicitTokenIssuer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1388,7 +1388,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	t.Run("Implicit request whose session row has vanished restarts level 1", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1397,7 +1397,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1412,14 +1412,14 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// Non-empty identifier, no row. The carve-out asks about the identifier, so it does
 		// not apply here, and OwnsSession(nil) is false.
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 
 		var savedAuthContext *ceremony.AuthContext
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			savedAuthContext = ac
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
@@ -1442,14 +1442,14 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assertWarnedSessionGone(t, logs)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		implicitTokenIssuer.AssertExpectations(t)
 	})
 
 	t.Run("Implicit request whose session row has vanished and prompt=none returns login_required", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1459,7 +1459,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1475,11 +1475,11 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 			State:        "test-state",
 			Prompt:       "none",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1495,11 +1495,11 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assertWarnedSessionGone(t, logs)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		implicitTokenIssuer.AssertExpectations(t)
 	})
@@ -1685,7 +1685,7 @@ func TestIsImplicitFlow(t *testing.T) {
 func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow with token response type", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1694,7 +1694,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1723,7 +1723,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			AuthStateGeneration: 7,
 			AuthMethods:         "pwd",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// Mock client lookup
 		mockClient := &models.Client{
@@ -1760,7 +1760,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1775,7 +1775,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		assert.Contains(t, location, "state=test-state")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		implicitTokenIssuer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1783,7 +1783,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow with id_token response type", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1792,7 +1792,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1817,7 +1817,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			AuthStateGeneration: 7,
 			AuthMethods:         "pwd",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{
 			Id:               1,
@@ -1846,7 +1846,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return details["issueAccessToken"] == false && details["issueIdToken"] == true
 		})).Return()
 
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1860,7 +1860,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		assert.NotContains(t, location, "access_token=")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		implicitTokenIssuer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1868,7 +1868,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow with id_token token response type", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1877,7 +1877,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1902,7 +1902,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			AuthStateGeneration: 7,
 			AuthMethods:         "pwd",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{
 			Id:               1,
@@ -1934,7 +1934,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return details["issueAccessToken"] == true && details["issueIdToken"] == true
 		})).Return()
 
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1950,7 +1950,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		assert.Contains(t, location, "state=test-state")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		implicitTokenIssuer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1958,7 +1958,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow uses consented scope when available", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -1967,7 +1967,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -1985,7 +1985,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ConsentedScope: "openid profile", // User consented to less
 			State:          "test-state",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
@@ -2004,7 +2004,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}), true, false).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -2024,7 +2024,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	// the withheld page and never names a client on it.
 	t.Run("Implicit flow, the client vanished - the redirect is withheld rather than emitted", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -2033,7 +2033,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2050,14 +2050,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ResponseType: "token",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "unknown-client").Return(nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["clientId"] == "unknown-client" && details["userId"] == int64(123)
 		})).Return()
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		// No clientName in the bind: renderRedirectBlocked leaves it out when the client could
 		// not be resolved, because saying anything about the application would be a claim this
@@ -2081,7 +2081,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow error - user not found", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -2090,7 +2090,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2107,7 +2107,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ResponseType: "token",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
@@ -2128,7 +2128,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow error - token generation fails", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -2137,7 +2137,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2153,7 +2153,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			Scope:        "openid",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
@@ -2422,7 +2422,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	t.Run("Implicit flow error - database error on client lookup", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -2431,7 +2431,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2448,7 +2448,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			ResponseType: "token",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		dbError := errs.New("database connection failed")
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, dbError)
@@ -2467,7 +2467,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 	t.Run("Implicit flow error - database error on user lookup", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -2476,7 +2476,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2493,7 +2493,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			ResponseType: "token",
 			RedirectURI:  "https://example.com/callback",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
@@ -2515,7 +2515,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 	t.Run("Implicit flow error - clear auth context fails", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -2524,7 +2524,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -2540,7 +2540,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			Scope:        "openid",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
@@ -2558,7 +2558,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 
 		clearError := errs.New("failed to clear auth context")
-		authHelper.On("ClearAuthContext", rr, req).Return(clearError)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(clearError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == clearError
@@ -2569,7 +2569,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 }
 
@@ -3344,7 +3344,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -3353,7 +3353,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3373,7 +3373,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:          "test-state",
 			IdTokenHintSub: userSubject,
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// Mock user lookup - subject matches IdTokenHintSub
 		mockUser := &models.User{
@@ -3406,7 +3406,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -3419,7 +3419,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Verify all expectations
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -3427,7 +3427,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub set different user - returns login_required", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -3437,7 +3437,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3460,7 +3460,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:          "test-state",
 			IdTokenHintSub: userASubject, // Hint says user A
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// Mock user lookup - authenticated user is user B (DIFFERENT)
@@ -3479,7 +3479,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// shows it under either ordering, while rr.Result() reads the snapshot taken when the
 		// status line was written.
 		const clearedContextCookie = "cleared-auth-context"
-		authHelper.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -3504,14 +3504,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Verify all other expectations
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("IdTokenHintSub set different user, failing clear - server_error to the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -3521,7 +3521,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3543,7 +3543,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:          "test-state",
 			IdTokenHintSub: userASubject,
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
@@ -3556,7 +3556,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -3575,13 +3575,13 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("IdTokenHintSub set different user, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3598,7 +3598,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3620,7 +3620,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:          "test-state",
 			IdTokenHintSub: userASubject,
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
@@ -3630,7 +3630,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			Enabled: true,
 		}, nil)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
@@ -3648,13 +3648,13 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("IdTokenHintSub set different user, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3667,7 +3667,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3689,7 +3689,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:          "test-state",
 			IdTokenHintSub: userASubject,
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
@@ -3703,7 +3703,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// login_required refusal that cannot be committed. This is the site's second and
 		// pre-existing 500, pinned separately so a future edit cannot delete either copy
 		// unnoticed.
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -3716,13 +3716,13 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("IdTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -3731,7 +3731,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3750,7 +3750,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:          "test-state",
 			IdTokenHintSub: "", // Empty - no hint
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// GetUserById IS reached with no hint: armIssueGate stubs it because #241's live
 		// permission check loads the user whichever way the hint branch went. What an empty
@@ -3778,7 +3778,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -3791,14 +3791,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Verify all other expectations
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("End-to-end: prompt=login with mismatched id_token_hint - blocks at issuance", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -3808,7 +3808,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
@@ -3822,7 +3822,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		var savedAuthContext *ceremony.AuthContext
 
-		authHelper.On("GetAuthContext", req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("GetAuthContext", req).Run(func(args mock.Arguments) {
 			stubClientProvenanceLookup(database)
 			savedAuthContext = &ceremony.AuthContext{
 				AuthState:      ceremony.AuthStateReadyToIssueCode,
@@ -3859,7 +3859,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 				client.RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
 			}).Return(nil)
 
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -3877,7 +3877,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -3949,7 +3949,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			authHelper := mocks_handlers.NewAuthHelper(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -3958,7 +3958,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -3973,7 +3973,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 				RedirectURI:  tc.requested,
 				State:        "test-state",
 			}
-			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
@@ -3995,7 +3995,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 				Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 				Return(func(_ context.Context, scope string, _ *models.User) string { return scope }, nil).Maybe()
-			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
 				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.Anything).
@@ -4027,7 +4027,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			}
 
 			pageRenderer.AssertExpectations(t)
-			authHelper.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
 			database.AssertExpectations(t)
 			codeIssuer.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
@@ -4048,7 +4048,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 // It needs its ordering stated or it reads as a duplicate of the row above and gets tidied away.
 func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
+	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -4057,7 +4057,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-	handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
@@ -4075,14 +4075,14 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 		State:          "test-state",
 		IdTokenHintSub: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 	}
-	authHelper.On("GetAuthContext", req).Return(authContext, nil)
+	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 	issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
-	authHelper.On("ClearAuthContext", rr, req).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 		mock.Anything).Return(nil)
 
@@ -4121,7 +4121,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			authHelper := mocks_handlers.NewAuthHelper(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -4136,7 +4136,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -4153,7 +4153,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 				State:        "test-state",
 				Prompt:       tc.prompt,
 			}
-			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
@@ -4179,9 +4179,9 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			})).Return()
 
 			if tc.silent {
-				authHelper.On("ClearAuthContext", rr, req).Return(nil)
+				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 			} else {
-				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == ceremony.AuthStateRequiresLevel1
 				})).Return(nil)
 			}
@@ -4213,7 +4213,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			noRecordSays(t, logs, "is gone")
 
 			pageRenderer.AssertExpectations(t)
-			authHelper.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
 		})
@@ -4272,7 +4272,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			authHelper := mocks_handlers.NewAuthHelper(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -4287,7 +4287,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4303,7 +4303,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				RedirectURI:    "https://example.com/callback",
 				State:          "test-state",
 			}
-			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
@@ -4327,7 +4327,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, wantFiltered, user).
 				Return(tc.filtered, nil)
 
-			authHelper.On("ClearAuthContext", rr, req).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
 				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
@@ -4365,7 +4365,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			assert.Equal(t, tc.wantConsented, authContext.ConsentedScope, tc.why)
 
 			pageRenderer.AssertExpectations(t)
-			authHelper.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
 			database.AssertExpectations(t)
 			codeIssuer.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
@@ -4428,7 +4428,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			authHelper := mocks_handlers.NewAuthHelper(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -4437,7 +4437,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer,
+			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 				database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -4453,7 +4453,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 				RedirectURI:  "https://example.com/callback",
 				State:        "test-state",
 			}
-			authHelper.On("GetAuthContext", req).Return(authContext, nil)
+			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
@@ -4476,7 +4476,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 				"a storage failure must not answer the client at all: %s", tc.why)
 
 			pageRenderer.AssertExpectations(t)
-			authHelper.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
 			database.AssertExpectations(t)
 			codeIssuer.AssertExpectations(t)
 			implicitTokenIssuer.AssertExpectations(t)
@@ -4503,7 +4503,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("failing clear - the refusal is still rendered and nothing is emitted", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -4512,7 +4512,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer,
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -4528,7 +4528,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
@@ -4545,7 +4545,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// is as unacceptable here as a code would be. The page is rendered anyway and the browser
 		// keeps a replayable auth context, which is the lesser of the two: a replay arrives back at
 		// this same gate and is refused again for as long as the registration is gone.
-		authHelper.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req).
 			Return(errs.New("the session store is unreachable"))
 
 		// This expectation IS the assertion. A handler that returned after the failed clear never
@@ -4566,14 +4566,14 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("an unrenderable page - 500 when the refusal itself cannot be shown", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -4582,7 +4582,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer,
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -4598,7 +4598,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 			State:        "test-state",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
@@ -4609,7 +4609,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 			}).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		// The clear worked and it is the page that cannot be produced. There is nowhere left to
 		// report the refusal, so the 500 is the last resort, and it stays a 500: falling back to a
@@ -4628,7 +4628,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -4646,7 +4646,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	// the condition all three cases share. The response mode and the clear's answer are what each
 	// case varies.
 	armEmptiedScope := func(t *testing.T, responseMode string, database *mocks_data.Database,
-		authHelper *mocks_handlers.AuthHelper, auditLogger *mocks_handlers.AuditLogger,
+		ceremonyStore *mocks_handlers.CeremonyStore, auditLogger *mocks_handlers.AuditLogger,
 		userSessionManager *mocks_handlers.UserSessionManager,
 		permissionChecker *mocks_handlers.PermissionChecker,
 		req *http.Request) *ceremony.AuthContext {
@@ -4664,7 +4664,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
 		}
-		authHelper.On("GetAuthContext", req).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// The gate's own registration read, and separately the emitter's: the refusal below is an
 		// answer to the client, so it passes through redirectWillBeEmitted too (#241 decision 11).
@@ -4692,7 +4692,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 	t.Run("failing clear - server_error to the client", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -4701,17 +4701,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer,
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
-		armEmptiedScope(t, "query", database, authHelper, auditLogger, userSessionManager, permissionChecker, req)
+		armEmptiedScope(t, "query", database, ceremonyStore, auditLogger, userSessionManager, permissionChecker, req)
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is the
 		// code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		authHelper.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req).
 			Return(errs.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
@@ -4730,14 +4730,14 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -4751,14 +4751,14 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer,
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
-		armEmptiedScope(t, "form_post", database, authHelper, auditLogger, userSessionManager, permissionChecker, req)
+		armEmptiedScope(t, "form_post", database, ceremonyStore, auditLogger, userSessionManager, permissionChecker, req)
 
-		authHelper.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req).
 			Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
@@ -4774,14 +4774,14 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -4793,17 +4793,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer,
+		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
-		armEmptiedScope(t, "form_post", database, authHelper, auditLogger, userSessionManager, permissionChecker, req)
+		armEmptiedScope(t, "form_post", database, ceremonyStore, auditLogger, userSessionManager, permissionChecker, req)
 
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// access_denied refusal that cannot be committed. This is the site's second and separate
 		// 500, pinned on its own so a future edit cannot delete either copy unnoticed.
-		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "unable to parse template")
@@ -4815,7 +4815,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})

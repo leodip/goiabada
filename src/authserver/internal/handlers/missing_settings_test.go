@@ -33,19 +33,19 @@ func isErrNoSettings(err error) bool {
 // A browser page answers the 500 page through PageRenderer.
 func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
+	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 	database := mocks_data.NewDatabase(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/pwd", nil)
 	rr := httptest.NewRecorder()
 
-	authHelper.On("GetAuthContext", req).Return(&ceremony.AuthContext{
+	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
 		AuthState: ceremony.AuthStateLevel1Password,
 		ClientId:  "test-client",
 	}, nil)
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	HandleAuthPwdGet(pageRenderer, authHelper, database, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	pageRenderer.AssertExpectations(t)
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)

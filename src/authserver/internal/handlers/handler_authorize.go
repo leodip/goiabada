@@ -92,7 +92,7 @@ type authorizeDatabase interface {
 
 func HandleAuthorizeGet(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	userSessionManager UserSessionManager,
 	database authorizeDatabase,
 	templateFS fs.FS,
@@ -150,7 +150,7 @@ func HandleAuthorizeGet(
 			r = r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
 		}
 
-		err := authHelper.SaveAuthContext(w, r, &authContext)
+		err := ceremonyStore.SaveAuthContext(w, r, &authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -382,7 +382,7 @@ func HandleAuthorizeGet(
 			// asks for itself.
 			input.redirectAlreadyWithheld = emissionLookedUp && !emissionAllowed
 
-			answerClientWithError(w, r, database, pageRenderer, authHelper, templateFS, input)
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, input)
 		}
 
 		// answerValidationError answers one of the five validations that run before this handler
@@ -423,7 +423,7 @@ func HandleAuthorizeGet(
 				customerrors.ConformErrorDescription(validationError.GetDescription())
 			authContext.AuthState = ceremony.AuthStateRequiresLevel1
 
-			saveAuthContextErr := authHelper.SaveAuthContext(w, r, &authContext)
+			saveAuthContextErr := ceremonyStore.SaveAuthContext(w, r, &authContext)
 			if saveAuthContextErr != nil {
 				pageRenderer.InternalServerError(w, r, saveAuthContextErr)
 				return
@@ -529,7 +529,7 @@ func HandleAuthorizeGet(
 
 		// Save AuthContext with the validated hint sub and the target ACR snapshot, for use in
 		// downstream handlers
-		err = authHelper.SaveAuthContext(w, r, &authContext)
+		err = ceremonyStore.SaveAuthContext(w, r, &authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -537,14 +537,14 @@ func HandleAuthorizeGet(
 
 		// Handle prompt=none: silent authentication without any UI
 		if authContext.HasPromptValue("none") {
-			handlePromptNone(w, r, pageRenderer, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
+			handlePromptNone(w, r, pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
 			return
 		}
 
 		// Handle prompt=login: force re-authentication, skip session entirely
 		if authContext.HasPromptValue("login") {
 			authContext.AuthState = ceremony.AuthStateRequiresLevel1
-			err = authHelper.SaveAuthContext(w, r, &authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, &authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -579,7 +579,7 @@ func HandleAuthorizeGet(
 			if authContext.IdTokenHintSub != "" && userSession.User.Subject != authContext.IdTokenHintSub {
 				// Treat as no valid session — force re-authentication
 				authContext.AuthState = ceremony.AuthStateRequiresLevel1
-				err = authHelper.SaveAuthContext(w, r, &authContext)
+				err = ceremonyStore.SaveAuthContext(w, r, &authContext)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)
 					return
@@ -616,7 +616,7 @@ func HandleAuthorizeGet(
 			// launder an old session into a newer generation (#106 decision 11(d)).
 			authContext.AuthStateGeneration = userSession.AuthStateGeneration
 			authContext.AuthState = ceremony.AuthStateLevel1ExistingSession
-			err = authHelper.SaveAuthContext(w, r, &authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, &authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -627,7 +627,7 @@ func HandleAuthorizeGet(
 
 		// no valid session, requires level 1 auth
 		authContext.AuthState = ceremony.AuthStateRequiresLevel1
-		err = authHelper.SaveAuthContext(w, r, &authContext)
+		err = ceremonyStore.SaveAuthContext(w, r, &authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -640,7 +640,7 @@ func HandleAuthorizeGet(
 // It performs all necessary checks without displaying any UI and either:
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
-func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings, baseURL string) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings, baseURL string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -650,7 +650,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	// as "retry later" rather than "start an interactive login", which on a genuine server fault
 	// is the accurate instruction of the two.
 	redirectWithError := func(errorCode string, errorDescription string) {
-		answerClientWithError(w, r, database, pageRenderer, authHelper, templateFS,
+		answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 	}
 
@@ -827,7 +827,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 
 	// Ready to issue code
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-	err = authHelper.SaveAuthContext(w, r, authContext)
+	err = ceremonyStore.SaveAuthContext(w, r, authContext)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return
@@ -927,9 +927,9 @@ func redirectErrorFromRequest(r *http.Request, client *models.Client,
 // code and description swapped, so each call site keeps the parameter source it built the input
 // from and neither has to restate it.
 func answerClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
-	pageRenderer PageRenderer, authHelper AuthHelper, templateFS fs.FS, input redirectErrorInput) {
+	pageRenderer PageRenderer, ceremonyStore CeremonyStore, templateFS fs.FS, input redirectErrorInput) {
 
-	err := authHelper.ClearAuthContext(w, r)
+	err := ceremonyStore.ClearAuthContext(w, r)
 	if err != nil {
 		// The clear failed, so Save wrote no cookie and the browser still holds the auth context.
 		slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",

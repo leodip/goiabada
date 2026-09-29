@@ -25,10 +25,10 @@ import (
 func TestHandleAuthPwdGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, authHelper, database, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -36,7 +36,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{}
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
@@ -45,15 +45,15 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, authHelper, database, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -63,22 +63,22 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		authContext := &ceremony.AuthContext{
 			AuthState: ceremony.AuthStateInitial,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Successful rendering with email from user session", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, authHelper, database, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -90,7 +90,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "my-app",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		sessionIdentifier := "test-session"
 		ctx := req.Context()
@@ -132,16 +132,16 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Successful rendering without email", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, authHelper, database, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -152,7 +152,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			AuthState: ceremony.AuthStateLevel1Password,
 			ClientId:  "another-app",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "another-app",
@@ -183,7 +183,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
@@ -192,10 +192,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	// value has to be THIS ceremony's (#79 seam 4).
 	t.Run("The render names the ceremony", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, authHelper, database, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/auth/pwd", nil)
 		assert.NoError(t, err)
@@ -207,7 +207,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "my-app",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").
 			Return(&models.Client{ClientIdentifier: "my-app"}, nil)
@@ -229,7 +229,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 }
@@ -237,17 +237,17 @@ func TestHandleAuthPwdGet(t *testing.T) {
 func TestHandleAuthPwdPost(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/auth/pwd", nil)
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{}
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
@@ -256,16 +256,16 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -279,14 +279,14 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			AuthState:  ceremony.AuthStateInitial,
 			CeremonyId: testCeremonyId,
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	// A login form left open in another tab, submitted after a second /auth/authorize replaced the
@@ -350,11 +350,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := mocks_handlers.NewPageRenderer(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
+				ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
-				handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 				form := url.Values{}
 				form.Add("email", "test@example.com")
@@ -376,7 +376,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 					CeremonyId: tc.stored,
 					ClientId:   "test-client",
 				}
-				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
 
@@ -387,7 +387,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				assert.Empty(t, rr.Header().Get("Location"))
 
 				pageRenderer.AssertExpectations(t)
-				authHelper.AssertExpectations(t)
+				ceremonyStore.AssertExpectations(t)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
 			})
@@ -396,11 +396,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 	t.Run("Missing email", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -414,7 +414,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "my-app",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "my-app",
@@ -441,16 +441,16 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	t.Run("Missing password", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -464,7 +464,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -488,7 +488,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 	})
 
 	// Identical to "Missing password" except the password rides in the target's query rather
@@ -502,11 +502,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	// absence is the assertion that no credential check ran.
 	t.Run("Password in the query alone", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -521,7 +521,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -542,18 +542,18 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("User not found", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -568,7 +568,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -603,7 +603,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -621,11 +621,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	// spelling, which is decision 4's two visible consequences.
 	t.Run("The address reaches the lookup, the audit entry and the form normalized", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -640,7 +640,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -666,7 +666,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -675,11 +675,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	// empty string: the trim now happens before the check rather than inside it.
 	t.Run("A whitespace-only address is refused as missing", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -694,7 +694,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -717,11 +717,11 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 	t.Run("Successful authentication", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
@@ -740,7 +740,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -777,7 +777,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// integration case can see that the cookie moved but not that it moved first
 		// (#266 decision 20).
 		authContextSaved := false
-		authHelper.On("RegenerateSession", rr, mock.Anything).Return(nil).Once().
+		ceremonyStore.On("RegenerateSession", rr, mock.Anything).Return(nil).Once().
 			Run(func(mock.Arguments) {
 				assert.False(t, authContextSaved,
 					"rotation must run before the password-completed auth context is saved: "+
@@ -789,7 +789,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// mock.Anything for the request: handler_auth_pwd.go refines the
 		// localizer to the user's stored locale after the password verifies,
 		// onto a fresh *http.Request, so the pointer no longer matches `req`.
-		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.UserId == 1 &&
 				ac.AuthState == ceremony.AuthStateLevel1PasswordCompleted &&
 				ac.AuthMethods == ceremony.AuthMethodPassword.String() &&
@@ -818,18 +818,18 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		assert.True(t, authContextSaved, "the ceremony must still record that the password was accepted")
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("Disabled user account", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
@@ -848,7 +848,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -883,7 +883,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -920,7 +920,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	// account, which is its own rejection branch with its own recording call.
 	newHandler := func(t *testing.T, account *models.User) (http.Handler, *mocks_data.Database, *ceremony.AuthContext) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -929,10 +929,10 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
-		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
-		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+		ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		// Only the accepted-password case reaches it, and this table covers both outcomes.
-		authHelper.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
+		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(account, nil)
@@ -940,8 +940,8 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			"/auth_pwd.html", mock.Anything).Return(nil).Maybe()
 
-		rateLimiter := newTestRateLimiter(authHelper)
-		handler := HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, rateLimiter, testBaseURL, testAdminConsoleBaseURL)
+		rateLimiter := newTestRateLimiter(ceremonyStore)
+		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, rateLimiter, testBaseURL, testAdminConsoleBaseURL)
 		return rateLimiter.LimitPwd(handler), database, authContext
 	}
 

@@ -13,7 +13,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/errs"
@@ -73,15 +72,15 @@ type consentDatabase interface {
 
 func HandleConsentGet(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	database consentDatabase,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -176,7 +175,7 @@ func HandleConsentGet(
 		} else {
 			// consent is done, ready to issue code
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -188,7 +187,7 @@ func HandleConsentGet(
 
 func HandleConsentPost(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	database consentDatabase,
 	templateFS fs.FS,
 	auditLogger AuditLogger,
@@ -197,9 +196,9 @@ func HandleConsentPost(
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -273,7 +272,7 @@ func HandleConsentPost(
 				// GET /auth/consent accepts: replaying it renders the consent screen again and
 				// the user may approve, so the client would receive access_denied and then a
 				// code for the same authorization request (#141).
-				err = authHelper.ClearAuthContext(w, r)
+				err = ceremonyStore.ClearAuthContext(w, r)
 				if err != nil {
 					// The clear failed, so Save wrote no cookie and the browser still holds the
 					// auth context. The client is owed an error response regardless: its redirect
@@ -354,7 +353,7 @@ func HandleConsentPost(
 					// reaches the wire, so the browser would keep an auth context in
 					// requires_consent that a replay of GET /auth/consent can still turn into a
 					// code (#141).
-					consentErr = authHelper.ClearAuthContext(w, r)
+					consentErr = ceremonyStore.ClearAuthContext(w, r)
 					if consentErr != nil {
 						// The clear failed, so Save wrote no cookie and the browser still holds
 						// the auth context. The client is owed an error response regardless: its
@@ -425,7 +424,7 @@ func HandleConsentPost(
 
 				// consent is done, ready to issue code
 				authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-				consentErr = authHelper.SaveAuthContext(w, r, authContext)
+				consentErr = ceremonyStore.SaveAuthContext(w, r, authContext)
 				if consentErr != nil {
 					pageRenderer.InternalServerError(w, r, consentErr)
 					return
@@ -443,7 +442,7 @@ func HandleConsentPost(
 			// above: a Set-Cookie written after redirToClientWithError has committed never
 			// reaches the wire, so the browser keeps an auth context in requires_consent that
 			// a replay of GET /auth/consent can still turn into a code (#141).
-			err = authHelper.ClearAuthContext(w, r)
+			err = ceremonyStore.ClearAuthContext(w, r)
 			if err != nil {
 				// The clear failed, so Save wrote no cookie and the browser still holds the
 				// auth context. The client is owed an error response regardless: its redirect

@@ -132,7 +132,7 @@ func (e *ErrorDetail) GetWWWAuthenticate() string {
 // rather than the sentinel value itself. That package's ErrUserDisabled, ErrClientDisabled and
 // ErrCodeRedirectURIDeregistered are never returned by identity: the validator constructs an equal
 // value at the point of failure, so without this method errors.Is would fall back to == and match
-// none of the three. handlerhelpers.ErrNoAuthContext is returned by identity and would match
+// none of the three. ceremony.ErrNoAuthContext is returned by identity and would match
 // either way. All four are the auth server's since #385; core holds only the comparison.
 //
 // Every entry is compared, and the lengths first, so a detail key added later cannot quietly widen

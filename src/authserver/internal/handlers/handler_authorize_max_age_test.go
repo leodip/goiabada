@@ -33,7 +33,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 
 	type fixture struct {
 		pageRenderer       *mocks_handlers.PageRenderer
-		authHelper         *mocks_handlers.AuthHelper
+		ceremonyStore      *mocks_handlers.CeremonyStore
 		userSessionManager *mocks_handlers.UserSessionManager
 		database           *mocks_data.Database
 		authorizeValidator *mocks_handlers.AuthorizeValidator
@@ -48,12 +48,12 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	arrange := func(t *testing.T, query string) *fixture {
 		f := &fixture{
 			pageRenderer:       mocks_handlers.NewPageRenderer(t),
-			authHelper:         mocks_handlers.NewAuthHelper(t),
+			ceremonyStore:      mocks_handlers.NewCeremonyStore(t),
 			userSessionManager: mocks_handlers.NewUserSessionManager(t),
 			database:           mocks_data.NewDatabase(t),
 			authorizeValidator: mocks_handlers.NewAuthorizeValidator(t),
 		}
-		f.handler = HandleAuthorizeGet(f.pageRenderer, f.authHelper, f.userSessionManager, f.database, nil,
+		f.handler = HandleAuthorizeGet(f.pageRenderer, f.ceremonyStore, f.userSessionManager, f.database, nil,
 			f.authorizeValidator, mocks_handlers.NewAuditLogger(t), mocks_handlers.NewPermissionChecker(t),
 			mocks_handlers.NewTokenParser(t), testBaseURL)
 
@@ -63,7 +63,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.req = f.req.WithContext(reqctx.WithSessionIdentifier(f.req.Context(), sessionIdentifier))
 		f.rr = httptest.NewRecorder()
 
-		f.authHelper.On("SaveAuthContext", f.rr, f.req, mock.AnythingOfType("*ceremony.AuthContext")).
+		f.ceremonyStore.On("SaveAuthContext", f.rr, f.req, mock.AnythingOfType("*ceremony.AuthContext")).
 			Run(func(args mock.Arguments) {
 				saved := *args.Get(2).(*ceremony.AuthContext)
 				f.saved = &saved
@@ -97,7 +97,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.userSessionManager.On("HasValidUserSession", userSession,
 			testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(true)
 		refuseMaxAge(f, "abc")
-		f.authHelper.On("ClearAuthContext", f.rr, f.req).Return(nil)
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil)
 
 		f.handler.ServeHTTP(f.rr, f.req)
 
@@ -113,7 +113,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	t.Run("a silent request's malformed max_age is refused at once, with no session read", func(t *testing.T) {
 		f := arrange(t, "max_age=abc&prompt=none")
 		refuseMaxAge(f, "abc")
-		f.authHelper.On("ClearAuthContext", f.rr, f.req).Return(nil)
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil)
 
 		f.handler.ServeHTTP(f.rr, f.req)
 
@@ -163,7 +163,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 			})).Return(false)
 		f.userSessionManager.On("HasValidUserSession", userSession,
 			testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(true)
-		f.authHelper.On("ClearAuthContext", f.rr, f.req).Return(nil)
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil)
 
 		f.handler.ServeHTTP(f.rr, f.req)
 

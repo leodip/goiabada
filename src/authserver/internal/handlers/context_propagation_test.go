@@ -111,7 +111,7 @@ func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Reques
 // transaction opened on a context nobody can cancel fails here rather than in production.
 func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
+	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -132,7 +132,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 		ResponseType: "code",
 		RedirectURI:  "https://example.com/callback",
 	}
-	authHelper.On("GetAuthContext", req).Return(authContext, nil)
+	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 	// The session read, the acquisition and the insert, each matched on THIS request's context.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
@@ -143,10 +143,10 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 		Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: "https://example.com/callback"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
-	authHelper.On("ClearAuthContext", rr, req).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
-	HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
+	HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
 		userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
@@ -159,7 +159,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 // handler that issued unconditionally.
 func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
+	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
@@ -180,15 +180,15 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 		ResponseType: "code",
 		RedirectURI:  "https://example.com/callback",
 	}
-	authHelper.On("GetAuthContext", req).Return(authContext, nil)
+	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 	// The row is gone, which is the shape refuseIssuanceUnusableSession answers.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(nil, nil)
-	authHelper.On("SaveAuthContext", rr, req, mock.Anything).Return(nil)
+	ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
-	HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
+	HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
 		userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)

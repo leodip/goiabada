@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
@@ -51,7 +52,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
-	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, sessionkeys.AuthServerSessionName)
+	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
 	middlewareBearerToken := middleware.NewMiddlewareBearerToken(tokenParser)
 	authHeaderToContext := middlewareBearerToken.JwtAuthorizationHeaderToContext()
@@ -61,7 +62,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	adminConsoleBaseURL := s.cfg.AdminConsole.BaseURL
 	maxUploadBytes := authServerConfig.ProfilePictureMaxSizeBytes
 	rateLimiter := middleware.NewRateLimiterMiddleware(
-		authHelper,
+		ceremonyStore,
 		httpHelper,
 		auditLogger,
 		authServerConfig.RateLimiterEnabled,
@@ -108,20 +109,20 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	root.Route("/auth", func(r chi.Router) {
-		authorizeHandler := handlers.HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, baseURL)
+		authorizeHandler := handlers.HandleAuthorizeGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, baseURL)
 		r.Get("/authorize", authorizeHandler)
 		r.Post("/authorize", authorizeHandler)
-		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, authHelper, baseURL, adminConsoleBaseURL))
-		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, baseURL, adminConsoleBaseURL))
-		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, authHelper, s.database, baseURL, adminConsoleBaseURL))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
-		r.Get("/issue", handlers.HandleIssueGet(httpHelper, authHelper, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker, baseURL, adminConsoleBaseURL))
-		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, authHelper, s.database, adminConsoleBaseURL))
-		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter, baseURL, adminConsoleBaseURL))
-		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, authHelper, s.database, otpSecretGenerator, adminConsoleBaseURL))
-		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, authHelper, s.database, auditLogger, rateLimiter, s.dataCipher, baseURL, adminConsoleBaseURL))
-		r.Get("/consent", handlers.HandleConsentGet(httpHelper, authHelper, s.database, baseURL, adminConsoleBaseURL))
-		r.Post("/consent", handlers.HandleConsentPost(httpHelper, authHelper, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
+		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, ceremonyStore, baseURL, adminConsoleBaseURL))
+		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, baseURL, adminConsoleBaseURL))
+		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, ceremonyStore, s.database, baseURL, adminConsoleBaseURL))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
+		r.Get("/issue", handlers.HandleIssueGet(httpHelper, ceremonyStore, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker, baseURL, adminConsoleBaseURL))
+		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, ceremonyStore, s.database, adminConsoleBaseURL))
+		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, ceremonyStore, s.database, auditLogger, rateLimiter, baseURL, adminConsoleBaseURL))
+		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, ceremonyStore, s.database, otpSecretGenerator, adminConsoleBaseURL))
+		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, ceremonyStore, s.database, auditLogger, rateLimiter, s.dataCipher, baseURL, adminConsoleBaseURL))
+		r.Get("/consent", handlers.HandleConsentGet(httpHelper, ceremonyStore, s.database, baseURL, adminConsoleBaseURL))
+		r.Post("/consent", handlers.HandleConsentPost(httpHelper, ceremonyStore, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
 		// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force)
 		r.With(rateLimiter.LimitROPC).Post("/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
 		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))

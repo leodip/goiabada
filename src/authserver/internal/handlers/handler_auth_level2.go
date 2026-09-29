@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -22,16 +21,16 @@ type authLevel2Database interface {
 
 func HandleAuthLevel2Get(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	database authLevel2Database,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -99,7 +98,7 @@ func HandleAuthLevel2Get(
 			// if user has OTP enabled, we'll ask for it
 			if user.OTPEnabled {
 				authContext.AuthState = ceremony.AuthStateLevel2OTP
-				err = authHelper.SaveAuthContext(w, r, authContext)
+				err = ceremonyStore.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)
 					return
@@ -108,7 +107,7 @@ func HandleAuthLevel2Get(
 			} else {
 				// user without OTP, we'll skip it
 				authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
-				err = authHelper.SaveAuthContext(w, r, authContext)
+				err = ceremonyStore.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)
 					return
@@ -118,7 +117,7 @@ func HandleAuthLevel2Get(
 		case models.AcrLevel2Mandatory:
 			// OTP is mandatory
 			authContext.AuthState = ceremony.AuthStateLevel2OTP
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return

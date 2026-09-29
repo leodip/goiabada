@@ -61,7 +61,7 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
-      AuthHelper:
+      CeremonyStore:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"

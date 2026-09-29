@@ -95,7 +95,7 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 	serve := func(t *testing.T, limit int, prepare func(pageRenderer *mocks_handlers.PageRenderer,
 		auditLogger *mocks_handlers.AuditLogger, database *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request)) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -105,14 +105,14 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1}))
 
-		authHelper.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}, nil).Once()
 		prepare(pageRenderer, auditLogger, database, rr, req)
 
-		HandleAuthPwdPost(pageRenderer, authHelper, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+		HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)

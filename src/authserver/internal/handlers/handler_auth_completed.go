@@ -10,7 +10,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -40,7 +39,7 @@ type authCompletedDatabase interface {
 
 func HandleAuthCompletedGet(
 	pageRenderer PageRenderer,
-	authHelper AuthHelper,
+	ceremonyStore CeremonyStore,
 	userSessionManager UserSessionManager,
 	database authCompletedDatabase,
 	templateFS fs.FS,
@@ -51,9 +50,9 @@ func HandleAuthCompletedGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := authHelper.GetAuthContext(r)
+		authContext, err := ceremonyStore.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
+			if errors.Is(err, ceremony.ErrNoAuthContext) {
 				var profileUrl = profileURL(adminConsoleBaseURL)
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -143,7 +142,7 @@ func HandleAuthCompletedGet(
 			// OWASP's "regenerate on any privilege level change", and this server's ACR
 			// levels are privilege levels by construction (#266 decision 6).
 			if usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel) {
-				if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
+				if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r); regenerateSessionErr != nil {
 					pageRenderer.InternalServerError(w, r, regenerateSessionErr)
 					return
 				}
@@ -246,7 +245,7 @@ func HandleAuthCompletedGet(
 			// never arrives here, it would be stopped rather than let through if it ever did.
 			if !authContext.Level1AuthCompleted {
 				authContext.AuthState = ceremony.AuthStateRequiresLevel1
-				err = authHelper.SaveAuthContext(w, r, authContext)
+				err = ceremonyStore.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)
 					return
@@ -405,7 +404,7 @@ func HandleAuthCompletedGet(
 			// on w, and redirToClientWithError commits the response in every response mode, so
 			// clearing afterwards leaves the header on a response already written and the
 			// browser keeps an auth context it can replay (#141).
-			refusalErr := authHelper.ClearAuthContext(w, r)
+			refusalErr := ceremonyStore.ClearAuthContext(w, r)
 			if refusalErr != nil {
 				// The clear failed, so Save wrote no cookie and the browser still holds the
 				// auth context. The client is owed an error response regardless: its redirect
@@ -447,7 +446,7 @@ func HandleAuthCompletedGet(
 			// The clear goes FIRST, for the same reason as the disabled-user refusal above: a
 			// Set-Cookie written after redirToClientWithError has committed never reaches the
 			// wire, so the browser keeps a replayable auth context (#141).
-			err = authHelper.ClearAuthContext(w, r)
+			err = ceremonyStore.ClearAuthContext(w, r)
 			if err != nil {
 				// The clear failed, so Save wrote no cookie and the browser still holds the
 				// auth context. The client is owed an error response regardless: its redirect
@@ -477,7 +476,7 @@ func HandleAuthCompletedGet(
 		// Handle prompt=consent: force consent screen regardless of existing consent or client settings
 		if authContext.HasPromptValue("consent") {
 			authContext.AuthState = ceremony.AuthStateRequiresConsent
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -490,7 +489,7 @@ func HandleAuthCompletedGet(
 		if client.ConsentRequired || oidc.HasOfflineAccessScope(authContext.Scope) {
 			authContext.AuthState = ceremony.AuthStateRequiresConsent
 
-			err = authHelper.SaveAuthContext(w, r, authContext)
+			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -501,7 +500,7 @@ func HandleAuthCompletedGet(
 
 		// if there's no need for consent, we're ready to issue the code
 		authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-		err = authHelper.SaveAuthContext(w, r, authContext)
+		err = ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

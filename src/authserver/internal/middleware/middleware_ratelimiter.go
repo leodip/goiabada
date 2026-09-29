@@ -278,10 +278,10 @@ func (m *RateLimiterMiddleware) RecordCredentialFailure(r *http.Request) {
 }
 
 type RateLimiterMiddleware struct {
-	authHelper  authContextGetter
-	renderer    errorRenderer
-	auditLogger auditEventLogger
-	enabled     bool
+	ceremonyStore authContextGetter
+	renderer      errorRenderer
+	auditLogger   auditEventLogger
+	enabled       bool
 	// pwdAccount is shared with the ROPC grant: both are a password guessed against one
 	// account, so one budget covers them.
 	pwdAccount *accountFailureGate
@@ -301,14 +301,14 @@ type RateLimiterMiddleware struct {
 	ropcIp          *tier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
-func NewRateLimiterMiddleware(authHelper authContextGetter, renderer errorRenderer, auditLogger auditEventLogger,
+func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRenderer, auditLogger auditEventLogger,
 	enabled bool) *RateLimiterMiddleware {
 
 	return &RateLimiterMiddleware{
-		authHelper:  authHelper,
-		renderer:    renderer,
-		auditLogger: auditLogger,
-		enabled:     enabled,
+		ceremonyStore: ceremonyStore,
+		renderer:      renderer,
+		auditLogger:   auditLogger,
+		enabled:       enabled,
 		// per-account password failures, in two tiers. 10 per 15 minutes against one
 		// account from one client block is room for a user working through the passwords
 		// they might have used before reaching for recovery, and it is 22x tighter than
@@ -557,7 +557,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 			return
 		}
 
-		authContext, err := m.authHelper.GetAuthContext(r)
+		authContext, err := m.ceremonyStore.GetAuthContext(r)
 		if err != nil {
 			// No readable auth context means there is no user to key a bucket on, so hand
 			// the request to the handler, which answers a missing auth context the same way

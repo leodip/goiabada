@@ -33,6 +33,6 @@ func (rateLimitTestRenderer) RenderTemplate(w http.ResponseWriter, r *http.Reque
 // newTestRateLimiter builds a live, enabled limiter for the cases that exercise a handler
 // through it. A nil audit logger is the supported shape: the limiter skips the audit write
 // and still emits its warning line and its rejection.
-func newTestRateLimiter(authHelper AuthHelper) *middleware.RateLimiterMiddleware {
-	return middleware.NewRateLimiterMiddleware(authHelper, rateLimitTestRenderer{}, nil, true)
+func newTestRateLimiter(ceremonyStore CeremonyStore) *middleware.RateLimiterMiddleware {
+	return middleware.NewRateLimiterMiddleware(ceremonyStore, rateLimitTestRenderer{}, nil, true)
 }
