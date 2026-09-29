@@ -71,9 +71,9 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, client, result.Client)
-	assert.Equal(t, user, result.User)
-	assert.Equal(t, "openid", result.Scope)
+	assert.Equal(t, client, grantAs[*PasswordGrant](t, result).Client)
+	assert.Equal(t, user, grantAs[*PasswordGrant](t, result).User)
+	assert.Equal(t, "openid", grantAs[*PasswordGrant](t, result).Scope)
 }
 
 func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
@@ -160,8 +160,8 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, client, result.Client)
-	assert.Equal(t, user, result.User)
+	assert.Equal(t, client, grantAs[*PasswordGrant](t, result).Client)
+	assert.Equal(t, user, grantAs[*PasswordGrant](t, result).User)
 }
 
 func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
@@ -789,9 +789,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, client, result.Client)
-	assert.Equal(t, user, result.User)
-	assert.Equal(t, "openid profile", result.Scope)
+	assert.Equal(t, client, grantAs[*PasswordGrant](t, result).Client)
+	assert.Equal(t, user, grantAs[*PasswordGrant](t, result).User)
+	assert.Equal(t, "openid profile", grantAs[*PasswordGrant](t, result).Scope)
 }
 
 func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
@@ -840,7 +840,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, "openid", result.Scope) // Should default to openid
+	assert.Equal(t, "openid", grantAs[*PasswordGrant](t, result).Scope) // Should default to openid
 }
 
 func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
@@ -889,7 +889,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Contains(t, result.Scope, "offline_access")
+	assert.Contains(t, grantAs[*PasswordGrant](t, result).Scope, "offline_access")
 }
 
 // TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid pins that a password grant asking for a
@@ -945,7 +945,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
-			assert.Equal(t, scope, result.Scope)
+			assert.Equal(t, scope, grantAs[*PasswordGrant](t, result).Scope)
 			mockPermissionChecker.AssertNotCalled(t, "UserHasScopePermission", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -1062,7 +1062,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Contains(t, result.Scope, "api:read")
+	assert.Contains(t, grantAs[*PasswordGrant](t, result).Scope, "api:read")
 }
 
 func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *testing.T) {

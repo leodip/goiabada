@@ -48,7 +48,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	codeIssuer := issuance.NewCodeIssuer(s.database)
 	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
-	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher)
+	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher, userSessionManager)
 	userCreator := usercreation.NewUserCreator(s.database)
 	emailSender := emaildelivery.NewSender(s.dataCipher)
 
@@ -137,7 +137,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
 	// protocol branch. chi routes POST /auth/token here ahead of the group's catch-all; a GET falls
 	// through to the group, which answers it 405 as it did when the route was its own (#435).
-	protocol.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, userSessionManager, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
+	protocol.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter))
 
 	pages.Route("/account", func(r chi.Router) {
 		r.Get("/register", accounthandlers.HandleAccountRegisterGet(httpHelper))

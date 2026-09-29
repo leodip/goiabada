@@ -57,7 +57,7 @@ func TestLoadSigningKey(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+			tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 			// Still on no transaction, as every grant read it before the split: none of them runs
 			// its issuance inside one yet.
 			mockDB.On("GetCurrentSigningKey", context.Background(), (*sql.Tx)(nil)).Return(tc.keyPair, tc.readErr).Once()

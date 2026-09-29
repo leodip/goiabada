@@ -17,7 +17,7 @@ import (
 
 func TestGenerateRefreshToken_Offline(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -87,7 +87,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 
 func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                          "https://test-issuer.com",
@@ -161,7 +161,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 
 func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -241,7 +241,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -339,7 +339,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 
 func TestGetRefreshTokenExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
 	settings := &models.Settings{
@@ -402,7 +402,7 @@ func TestGetRefreshTokenExpiration(t *testing.T) {
 
 func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
 	settings := &models.Settings{

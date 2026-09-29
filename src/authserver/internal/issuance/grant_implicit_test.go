@@ -16,7 +16,7 @@ import (
 
 func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -94,7 +94,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 
 func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                              "https://test-issuer.com",
@@ -183,7 +183,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 
 func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -273,7 +273,7 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 	// This test verifies that implicit flow NEVER issues a refresh token
 	// per RFC 6749 Section 4.2.2
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -329,7 +329,7 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 
 func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -390,7 +390,7 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 
 func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",

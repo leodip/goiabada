@@ -211,7 +211,7 @@ func TestValidateTokenRequest_ROPC_ScopeWhitespace(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
-			assert.Equal(t, whitespaceScopeA+" "+whitespaceScopeB, result.Scope)
+			assert.Equal(t, whitespaceScopeA+" "+whitespaceScopeB, grantAs[*PasswordGrant](t, result).Scope)
 		})
 	}
 

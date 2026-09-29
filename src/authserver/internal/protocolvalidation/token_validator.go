@@ -82,21 +82,19 @@ type ValidateTokenRequestInput struct {
 	UsedBasicAuth bool
 }
 
-type ValidateTokenRequestResult struct {
-	CodeEntity       *models.Code
-	Client           *models.Client
-	Scope            string
-	RefreshToken     *models.RefreshToken
-	RefreshTokenInfo *oauth.JwtToken
-	// User is set for ROPC grant (RFC 6749 Section 4.3)
-	User *models.User
+// TokenGrant is what a validated token request is: one type per grant, declared beside the method
+// that validates it in token_grant_<grant>.go and carrying only what that grant proved. The token
+// handler dispatches on the type, where it used to infer the grant from which fields of one shared
+// result were filled, the refresh token's shape included, which a nil code entity stood for (#437).
+type TokenGrant interface {
+	GrantType() oidc.GrantType
 }
 
 // ValidateTokenRequest validates a token endpoint request. It checks what every grant shares, the
 // client_id, the client and whether it is enabled, and then hands the request to the grant's own
 // method, one per grant in token_grant_<grant>.go (#437).
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *models.Settings,
-	input *ValidateTokenRequestInput) (*ValidateTokenRequestResult, error) {
+	input *ValidateTokenRequestInput) (TokenGrant, error) {
 
 	if len(input.ClientId) == 0 {
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
@@ -125,16 +123,26 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 
 	switch input.GrantType {
 	case oidc.GrantTypeAuthorizationCode:
-		return val.validateAuthorizationCodeGrant(ctx, client, input)
+		return asTokenGrant(val.validateAuthorizationCodeGrant(ctx, client, input))
 	case oidc.GrantTypeClientCredentials:
-		return val.validateClientCredentialsGrant(ctx, client, input)
+		return asTokenGrant(val.validateClientCredentialsGrant(ctx, client, input))
 	case oidc.GrantTypeRefreshToken:
-		return val.validateRefreshTokenGrant(ctx, settings, client, input)
+		return asTokenGrant(val.validateRefreshTokenGrant(ctx, settings, client, input))
 	case oidc.GrantTypePassword:
-		return val.validatePasswordGrant(ctx, settings, client, input)
+		return asTokenGrant(val.validatePasswordGrant(ctx, settings, client, input))
 	default:
 		// Reachable only if the grant table accepts a grant this switch has no arm for; the
 		// validator's tests hold the two in agreement.
 		return nil, errs.Errorf("grant type %q is accepted at the token endpoint but has no validation", input.GrantType)
 	}
+}
+
+// asTokenGrant hands a grant method's answer back as a TokenGrant. A refusal comes back as a nil
+// interface, never as an interface holding a nil pointer, which compares unequal to nil and would
+// read as a grant to any caller that checked the grant rather than the error.
+func asTokenGrant[G TokenGrant](grant G, err error) (TokenGrant, error) {
+	if err != nil {
+		return nil, err
+	}
+	return grant, nil
 }

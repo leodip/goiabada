@@ -148,8 +148,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, client, result.Client)
-		assert.Equal(t, "resource:permission", result.Scope)
+		assert.Equal(t, client, grantAs[*ClientCredentialsGrant](t, result).Client)
+		assert.Equal(t, "resource:permission", grantAs[*ClientCredentialsGrant](t, result).Scope)
 	})
 
 	t.Run("Invalid client secret", func(t *testing.T) {
@@ -234,7 +234,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, "resource1:read resource2:write", result.Scope)
+		assert.Equal(t, "resource1:read resource2:write", grantAs[*ClientCredentialsGrant](t, result).Scope)
 	})
 
 	t.Run("Invalid scope format", func(t *testing.T) {
@@ -495,7 +495,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, "resource1:read resource2:write resource3:delete", result.Scope)
+		assert.Equal(t, "resource1:read resource2:write resource3:delete", grantAs[*ClientCredentialsGrant](t, result).Scope)
 	})
 
 	// --- Resource-scoped permission ownership (#104) ---------------------------------
@@ -576,7 +576,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		if wantCode == "" {
 			assert.NoError(t, err)
 			if assert.NotNil(t, result) {
-				assert.Equal(t, wantScope, result.Scope)
+				assert.Equal(t, wantScope, grantAs[*ClientCredentialsGrant](t, result).Scope)
 			}
 			return
 		}
@@ -944,7 +944,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 
 			assert.NoError(t, err)
 			if assert.NotNil(t, result) {
-				assert.Equal(t, tc.wantScope, result.Scope)
+				assert.Equal(t, tc.wantScope, grantAs[*ClientCredentialsGrant](t, result).Scope)
 			}
 		})
 	}

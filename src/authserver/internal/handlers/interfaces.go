@@ -53,21 +53,20 @@ type OtpSecretGenerator interface {
 	GenerateOTPSecret(email string, appName string) (string, error)
 }
 
+// TokenIssuer redeems a validated grant at the token endpoint, one method per grant. Each owns its
+// grant from the claim on what is redeemed to the minted tokens, so the handler parses, dispatches,
+// audits and answers, and writes nothing of a grant itself (#437).
 type TokenIssuer interface {
-	GenerateTokenResponseForAuthCode(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error)
-	GenerateTokenResponseForClientCred(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error)
-	GenerateTokenResponseForRefresh(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)
-	// GenerateTokenResponseForRefreshROPC generates new tokens for an ROPC refresh token.
-	// Unlike auth code flow, ROPC tokens have UserId and ClientId directly on the RefreshToken.
-	GenerateTokenResponseForRefreshROPC(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)
-	// GenerateTokenResponseForROPC generates tokens for Resource Owner Password Credentials flow.
-	// RFC 6749 Section 4.3
+	IssueAuthorizationCodeGrant(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error)
+	IssueClientCredentialsGrant(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error)
+	IssueRefreshTokenGrant(ctx context.Context, settings *models.Settings, input *issuance.RefreshTokenGrantInput) (*oauth.TokenResponse, *issuance.RefreshOutcome, error)
+	// IssuePasswordGrant issues the resource owner password credentials grant, RFC 6749 section 4.3.
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
-	GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
+	IssuePasswordGrant(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
 }
 
 // ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens
-// in the redirect fragment. The token endpoint issues the other five, through TokenIssuer.
+// in the redirect fragment. The token endpoint issues the other four grants, through TokenIssuer.
 type ImplicitTokenIssuer interface {
 	GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
 }
@@ -105,7 +104,7 @@ type UserSessionManager interface {
 }
 
 type TokenValidator interface {
-	ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)
+	ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)
 }
 
 type TokenParser interface {

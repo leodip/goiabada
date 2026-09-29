@@ -725,7 +725,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, codeEntity, result.CodeEntity)
+		assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 	})
 
 	t.Run("Public client with valid code verifier", func(t *testing.T) {
@@ -781,7 +781,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, codeEntity, result.CodeEntity)
+		assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 		assert.True(t, client.IsPublic)
 		assert.Empty(t, input.ClientSecret, "Public client should not provide a client secret")
 	})
@@ -1311,7 +1311,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, codeEntity, result.CodeEntity)
+	assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 }
 
 func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.T) {
@@ -1441,7 +1441,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, codeEntity, result.CodeEntity)
+	assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 }
 
 func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
@@ -1630,7 +1630,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	// Empty string code_challenge should be treated as no PKCE, so this should succeed
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, codeEntity, result.CodeEntity)
+	assert.Equal(t, codeEntity, grantAs[*AuthorizationCodeGrant](t, result).Code)
 }
 
 // =============================================================================

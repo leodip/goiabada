@@ -8,21 +8,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateTokenResponseForRefresh(t *testing.T) {
+func TestMintCodeRefreshTokens(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -77,21 +75,6 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		Scope:                "openid profile resource1:read",
 	}
 
-	refreshTokenInfo := &oauth.JwtToken{
-		Claims: jwt.MapClaims{
-			"jti":    "existing-jti",
-			"scope":  "openid profile resource1:read",
-			"exp":    now.Add(1 * time.Hour).Unix(),
-			"iat":    now.Add(-1 * time.Hour).Unix(),
-			"iss":    "https://test-issuer.com",
-			"aud":    "https://test-issuer.com",
-			"sub":    sub,
-			"typ":    "Refresh",
-			"sid":    sessionIdentifier,
-			"client": client.ClientIdentifier,
-		},
-	}
-
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
@@ -118,14 +101,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
 
-	input := &GenerateTokenForRefreshInput{
-		Code:             code,
-		ScopeRequested:   "openid profile resource1:read",
-		RefreshToken:     refreshToken,
-		RefreshTokenInfo: refreshTokenInfo,
-	}
-
-	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, settings, input)
+	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, settings, code, refreshToken, "openid profile resource1:read")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -224,9 +200,9 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
+func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &models.Settings{
 		Issuer:                                  "https://test-issuer.com",
@@ -290,20 +266,6 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		AuthStateGeneration: 7,
 	}
 
-	refreshTokenInfo := &oauth.JwtToken{
-		Claims: jwt.MapClaims{
-			"jti":    "existing-jti-offline",
-			"scope":  "openid profile offline_access",
-			"exp":    now.Add(2 * time.Hour).Unix(),
-			"iat":    now.Add(-1 * time.Hour).Unix(),
-			"iss":    "https://test-issuer.com",
-			"aud":    "https://test-issuer.com",
-			"sub":    sub,
-			"typ":    "Offline",
-			"client": client.ClientIdentifier,
-		},
-	}
-
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
@@ -322,14 +284,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	input := &GenerateTokenForRefreshInput{
-		Code:             code,
-		ScopeRequested:   "resource1:write offline_access",
-		RefreshToken:     refreshToken,
-		RefreshTokenInfo: refreshTokenInfo,
-	}
-
-	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, settings, input)
+	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, settings, code, refreshToken, "resource1:write offline_access")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -352,7 +307,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	// Reversed: the parent is genuinely Offline now, so no sid. An offline grant outlives
 	// the browser session, and this is the public entry point proving the suppression is
-	// wired through GenerateTokenResponseForRefresh and not only in the helper (#106
+	// wired through mintCodeRefreshTokens and not only in the helper (#106
 	// decision 9).
 	assert.NotContains(t, accessClaims, "sid")
 	// Provenance at the public entry point: the PARENT is at 7 while the code stays at its
@@ -410,10 +365,10 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForRefreshROPC tests ROPC refresh token flow
-func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
+// TestMintROPCRefreshTokens tests ROPC refresh token flow
+func TestMintROPCRefreshTokens(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -483,12 +438,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 		Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
-	input := &GenerateTokenForRefreshROPCInput{
-		RefreshToken:   refreshToken,
-		ScopeRequested: "openid email resource:read",
-	}
-
-	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, settings, input)
+	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, settings, refreshToken, "openid email resource:read")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -540,10 +490,10 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade tests requesting fewer scopes on refresh
-func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
+// TestMintROPCRefreshTokens_ScopeDowngrade tests requesting fewer scopes on refresh
+func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -598,12 +548,7 @@ func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	// Request only a subset of the original scopes
-	input := &GenerateTokenForRefreshROPCInput{
-		RefreshToken:   refreshToken,
-		ScopeRequested: "resource:read",
-	}
-
-	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, settings, input)
+	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, settings, refreshToken, "resource:read")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)

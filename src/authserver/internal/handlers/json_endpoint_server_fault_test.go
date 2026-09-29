@@ -46,7 +46,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 
-	handler := HandleTokenPost(handlerhelpers.NewHttpHelper(nil), mocks_handlers.NewUserSessionManager(t),
+	handler := HandleTokenPost(handlerhelpers.NewHttpHelper(nil),
 		database, mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t),
 		noCredentialFailures{})
 

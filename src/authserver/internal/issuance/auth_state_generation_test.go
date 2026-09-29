@@ -90,7 +90,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 	// pictures. Maybe(), because the rows using bare "openid" never reach it.
 	mockDB := mocks_data.NewDatabase(t)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 	now := time.Now().UTC()
 	const sid = "test-session-123"
 
@@ -181,7 +181,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 	// pictures. Maybe(), because the rows using bare "openid" never reach it.
 	mockDB := mocks_data.NewDatabase(t)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 	now := time.Now().UTC()
 	const sid = "test-session-123"
 
@@ -321,7 +321,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 
 	t.Run("initial auth-code refresh token inherits its code's generation", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		// code 7 against a user already at 9.
 		code := generationTestCode("openid offline_access", sid, 7, 9)
@@ -339,7 +339,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 
 	t.Run("auth-code rotation inherits the parent token, not the code or the user", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		// Three-way conflict on purpose: parent 7, code 3, user 9. A read of either wrong
 		// source is therefore visible rather than only one of them.
@@ -365,7 +365,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 
 	t.Run("initial ROPC refresh token inherits the validated user snapshot", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		input := &ROPCGrantInput{
 			Client: &models.Client{Id: 1, ClientIdentifier: "test-client"},
@@ -386,7 +386,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 
 	t.Run("ROPC rotation inherits the parent token, not the reloaded user", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher)
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		// The refresh path reloads the user, so this fixture puts the reloaded user at 9
 		// while the grant was authenticated at 7.

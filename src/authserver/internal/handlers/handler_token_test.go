@@ -21,8 +21,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,7 +52,7 @@ func TestHandleTokenPost(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				jsonWriter := mocks_handlers.NewJSONWriter(t)
 				database := mocks_data.NewDatabase(t)
-				handler := HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), database,
+				handler := HandleTokenPost(jsonWriter, database,
 					mocks_handlers.NewTokenIssuer(t), mocks_handlers.NewTokenValidator(t),
 					mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
 
@@ -83,7 +85,7 @@ func TestHandleTokenPost(t *testing.T) {
 			})).Return(nil, refused).Once()
 			jsonWriter := mocks_handlers.NewJSONWriter(t)
 
-			handler := HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), mocks_data.NewDatabase(t),
+			handler := HandleTokenPost(jsonWriter, mocks_data.NewDatabase(t),
 				mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
 
 			rr := httptest.NewRecorder()
@@ -109,7 +111,7 @@ func TestHandleTokenPost(t *testing.T) {
 		t.Run("a body cut before the handler, as the ROPC limiter leaves it", func(t *testing.T) {
 			jsonWriter := mocks_handlers.NewJSONWriter(t)
 			database := mocks_data.NewDatabase(t)
-			handler := HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), database,
+			handler := HandleTokenPost(jsonWriter, database,
 				mocks_handlers.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
 				mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
 
@@ -133,15 +135,37 @@ func TestHandleTokenPost(t *testing.T) {
 		})
 	})
 
+	// RFC 6749 section 2.3: a client MUST NOT use more than one authentication method in a request.
+	// Refused as parsed, before any client is looked up; which pairs count as two is
+	// TestExtractClientCredentials'.
+	t.Run("two client authentication methods are refused before the validator", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			detail, ok := err.(*customerrors.ErrorDetail)
+			return ok && detail.GetCode() == "invalid_request" &&
+				detail.GetHttpStatusCode() == http.StatusBadRequest &&
+				strings.Contains(detail.GetDescription(), "multiple authentication methods provided")
+		})).Return().Once()
+
+		req, _ := http.NewRequest("POST", "/token",
+			strings.NewReader("grant_type=client_credentials&client_id=test_client&client_secret=body-secret"))
+		req = withSettings(req, endpoint.settings)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.SetBasicAuth("test_client", "basic-secret")
+		endpoint.handler.ServeHTTP(httptest.NewRecorder(), req)
+
+		// The strict validator double registered nothing, so reaching it would have failed here.
+		endpoint.assertExpectations(t)
+	})
+
 	t.Run("ValidateTokenRequest gives error", func(t *testing.T) {
 		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -162,527 +186,373 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.AssertExpectations(t)
 	})
 
-	t.Run("Authorization_code GenerateTokenResponseForAuthCode gives error", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+	t.Run("Authorization_code: an issuer failure is answered as it arrived", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		code := &models.Code{Id: 1}
+		endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
 
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		failure := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError)
+		endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code).Return(nil, failure).Once()
+		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
 
-		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req = withSettings(req, &models.Settings{})
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rr := httptest.NewRecorder()
+		endpoint.post(t, "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client")
 
-		mockCode := &models.Code{Id: 1, Used: false}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: mockCode}
-
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
-
-		// Code is claimed successfully, but token generation then fails.
-		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
-
-		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mock.Anything, mockCode).
-			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
-
-		jsonWriter.On("JsonError",
-			mock.Anything,
-			mock.Anything,
-			mock.MatchedBy(func(err *customerrors.ErrorDetail) bool {
-				return err.GetCode() == "server_error" && err.GetDescription() == "Failed to generate token"
-			})).
-			Return().Once()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		tokenIssuer.AssertExpectations(t)
-	})
-
-	t.Run("Authorization_code MarkCodeAsUsed gives error", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req = withSettings(req, &models.Settings{})
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rr := httptest.NewRecorder()
-
-		mockCode := &models.Code{Id: 1, Used: false}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: mockCode}
-
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
-
-		// Claiming the code errors out. Tokens must NOT be generated.
-		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).
-			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to mark code as used", http.StatusInternalServerError))
-
-		jsonWriter.On("JsonError",
-			mock.Anything,
-			mock.Anything,
-			mock.MatchedBy(func(err error) bool {
-				return strings.Contains(err.Error(), "Failed to mark code as used")
-			}),
-		).Return().Once()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		database.AssertExpectations(t)
-		// Token generation must not happen when the claim fails.
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything, mock.Anything)
+		endpoint.assertExpectations(t)
+		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Authorization_code successful flow", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		endpoint := newTokenEndpoint(t)
+		code := &models.Code{Id: 1}
+		requestSettings := &models.Settings{Issuer: "https://issuer.example"}
+		endpoint.settings = requestSettings
+		endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
 
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		tokenResponse := &oauth.TokenResponse{AccessToken: "access_token", TokenType: "Bearer", ExpiresIn: 3600}
+		// The issuer is handed the request's own settings and the validated code itself.
+		endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, theseSettings(requestSettings), code).
+			Return(tokenResponse, nil).Once()
+		endpoint.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
+			"codeId": code.Id,
+		}).Return().Once()
+		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
-		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req = withSettings(req, &models.Settings{})
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rr := httptest.NewRecorder()
+		rr := endpoint.post(t, "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client")
 
-		mockCode := &models.Code{Id: 1, Used: false}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: mockCode}
-
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
-
-		mockTokenResponse := &oauth.TokenResponse{
-			AccessToken: "access_token",
-			TokenType:   "Bearer",
-			ExpiresIn:   3600,
-		}
-		// Code is claimed atomically before minting; only the winner proceeds.
-		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
-
-		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mock.Anything, mockCode).
-			Return(mockTokenResponse, nil)
-
-		auditLogger.On("Log", mock.Anything, "token_issued_authorization_code_response", mock.MatchedBy(func(details map[string]interface{}) bool {
-			codeId, ok := details["codeId"].(int64)
-			return ok && codeId == mockCode.Id
-		})).Return()
-
-		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		tokenIssuer.AssertExpectations(t)
-		database.AssertExpectations(t)
-		auditLogger.AssertExpectations(t)
-
+		endpoint.assertExpectations(t)
 		assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 	})
 
 	t.Run("Client_credentials successful flow", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-		formData := "grant_type=client_credentials&client_id=test_client&client_secret=test_secret&scope=test_scope"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		// The validator and the issuer are both handed the request's own settings.
+		endpoint := newTokenEndpoint(t)
 		requestSettings := &models.Settings{Issuer: "https://issuer.example"}
-		req = withSettings(req, requestSettings)
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rr := httptest.NewRecorder()
+		endpoint.settings = requestSettings
+		client := &models.Client{Id: 1, ClientIdentifier: "test_client"}
+		endpoint.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "test_scope"})
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test_client"}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{
-			Client: mockClient,
-			Scope:  "test_scope",
-		}
+		tokenResponse := &oauth.TokenResponse{AccessToken: "access_token", TokenType: "Bearer", ExpiresIn: 3600}
+		endpoint.issuer.On("IssueClientCredentialsGrant", mock.Anything, theseSettings(requestSettings), client, "test_scope").
+			Return(tokenResponse, nil).Once()
+		endpoint.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
+			"clientId": client.Id,
+			"scope":    "test_scope",
+		}).Return().Once()
+		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), theseSettings(requestSettings), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
+		rr := endpoint.post(t, "grant_type=client_credentials&client_id=test_client&client_secret=test_secret&scope=test_scope")
 
-		mockTokenResponse := &oauth.TokenResponse{
-			AccessToken: "access_token",
-			TokenType:   "Bearer",
-			ExpiresIn:   3600,
-		}
-		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), theseSettings(requestSettings), mockClient, "test_scope").
-			Return(mockTokenResponse, nil)
-
-		auditLogger.On("Log", mock.Anything, "token_issued_client_credentials_response", mock.MatchedBy(func(details map[string]interface{}) bool {
-			clientId, ok := details["clientId"].(int64)
-			return ok && clientId == mockClient.Id
-		})).Return()
-
-		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		tokenIssuer.AssertExpectations(t)
-		auditLogger.AssertExpectations(t)
-
+		endpoint.assertExpectations(t)
 		assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 	})
 
-	t.Run("Refresh_token and token is revoked", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+	t.Run("Client_credentials: an issuer failure is answered, and nothing is audited", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		client := &models.Client{Id: 1, ClientIdentifier: "test_client"}
+		endpoint.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "test_scope"})
 
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		failure := errs.New("signing key unavailable")
+		endpoint.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "test_scope").
+			Return(nil, failure).Once()
+		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
 
-		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req = withSettings(req, &models.Settings{})
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rr := httptest.NewRecorder()
+		endpoint.post(t, "grant_type=client_credentials&client_id=test_client&client_secret=test_secret&scope=test_scope")
 
-		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: true, FirstRefreshTokenJti: "family-1"}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{RefreshToken: mockRefreshToken}
-
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
-
-		// Containment runs but finds nothing live, which is the idempotent no-op an
-		// already-swept family produces. Zero count means no audit event (#128).
-		database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "family-1").Return(int64(0), nil)
-
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.(*customerrors.ErrorDetail).GetCode() == "invalid_grant" &&
-				err.(*customerrors.ErrorDetail).GetDescription() == "This refresh token has been revoked."
-		})).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		database.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		endpoint.assertExpectations(t)
+		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
-	t.Run("Refresh_token MarkRefreshTokenAsRevoked gives error", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = withSettings(req, &models.Settings{})
-		rr := httptest.NewRecorder()
-
-		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: false}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{
-			Client:       authCodeClient(),
-			RefreshToken: mockRefreshToken,
-			CodeEntity:   &models.Code{},
+	t.Run("Password: an issuer failure is answered, and nothing is audited", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		grant := &protocolvalidation.PasswordGrant{
+			Client: &models.Client{Id: 1, ClientIdentifier: "test_client"},
+			User:   &models.User{Id: 42},
+			Scope:  "openid",
 		}
+		endpoint.validates(grant)
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
+		failure := errs.New("signing key unavailable")
+		endpoint.issuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).Return(nil, failure).Once()
+		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
 
-		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
-			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to claim refresh token", http.StatusInternalServerError))
+		endpoint.post(t, "grant_type=password&client_id=test_client&username=u&password=p&scope=openid")
 
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			return strings.Contains(err.Error(), "Failed to claim refresh token")
-		})).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		database.AssertExpectations(t)
+		endpoint.assertExpectations(t)
+		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
-	t.Run("Refresh_token GenerateTokenResponseForRefresh gives error", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = withSettings(req, &models.Settings{})
-		rr := httptest.NewRecorder()
-
-		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: false}
-		mockCode := &models.Code{Id: 1}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{
-			Client:           authCodeClient(),
-			RefreshToken:     mockRefreshToken,
-			CodeEntity:       mockCode,
-			RefreshTokenInfo: &oauth.JwtToken{},
+	t.Run("Password successful flow", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		grant := &protocolvalidation.PasswordGrant{
+			Client: &models.Client{Id: 1, ClientIdentifier: "test_client"},
+			User:   &models.User{Id: 42},
+			Scope:  "openid",
 		}
+		endpoint.validates(grant)
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
+		tokenResponse := &oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer", ExpiresIn: 3600}
+		endpoint.issuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, &issuance.ROPCGrantInput{
+			Client: grant.Client, User: grant.User, Scope: grant.Scope,
+		}).Return(tokenResponse, nil).Once()
+		endpoint.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedROPCResponse, map[string]interface{}{
+			"userId":   int64(42),
+			"clientId": int64(1),
+		}).Return().Once()
+		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
-		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
-			Return(true, nil)
+		rr := endpoint.post(t, "grant_type=password&client_id=test_client&username=u&password=p&scope=openid")
 
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
-			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
-
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			return strings.Contains(err.Error(), "Failed to generate token")
-		})).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		database.AssertExpectations(t)
-		tokenIssuer.AssertExpectations(t)
-	})
-
-	t.Run("Refresh_token with SessionIdentifier bumps user session", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = withSettings(req, &models.Settings{})
-		rr := httptest.NewRecorder()
-
-		mockSessionIdentifier := "test_session_identifier"
-		mockClientId := int64(123)
-		mockUserId := int64(456)
-		mockCodeId := int64(789)
-		mockRefreshTokenJti := "test_jti"
-
-		mockRefreshToken := &models.RefreshToken{
-			Id:                1,
-			Revoked:           false,
-			SessionIdentifier: mockSessionIdentifier,
-			RefreshTokenJti:   mockRefreshTokenJti,
-			Code: models.Code{
-				Id:       mockCodeId,
-				ClientId: mockClientId,
-			},
-		}
-		mockCode := &models.Code{Id: mockCodeId, ClientId: mockClientId}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{
-			Client:           authCodeClient(),
-			RefreshToken:     mockRefreshToken,
-			CodeEntity:       mockCode,
-			RefreshTokenInfo: &oauth.JwtToken{},
-		}
-
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
-
-		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
-			Return(true, nil)
-
-		mockTokenResponse := &oauth.TokenResponse{
-			AccessToken:  "new_access_token",
-			RefreshToken: "new_refresh_token",
-			TokenType:    "Bearer",
-			ExpiresIn:    3600,
-		}
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
-			Return(mockTokenResponse, nil)
-
-		mockUserSession := &models.UserSession{
-			Id:     1,
-			UserId: mockUserId,
-		}
-		// For refresh token flow, empty strings are passed (no step-up authentication)
-		userSessionManager.On("BumpUserSession", mock.Anything, mockSessionIdentifier, mockClientId, "", models.AcrLevel(""), "").
-			Return(mockUserSession, nil)
-
-		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userId"] == mockUserId && details["clientId"] == mockClientId
-		})).Return()
-
-		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
-		})).Return()
-
-		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
-
-		handler.ServeHTTP(rr, req)
-
+		endpoint.assertExpectations(t)
 		assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
+	})
 
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		database.AssertExpectations(t)
-		tokenIssuer.AssertExpectations(t)
-		userSessionManager.AssertExpectations(t)
-		auditLogger.AssertExpectations(t)
+	t.Run("Refresh_token: an issuer fault is answered as it arrived", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		grant := codeRefreshGrant(false)
+		endpoint.validates(grant)
+
+		failure := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError)
+		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil, failure).Once()
+		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
+
+		endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
+
+		endpoint.assertExpectations(t)
+		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Refresh_token: the issuer is handed the whole validated grant", func(t *testing.T) {
+		for _, isROPC := range []bool{false, true} {
+			endpoint := newTokenEndpoint(t)
+			requestSettings := &models.Settings{Issuer: "https://issuer.example"}
+			endpoint.settings = requestSettings
+			grant := codeRefreshGrant(false)
+			if isROPC {
+				grant = ropcRefreshGrant(false)
+			}
+			grant.ScopeRequested = "openid"
+			endpoint.validates(grant)
+
+			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, theseSettings(requestSettings), &issuance.RefreshTokenGrantInput{
+				Client:         grant.Client,
+				RefreshToken:   grant.RefreshToken,
+				ScopeRequested: "openid",
+				IsROPC:         isROPC,
+			}).Return(nil, nil, issuance.ErrRefreshTokenNotClaimed).Once()
+			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+
+			endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token&scope=openid")
+
+			endpoint.assertExpectations(t)
+		}
+	})
+
+	t.Run("Refresh_token with a bumped session audits the bump before the issuance", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		grant := codeRefreshGrant(false)
+		endpoint.validates(grant)
+
+		tokenResponse := &oauth.TokenResponse{AccessToken: "new_access_token", RefreshToken: "new_refresh_token", TokenType: "Bearer", ExpiresIn: 3600}
+		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+			Return(tokenResponse, &issuance.RefreshOutcome{BumpedSession: &models.UserSession{Id: 1, UserId: 456}}, nil).Once()
+
+		var order []string
+		endpoint.auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, map[string]interface{}{
+			"userId":   int64(456),
+			"clientId": grant.RefreshToken.Code.ClientId,
+		}).Run(func(mock.Arguments) { order = append(order, audit.AuditBumpedUserSession) }).Return().Once()
+		endpoint.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+			"codeId":          grant.RefreshToken.Code.Id,
+			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
+			"flow":            "auth_code",
+		}).Run(func(mock.Arguments) { order = append(order, audit.AuditTokenIssuedRefreshTokenResponse) }).Return().Once()
+		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
+
+		rr := endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
+
+		endpoint.assertExpectations(t)
+		assert.Equal(t, []string{audit.AuditBumpedUserSession, audit.AuditTokenIssuedRefreshTokenResponse}, order)
+		assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
+		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
 	})
 
 	t.Run("Refresh_token success path without session", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		endpoint := newTokenEndpoint(t)
+		grant := codeRefreshGrant(false)
+		endpoint.validates(grant)
 
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		tokenResponse := &oauth.TokenResponse{AccessToken: "new_access_token", RefreshToken: "new_refresh_token", TokenType: "Bearer", ExpiresIn: 3600}
+		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+			Return(tokenResponse, &issuance.RefreshOutcome{}, nil).Once()
+		// The strict double refuses any other Log call, the bump's included.
+		endpoint.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+			"codeId":          grant.RefreshToken.Code.Id,
+			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
+			"flow":            "auth_code",
+		}).Return().Once()
+		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
-		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = withSettings(req, &models.Settings{})
-		rr := httptest.NewRecorder()
+		rr := endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
 
-		mockClientId := int64(123)
-		mockCodeId := int64(789)
-		mockRefreshTokenJti := "test_jti"
-
-		mockRefreshToken := &models.RefreshToken{
-			Id:              1,
-			Revoked:         false,
-			RefreshTokenJti: mockRefreshTokenJti,
-			Code: models.Code{
-				Id:       mockCodeId,
-				ClientId: mockClientId,
-			},
-		}
-		mockCode := &models.Code{Id: mockCodeId, ClientId: mockClientId}
-		validationResult := &protocolvalidation.ValidateTokenRequestResult{
-			Client:           authCodeClient(),
-			RefreshToken:     mockRefreshToken,
-			CodeEntity:       mockCode,
-			RefreshTokenInfo: &oauth.JwtToken{},
-		}
-
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(validationResult, nil)
-
-		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
-			Return(true, nil)
-
-		mockTokenResponse := &oauth.TokenResponse{
-			AccessToken:  "new_access_token",
-			RefreshToken: "new_refresh_token",
-			TokenType:    "Bearer",
-			ExpiresIn:    3600,
-		}
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
-			Return(mockTokenResponse, nil)
-
-		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
-		})).Return()
-
-		jsonWriter.On("EncodeJson", rr, req, mockTokenResponse).Return()
-
-		handler.ServeHTTP(rr, req)
-
+		endpoint.assertExpectations(t)
 		assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 		assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-		database.AssertExpectations(t)
-		tokenIssuer.AssertExpectations(t)
-		auditLogger.AssertExpectations(t)
-
-		// Ensure that BumpUserSession was not called
-		userSessionManager.AssertNotCalled(t, "BumpUserSession",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
-	t.Run("Unsupported_grant_type", func(t *testing.T) {
-		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_handlers.NewTokenValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+	t.Run("Refresh_token, a password grant's token: audited with the user and client on its row", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		grant := ropcRefreshGrant(false)
+		endpoint.validates(grant)
 
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		tokenResponse := &oauth.TokenResponse{AccessToken: "new_access_token", RefreshToken: "new_refresh_token", TokenType: "Bearer", ExpiresIn: 3600}
+		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+			Return(tokenResponse, &issuance.RefreshOutcome{}, nil).Once()
+		endpoint.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+			"userId":          grant.RefreshToken.UserId.Int64,
+			"clientId":        grant.RefreshToken.ClientId.Int64,
+			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
+			"flow":            "ropc",
+		}).Return().Once()
+		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
-		formData := "grant_type=unsupported_type&client_id=test_client&client_secret=test_secret"
-		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-		req = withSettings(req, &models.Settings{})
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rr := httptest.NewRecorder()
+		endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
 
-		// Mock the ValidateTokenRequest to return a result (even though it's not used in this case)
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(&protocolvalidation.ValidateTokenRequestResult{}, nil)
-
-		// Expect a JSON error response for unsupported grant type
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			if customErr, ok := err.(*customerrors.ErrorDetail); ok {
-				return customErr.GetCode() == "unsupported_grant_type" &&
-					customErr.GetDescription() == "Unsupported grant_type." &&
-					customErr.GetHttpStatusCode() == http.StatusBadRequest
-			}
-			return false
-		})).Return()
-
-		handler.ServeHTTP(rr, req)
-
-		jsonWriter.AssertExpectations(t)
-		tokenValidator.AssertExpectations(t)
-
-		// Ensure that other methods were not called
-		database.AssertNotCalled(t, "UpdateRefreshToken", mock.Anything, mock.Anything, mock.Anything)
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything, mock.Anything)
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForClientCred",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
-		userSessionManager.AssertNotCalled(t, "BumpUserSession",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		endpoint.assertExpectations(t)
 	})
+
+	t.Run("Refresh_token replayed with nothing left to contain: refused, not audited", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		endpoint.validates(codeRefreshGrant(true))
+
+		// Containment ran and found nothing live, the idempotent no-op an already-swept family
+		// produces. A zero count means no audit event (#128).
+		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil, &issuance.RefreshTokenReplayedError{FamilyRevokedCount: 0}).Once()
+		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			detail, ok := err.(*customerrors.ErrorDetail)
+			return ok && detail.GetCode() == "invalid_grant" &&
+				detail.GetDescription() == "This refresh token has been revoked." &&
+				detail.GetHttpStatusCode() == http.StatusBadRequest
+		})).Return().Once()
+
+		endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
+
+		endpoint.assertExpectations(t)
+		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	// The validator refuses every grant_type the grant table does not accept, so no request
+	// reaches this arm; it is what the endpoint answers if a validator ever returned a grant with
+	// no responder. A server fault, never a token.
+	t.Run("a grant the endpoint has no responder for is a server fault", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		endpoint.validates(unansweredGrant{})
+
+		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			var detail *customerrors.ErrorDetail
+			return !errors.As(err, &detail) && strings.Contains(err.Error(), "does not answer")
+		})).Return().Once()
+
+		endpoint.post(t, "grant_type=device_code&client_id=test_client")
+
+		endpoint.assertExpectations(t)
+		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+// unansweredGrant is a validated grant the token endpoint has no responder for.
+type unansweredGrant struct{}
+
+func (unansweredGrant) GrantType() oidc.GrantType { return "device_code" }
+
+// tokenEndpoint is one HandleTokenPost wired to fresh strict doubles, for a case that drives one
+// request through it. The validator answers whatever validates names.
+type tokenEndpoint struct {
+	jsonWriter  *mocks_handlers.JSONWriter
+	database    *mocks_data.Database
+	issuer      *mocks_handlers.TokenIssuer
+	validator   *mocks_handlers.TokenValidator
+	auditLogger *mocks_handlers.AuditLogger
+	settings    *models.Settings
+	handler     http.HandlerFunc
+}
+
+func newTokenEndpoint(t *testing.T) *tokenEndpoint {
+	t.Helper()
+	endpoint := &tokenEndpoint{
+		jsonWriter:  mocks_handlers.NewJSONWriter(t),
+		database:    mocks_data.NewDatabase(t),
+		issuer:      mocks_handlers.NewTokenIssuer(t),
+		validator:   mocks_handlers.NewTokenValidator(t),
+		auditLogger: mocks_handlers.NewAuditLogger(t),
+		settings:    &models.Settings{},
+	}
+	endpoint.handler = HandleTokenPost(endpoint.jsonWriter, endpoint.database, endpoint.issuer,
+		endpoint.validator, endpoint.auditLogger, noCredentialFailures{})
+	return endpoint
+}
+
+// validates makes the validator accept every request as grant.
+func (e *tokenEndpoint) validates(grant protocolvalidation.TokenGrant) {
+	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
+		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(grant, nil).Once()
+}
+
+// post submits form to the endpoint with the endpoint's settings on the request.
+func (e *tokenEndpoint) post(t *testing.T, form string) *httptest.ResponseRecorder {
+	t.Helper()
+	req, err := http.NewRequest("POST", "/token", strings.NewReader(form))
+	require.NoError(t, err)
+	req = withSettings(req, e.settings)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	e.handler.ServeHTTP(rr, req)
+	return rr
+}
+
+func (e *tokenEndpoint) assertExpectations(t *testing.T) {
+	t.Helper()
+	e.jsonWriter.AssertExpectations(t)
+	e.validator.AssertExpectations(t)
+	e.issuer.AssertExpectations(t)
+	e.auditLogger.AssertExpectations(t)
+	e.database.AssertExpectations(t)
+}
+
+// codeRefreshGrant is a validated refresh of a token an authorization code minted; revoked is what
+// the validator read.
+func codeRefreshGrant(revoked bool) *protocolvalidation.RefreshTokenGrant {
+	return &protocolvalidation.RefreshTokenGrant{
+		Client: &models.Client{Id: 123, ClientIdentifier: "test_client", AuthorizationCodeEnabled: true},
+		RefreshToken: &models.RefreshToken{
+			Id:                   1,
+			Revoked:              revoked,
+			RefreshTokenJti:      "jti-presented",
+			FirstRefreshTokenJti: "jti-family",
+			SessionIdentifier:    "sid-1",
+			CodeId:               sql.NullInt64{Int64: 789, Valid: true},
+			Code:                 models.Code{Id: 789, ClientId: 123, UserId: 456},
+		},
+	}
+}
+
+// ropcRefreshGrant is a validated refresh of a token the password grant minted, whose user and
+// client are on the token row.
+func ropcRefreshGrant(revoked bool) *protocolvalidation.RefreshTokenGrant {
+	return &protocolvalidation.RefreshTokenGrant{
+		Client: &models.Client{Id: 123, ClientIdentifier: "test_client"},
+		RefreshToken: &models.RefreshToken{
+			Id:                   1,
+			Revoked:              revoked,
+			RefreshTokenJti:      "jti-presented",
+			FirstRefreshTokenJti: "jti-family",
+			UserId:               sql.NullInt64{Int64: 456, Valid: true},
+			ClientId:             sql.NullInt64{Int64: 123, Valid: true},
+		},
+		IsROPC: true,
+	}
 }
 
 func TestParseBasicAuth(t *testing.T) {
@@ -957,13 +827,12 @@ func TestExtractClientCredentials(t *testing.T) {
 // It must also skip the audit log, which fires only after a successful commit.
 func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1023,13 +892,12 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 // must still surface a 500 and skip both the audit log and the invalid_grant.
 func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *testing.T) {
 	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1076,7 +944,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), database,
+	handler := HandleTokenPost(jsonWriter, database,
 		mocks_handlers.NewTokenIssuer(t), tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
@@ -1123,132 +991,60 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-// TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses verifies the #77 fix:
-// when two requests race to redeem the same code, the loser (whose atomic claim
-// via MarkCodeAsUsed returns false) is rejected with invalid_grant. Crucially it
-// must NOT mint tokens and must NOT run the session-wide reuse cascade (no
-// BeginTransaction, no session teardown, no reuse audit) — that cascade running
-// concurrently with the winner's mint on the same session rows is what deadlocks
-// the winner. A genuine *later* replay is still cascaded by the sequential-reuse
-// path (covered by the integration CodeReuse_* tests).
+// TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses verifies the handler half of the #77 fix:
+// a redemption whose claim was lost (issuance.ErrCodeNotClaimed) is refused as an invalid code, and
+// does NOT run the session-wide reuse cascade (no transaction, no session teardown, no reuse audit),
+// which running concurrently with the winner's mint on the same session rows is what deadlocks the
+// winner. That the loser mints nothing is the issuer's, and is pinned in issuance's
+// TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing. A genuine LATER replay is still cascaded,
+// by the sequential-reuse path (covered by the integration CodeReuse_* tests).
 func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	endpoint := newTokenEndpoint(t)
+	racedCode := &models.Code{Id: 42, ClientId: 7, UserId: 13, SessionIdentifier: "sid-raced"}
+	endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: racedCode})
 
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-	formData := "grant_type=authorization_code&code=raced&redirect_uri=http://example.com&client_id=test_client"
-	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-	req = withSettings(req, &models.Settings{})
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rr := httptest.NewRecorder()
-
-	racedCode := &models.Code{
-		Id:                42,
-		ClientId:          7,
-		UserId:            13,
-		SessionIdentifier: "sid-raced",
-	}
-	validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: racedCode}
-
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-		Return(validationResult, nil)
-
-	// This request loses the race: the code was already claimed concurrently.
-	database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), racedCode.Id).Return(false, nil)
-
-	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, racedCode).
+		Return(nil, issuance.ErrCodeNotClaimed).Once()
+	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*customerrors.ErrorDetail)
-		return ok && detail.GetCode() == "invalid_grant"
+		return ok && detail.GetCode() == "invalid_grant" && detail.GetDescription() == "Code is invalid." &&
+			detail.GetHttpStatusCode() == http.StatusBadRequest
 	})).Return().Once()
 
-	handler.ServeHTTP(rr, req)
+	endpoint.post(t, "grant_type=authorization_code&code=raced&redirect_uri=http://example.com&client_id=test_client")
 
-	jsonWriter.AssertExpectations(t)
-	tokenValidator.AssertExpectations(t)
-	database.AssertExpectations(t)
-
-	// The loser must not mint tokens, and must not run the reuse cascade: no
-	// transaction, no session teardown, no reuse audit.
-	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	endpoint.assertExpectations(t)
+	endpoint.database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+	endpoint.database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
+	endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses pins the branch a refresh
-// request takes when its validation read saw the token live but the compare-and-set
-// then failed: refuse, and do NOT run the family cascade (#128).
+// TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses pins the answer to a refresh whose claim was
+// lost (issuance.ErrRefreshTokenNotClaimed): refused, and nothing audited (#128). That the lost claim
+// cascades over nothing and mints nothing is the issuer's, pinned in issuance's
+// TestIssueRefreshTokenGrant_ALostClaimContainsAndMintsNothing.
 //
-// The two negative assertions are the test. Without them it would pass under the
-// design decision 1 rejected, which cascades on the compare-and-set's false return.
-// That version tears down the winner's freshly minted child, because a false return
-// means only "the row was no longer live when this statement ran" and so merges the
-// concurrent loser with the sequential replayer.
-//
-// What it does NOT prove: the inter-request ordering that produced this state. A mocked
-// unit test fixes the state the handler reads and asserts the resulting branch; no
-// mocked test can establish that one HTTP request really arrived before another. Its
-// sibling for the other branch is the already-revoked subtest inside TestHandleTokenPost.
+// What it does NOT prove: the inter-request ordering that produced this state. A mocked unit test
+// fixes the state and asserts the resulting branch; no mocked test can establish that one HTTP
+// request really arrived before another. Its sibling for the other branch is the replayed subtest
+// inside TestHandleTokenPost.
 func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	endpoint := newTokenEndpoint(t)
+	endpoint.validates(codeRefreshGrant(false))
 
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-	formData := "grant_type=refresh_token&refresh_token=raced"
-	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req = withSettings(req, &models.Settings{})
-	rr := httptest.NewRecorder()
-
-	// Revoked=false is the whole point: the validation read saw a live token, so this
-	// request is a compare-and-set loser rather than a replay.
-	racedToken := &models.RefreshToken{
-		Id:                   42,
-		Revoked:              false,
-		RefreshTokenJti:      "jti-raced",
-		FirstRefreshTokenJti: "jti-family",
-	}
-	validationResult := &protocolvalidation.ValidateTokenRequestResult{
-		Client:       authCodeClient(),
-		RefreshToken: racedToken,
-		CodeEntity:   &models.Code{Id: 1},
-	}
-
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-		Return(validationResult, nil)
-
-	// This request loses the race: the row stopped being live between the validation
-	// read and the claim.
-	database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), racedToken.Id).Return(false, nil)
-
-	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil, issuance.ErrRefreshTokenNotClaimed).Once()
+	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*customerrors.ErrorDetail)
-		return ok && detail.GetCode() == "invalid_grant"
+		return ok && detail.GetCode() == "invalid_grant" &&
+			detail.GetDescription() == "This refresh token has been revoked." &&
+			detail.GetHttpStatusCode() == http.StatusBadRequest
 	})).Return().Once()
 
-	handler.ServeHTTP(rr, req)
+	endpoint.post(t, "grant_type=refresh_token&refresh_token=raced")
 
-	jsonWriter.AssertExpectations(t)
-	tokenValidator.AssertExpectations(t)
-	database.AssertExpectations(t)
-
-	// The loser must not mint tokens, must not cascade over the family, and must not
-	// audit anything.
-	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
-	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything, mock.Anything)
-	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	endpoint.assertExpectations(t)
+	endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleTokenPost_Refresh_Replay_AuditsContainment asserts the replay-containment
@@ -1264,91 +1060,52 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 // payload carries neither the presented refresh token itself nor a list of revoked JTIs.
 // A set-based update yields an exact COUNT but not an exact cross-engine row set, and an
 // inaccurate security field is worse than an omitted one.
+//
+// Containment itself, and that a replay reaches neither the flow gate nor the claim nor the mint,
+// is the issuer's: issuance's TestIssueRefreshTokenGrant_AReplayContainsItsFamilyAndGoesNoFurther.
 func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 	const (
 		presentedJti = "jti-presented"
 		familyJti    = "jti-family"
-		clientId     = int64(111)
-		userId       = int64(222)
+		clientId     = int64(123)
+		userId       = int64(456)
 	)
 
 	testCases := []struct {
 		name     string
-		result   *protocolvalidation.ValidateTokenRequestResult
+		grant    *protocolvalidation.RefreshTokenGrant
 		wantFlow string
 	}{
-		{
-			name: "authorization code family",
-			result: &protocolvalidation.ValidateTokenRequestResult{
-				RefreshToken: &models.RefreshToken{
-					Id:                   1,
-					Revoked:              true,
-					RefreshTokenJti:      presentedJti,
-					FirstRefreshTokenJti: familyJti,
-					CodeId:               sql.NullInt64{Int64: 9, Valid: true},
-				},
-				// The principal fields come from the loaded code on this shape.
-				CodeEntity: &models.Code{Id: 9, ClientId: clientId, UserId: userId},
-			},
-			wantFlow: "auth_code",
-		},
-		{
-			name: "ROPC family",
-			result: &protocolvalidation.ValidateTokenRequestResult{
-				// No code at all: the client and user are on the refresh token row.
-				RefreshToken: &models.RefreshToken{
-					Id:                   1,
-					Revoked:              true,
-					RefreshTokenJti:      presentedJti,
-					FirstRefreshTokenJti: familyJti,
-					UserId:               sql.NullInt64{Int64: userId, Valid: true},
-					ClientId:             sql.NullInt64{Int64: clientId, Valid: true},
-				},
-			},
-			wantFlow: "ropc",
-		},
+		// The principal fields come from the loaded code on this shape.
+		{name: "authorization code family", grant: codeRefreshGrant(true), wantFlow: "auth_code"},
+		// No code at all: the client and user are on the refresh token row.
+		{name: "ROPC family", grant: ropcRefreshGrant(true), wantFlow: "ropc"},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			jsonWriter := mocks_handlers.NewJSONWriter(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-			tokenValidator := mocks_handlers.NewTokenValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-
-			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-			formData := "grant_type=refresh_token&refresh_token=replayed"
-			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-			req = withSettings(req, &models.Settings{})
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			rr := httptest.NewRecorder()
-
-			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-				Return(tc.result, nil)
+			endpoint := newTokenEndpoint(t)
+			endpoint.validates(tc.grant)
 
 			// Two live members transitioned, so this is a real containment.
-			database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), familyJti).Return(int64(2), nil)
+			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+				Return(nil, nil, &issuance.RefreshTokenReplayedError{FamilyRevokedCount: 2}).Once()
 
 			var logged []map[string]interface{}
-			auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+			endpoint.auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
 				Run(func(args mock.Arguments) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()
 
-			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "invalid_grant"
+				return ok && detail.GetCode() == "invalid_grant" &&
+					detail.GetDescription() == "This refresh token has been revoked."
 			})).Return().Once()
 
-			handler.ServeHTTP(rr, req)
+			endpoint.post(t, "grant_type=refresh_token&refresh_token=replayed")
 
-			jsonWriter.AssertExpectations(t)
-			tokenValidator.AssertExpectations(t)
-			database.AssertExpectations(t)
-			auditLogger.AssertExpectations(t)
+			endpoint.assertExpectations(t)
 
 			require.Len(t, logged, 1, "exactly one replay event must be emitted")
 			assert.Equal(t, map[string]interface{}{
@@ -1359,11 +1116,6 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 				"userId":                   userId,
 				"flow":                     tc.wantFlow,
 			}, logged[0], "the replay payload must carry exactly these six fields")
-
-			// A replay mints nothing and bumps nothing.
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
-			userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -1372,54 +1124,25 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 // containment is surfaced rather than swallowed, and that no event is emitted for it.
 //
 // Emitting on a failed containment would be worse than emitting nothing: the event's
-// contract is that it records members actually revoked, and a failure revoked none.
+// contract is that it records members actually revoked, and a failure revoked none. The issuer
+// returns the failure itself rather than a RefreshTokenReplayedError, which issuance's
+// TestIssueRefreshTokenGrant_AFailedContainmentIsAFault pins.
 func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T) {
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	endpoint := newTokenEndpoint(t)
+	endpoint.validates(codeRefreshGrant(true))
 
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	failure := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to contain family", http.StatusInternalServerError)
+	endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil, failure).Once()
+	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
 
-	formData := "grant_type=refresh_token&refresh_token=replayed"
-	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-	req = withSettings(req, &models.Settings{})
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rr := httptest.NewRecorder()
+	endpoint.post(t, "grant_type=refresh_token&refresh_token=replayed")
 
-	replayed := &models.RefreshToken{
-		Id:                   1,
-		Revoked:              true,
-		RefreshTokenJti:      "jti-presented",
-		FirstRefreshTokenJti: "jti-family",
-	}
-	validationResult := &protocolvalidation.ValidateTokenRequestResult{
-		RefreshToken: replayed,
-		CodeEntity:   &models.Code{Id: 9},
-	}
-
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-		Return(validationResult, nil)
-
-	database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").
-		Return(int64(0), customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to contain family", http.StatusInternalServerError))
-
-	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-		return strings.Contains(err.Error(), "Failed to contain family")
-	})).Return().Once()
-
-	handler.ServeHTTP(rr, req)
-
-	jsonWriter.AssertExpectations(t)
-	tokenValidator.AssertExpectations(t)
-	database.AssertExpectations(t)
-
+	endpoint.assertExpectations(t)
 	// No event, and no invalid_grant either: the request did not get a clean refusal,
 	// it got a server error.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
+	endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	endpoint.jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
 }
 
 // TestHandleTokenPost_ScopeNormalizationWiring proves the handler normalizes the scope with
@@ -1539,13 +1262,12 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			jsonWriter := mocks_handlers.NewJSONWriter(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_handlers.NewTokenValidator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+			handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 			form := url.Values{"grant_type": {tc.grantType}, "client_id": {"test_client"}}
 			if tc.rawScope != omittedScope {
@@ -1616,13 +1338,12 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		*mocks_handlers.TokenIssuer, *mocks_handlers.AuditLogger, http.HandlerFunc) {
 		t.Helper()
 		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		return jsonWriter, tokenValidator, tokenIssuer, auditLogger,
-			HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 	}
 
 	// Rows 1 and 2 differ ONLY in grant type. Row 2 fails if a GrantType check is ever added to the
@@ -1741,10 +1462,10 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		mockClient := &models.Client{Id: 42, ClientIdentifier: "test_client"}
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-			Return(&protocolvalidation.ValidateTokenRequestResult{Client: mockClient, Scope: "billing-api:read"}, nil)
+			Return(&protocolvalidation.ClientCredentialsGrant{Client: mockClient, Scope: "billing-api:read"}, nil)
 
 		tokenResponse := &oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer", ExpiresIn: 3600}
-		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mock.Anything, mockClient, "billing-api:read").
+		tokenIssuer.On("IssueClientCredentialsGrant", req.Context(), mock.Anything, mockClient, "billing-api:read").
 			Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedClientCredentialsResponse, mock.MatchedBy(
@@ -1768,7 +1489,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 //
 // Scope note: the token issuer is mocked here, so this proves the handoff and nothing about
 // the tokens themselves. That neither generated token carries a sid is proven separately, in
-// core/oauth's TestGenerateTokenResponseForROPC and TestGenerateTokenResponseForRefreshROPC.
+// issuance's TestIssuePasswordGrant_* and TestMintROPCRefreshTokens cases.
 // Neither half substitutes for the other.
 //
 // This closes a real leak rather than guarding a hypothetical. MiddlewareSessionIdentifier
@@ -1784,12 +1505,11 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 // absent (#106).
 func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	form := "grant_type=password&client_id=test_client&username=u&password=p&scope=openid"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
@@ -1806,10 +1526,10 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 
 	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-		Return(&protocolvalidation.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
+		Return(&protocolvalidation.PasswordGrant{Client: client, User: user, Scope: "openid"}, nil)
 
 	var captured *issuance.ROPCGrantInput
-	tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything, mock.Anything).
+	tokenIssuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { captured = args.Get(2).(*issuance.ROPCGrantInput) }).
 		Return(&oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
@@ -1818,7 +1538,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	require.NotNil(t, captured, "GenerateTokenResponseForROPC was never called")
+	require.NotNil(t, captured, "IssuePasswordGrant was never called")
 	assert.Equal(t, client, captured.Client)
 	assert.Equal(t, user, captured.User)
 	// The generation travels on the validated User snapshot, which is what the issuer stamps
@@ -1837,13 +1557,12 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 // be recorded as either. Stage 5 adds the event that does cover this.
 func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	jsonWriter := mocks_handlers.NewJSONWriter(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 
 	formData := "grant_type=refresh_token&refresh_token=superseded&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1889,7 +1608,6 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	// is what ValidateTokenRequest answers every time; nil means the grant succeeds.
 	newHandler := func(t *testing.T, failure error) (http.Handler, *mocks_handlers.AuditLogger) {
 		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
@@ -1903,15 +1621,15 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 			client := &models.Client{Id: 1, ClientIdentifier: "app"}
 			user := &models.User{Id: 42, Subject: fake.UUID()}
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
-				Return(&protocolvalidation.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
-			tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything, mock.Anything).
+				Return(&protocolvalidation.PasswordGrant{Client: client, User: user, Scope: "openid"}, nil)
+			tokenIssuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).
 				Return(&oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 			jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 		}
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		rateLimiter := newTestRateLimiter(nil)
-		handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer,
+		handler := HandleTokenPost(jsonWriter, database, tokenIssuer,
 			tokenValidator, auditLogger, rateLimiter)
 		return rateLimiter.LimitROPC(handler), auditLogger
 	}
@@ -2033,283 +1751,52 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	})
 }
 
-// withSettings puts resolved settings on a request, which the refresh arm's flow gate reads to
-// resolve a client left on "inherit". Every refresh fixture that reaches past replay containment
-// needs it, and needs a Client on its validation result beside it: a refresh token exists only
-// where the flow that issued it was switched on, so saying so is the fixture stating what it
-// always meant rather than working around the gate (#250).
 // theseSettings matches the very settings value a test put on its request, by identity, so a
 // handler that built its own or read another request's would match nothing.
 func theseSettings(want *models.Settings) interface{} {
 	return mock.MatchedBy(func(got *models.Settings) bool { return got == want })
 }
 
+// withSettings puts resolved settings on a request, as the settings middleware does.
 func withSettings(req *http.Request, settings *models.Settings) *http.Request {
 	return req.WithContext(reqctx.WithSettings(req.Context(), settings))
 }
 
-// authCodeClient is the client an authorization code flow refresh fixture implies: the flow that
-// minted the token is on. Its zero-valued ROPC override leaves that grant inheriting, which is
-// irrelevant on this arm because a token carrying a CodeEntity is never judged by the ROPC switch.
-func authCodeClient() *models.Client {
-	return &models.Client{Id: 1, ClientIdentifier: "test_client", AuthorizationCodeEnabled: true}
-}
-
-// TestHandleTokenPost_Refresh_FlowGate owns the whole truth table for the rule that a refresh is
-// governed by the switch of the flow that ISSUED the token, not by the authorization code flag
-// alone. Before this landed the arm refused on !AuthorizationCodeEnabled whatever minted the
-// token, so an ROPC-only client could never redeem the token ROPC handed it (row 2) and turning
-// ROPC off stopped nothing already issued (rows 3 to 5) (#250).
-//
-// Every row presents a LIVE token, so the flow gate is what answers rather than replay
-// containment. The containment cases are the two tests below this one.
-//
-// An accepted row is proved by reaching MarkRefreshTokenAsRevoked, which is the first thing past
-// the gate. It is stubbed to lose its claim so the row stops there rather than dragging the whole
-// minting chain into a test about a gate; a lost claim answers invalid_grant, which is visibly not
-// the refusal the gate emits.
-func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
-	ropcOn, ropcOff := true, false
-
-	testCases := []struct {
-		name          string
-		client        *models.Client
-		globalROPC    bool
-		ropcToken     bool // true: no CodeEntity, so ROPC minted it
-		wantRefusal   string
-		wantRefusalIs string
+// TestHandleTokenPost_Refresh_FlowDisabledAnswer pins the answer to a refresh the issuer refused
+// because the flow that minted its token is switched off for the client (#250): unauthorized_client,
+// worded for that flow. The truth table of when the gate refuses, and that it sits below containment
+// and above the claim, is the issuer's: issuance's TestIssueRefreshTokenGrant_FlowGate and
+// TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate.
+func TestHandleTokenPost_Refresh_FlowDisabledAnswer(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		grant       *protocolvalidation.RefreshTokenGrant
+		wantRefusal string
 	}{
-		{
-			name:       "row 1: ROPC token, both flows on, accepted",
-			client:     &models.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
-			globalROPC: true,
-			ropcToken:  true,
-		},
-		{
-			// The defect this stage exists to close. Refused today, with a sentence about a
-			// flow the client never used.
-			name:       "row 2: ROPC token, ROPC-only client, accepted",
-			client:     &models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
-			globalROPC: true,
-			ropcToken:  true,
-		},
-		{
-			// Reverses today's behaviour, where turning ROPC off stops nothing already issued.
-			name:          "row 3: ROPC token, ROPC off on the client, refused",
-			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff},
-			globalROPC:    true,
-			ropcToken:     true,
-			wantRefusal:   protocolvalidation.ROPCNotAuthorizedErrorMsg,
-			wantRefusalIs: "unauthorized_client",
-		},
-		{
-			name:          "row 4: ROPC token, both flows off, refused for ROPC",
-			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff},
-			globalROPC:    true,
-			ropcToken:     true,
-			wantRefusal:   protocolvalidation.ROPCNotAuthorizedErrorMsg,
-			wantRefusalIs: "unauthorized_client",
-		},
-		{
-			// Decision 3, and the only row that fails if the gate reads the per-client override
-			// alone: the client inherits, and the global switch is what turns ROPC off.
-			name:          "row 5: ROPC token, client inherits, global ROPC off, refused",
-			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: true},
-			globalROPC:    false,
-			ropcToken:     true,
-			wantRefusal:   protocolvalidation.ROPCNotAuthorizedErrorMsg,
-			wantRefusalIs: "unauthorized_client",
-		},
-		{
-			// Goal 3: the authorization code half keeps the refusal it has today, word for word.
-			name:          "row 6: authorization code token, that flow off, refused for auth code",
-			client:        &models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
-			globalROPC:    true,
-			ropcToken:     false,
-			wantRefusal:   authCodeNotAuthorizedErrorMsg,
-			wantRefusalIs: "unauthorized_client",
-		},
-	}
-
-	for _, tc := range testCases {
+		// The refusal the password grant itself answers, so an operator reads one story about
+		// turning ROPC off.
+		{"a password grant's token", ropcRefreshGrant(false), protocolvalidation.ROPCNotAuthorizedErrorMsg},
+		// The authorization code half keeps the refusal it had, word for word.
+		{"an authorization code's token", codeRefreshGrant(false), authCodeNotAuthorizedErrorMsg},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			jsonWriter := mocks_handlers.NewJSONWriter(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-			tokenValidator := mocks_handlers.NewTokenValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			endpoint := newTokenEndpoint(t)
+			endpoint.validates(tc.grant)
 
-			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-			formData := "grant_type=refresh_token&refresh_token=live"
-			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			// The mocked validator is matched against THIS request's context, so the settings
-			// have to be on it before the expectation is set up.
-			req = withSettings(req, &models.Settings{ResourceOwnerPasswordCredentialsEnabled: tc.globalROPC})
-			rr := httptest.NewRecorder()
-
-			liveToken := &models.RefreshToken{
-				Id:                   7,
-				Revoked:              false,
-				RefreshTokenJti:      "jti-live",
-				FirstRefreshTokenJti: "jti-family",
-			}
-			result := &protocolvalidation.ValidateTokenRequestResult{
-				Client:           tc.client,
-				RefreshToken:     liveToken,
-				RefreshTokenInfo: &oauth.JwtToken{},
-			}
-			if tc.ropcToken {
-				liveToken.ClientId = sql.NullInt64{Int64: tc.client.Id, Valid: true}
-				liveToken.UserId = sql.NullInt64{Int64: 5, Valid: true}
-			} else {
-				liveToken.CodeId = sql.NullInt64{Int64: 9, Valid: true}
-				result.CodeEntity = &models.Code{Id: 9, ClientId: tc.client.Id, UserId: 5}
-			}
-
-			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-				Return(result, nil)
-
-			if tc.wantRefusal == "" {
-				// Accepted: the request reaches the claim, and loses it, which is as far as a
-				// test about the gate needs to go.
-				database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), liveToken.Id).Return(false, nil).Once()
-				jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-					detail, ok := err.(*customerrors.ErrorDetail)
-					return ok && detail.GetCode() == "invalid_grant"
-				})).Return().Once()
-			} else {
-				jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-					detail, ok := err.(*customerrors.ErrorDetail)
-					return ok && detail.GetCode() == tc.wantRefusalIs &&
-						detail.GetDescription() == tc.wantRefusal &&
-						detail.GetHttpStatusCode() == http.StatusBadRequest
-				})).Return().Once()
-			}
-
-			handler.ServeHTTP(rr, req)
-
-			jsonWriter.AssertExpectations(t)
-			tokenValidator.AssertExpectations(t)
-			database.AssertExpectations(t)
-
-			if tc.wantRefusal != "" {
-				// A refused token is not spent. The operator may turn the switch back on, and a
-				// live token should still be live when they do.
-				database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything, mock.Anything)
-				// The gate is not containment: nothing is cascaded and nothing is audited.
-				database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything, mock.Anything)
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-			}
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
-		})
-	}
-}
-
-// TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate is why the flow gate lives in this
-// handler rather than in ValidateTokenRequest, and it is the case that was broken before this
-// stage: a stolen token replayed while its flow is switched off was refused by the validator, so
-// its rotation family stayed live and the theft went unrecorded.
-//
-// Whether a theft is detected must not depend on which switches happen to be on. Both rows
-// therefore present a REVOKED token with the issuing flow off, and require that containment ran
-// and was audited, and that the answer is the containment refusal rather than the gate's (#250).
-func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
-	ropcOff := false
-
-	testCases := []struct {
-		name     string
-		client   *models.Client
-		result   *protocolvalidation.ValidateTokenRequestResult
-		wantFlow string
-	}{
-		{
-			name:   "ROPC token replayed while ROPC is off",
-			client: &models.Client{Id: 111, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff},
-			result: &protocolvalidation.ValidateTokenRequestResult{
-				RefreshToken: &models.RefreshToken{
-					Id:                   1,
-					Revoked:              true,
-					RefreshTokenJti:      "jti-presented",
-					FirstRefreshTokenJti: "jti-family",
-					ClientId:             sql.NullInt64{Int64: 111, Valid: true},
-					UserId:               sql.NullInt64{Int64: 222, Valid: true},
-				},
-			},
-			wantFlow: "ropc",
-		},
-		{
-			name:   "authorization code token replayed while that flow is off",
-			client: &models.Client{Id: 111, AuthorizationCodeEnabled: false},
-			result: &protocolvalidation.ValidateTokenRequestResult{
-				RefreshToken: &models.RefreshToken{
-					Id:                   1,
-					Revoked:              true,
-					RefreshTokenJti:      "jti-presented",
-					FirstRefreshTokenJti: "jti-family",
-					CodeId:               sql.NullInt64{Int64: 9, Valid: true},
-				},
-				CodeEntity: &models.Code{Id: 9, ClientId: 111, UserId: 222},
-			},
-			wantFlow: "auth_code",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			jsonWriter := mocks_handlers.NewJSONWriter(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-			tokenValidator := mocks_handlers.NewTokenValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-
-			handler := HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
-
-			formData := "grant_type=refresh_token&refresh_token=replayed"
-			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			// Global ROPC off as well, so neither arm of the gate would let this through if it
-			// were reached.
-			req = withSettings(req, &models.Settings{ResourceOwnerPasswordCredentialsEnabled: false})
-			rr := httptest.NewRecorder()
-
-			result := tc.result
-			result.Client = tc.client
-			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
-				Return(result, nil)
-
-			database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
-
-			var logged []map[string]interface{}
-			auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
-				Run(func(args mock.Arguments) {
-					logged = append(logged, args.Get(2).(map[string]interface{}))
-				}).Return().Once()
-
-			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
+				Return(nil, nil, issuance.ErrRefreshFlowDisabled).Once()
+			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "invalid_grant" &&
-					detail.GetDescription() == "This refresh token has been revoked."
+				return ok && detail.GetCode() == "unauthorized_client" &&
+					detail.GetDescription() == tc.wantRefusal &&
+					detail.GetHttpStatusCode() == http.StatusBadRequest
 			})).Return().Once()
 
-			handler.ServeHTTP(rr, req)
+			endpoint.post(t, "grant_type=refresh_token&refresh_token=live")
 
-			jsonWriter.AssertExpectations(t)
-			tokenValidator.AssertExpectations(t)
-			database.AssertExpectations(t)
-			auditLogger.AssertExpectations(t)
-
-			require.Len(t, logged, 1, "containment must be audited even though the flow is switched off")
-			assert.Equal(t, tc.wantFlow, logged[0]["flow"])
-			assert.Equal(t, int64(2), logged[0]["revokedCount"])
-
-			// The flow gate must not have answered: it sits below containment, and a replay
-			// never reaches it.
-			database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything, mock.Anything)
+			endpoint.assertExpectations(t)
+			// The gate is not containment: nothing is audited.
+			endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -2327,13 +1814,12 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		*mocks_handlers.AuditLogger, http.HandlerFunc) {
 		t.Helper()
 		jsonWriter := mocks_handlers.NewJSONWriter(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_handlers.NewTokenValidator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		return jsonWriter, tokenValidator, auditLogger,
-			HandleTokenPost(jsonWriter, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
 	}
 
 	const form = "grant_type=authorization_code&client_id=test_client&client_secret=s&" +

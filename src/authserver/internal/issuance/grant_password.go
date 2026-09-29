@@ -28,13 +28,13 @@ type ROPCGrantInput struct {
 	User   *models.User
 	Scope  string
 	// AuthenticatedAt is when the password was checked, and so what every token of the grant
-	// issues as auth_time. The issuer writes it, not the caller: GenerateTokenResponseForROPC
+	// issues as auth_time. The issuer writes it, not the caller: IssuePasswordGrant
 	// stamps the moment of the password grant, and a refresh copies the instant its parent
 	// token recorded (#125).
 	AuthenticatedAt time.Time
 }
 
-// GenerateTokenResponseForROPC creates tokens for Resource Owner Password Credentials flow.
+// IssuePasswordGrant creates tokens for Resource Owner Password Credentials flow.
 // RFC 6749 Section 4.3
 // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 //
@@ -45,7 +45,7 @@ type ROPCGrantInput struct {
 // its own used to differ only in three omitempty tags, on the access token, token type and
 // expires_in, none of which is ever empty here: the settings refuse a lifetime of 0 or less, and
 // a client's 0 means it inherits that setting (#437).
-func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings,
+func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.Settings,
 	input *ROPCGrantInput) (*oauth.TokenResponse, error) {
 
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
