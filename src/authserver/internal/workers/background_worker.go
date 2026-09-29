@@ -29,7 +29,7 @@ const (
 	// like a dead one to that sweep, and deleting it makes the insert fail on
 	// fk_refresh_tokens_code. The client gets a 500 instead of its tokens.
 	//
-	// Codes expire after 60 seconds (token_validator.go), so anything older than that
+	// Codes expire after 60 seconds (token_grant_authorization_code.go), so anything older than that
 	// can never be redeemed and can never gain a refresh token. Five minutes is that
 	// bound with generous room for clock skew and slow signing. It bounds every class
 	// the sweep reaps, used, revoked or never redeemed (#129, #436): past the lifetime

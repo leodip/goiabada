@@ -71,8 +71,8 @@ func HandleTokenPost(
 		// Normalize the scope HERE, at the entry point, and not inside the validator. The
 		// placement is load-bearing in both directions:
 		//
-		//   - It must run before token_validator.go's `len(input.Scope) == 0` test, which is what
-		//     selects the client credentials "no scope given, grant everything the client holds"
+		//   - It must run before token_grant_client_credentials.go's `len(input.Scope) == 0`
+		//     test, which is what selects the client credentials "no scope given, grant everything the client holds"
 		//     branch. Normalizing after that test means a scope of "   " has non-zero length,
 		//     skips the branch, then trims to empty inside validateClientCredentialsScopes and
 		//     hits its early return, so the ownership loop never runs at all. That yields a 500
