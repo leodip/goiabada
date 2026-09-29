@@ -177,14 +177,14 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		})
 
 		rejectAuthStateMismatch(pageRenderer, rr, req,
-			ceremony.AuthStateRequiresConsent, ceremony.AuthStateInitial)
+			ceremony.AuthStateRequiresConsent, ceremony.AuthStateLevel1Password)
 
 		output := logged.Text()
 		// Both states, because the pair is the whole diagnosis: neither alone says which step
 		// the browser asked for and which one the ceremony is on.
 		assert.Contains(t, output, "level=WARN")
 		assert.Contains(t, output, "required_state="+ceremony.AuthStateRequiresConsent)
-		assert.Contains(t, output, "actual_state="+ceremony.AuthStateInitial)
+		assert.Contains(t, output, "actual_state="+ceremony.AuthStateLevel1Password)
 		assert.NotContains(t, output, "level=ERROR",
 			"the Back button must not page whoever watches error-level lines")
 	})

@@ -60,7 +60,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateInitial, // This is an unexpected state
+			AuthState: ceremony.AuthStateReadyToIssueCode, // This is an unexpected state
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -148,12 +148,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateInitial,
+			AuthState: ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState 'initial' does not match any required state"
+			return err.Error() == "authContext.AuthState 'ready_to_issue_code' does not match any required state"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)

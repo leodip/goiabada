@@ -153,7 +153,6 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 
 | State | Assigned by | When |
 |---|---|---|
-| `initial` | `HandleAuthorizeGet` | the composite literal, before validation. Dead: no gate accepts it, so it is only ever overwritten. #248 part 2 deletes it |
 | `requires_level_1` | `HandleAuthorizeGet` | four sites: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
 | | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted` (restart route 1) |
 | | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, and not `prompt=none` (restart route 2) |
@@ -162,7 +161,6 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
 | `requires_level_2` | `HandleAuthLevel1CompletedGet` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1 |
 | `level2_otp` | `HandleAuthLevel2Get` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
-| `level2_otp_completed` | nobody | Dead: declared and assigned nowhere. #248 part 2 deletes it |
 | `authentication_completed` | `HandleAuthLevel1CompletedGet` | no step-up needed |
 | | `HandleAuthLevel2Get` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
 | | `HandleAuthOtpPost` | OTP verified or enrolled |

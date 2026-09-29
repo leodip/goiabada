@@ -116,7 +116,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateInitial, // Unexpected state
+			AuthState: ceremony.AuthStateRequiresConsent, // Unexpected state
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 

@@ -163,7 +163,7 @@ func TestHandleConsentGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateInitial,
+			AuthState: ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -491,7 +491,7 @@ func TestHandleConsentPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState:  ceremony.AuthStateInitial,
+			AuthState:  ceremony.AuthStateReadyToIssueCode,
 			CeremonyId: testCeremonyId,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
