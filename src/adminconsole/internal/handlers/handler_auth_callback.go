@@ -264,7 +264,7 @@ func refuseSignIn(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
 	renderSignInRefusal(httpHelper, w, r, refusal, "", "", cause)
 }
 
-// renderSignInRefusal is shaped like the auth server's rejectAuthStateMismatch. A 400 is a stale
+// renderSignInRefusal is shaped like the auth server's requireAuthState. A 400 is a stale
 // tab, a second sign-in or the auth server's own refusal, logged at Warn so that nobody watching
 // Error lines is paged by a Back button; a 500 is an exchange or a token the console could not
 // accept, which someone must fix, logged at Error with a stack. The log names the exact cause

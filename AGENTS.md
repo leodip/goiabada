@@ -170,8 +170,8 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 | | `HandleConsentGet` | scope already fully consented, no `offline_access`, no `prompt=consent` |
 | | `HandleConsentPost` | approved with at least one scope |
 
-Each route then gates on the state it finds, and answers `rejectAuthStateMismatch` when it is not one
-it accepts:
+Each route then gates on the state it finds through `requireAuthState`, which answers 400 when it is
+not one it accepts:
 
 | Route | Method | Accepts | On mismatch |
 |---|---|---|---|
@@ -179,7 +179,7 @@ it accepts:
 | `/auth/level1` | GET | `requires_level_1` | 400 |
 | `/auth/pwd` | GET | `level1_password` | 400 |
 | `/auth/pwd` | POST | ceremony id first, then `level1_password` | 400, 400 |
-| `/auth/level1completed` | GET | `level1_password_completed`, `level1_existing_session` | **500**, the one gate c499ec51 missed when it converted the other ten to 400. #248 part 1 |
+| `/auth/level1completed` | GET | `level1_password_completed`, `level1_existing_session` | 400 |
 | `/auth/level2` | GET | `requires_level_2` | 400 |
 | `/auth/otp` | GET | `level2_otp` | 400 |
 | `/auth/otp` | POST | ceremony id first, then `level2_otp` | 400, 400 |

@@ -3,12 +3,8 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 	"io/fs"
-	"log/slog"
 	"net/http"
-	"slices"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -24,21 +20,12 @@ func HandleAuthLevel1Get(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := ceremonyStore.GetAuthContext(r)
-		if err != nil {
-			if errors.Is(err, ceremony.ErrNoAuthContext) {
-				var profileUrl = profileURL(adminConsoleBaseURL)
-				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
-				http.Redirect(w, r, profileUrl, http.StatusFound)
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-			}
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		if !ok {
 			return
 		}
 
-		requiredState := ceremony.AuthStateRequiresLevel1
-		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
+		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateRequiresLevel1) {
 			return
 		}
 
@@ -46,7 +33,7 @@ func HandleAuthLevel1Get(
 		// today we only support pwd, other types will be added in the future
 
 		authContext.AuthState = ceremony.AuthStateLevel1Password
-		err = ceremonyStore.SaveAuthContext(w, r, authContext)
+		err := ceremonyStore.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -79,22 +66,13 @@ func HandleAuthLevel1CompletedGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, err := ceremonyStore.GetAuthContext(r)
-		if err != nil {
-			if errors.Is(err, ceremony.ErrNoAuthContext) {
-				var profileUrl = profileURL(adminConsoleBaseURL)
-				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
-				http.Redirect(w, r, profileUrl, http.StatusFound)
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-			}
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		if !ok {
 			return
 		}
 
-		requiredStates := []ceremony.AuthState{ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession}
-		if !slices.Contains(requiredStates, authContext.AuthState) {
-			errorMsg := fmt.Sprintf("authContext.AuthState '%s' does not match any required state", authContext.AuthState)
-			pageRenderer.InternalServerError(w, r, errs.New(errorMsg))
+		if !requireAuthState(pageRenderer, w, r, authContext,
+			ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession) {
 			return
 		}
 

@@ -152,9 +152,10 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err.Error() == "authContext.AuthState 'ready_to_issue_code' does not match any required state"
-		})).Return()
+		// 400 like the other ten gates. This one answered InternalServerError, a 500 with a
+		// stack, until #436 routed it through requireAuthState (#248 part 1). The strict mock
+		// refuses that call now, so a gate drifting back fails here.
+		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
