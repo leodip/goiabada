@@ -18,7 +18,7 @@ import (
 //
 // This is the authorization gate: handler_authorize.go and
 // handler_auth_completed.go use it (via FilterOutScopesWhereUserIsNotAuthorized)
-// to decide which scopes end up in a token, and token_validator.go uses it
+// to decide which scopes end up in a token, and the token validator uses it
 // directly for the ROPC and client_credentials flows. A regression here is a
 // privilege escalation, so the tests below pin both the grant paths and the
 // deny-by-default paths.

@@ -123,7 +123,7 @@ Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to
 - Endpoint: `POST /auth/token` (grant_type=password, username, password)
 - Disabled by default. Enable via `Settings.ResourceOwnerPasswordCredentialsEnabled` or per-client
 - Rate limited. Blocks users with 2FA enabled. Logs `AuditROPCAuthFailed` on failure
-- Implementation: `handler_token.go` case "password", `protocolvalidation/token_validator.go`
+- Implementation: `handler_token.go` case "password", `protocolvalidation/token_grant_password.go`
 
 ### Dynamic Client Registration (RFC 7591)
 Programmatic client registration for MCP servers, native apps, etc.

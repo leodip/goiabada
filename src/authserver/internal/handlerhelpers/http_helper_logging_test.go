@@ -452,9 +452,10 @@ func TestJsonError_ConformsTheFinalDescription(t *testing.T) {
 }
 
 // The token endpoint's half of RFC 6749 section 5.2: a confidential client that presented Basic
-// credentials and failed must be answered 401 with a WWW-Authenticate header, and the sites in
-// token_validator.go that build that refusal reach the wire through this writer. Built with
-// customerrors directly, byte for byte what the validator returns, and wrapped the way the token
+// credentials and failed must be answered 401 with a WWW-Authenticate header, and the token
+// validator's authenticateClient, which builds that refusal, reaches the wire through this
+// writer. Built with customerrors directly, byte for byte what the validator returns, and wrapped
+// the way the token
 // endpoint's validator error arrives. A chosen 401 is a client's mistake, so nothing is logged.
 func TestJsonError_CarriesTheBasicChallengeThrough(t *testing.T) {
 	logs := logtest.CaptureSlog(t)

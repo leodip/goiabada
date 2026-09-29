@@ -331,7 +331,7 @@ func (d *CommonDatabase) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int6
 // token that references it, so for the duration of token generation a healthy code has no
 // descendant yet. Deleting it there makes the insert fail on fk_refresh_tokens_code and the
 // client gets a 500 instead of its tokens; observed in CI on postgres. Past the 60 second
-// code lifetime (token_validator.go) no code can be redeemed, so none can gain a descendant
+// code lifetime (token_grant_authorization_code.go) no code can be redeemed, so none can gain a descendant
 // either. Callers pass a cutoff comfortably beyond that 60 seconds.
 //
 // An unused code needs no term of its own: MarkCodeAsUsed is the gate every redemption
