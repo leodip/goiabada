@@ -177,7 +177,7 @@ Route on the **HTTP status code**, not the body.
 Common `error_code` categories:
 - `ACCESS_TOKEN_REQUIRED` - Missing bearer token
 - `INVALID_TOKEN` - Bearer token is invalid, expired or its session has ended
-- `INVALID_REQUEST` - Bearer token sent twice, or a form body that does not parse
+- `INVALID_REQUEST` - Bearer token or `Authorization` header sent twice, or a form body that does not parse
 - `INVALID_REQUEST_BODY` - Malformed JSON in request
 - `VALIDATION_ERROR` - Input validation failed
 - `NOT_FOUND` - Resource not found

@@ -79,6 +79,7 @@ const (
 	challengeInvalidRequest = `Bearer realm="goiabada", error="invalid_request", error_description="The access token must be sent by one method only."`
 	challengeRepeated       = `Bearer realm="goiabada", error="invalid_request", error_description="The access_token parameter must be sent once."`
 	challengeUnparseable    = `Bearer realm="goiabada", error="invalid_request", error_description="The request body could not be parsed."`
+	challengeHeaderRepeated = `Bearer realm="goiabada", error="invalid_request", error_description="The Authorization header must be sent once."`
 	challengeScope          = `Bearer realm="goiabada", error="insufficient_scope", error_description="Insufficient scope."`
 	challengeUserContext    = `Bearer realm="goiabada", error="insufficient_scope", error_description="This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted."`
 	userContextDescription  = "This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted."
@@ -92,6 +93,7 @@ var (
 	apiInvalidRequest = chainAnswer{http.StatusBadRequest, challengeInvalidRequest, `{"error_code":"INVALID_REQUEST","error_description":"The access token must be sent by one method only."}`}
 	apiRepeated       = chainAnswer{http.StatusBadRequest, challengeRepeated, `{"error_code":"INVALID_REQUEST","error_description":"The access_token parameter must be sent once."}`}
 	apiUnparseable    = chainAnswer{http.StatusBadRequest, challengeUnparseable, `{"error_code":"INVALID_REQUEST","error_description":"The request body could not be parsed."}`}
+	apiHeaderRepeated = chainAnswer{http.StatusBadRequest, challengeHeaderRepeated, `{"error_code":"INVALID_REQUEST","error_description":"The Authorization header must be sent once."}`}
 	apiScope          = chainAnswer{http.StatusForbidden, challengeScope, `{"error_code":"INSUFFICIENT_SCOPE","error_description":"Insufficient scope."}`}
 	apiUserContext    = chainAnswer{http.StatusForbidden, challengeUserContext, `{"error_code":"USER_CONTEXT_REQUIRED","error_description":"` + userContextDescription + `"}`}
 
@@ -100,6 +102,7 @@ var (
 	userinfoInvalidRequest = chainAnswer{http.StatusBadRequest, challengeInvalidRequest, `{"error":"invalid_request","error_description":"The access token must be sent by one method only."}`}
 	userinfoRepeated       = chainAnswer{http.StatusBadRequest, challengeRepeated, `{"error":"invalid_request","error_description":"The access_token parameter must be sent once."}`}
 	userinfoUnparseable    = chainAnswer{http.StatusBadRequest, challengeUnparseable, `{"error":"invalid_request","error_description":"The request body could not be parsed."}`}
+	userinfoHeaderRepeated = chainAnswer{http.StatusBadRequest, challengeHeaderRepeated, `{"error":"invalid_request","error_description":"The Authorization header must be sent once."}`}
 	userinfoScope          = chainAnswer{http.StatusForbidden, challengeScope, `{"error":"insufficient_scope","error_description":"Insufficient scope."}`}
 	userinfoUserContext    = chainAnswer{http.StatusForbidden, challengeUserContext, `{"error":"insufficient_scope","error_description":"` + userContextDescription + `"}`}
 )
@@ -129,9 +132,13 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 		method        string
 		target        string
 		authorization string
-		body          string
-		api           chainAnswer
-		userinfo      chainAnswer
+		// secondAuthorization, when set, is sent as a second Authorization field line.
+		secondAuthorization string
+		body                string
+		// contentType is the body's media type, application/x-www-form-urlencoded when empty.
+		contentType string
+		api         chainAnswer
+		userinfo    chainAnswer
 	}{
 		// RFC 6750 section 3.1: lacking any authentication information, no error code.
 		{name: "no credentials at all", method: "GET", target: "/userinfo",
@@ -166,6 +173,17 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 		// RFC 6750 section 2 MUST NOT use more than one method; 3.1 invalid_request SHOULD 400.
 		{name: "header and form body both", method: "POST", target: "/userinfo", authorization: "Bearer good", body: "access_token=good",
 			api: apiInvalidRequest, userinfo: userinfoInvalidRequest},
+		// RFC 9110 section 8.3.1: a media type is case-insensitive, and net/http reads this body as a form.
+		{name: "header and form body both, the media type in capitals", method: "POST", target: "/userinfo", authorization: "Bearer good",
+			body: "access_token=good", contentType: "APPLICATION/X-WWW-FORM-URLENCODED",
+			api: apiInvalidRequest, userinfo: userinfoInvalidRequest},
+
+		// RFC 9110 section 5.3: Authorization is no list, so a second field line makes the request
+		// "otherwise malformed", RFC 6750 section 3.1's invalid_request.
+		{name: "the Authorization header sent twice", method: "GET", target: "/userinfo", authorization: "Bearer good", secondAuthorization: "Bearer good",
+			api: apiHeaderRepeated, userinfo: userinfoHeaderRepeated},
+		{name: "a Basic line, then a Bearer line", method: "GET", target: "/userinfo", authorization: "Basic dXNlcjpwYXNz", secondAuthorization: "Bearer good",
+			api: apiHeaderRepeated, userinfo: userinfoHeaderRepeated},
 
 		// RFC 6750 section 3.1 invalid_request: a request that "repeats the same parameter".
 		{name: "access_token repeated in the form body", method: "POST", target: "/userinfo", body: "access_token=good&access_token=good",
@@ -190,6 +208,9 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 		// RFC 6750 section 2.2 MAY; OIDC Core 1.0 section 5.3.1 allows POST.
 		{name: "valid token in a POST form body only", method: "POST", target: "/userinfo", body: "access_token=good",
 			api: answerAdmitted, userinfo: answerAdmitted},
+		{name: "valid token in a POST form body only, the media type in capitals", method: "POST", target: "/userinfo",
+			body: "access_token=good", contentType: "APPLICATION/X-WWW-FORM-URLENCODED",
+			api: answerAdmitted, userinfo: answerAdmitted},
 	}
 
 	for _, surface := range chainSurfaces() {
@@ -207,12 +228,19 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 				var req *http.Request
 				if body != nil {
 					req = httptest.NewRequest(tc.method, tc.target, body)
-					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+					contentType := tc.contentType
+					if contentType == "" {
+						contentType = "application/x-www-form-urlencoded"
+					}
+					req.Header.Set("Content-Type", contentType)
 				} else {
 					req = httptest.NewRequest(tc.method, tc.target, nil)
 				}
 				if tc.authorization != "" {
 					req.Header.Set("Authorization", tc.authorization)
+				}
+				if tc.secondAuthorization != "" {
+					req.Header.Add("Authorization", tc.secondAuthorization)
 				}
 
 				rr := httptest.NewRecorder()
