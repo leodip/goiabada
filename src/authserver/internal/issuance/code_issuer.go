@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
@@ -51,9 +50,30 @@ type CodeIssuer struct {
 	database codeIssuerDatabase
 }
 
+// CreateCodeInput is what one authorization code is written from: the fields createAuthCode reads
+// and nothing else. It used to embed the whole ceremony.AuthContext, which made issuance depend on
+// every field of the ceremony's state machine to read seventeen of them; the handler that holds the
+// context copies them across (#437).
 type CreateCodeInput struct {
-	ceremony.AuthContext
-	SessionIdentifier string
+	ClientId            string
+	RedirectURI         string
+	ResponseMode        string
+	Scope               string
+	ConsentedScope      string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	State               string
+	Nonce               string
+	UserAgent           string
+	IpAddress           string
+	UserId              int64
+	AcrLevel            models.AcrLevel
+	AuthMethods         string
+	// AuthenticatedAt overrides the code's auth_time when set (prompt=none reuses the session's);
+	// nil or zero means the moment of issuance.
+	AuthenticatedAt     *time.Time
+	AuthStateGeneration int64
+	SessionIdentifier   string
 }
 
 func NewCodeIssuer(database codeIssuerDatabase) *CodeIssuer {

@@ -109,7 +109,7 @@ Exchange refresh token for new access/refresh tokens. Works with auth code and R
 - Endpoint: `POST /auth/token` (grant_type=refresh_token)
 - Offline tokens: Configurable idle timeout and max lifetime per client/globally
 - Revocation: Old refresh token revoked on use, new one issued
-- Implementation: `handler_token.go` case "refresh_token", `issuance/token_issuer.go`
+- Implementation: `handler_token.go` case "refresh_token", `issuance/grant_refresh_token.go`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**

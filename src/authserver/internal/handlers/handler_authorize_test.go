@@ -131,7 +131,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				ac.AcrLevel == userSession.AcrLevel &&
 				ac.AuthMethods == userSession.AuthMethods &&
 				// From the session, not the user. Thin on purpose: the tables live in
-				// token_issuer_auth_state_generation_test.go.
+				// issuance/auth_state_generation_test.go.
 				ac.AuthStateGeneration == 7
 		})).Return(nil)
 

@@ -209,23 +209,23 @@ func (_c *TokenIssuer_GenerateTokenResponseForClientCred_Call) RunAndReturn(run 
 }
 
 // GenerateTokenResponseForROPC provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*issuance.ROPCGrantResponse, error) {
+func (_mock *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, settings, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GenerateTokenResponseForROPC")
 	}
 
-	var r0 *issuance.ROPCGrantResponse
+	var r0 *oauth.TokenResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.ROPCGrantInput) (*issuance.ROPCGrantResponse, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)); ok {
 		return returnFunc(ctx, settings, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.ROPCGrantInput) *issuance.ROPCGrantResponse); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *issuance.ROPCGrantInput) *oauth.TokenResponse); ok {
 		r0 = returnFunc(ctx, settings, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*issuance.ROPCGrantResponse)
+			r0 = ret.Get(0).(*oauth.TokenResponse)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.Settings, *issuance.ROPCGrantInput) error); ok {
@@ -272,12 +272,12 @@ func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Return(rOPCGrantResponse *issuance.ROPCGrantResponse, err error) *TokenIssuer_GenerateTokenResponseForROPC_Call {
-	_c.Call.Return(rOPCGrantResponse, err)
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+	_c.Call.Return(tokenResponse, err)
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*issuance.ROPCGrantResponse, error)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
 	_c.Call.Return(run)
 	return _c
 }

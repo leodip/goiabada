@@ -63,7 +63,7 @@ type TokenIssuer interface {
 	// GenerateTokenResponseForROPC generates tokens for Resource Owner Password Credentials flow.
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
-	GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*issuance.ROPCGrantResponse, error)
+	GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
 }
 
 // ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens

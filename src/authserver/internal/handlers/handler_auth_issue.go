@@ -427,10 +427,7 @@ func HandleIssueGet(
 
 		// Authorization Code Flow
 
-		createCodeInput := &issuance.CreateCodeInput{
-			AuthContext:       *authContext,
-			SessionIdentifier: sessionIdentifier,
-		}
+		createCodeInput := newCreateCodeInput(authContext, sessionIdentifier)
 
 		// The session row and the insert share one transaction the issuer opens, which is what
 		// orders this ceremony against a termination of that session (#139); the liveness read
@@ -493,6 +490,31 @@ func HandleIssueGet(
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 		}
+	}
+}
+
+// newCreateCodeInput copies the fields an authorization code is written from off the ceremony,
+// with the session the code binds to. Issuance names only these, so it depends on no ceremony
+// state it does not read (#437).
+func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier string) *issuance.CreateCodeInput {
+	return &issuance.CreateCodeInput{
+		ClientId:            authContext.ClientId,
+		RedirectURI:         authContext.RedirectURI,
+		ResponseMode:        authContext.ResponseMode,
+		Scope:               authContext.Scope,
+		ConsentedScope:      authContext.ConsentedScope,
+		CodeChallenge:       authContext.CodeChallenge,
+		CodeChallengeMethod: authContext.CodeChallengeMethod,
+		State:               authContext.State,
+		Nonce:               authContext.Nonce,
+		UserAgent:           authContext.UserAgent,
+		IpAddress:           authContext.IpAddress,
+		UserId:              authContext.UserId,
+		AcrLevel:            authContext.AcrLevel,
+		AuthMethods:         authContext.AuthMethods,
+		AuthenticatedAt:     authContext.AuthenticatedAt,
+		AuthStateGeneration: authContext.AuthStateGeneration,
+		SessionIdentifier:   sessionIdentifier,
 	}
 }
 
@@ -821,6 +843,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		// Appended rather than written through writeResponseParams: a redirect URI cannot carry a
 		// fragment of its own for these fields to collide with, so there is no registered field
 		// list here to preserve or replace, and its query is left exactly as registered.
+		//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 above
 		http.Redirect(w, r, code.RedirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 		return nil
 	}
@@ -905,6 +928,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		return errs.Wrap(err, "unable to build the authorization code redirect")
 	}
 
+	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 above
 	http.Redirect(w, r, location, http.StatusFound)
 	return nil
 }

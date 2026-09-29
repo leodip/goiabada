@@ -1811,7 +1811,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	var captured *issuance.ROPCGrantInput
 	tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { captured = args.Get(2).(*issuance.ROPCGrantInput) }).
-		Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
+		Return(&oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedROPCResponse, mock.Anything).Return()
 	jsonWriter.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
@@ -1905,7 +1905,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 				Return(&protocolvalidation.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
 			tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything, mock.Anything).
-				Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
+				Return(&oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 			jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 		}
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
