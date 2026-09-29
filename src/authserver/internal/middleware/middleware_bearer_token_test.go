@@ -248,6 +248,51 @@ func TestJwtAuthorizationHeaderToContext_ARepeatedAccessTokenIsInvalidRequest(t 
 	}
 }
 
+// A form body that does not parse is refused as invalid_request before either method is looked at:
+// RFC 6750 section 3.1 names a request that "is otherwise malformed" invalid_request. url.ParseQuery
+// keeps the pairs it could read, so before this a valid header beside a malformed body carrying a
+// second token was admitted as though one method had been used, and a body token beside a malformed
+// pair passed through as no credential at all. A body cut at the request-body limit is the same
+// refusal, as it is at the token endpoint (#426). Nothing is validated, whatever either token is.
+func TestJwtAuthorizationHeaderToContext_ABodyThatDoesNotParseIsInvalidRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name, header, body string
+		limit              int64
+	}{
+		{name: "a valid header beside a malformed body carrying a token", header: "Bearer headertoken", body: "access_token=bodytoken&junk=%GG"},
+		{name: "a valid header beside a malformed body carrying no token", header: "Bearer headertoken", body: "junk=%GG"},
+		{name: "a body token beside a malformed pair", body: "access_token=bodytoken&junk=%GG"},
+		{name: "a malformed token pair", body: "access_token=%GG"},
+		{name: "a malformed body and no credential", body: "%GG"},
+		{name: "a body cut at the request-body limit", header: "Bearer headertoken", body: "access_token=" + strings.Repeat("a", 64), limit: 16},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			parser := new(mock_middleware.TokenParser)
+			req := httptest.NewRequest("POST", "/userinfo", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			if tc.limit > 0 {
+				req.Body = http.MaxBytesReader(httptest.NewRecorder(), req.Body, tc.limit)
+			}
+
+			result := serveParseGuard(parser, req)
+			requireRefused(t, result, http.StatusBadRequest, "INVALID_REQUEST")
+			var body api.ErrorResponse
+			require.NoError(t, json.Unmarshal(result.rr.Body.Bytes(), &body))
+			assert.Equal(t, "The request body could not be parsed.", body.ErrorDescription)
+			assertParserNotCalled(t, parser)
+
+			records := logs.Records()
+			require.Len(t, records, 1, "one record per refusal")
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Contains(t, records[0].Message, "could not be parsed")
+		})
+	}
+}
+
 // A Basic header beside a body token is one bearer method, not two: Basic is not a way of sending a
 // bearer token.
 func TestJwtAuthorizationHeaderToContext_BasicHeaderBesideABodyTokenIsOneMethod(t *testing.T) {

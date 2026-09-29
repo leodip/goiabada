@@ -78,6 +78,7 @@ const (
 	challengeInvalidToken   = `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`
 	challengeInvalidRequest = `Bearer realm="goiabada", error="invalid_request", error_description="The access token must be sent by one method only."`
 	challengeRepeated       = `Bearer realm="goiabada", error="invalid_request", error_description="The access_token parameter must be sent once."`
+	challengeUnparseable    = `Bearer realm="goiabada", error="invalid_request", error_description="The request body could not be parsed."`
 	challengeScope          = `Bearer realm="goiabada", error="insufficient_scope", error_description="Insufficient scope."`
 	challengeUserContext    = `Bearer realm="goiabada", error="insufficient_scope", error_description="This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted."`
 	userContextDescription  = "This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted."
@@ -90,6 +91,7 @@ var (
 	apiInvalidToken   = chainAnswer{http.StatusUnauthorized, challengeInvalidToken, `{"error_code":"INVALID_TOKEN","error_description":"The access token is invalid."}`}
 	apiInvalidRequest = chainAnswer{http.StatusBadRequest, challengeInvalidRequest, `{"error_code":"INVALID_REQUEST","error_description":"The access token must be sent by one method only."}`}
 	apiRepeated       = chainAnswer{http.StatusBadRequest, challengeRepeated, `{"error_code":"INVALID_REQUEST","error_description":"The access_token parameter must be sent once."}`}
+	apiUnparseable    = chainAnswer{http.StatusBadRequest, challengeUnparseable, `{"error_code":"INVALID_REQUEST","error_description":"The request body could not be parsed."}`}
 	apiScope          = chainAnswer{http.StatusForbidden, challengeScope, `{"error_code":"INSUFFICIENT_SCOPE","error_description":"Insufficient scope."}`}
 	apiUserContext    = chainAnswer{http.StatusForbidden, challengeUserContext, `{"error_code":"USER_CONTEXT_REQUIRED","error_description":"` + userContextDescription + `"}`}
 
@@ -97,6 +99,7 @@ var (
 	userinfoInvalidToken   = chainAnswer{http.StatusUnauthorized, challengeInvalidToken, `{"error":"invalid_token","error_description":"The access token is invalid."}`}
 	userinfoInvalidRequest = chainAnswer{http.StatusBadRequest, challengeInvalidRequest, `{"error":"invalid_request","error_description":"The access token must be sent by one method only."}`}
 	userinfoRepeated       = chainAnswer{http.StatusBadRequest, challengeRepeated, `{"error":"invalid_request","error_description":"The access_token parameter must be sent once."}`}
+	userinfoUnparseable    = chainAnswer{http.StatusBadRequest, challengeUnparseable, `{"error":"invalid_request","error_description":"The request body could not be parsed."}`}
 	userinfoScope          = chainAnswer{http.StatusForbidden, challengeScope, `{"error":"insufficient_scope","error_description":"Insufficient scope."}`}
 	userinfoUserContext    = chainAnswer{http.StatusForbidden, challengeUserContext, `{"error":"insufficient_scope","error_description":"` + userContextDescription + `"}`}
 )
@@ -167,6 +170,14 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 		// RFC 6750 section 3.1 invalid_request: a request that "repeats the same parameter".
 		{name: "access_token repeated in the form body", method: "POST", target: "/userinfo", body: "access_token=good&access_token=good",
 			api: apiRepeated, userinfo: userinfoRepeated},
+
+		// RFC 6750 section 3.1 invalid_request: a request that "is otherwise malformed". A body that
+		// does not parse cannot say whether it carries a second token, so neither the valid header
+		// beside it nor the readable token inside it is admitted.
+		{name: "valid header beside a form body that does not parse", method: "POST", target: "/userinfo", authorization: "Bearer good", body: "access_token=good&junk=%GG",
+			api: apiUnparseable, userinfo: userinfoUnparseable},
+		{name: "valid form body token beside a pair that does not parse", method: "POST", target: "/userinfo", body: "access_token=good&junk=%GG",
+			api: apiUnparseable, userinfo: userinfoUnparseable},
 
 		// RFC 6750 section 3.1 insufficient_scope SHOULD 403.
 		{name: "valid token lacking openid", method: "GET", target: "/userinfo", authorization: "Bearer noopenid",
