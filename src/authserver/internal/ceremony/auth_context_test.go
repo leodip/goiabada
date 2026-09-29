@@ -357,6 +357,58 @@ func TestSetTargetAcrLevel_RoundTripsEveryLevel(t *testing.T) {
 	}
 }
 
+// acr_values is split by oidc.SplitScope, the rule the space-delimited parameters share: the
+// separators are space, tab, newline, form feed and carriage return, and each value is trimmed with
+// strings.TrimSpace. The trim is the one edge that moved when the per-call regexp went: a value
+// padded with Unicode whitespace used to be one unrecognized value and is now recognized. That can
+// only raise the target, since the client's level stays the floor, which is why it was taken (#436).
+func TestSetTargetAcrLevel_SplitsAcrValuesAsSplitScopeDoes(t *testing.T) {
+	testCases := []struct {
+		name          string
+		acrValues     string
+		clientDefault models.AcrLevel
+		want          models.AcrLevel
+	}{
+		{
+			name:          "tab and newline separate values",
+			acrValues:     "urn:example:unknown\turn:goiabada:level2_optional\nurn:goiabada:level1",
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel2Optional,
+		},
+		{
+			name:          "a value padded with Unicode whitespace is recognized",
+			acrValues:     " urn:goiabada:level2_mandatory ",
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel2Mandatory,
+		},
+		{
+			name:          "a recognized padded value still never lowers the client's level",
+			acrValues:     " urn:goiabada:level1 ",
+			clientDefault: models.AcrLevel2Mandatory,
+			want:          models.AcrLevel2Mandatory,
+		},
+		{
+			// Unicode whitespace pads a value and does not separate two: this is one value, which
+			// names no level, so the client's level answers. Split there, the first value would
+			// raise the target to level2_mandatory.
+			name:          "Unicode whitespace between two values does not separate them",
+			acrValues:     "urn:goiabada:level2_mandatory urn:goiabada:level1",
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ac := &AuthContext{AcrValuesFromAuthorizeRequest: tc.acrValues}
+			ac.SetTargetAcrLevel(tc.clientDefault)
+
+			assert.Equal(t, tc.want.String(), ac.TargetAcrLevel)
+			assert.Equal(t, tc.want, ac.GetTargetAcrLevel(tc.clientDefault))
+		})
+	}
+}
+
 func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
 	t.Run("collapses repeated whitespace", func(t *testing.T) {
 		ac := &AuthContext{
@@ -602,100 +654,41 @@ func TestRequestedMaxAge(t *testing.T) {
 // Tests for AddAuthMethod
 //
 // AuthMethods becomes the "amr" claim. It must stay free of duplicates, since
-// clients read it to decide whether a second factor was used.
+// clients read it to decide whether a second factor was used. It takes an AuthMethod, so the only
+// inputs are the two constants and a value outside their range (#436).
 // =============================================================================
 
-func TestAddAuthMethod_FirstMethod(t *testing.T) {
-	ac := &AuthContext{}
-
-	ac.AddAuthMethod("pwd")
-
-	assert.Equal(t, "pwd", ac.AuthMethods)
-}
-
-func TestAddAuthMethod_AppendsSecondMethod(t *testing.T) {
-	ac := &AuthContext{}
-
-	ac.AddAuthMethod("pwd")
-	ac.AddAuthMethod("otp")
-
-	assert.Equal(t, "pwd otp", ac.AuthMethods)
-}
-
-func TestAddAuthMethod_IgnoresEmptyAndWhitespaceOnly(t *testing.T) {
-	testCases := []string{"", "   ", "\t", "\n"}
-
-	for _, method := range testCases {
-		t.Run("input:"+method, func(t *testing.T) {
-			ac := &AuthContext{AuthMethods: "pwd"}
-
-			ac.AddAuthMethod(method)
-
-			assert.Equal(t, "pwd", ac.AuthMethods, "an empty method must be a no-op")
-		})
-	}
-}
-
-func TestAddAuthMethod_EmptyMethodOnEmptyContextStaysEmpty(t *testing.T) {
-	ac := &AuthContext{}
-
-	ac.AddAuthMethod("")
-
-	assert.Equal(t, "", ac.AuthMethods)
-}
-
-func TestAddAuthMethod_NormalizesInput(t *testing.T) {
-	ac := &AuthContext{}
-
-	ac.AddAuthMethod("  PWD  ")
-
-	assert.Equal(t, "pwd", ac.AuthMethods, "methods are lowercased and trimmed")
-}
-
-func TestAddAuthMethod_SuppressesDuplicates(t *testing.T) {
+func TestAddAuthMethod(t *testing.T) {
 	testCases := []struct {
 		name     string
 		existing string
-		add      string
+		add      []AuthMethod
 		want     string
 	}{
-		{"exact duplicate", "pwd", "pwd", "pwd"},
-		{"duplicate differing in case", "pwd", "PWD", "pwd"},
-		{"duplicate with whitespace", "pwd", "  pwd  ", "pwd"},
-		{"duplicate of the second method", "pwd otp", "otp", "pwd otp"},
-		{"duplicate of the first method", "pwd otp", "pwd", "pwd otp"},
+		{"password on an empty list", "", []AuthMethod{AuthMethodPassword}, "pwd"},
+		{"otp on an empty list", "", []AuthMethod{AuthMethodOTP}, "otp"},
+		{"otp appended after password", "", []AuthMethod{AuthMethodPassword, AuthMethodOTP}, "pwd otp"},
+		{"a duplicate of the only method", "pwd", []AuthMethod{AuthMethodPassword}, "pwd"},
+		{"a duplicate of the first of two", "pwd otp", []AuthMethod{AuthMethodPassword}, "pwd otp"},
+		{"a duplicate of the second of two", "pwd otp", []AuthMethod{AuthMethodOTP}, "pwd otp"},
+		{"a method listed inside another's name is not a duplicate", "xotp", []AuthMethod{AuthMethodOTP}, "xotp otp"},
+		{"repeated calls stay idempotent", "", []AuthMethod{AuthMethodPassword, AuthMethodOTP,
+			AuthMethodPassword, AuthMethodOTP, AuthMethodOTP}, "pwd otp"},
+		{"an out-of-range value adds nothing to an empty list", "", []AuthMethod{AuthMethodOTP + 1}, ""},
+		{"an out-of-range value adds nothing to a list", "pwd", []AuthMethod{AuthMethod(-1)}, "pwd"},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ac := &AuthContext{AuthMethods: tc.existing}
 
-			ac.AddAuthMethod(tc.add)
+			for _, method := range tc.add {
+				ac.AddAuthMethod(method)
+			}
 
 			assert.Equal(t, tc.want, ac.AuthMethods)
 		})
 	}
-}
-
-// The duplicate check is case-insensitive, but an existing value's original
-// casing is left untouched when a new method is appended.
-func TestAddAuthMethod_PreservesExistingCasingWhenAppending(t *testing.T) {
-	ac := &AuthContext{AuthMethods: "PWD"}
-
-	ac.AddAuthMethod("otp")
-
-	assert.Equal(t, "PWD otp", ac.AuthMethods)
-}
-
-func TestAddAuthMethod_RepeatedCallsStayIdempotent(t *testing.T) {
-	ac := &AuthContext{}
-
-	for i := 0; i < 5; i++ {
-		ac.AddAuthMethod("pwd")
-		ac.AddAuthMethod("otp")
-	}
-
-	assert.Equal(t, "pwd otp", ac.AuthMethods)
 }
 
 // =============================================================================

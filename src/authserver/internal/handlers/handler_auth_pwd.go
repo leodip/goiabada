@@ -16,16 +16,19 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// authPwdDatabase is what the password hop needs: the client, the user being authenticated, and
-// the session that may already exist.
+// authPwdDatabase is what the password hop needs: the client and the user being authenticated.
 //
 // It embeds the client display port because the screen renders through getClientDisplayInfo.
+//
+// No session lookup: the GET used to read the browser's session to prefill the email field, but
+// GetUserSessionBySessionIdentifier never loads the session's User, so the address was always
+// empty. It was removed rather than repaired, because prefilling an ended session's address is
+// what a shared machine should not do (#248, #436).
 type authPwdDatabase interface {
 	clientDisplayDatabase
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
 }
 
 func HandleAuthPwdGet(
@@ -44,21 +47,6 @@ func HandleAuthPwdGet(
 
 		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel1Password) {
 			return
-		}
-
-		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
-
-		// try to get email from session
-		email := ""
-		if len(sessionIdentifier) > 0 {
-			userSession, getUserSessionErr := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
-			if getUserSessionErr != nil {
-				pageRenderer.InternalServerError(w, r, getUserSessionErr)
-				return
-			}
-			if userSession != nil {
-				email = userSession.User.Email
-			}
 		}
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
@@ -95,9 +83,6 @@ func HandleAuthPwdGet(
 			"layoutClientLogoUrl":     displayInfo.LogoURL,
 			"layoutClientDescription": displayInfo.Description,
 			"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
-		}
-		if len(email) > 0 {
-			bind["email"] = email
 		}
 
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
@@ -287,7 +272,7 @@ func HandleAuthPwdPost(
 		// answer was given against (#242 decision 3).
 		otpConfigGeneration := user.OtpConfigGeneration
 		authContext.OtpConfigGeneration = &otpConfigGeneration
-		authContext.AddAuthMethod(ceremony.AuthMethodPassword.String())
+		authContext.AddAuthMethod(ceremony.AuthMethodPassword)
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.
 		utcNow := time.Now().UTC()

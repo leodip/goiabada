@@ -387,7 +387,7 @@ func HandleAuthOtpPost(
 			"userId": user.Id,
 		})
 
-		authContext.AddAuthMethod(ceremony.AuthMethodOTP.String())
+		authContext.AddAuthMethod(ceremony.AuthMethodOTP)
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.
 		//
