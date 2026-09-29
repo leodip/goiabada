@@ -10,12 +10,13 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// The four test helpers the handler tests here reach for when the code under test revokes
-// something. All four were declared in revocation_test.go and were package-private to this
+// The three test helpers the handler tests here reach for when the code under test revokes
+// something. All three were declared in revocation_test.go and were package-private to this
 // package until #387 moved that file to internal/revocation, which is one package away and
-// cannot export a test helper to it.
+// cannot export a test helper to it. A fourth, methodOrder, left with its one caller when #435
+// moved the reuse response's sequence test to internal/revocation.
 //
-// Three are copies, and the fourth, stubRevocationSweepTx, moved whole because revocation_test.go
+// Two are copies, and the third, stubRevocationSweepTx, moved whole because revocation_test.go
 // never used it: its doc comment already said it is the shape a HANDLER test wants. Copying is
 // the answer the tree already gives to this shape -- run_in_transaction_stub_test.go exists in
 // five packages, and apihandlers keeps its own assertNotAttemptedOnClientDatabase and callIndex
@@ -37,17 +38,6 @@ func assertNotAttempted(t *testing.T, db *mocks_data.Database, methods ...string
 			assert.NotEqual(t, method, call.Method, "%v must not be attempted on this path", method)
 		}
 	}
-}
-
-// methodOrder is the sequence of database methods a call issued. Most assertions are about WHAT a
-// function wrote; the ones that take this are about WHEN, so the order is what has to be pinned,
-// and testify records it whether or not the expectations were registered in that order.
-func methodOrder(db *mocks_data.Database) []string {
-	order := make([]string, 0, len(db.Calls))
-	for _, call := range db.Calls {
-		order = append(order, call.Method)
-	}
-	return order
 }
 
 // stubRevocationSweepTx registers every database call revocation.RevokeUserAuthStateTx makes for
