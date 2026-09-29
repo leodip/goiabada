@@ -211,9 +211,8 @@ consent (#140, #436). There are two restart routes: `HandleAuthCompletedGet` whe
 reusable and level 1 was never completed, and `refuseIssuanceUnusableSession` at `/auth/issue` when the
 bound session is gone, expired or foreign and the request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
-list. The request-derived fields are written once and only at `/auth/authorize` — the composite
-literal in `HandleAuthorizeGet` plus `TargetAcrLevel` and `RequestedScope`, set immediately after
-validation and nowhere else — which #248 pins with a test.
+list. Request fields are written only in `HandleAuthorizeGet`, which
+`TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`.
 
 ### Deferred error redirects (#213)
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
@@ -395,7 +394,7 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Twenty-five guards follow this -- fourteen in `core/testutil`, the newest
+does. Twenty-six guards follow this -- fourteen in `core/testutil`, the newest
 `AssertContextValuesThroughAccessors`, which refuses a `context.WithValue` or a context `Value`
 read in a production file outside the module's accessor package, resolved with `go/types`, and
 which the auth server calls with `internal/reqctx` (#433), and before it
@@ -404,7 +403,9 @@ file instead of stating the fact with its issue number (#428), plus `authserver/
 begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and
 SQL-context lints, the auth server's API error-code and audit-catalog lints, its discarded-error lint
 in `internal/server`, which refuses `_` in the error position of a hash, encryption or
-key-generation call (#409) and resolves the data cipher's methods by receiver type with `go/types` (#434), and the two import
+key-generation call (#409) and resolves the data cipher's methods by receiver type with `go/types` (#434),
+its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
+outside `HandleAuthorizeGet`, resolved with `go/types` (#436), and the two import
 rules #387 added: `models/import_lint_test.go`, which holds that package to the standard library,
 `core/constants` and `core/errs`, and `handlers/child_package_import_lint_test.go`, which holds
 `apihandlers` and `accounthandlers` to naming no import of the parent -- both parse imports with
