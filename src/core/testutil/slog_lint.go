@@ -315,7 +315,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/otp",
 	"authserver/internal/otpcredential",
 	"authserver/internal/userclaims",
-	"authserver/internal/imaging",
+	"authserver/internal/imageupload",
 	"authserver/internal/uithemes",
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",

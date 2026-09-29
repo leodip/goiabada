@@ -1485,6 +1485,13 @@
 "validator.profile.zone_info_invalid" = "Fuso horário inválido."
 "validator.profile.locale_invalid" = "Localidade inválida."
 
+"validator.image.too_large" = "A imagem pode ter no máximo {{.max}} bytes."
+"validator.image.empty" = "O arquivo de imagem está vazio."
+"validator.image.unsupported_type" = "Tipo de imagem não suportado. Os tipos permitidos são JPEG, PNG, GIF e WebP."
+"validator.image.undecodable" = "Não foi possível ler a imagem. O arquivo pode estar danificado."
+"validator.image.dimensions_too_small" = "A imagem deve ter pelo menos {{.min}}x{{.min}} pixels."
+"validator.image.dimensions_too_large" = "A imagem pode ter no máximo {{.max}}x{{.max}} pixels."
+
 # --- Endpoint de autorização, client e redirect_uri (LocalizedError-backed) --
 
 "validator.authorize.client_id_missing" = "O parâmetro client_id está ausente."

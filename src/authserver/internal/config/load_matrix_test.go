@@ -373,6 +373,55 @@ func TestLoad_EveryNumericAndBooleanVariableHasARefusalRow(t *testing.T) {
 	}
 }
 
+// TestLoad_TheUploadSizeMustBePositive is decision 13 of #435: a zero or negative size used to be
+// read as 3 MiB with no message, and a size near MaxInt64 wrapped the request-body table's upload
+// rows negative, which panicked at startup without naming the variable. Both are refused with the
+// variable named, and the bounds either side of each refusal are accepted as written.
+func TestLoad_TheUploadSizeMustBePositive(t *testing.T) {
+	const key = "GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES"
+	tests := []struct {
+		name    string
+		env     map[string]string
+		want    int64
+		refusal string
+	}{
+		{name: "unset is 3 MiB", want: 3 << 20},
+		{name: "one byte", env: map[string]string{key: "1"}, want: 1},
+		{name: "a raised size", env: map[string]string{key: "10485760"}, want: 10 << 20},
+		{name: "the largest accepted size", env: map[string]string{key: "9223372036854710271"}, want: MaxProfilePictureMaxSizeBytes},
+		{name: "zero", env: map[string]string{key: "0"},
+			refusal: key + ` is "0", not a positive integer`},
+		{name: "a negative size", env: map[string]string{key: " -1 "},
+			refusal: key + ` is "-1", not a positive integer`},
+		{name: "one byte over the largest accepted size", env: map[string]string{key: "9223372036854710272"},
+			refusal: key + ` is "9223372036854710272", not at most 9223372036854710271`},
+		{name: "MaxInt64", env: map[string]string{key: "9223372036854775807"},
+			refusal: key + ` is "9223372036854775807", not at most 9223372036854710271`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, c, err := loadMatrixRefusing(t, tt.env, nil)
+
+			if tt.refusal != "" {
+				want := "malformed configuration: " + tt.refusal
+				if err == nil || err.Error() != want {
+					t.Errorf("Load() = %v, want %q", err, want)
+				}
+				if c != nil {
+					t.Errorf("Load() refused and still answered a configuration: %#v", c)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() = %v", err)
+			}
+			if c.AuthServer.ProfilePictureMaxSizeBytes != tt.want {
+				t.Errorf("ProfilePictureMaxSizeBytes = %d, want %d", c.AuthServer.ProfilePictureMaxSizeBytes, tt.want)
+			}
+		})
+	}
+}
+
 // TestLoad_NamesEveryMalformedVariableInOneError is the row that pins "all at once". Keep it: a
 // Load stopping at the first malformed variable passes every other case, and costs the operator
 // one restart per typo. The error is one line, because main writes it to stderr as the one line

@@ -10,9 +10,10 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/web"
+	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,7 +39,7 @@ func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, registered, "the walk must have reached the routes")
 
-	policy := bodyLimitPolicy(0)
+	policy := bodyLimitPolicy(testProfilePictureMaxSizeBytes)
 	for key := range policy.Routes {
 		assert.Contains(t, registered, key, "a Routes key must be a registered method and pattern")
 	}
@@ -55,7 +56,7 @@ func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
 // TestBodyLimitPolicy_EachRowAtItsBoundary sends each row's limit and one byte more through the
 // real root chain, to a stub at a pattern that row governs.
 func TestBodyLimitPolicy_EachRowAtItsBoundary(t *testing.T) {
-	uploadLimit := imaging.MaxFileSize(testProfilePictureMaxSizeBytes) + 64*1024
+	uploadLimit := int64(testProfilePictureMaxSizeBytes) + 64*1024
 
 	tests := []struct {
 		name    string
@@ -101,15 +102,15 @@ func TestBodyLimitPolicy_EachRowHoldsItsHandlersBound(t *testing.T) {
 	// The upload handlers bound their bodies at the image size plus 1 KiB, and the image size
 	// follows GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES, so the rows must follow it too: at the
 	// default, and at a raised setting.
-	for _, configured := range []int64{0, 10 << 20} {
+	for _, configured := range []int64{3 << 20, 10 << 20} {
 		policy := bodyLimitPolicy(configured)
 		for _, route := range uploads {
-			assert.Greater(t, policy.Routes[route], imaging.MaxFileSize(configured)+1024,
+			assert.Greater(t, policy.Routes[route], configured+1024,
 				"%s at a configured size of %d", route, configured)
 		}
 	}
 
-	policy := bodyLimitPolicy(0)
+	policy := bodyLimitPolicy(testProfilePictureMaxSizeBytes)
 
 	// The session handlers bound theirs at the store's wire ceiling, on purpose, and the row is
 	// that same constant rather than a wider one, so it is equal rather than greater.
@@ -137,4 +138,19 @@ func sendBody(router http.Handler, method string, target string, size int64) str
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(method, target, strings.NewReader(strings.Repeat("x", int(size)))))
 	return recorder.Body.String()
+}
+
+// TestBodyLimitPolicy_TheLargestAcceptedSizeBuilds: config.Load accepts an upload size up to
+// config.MaxProfilePictureMaxSizeBytes, and the upload rows add uploadMultipartAllowance to it. A
+// sum that wrapped negative made the body limiter panic at startup, so the largest accepted size
+// must still build a policy with positive upload rows; widening the allowance past the gap the
+// ceiling leaves fails here rather than on an operator's server (#435).
+func TestBodyLimitPolicy_TheLargestAcceptedSizeBuilds(t *testing.T) {
+	policy := bodyLimitPolicy(config.MaxProfilePictureMaxSizeBytes)
+	for route, limit := range policy.Routes {
+		assert.Positive(t, limit, "%s at the largest accepted upload size", route)
+	}
+
+	router := chi.NewRouter()
+	assert.NotPanics(t, func() { custom_middleware.MiddlewareBodyLimit(router, policy) })
 }

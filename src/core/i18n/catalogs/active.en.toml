@@ -1562,6 +1562,15 @@
 "validator.profile.zone_info_invalid" = "The zone info is invalid."
 "validator.profile.locale_invalid" = "The locale is invalid."
 
+# --- Image validator (LocalizedError-backed) ---------------------------------
+
+"validator.image.too_large" = "The image can be at most {{.max}} bytes."
+"validator.image.empty" = "The image file is empty."
+"validator.image.unsupported_type" = "The image type is not supported. Allowed types are JPEG, PNG, GIF and WebP."
+"validator.image.undecodable" = "The image could not be read. The file may be damaged."
+"validator.image.dimensions_too_small" = "The image must be at least {{.min}}x{{.min}} pixels."
+"validator.image.dimensions_too_large" = "The image can be at most {{.max}}x{{.max}} pixels."
+
 # --- Authorize endpoint, client and redirect_uri (LocalizedError-backed) -----
 #
 # These seven render the refusal page at /auth/authorize and never become an

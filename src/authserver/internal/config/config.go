@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"log/slog"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -171,7 +172,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
 			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
 			RateLimiterEnabled:               getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", &malformed),
-			ProfilePictureMaxSizeBytes:       getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, &malformed),
+			ProfilePictureMaxSizeBytes:       getEnvAsUploadSize("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", defaultProfilePictureMaxSizeBytes, &malformed),
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AdminConsole: AdminConsoleConfig{
@@ -371,6 +372,39 @@ func getEnvAsInt64(key string, defaultVal int64, malformed *malformedValues) int
 	if err != nil {
 		malformed.add(key, valueStr, "an integer")
 		return defaultVal
+	}
+	return value
+}
+
+const (
+	// defaultProfilePictureMaxSizeBytes is GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES unset: 3 MiB.
+	// It is written here and nowhere else; the upload handlers and the request-body table use
+	// the loaded value as it is (#435).
+	defaultProfilePictureMaxSizeBytes = 3 * 1024 * 1024
+
+	// MaxProfilePictureMaxSizeBytes is the largest GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES Load
+	// accepts. The server's request-body table adds a 64 KiB multipart allowance to the value,
+	// and anything above this wrapped that sum negative, which the body limiter refuses with a
+	// panic at startup rather than a sentence naming the variable. The server's tests hold its
+	// allowance within the gap this leaves (#435).
+	MaxProfilePictureMaxSizeBytes = math.MaxInt64 - 64<<10
+)
+
+// getEnvAsUploadSize is getEnvAsInt64 for the upload size, which must be positive and at most
+// MaxProfilePictureMaxSizeBytes. A value outside that is recorded as malformed: a zero or negative
+// size used to be read as the 3 MiB default with no message, so an operator who wrote 0 got 3 MiB
+// (#435).
+func getEnvAsUploadSize(key string, defaultVal int64, malformed *malformedValues) int64 {
+	before := len(*malformed)
+	value := getEnvAsInt64(key, defaultVal, malformed)
+	if len(*malformed) > before {
+		return value
+	}
+	switch {
+	case value <= 0:
+		malformed.add(key, getEnv(key, ""), "a positive integer")
+	case value > MaxProfilePictureMaxSizeBytes:
+		malformed.add(key, getEnv(key, ""), "at most "+strconv.FormatInt(MaxProfilePictureMaxSizeBytes, 10))
 	}
 	return value
 }

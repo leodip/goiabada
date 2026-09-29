@@ -139,6 +139,17 @@ resource-permissions page.
 | `validator.profile.zone_info_invalid` | (none) | The zone info is invalid. |
 | `validator.profile.locale_invalid` | (none) | The locale is invalid. |
 
+## Image validator
+
+| Code | Args | English message |
+|---|---|---|
+| `validator.image.too_large` | `max` (int) | The image can be at most {{.max}} bytes. |
+| `validator.image.empty` | (none) | The image file is empty. |
+| `validator.image.unsupported_type` | (none) | The image type is not supported. Allowed types are JPEG, PNG, GIF and WebP. |
+| `validator.image.undecodable` | (none) | The image could not be read. The file may be damaged. |
+| `validator.image.dimensions_too_small` | `min` (int) | The image must be at least {{.min}}x{{.min}} pixels. |
+| `validator.image.dimensions_too_large` | `max` (int) | The image can be at most {{.max}}x{{.max}} pixels. |
+
 ## Authorize validator
 
 Emitted by `ValidateClientAndRedirectURI` before any redirect is possible, so
