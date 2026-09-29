@@ -132,6 +132,9 @@ func HandleAuthorizeGet(
 			IpAddress:                     authserver_middleware.GetClientIPFromRequest(r),
 		}
 		authContext.SetScope(r.FormValue("scope"))
+		// The scope as asked for, before any hop narrows Scope to what a user holds. A restart
+		// restores Scope from it, so it is written here and nowhere else (#436).
+		authContext.RequestedScope = authContext.Scope
 
 		// Capture OIDC ui_locales (RFC §3.1.2.1) into AuthContext so the
 		// RP's stated preference survives every subsequent step of the
