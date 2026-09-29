@@ -35,7 +35,7 @@ type authOTPDatabase interface {
 }
 
 func HandleAuthOtpGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	database authOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
@@ -51,35 +51,35 @@ func HandleAuthOtpGet(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		requiredState := ceremony.AuthStateLevel2OTP
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
 		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errs.New("user not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
 		// Fetch client to get display settings
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.New("client not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 
@@ -96,7 +96,7 @@ func HandleAuthOtpGet(
 
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -115,9 +115,9 @@ func HandleAuthOtpGet(
 				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 			}
 
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		} else {
@@ -138,19 +138,19 @@ func HandleAuthOtpGet(
 			if err != nil {
 				settings, ok := reqctx.SettingsFrom(r.Context())
 				if !ok {
-					httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+					pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 					return
 				}
 				keyURL, genErr := otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
 				if genErr != nil {
-					httpHelper.InternalServerError(w, r, genErr)
+					pageRenderer.InternalServerError(w, r, genErr)
 					return
 				}
 				authContext.OTPKeyURL = keyURL
 
 				secretKey, err = otp.SecretFromKeyURL(keyURL)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 					return
 				}
 			}
@@ -160,13 +160,13 @@ func HandleAuthOtpGet(
 			// the code is checked against (#247).
 			base64Image, err := otp.RenderQRCodeImage(authContext.OTPKeyURL)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 
@@ -183,9 +183,9 @@ func HandleAuthOtpGet(
 				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
 			}
 
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp_enrollment.html", bind)
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp_enrollment.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
@@ -193,7 +193,7 @@ func HandleAuthOtpGet(
 }
 
 func HandleAuthOtpPost(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	database authOTPDatabase,
 	auditLogger AuditLogger,
@@ -212,7 +212,7 @@ func HandleAuthOtpPost(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -226,13 +226,13 @@ func HandleAuthOtpPost(
 		// r.PostFormValue rather than r.FormValue, as on the other two bound forms: this form
 		// posts to action="" and only the submitted body is a submission.
 		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
-			rejectCeremonyMismatch(httpHelper, auditLogger, w, r, authContext)
+			rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
 			return
 		}
 
 		requiredState := ceremony.AuthStateLevel2OTP
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -249,29 +249,29 @@ func HandleAuthOtpPost(
 		if keyURL != "" {
 			secretKey, err = otp.SecretFromKeyURL(keyURL)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
 
 		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errs.New("user not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
 		// Fetch client to get display settings
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.New("client not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 
@@ -296,7 +296,7 @@ func HandleAuthOtpPost(
 			if keyURL != "" {
 				base64Image, imgErr := otp.RenderQRCodeImage(keyURL)
 				if imgErr != nil {
-					httpHelper.InternalServerError(w, r, imgErr)
+					pageRenderer.InternalServerError(w, r, imgErr)
 					return
 				}
 				template = "/auth_otp_enrollment.html"
@@ -304,9 +304,9 @@ func HandleAuthOtpPost(
 				bind["secretKey"] = secretKey
 			}
 
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", template, bind)
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", template, bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 		}
 
@@ -345,7 +345,7 @@ func HandleAuthOtpPost(
 				time.Now().UTC())
 		}
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -384,7 +384,7 @@ func HandleAuthOtpPost(
 			// which the authenticator is on and no session knows (#242 decision 2).
 			enrolledGeneration, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, secretKey)
 			if establishErr != nil {
-				httpHelper.InternalServerError(w, r, establishErr)
+				pageRenderer.InternalServerError(w, r, establishErr)
 				return
 			}
 
@@ -444,13 +444,13 @@ func HandleAuthOtpPost(
 		// leaves a fresh identifier on a session that has not been marked
 		// authentication_completed (#266).
 		if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
-			httpHelper.InternalServerError(w, r, regenerateSessionErr)
+			pageRenderer.InternalServerError(w, r, regenerateSessionErr)
 			return
 		}
 
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)

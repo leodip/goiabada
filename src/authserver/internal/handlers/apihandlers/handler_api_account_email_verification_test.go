@@ -208,19 +208,19 @@ func TestHandleAPIAccountEmailVerificationPost_CodeComparison(t *testing.T) {
 // The emailed verification link points at the admin console base URL the handler was handed,
 // not at the configured one (#434).
 func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHanded(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	emailSender := mocks_handlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountEmailVerificationSendPost(httpHelper, database, emailSender, auditLogger,
+	handler := HandleAPIAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL)
 
 	user := &models.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 	var emailedLink string
-	httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 		"/emails/email_verification.html", mock.Anything).
 		Run(func(args mock.Arguments) {
 			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)

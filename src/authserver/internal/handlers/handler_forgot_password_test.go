@@ -22,16 +22,16 @@ import (
 
 func TestHandleForgotPasswordGet(t *testing.T) {
 	t.Run("Successful render", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 
-		handler := HandleForgotPasswordGet(httpHelper)
+		handler := HandleForgotPasswordGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
 		assert.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("RenderTemplate",
+		pageRenderer.On("RenderTemplate",
 			rr,
 			req,
 			"/layouts/auth_layout.html",
@@ -45,13 +45,13 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("RenderTemplate error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 
-		handler := HandleForgotPasswordGet(httpHelper)
+		handler := HandleForgotPasswordGet(pageRenderer)
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
 		assert.NoError(t, err)
@@ -59,7 +59,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		expectedError := assert.AnError
-		httpHelper.On("RenderTemplate",
+		pageRenderer.On("RenderTemplate",
 			rr,
 			req,
 			"/layouts/auth_layout.html",
@@ -67,7 +67,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 			mock.Anything,
 		).Return(expectedError)
 
-		httpHelper.On("InternalServerError",
+		pageRenderer.On("InternalServerError",
 			rr,
 			req,
 			expectedError,
@@ -75,17 +75,17 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 }
 
 func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Email not given", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, testDataCipher, testBaseURL)
 
 		req, err := http.NewRequest("POST", "/forgot-password", strings.NewReader(""))
 		assert.NoError(t, err)
@@ -93,7 +93,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		httpHelper.On("RenderTemplate",
+		pageRenderer.On("RenderTemplate",
 			rr,
 			req,
 			"/layouts/auth_layout.html",
@@ -108,17 +108,17 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, testDataCipher, testBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "nonexistent@example.com")
@@ -135,7 +135,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "nonexistent@example.com").Return(nil, nil)
 
-		httpHelper.On("RenderTemplate",
+		pageRenderer.On("RenderTemplate",
 			rr,
 			req,
 			"/layouts/auth_layout.html",
@@ -149,17 +149,17 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
 	})
 
 	t.Run("Success path, email is sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
-		handler := HandleForgotPasswordPost(httpHelper, database, emailSender, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, testDataCipher, testBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "existing@example.com")
@@ -193,7 +193,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// pointer differs from the original. mock.Anything keeps the
 		// expectation focused on the layout / template / bind args.
 		var emailedLink string
-		httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
+		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
 			Run(func(args mock.Arguments) {
 				emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
 			}).Return(&bytes.Buffer{}, nil)
@@ -206,7 +206,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 				return input.To == "existing@example.com" && input.Subject == "Password reset"
 			})).Return(nil)
 
-		httpHelper.On("RenderTemplate",
+		pageRenderer.On("RenderTemplate",
 			rr,
 			req,
 			"/layouts/auth_layout.html",
@@ -239,7 +239,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
 			"the emailed link must be the shared builder's output for the code that was issued")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
 	})

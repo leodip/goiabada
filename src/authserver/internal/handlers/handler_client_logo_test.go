@@ -40,10 +40,10 @@ func createTestLogoData(width, height int) []byte {
 }
 
 func TestHandleClientLogoGet_EmptyIdentifier(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	req, _ := http.NewRequest("GET", "/client/logo/", nil)
 	rr := httptest.NewRecorder()
@@ -54,10 +54,10 @@ func TestHandleClientLogoGet_EmptyIdentifier(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	req, _ := http.NewRequest("GET", "/client/logo/unknown-app", nil)
 	req = setChiURLParamForHandlers(req, "clientIdentifier", "unknown-app")
@@ -72,10 +72,10 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_NoLogo(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -93,10 +93,10 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_Success(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
@@ -127,10 +127,10 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
@@ -163,10 +163,10 @@ func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
@@ -194,10 +194,10 @@ func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
@@ -229,10 +229,10 @@ func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
@@ -264,10 +264,10 @@ func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
@@ -294,10 +294,10 @@ func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_DatabaseError(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleClientLogoGet(httpHelper, database)
+	handler := HandleClientLogoGet(pageRenderer, database)
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
 	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
@@ -305,7 +305,7 @@ func TestHandleClientLogoGet_DatabaseError(t *testing.T) {
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(nil, assert.AnError)
 
-	httpHelper.On("InternalServerError",
+	pageRenderer.On("InternalServerError",
 		mock.AnythingOfType("*httptest.ResponseRecorder"),
 		req,
 		mock.MatchedBy(func(err error) bool {
@@ -316,5 +316,5 @@ func TestHandleClientLogoGet_DatabaseError(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	database.AssertExpectations(t)
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 }

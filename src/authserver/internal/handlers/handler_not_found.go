@@ -8,10 +8,10 @@ import (
 // rendered the same way, that HttpHelper.NotFound answers a stale or malformed id with, so it is
 // that method rather than a second copy of it (#279).
 func HandleNotFoundGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		httpHelper.NotFound(w, r)
+		pageRenderer.NotFound(w, r)
 	}
 }

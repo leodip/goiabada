@@ -30,9 +30,9 @@ func isErrNoSettings(err error) bool {
 	return errors.Is(err, reqctx.ErrNoSettings)
 }
 
-// A browser page answers the 500 page through HttpHelper.
+// A browser page answers the 500 page through PageRenderer.
 func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	database := mocks_data.NewDatabase(t)
 
@@ -43,11 +43,11 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 		AuthState: ceremony.AuthStateLevel1Password,
 		ClientId:  "test-client",
 	}, nil)
-	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	HandleAuthPwdGet(httpHelper, authHelper, database, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	HandleAuthPwdGet(pageRenderer, authHelper, database, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -55,7 +55,7 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 // every other failure there is answered, and it is refused before the validator sees the request
 // (#435).
 func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/token",
@@ -63,13 +63,13 @@ func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
-	httpHelper.On("JsonError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), mocks_data.NewDatabase(t),
+	HandleTokenPost(jsonWriter, mocks_handlers.NewUserSessionManager(t), mocks_data.NewDatabase(t),
 		mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t),
 		noCredentialFailures{}).ServeHTTP(rr, req)
 
-	httpHelper.AssertExpectations(t)
+	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything)
 }
 

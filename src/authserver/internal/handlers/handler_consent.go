@@ -72,7 +72,7 @@ type consentDatabase interface {
 }
 
 func HandleConsentGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	database consentDatabase,
 	baseURL string,
@@ -86,40 +86,40 @@ func HandleConsentGet(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		requiredState := ceremony.AuthStateRequiresConsent
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
 		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errs.New("user not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.New("client not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
 			return
 		}
 
 		consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -168,9 +168,9 @@ func HandleConsentGet(
 				"ceremonyId": authContext.CeremonyId,
 			}
 
-			err = httpHelper.RenderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		} else {
@@ -178,7 +178,7 @@ func HandleConsentGet(
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
@@ -187,7 +187,7 @@ func HandleConsentGet(
 }
 
 func HandleConsentPost(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	database consentDatabase,
 	templateFS fs.FS,
@@ -204,7 +204,7 @@ func HandleConsentPost(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -218,13 +218,13 @@ func HandleConsentPost(
 		// would let /auth/consent?ceremonyId=... supply the id, and only the submitted body is
 		// a submission. Same reasoning as the checkbox selection below.
 		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
-			rejectCeremonyMismatch(httpHelper, auditLogger, w, r, authContext)
+			rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
 			return
 		}
 
 		requiredState := ceremony.AuthStateRequiresConsent
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -281,20 +281,20 @@ func HandleConsentPost(
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 						"error", err)
-					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+					err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 						redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 					if err != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
-						httpHelper.InternalServerError(w, r, err)
+						pageRenderer.InternalServerError(w, r, err)
 					}
 					return
 				}
 
-				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 					redirectErrorFromAuthContext(authContext, refusedClient,
 						"access_denied", "The user did not provide consent"))
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 					return
 				}
 				return
@@ -302,21 +302,21 @@ func HandleConsentPost(
 
 				client, consentErr := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 				if consentErr != nil {
-					httpHelper.InternalServerError(w, r, consentErr)
+					pageRenderer.InternalServerError(w, r, consentErr)
 					return
 				}
 				if client == nil {
-					httpHelper.InternalServerError(w, r, errs.New("client not found"))
+					pageRenderer.InternalServerError(w, r, errs.New("client not found"))
 					return
 				}
 
 				user, consentErr := database.GetUserById(r.Context(), nil, authContext.UserId)
 				if consentErr != nil {
-					httpHelper.InternalServerError(w, r, consentErr)
+					pageRenderer.InternalServerError(w, r, consentErr)
 					return
 				}
 				if user == nil {
-					httpHelper.InternalServerError(w, r, errs.New("user not found"))
+					pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 					return
 				}
 
@@ -334,7 +334,7 @@ func HandleConsentPost(
 				grantedScope, consentErr := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(),
 					strings.Join(grantedScopes, " "), user)
 				if consentErr != nil {
-					httpHelper.InternalServerError(w, r, consentErr)
+					pageRenderer.InternalServerError(w, r, consentErr)
 					return
 				}
 
@@ -363,20 +363,20 @@ func HandleConsentPost(
 						// this condition (#141).
 						slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 							"error", consentErr)
-						consentErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
+						consentErr = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 							redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
 						if consentErr != nil {
 							// Nowhere left to send the client, so the 500 is the last resort here.
-							httpHelper.InternalServerError(w, r, consentErr)
+							pageRenderer.InternalServerError(w, r, consentErr)
 						}
 						return
 					}
 
-					consentErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
+					consentErr = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 						redirectErrorFromAuthContext(authContext, client,
 							"access_denied", "The user is not authorized to access any of the requested scopes"))
 					if consentErr != nil {
-						httpHelper.InternalServerError(w, r, consentErr)
+						pageRenderer.InternalServerError(w, r, consentErr)
 						return
 					}
 					return
@@ -384,7 +384,7 @@ func HandleConsentPost(
 
 				consent, consentErr := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 				if consentErr != nil {
-					httpHelper.InternalServerError(w, r, consentErr)
+					pageRenderer.InternalServerError(w, r, consentErr)
 					return
 				}
 
@@ -405,13 +405,13 @@ func HandleConsentPost(
 				if consent.Id > 0 {
 					consentErr = database.UpdateUserConsent(r.Context(), nil, consent)
 					if consentErr != nil {
-						httpHelper.InternalServerError(w, r, consentErr)
+						pageRenderer.InternalServerError(w, r, consentErr)
 						return
 					}
 				} else {
 					consentErr = database.CreateUserConsent(r.Context(), nil, consent)
 					if consentErr != nil {
-						httpHelper.InternalServerError(w, r, consentErr)
+						pageRenderer.InternalServerError(w, r, consentErr)
 						return
 					}
 				}
@@ -427,7 +427,7 @@ func HandleConsentPost(
 				authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 				consentErr = authHelper.SaveAuthContext(w, r, authContext)
 				if consentErr != nil {
-					httpHelper.InternalServerError(w, r, consentErr)
+					pageRenderer.InternalServerError(w, r, consentErr)
 					return
 				}
 				http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
@@ -451,20 +451,20 @@ func HandleConsentPost(
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 					"error", err)
-				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 					redirectErrorFromAuthContext(authContext, refusedClient, "server_error", "Internal server error"))
 				if err != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 				}
 				return
 			}
 
-			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+			err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 				redirectErrorFromAuthContext(authContext, refusedClient,
 					"access_denied", "The user did not provide consent"))
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			return

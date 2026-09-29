@@ -18,7 +18,7 @@ type profilePictureDatabase interface {
 }
 
 func HandleProfilePictureGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	database profilePictureDatabase,
 ) http.HandlerFunc {
 
@@ -31,7 +31,7 @@ func HandleProfilePictureGet(
 
 		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -42,7 +42,7 @@ func HandleProfilePictureGet(
 
 		profilePicture, err := database.GetUserProfilePictureByUserId(r.Context(), nil, user.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 

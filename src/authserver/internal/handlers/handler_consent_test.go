@@ -130,11 +130,11 @@ func TestBuildScopeInfoArray(t *testing.T) {
 
 func TestHandleConsentGet(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -142,22 +142,22 @@ func TestHandleConsentGet(t *testing.T) {
 		expectedError := &customerrors.ErrorDetail{}
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -167,20 +167,20 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		expectAuthStateMismatch(t, httpHelper, rr, req)
+		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -193,23 +193,23 @@ func TestHandleConsentGet(t *testing.T) {
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "user not found"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Client not found", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -226,23 +226,23 @@ func TestHandleConsentGet(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "client not found"
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Successful consent page rendering", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -273,7 +273,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(true, nil)
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			scopes, ok := data["scopes"].([]ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["showClientSection"] == true &&
@@ -289,17 +289,17 @@ func TestHandleConsentGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Fully consented scopes, redirect to issue", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -338,17 +338,17 @@ func TestHandleConsentGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
 
 	t.Run("Partial consent, render consent page", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -379,7 +379,7 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(consent, nil)
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			scopes, ok := data["scopes"].([]ScopeInfo)
 			return ok && len(scopes) == 3 &&
 				data["showClientSection"] == true &&
@@ -394,7 +394,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
@@ -403,11 +403,11 @@ func TestHandleConsentGet(t *testing.T) {
 	// is refused by HandleConsentPost. Asserted as an equality rather than as "not empty",
 	// because the value has to be THIS ceremony's (#79 seam 4).
 	t.Run("The render names the ceremony", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(httpHelper, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentGet(pageRenderer, authHelper, database, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -427,7 +427,7 @@ func TestHandleConsentGet(t *testing.T) {
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
 
 		var rendered map[string]interface{}
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html",
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html",
 			mock.MatchedBy(func(data map[string]interface{}) bool {
 				rendered = data
 				return true
@@ -439,7 +439,7 @@ func TestHandleConsentGet(t *testing.T) {
 			assert.Equal(t, testCeremonyId, rendered["ceremonyId"])
 		}
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 	})
@@ -447,14 +447,14 @@ func TestHandleConsentGet(t *testing.T) {
 
 func TestHandleConsentPost(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
@@ -462,25 +462,25 @@ func TestHandleConsentPost(t *testing.T) {
 		expectedError := &customerrors.ErrorDetail{}
 		authHelper.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == expectedError
 		})).Return()
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -496,11 +496,11 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		expectAuthStateMismatch(t, httpHelper, rr, req)
+		expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
@@ -567,14 +567,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				form := url.Values{}
 				if tc.btn == "btnSubmit" {
@@ -607,7 +607,7 @@ func TestHandleConsentPost(t *testing.T) {
 				}
 				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-				expectCeremonyMismatch(t, httpHelper, auditLogger, rr, req)
+				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
 
 				handler.ServeHTTP(rr, req)
 
@@ -615,7 +615,7 @@ func TestHandleConsentPost(t *testing.T) {
 				// have no expectation for any of it, and database is empty besides.
 				assert.Empty(t, rr.Header().Get("Location"))
 
-				httpHelper.AssertExpectations(t)
+				pageRenderer.AssertExpectations(t)
 				authHelper.AssertExpectations(t)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
@@ -624,7 +624,7 @@ func TestHandleConsentPost(t *testing.T) {
 	})
 
 	t.Run("User cancels consent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -632,7 +632,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -668,12 +668,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("User cancels consent, failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -681,7 +681,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -707,7 +707,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// pageRenderer has no InternalServerError expectation, so the mock fails the test if the
 		// handler answers with a bare 500 instead of redirecting the client.
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location := rr.Result().Header.Get("Location")
@@ -715,12 +715,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Contains(t, location, "error_description=Internal+server+error")
 		assert.NotContains(t, location, "access_denied")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("User cancels consent, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -736,7 +736,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -760,7 +760,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
 		// this expectation the handler would answer nothing at all.
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -770,12 +770,12 @@ func TestHandleConsentPost(t *testing.T) {
 		// the mock's, so no redirect is committed.
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("User cancels consent, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -787,7 +787,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
@@ -811,7 +811,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// pinned separately so a future edit cannot delete either copy unnoticed.
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -819,19 +819,19 @@ func TestHandleConsentPost(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("User provides consent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -879,21 +879,21 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("Partial consent given", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -947,7 +947,7 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -958,14 +958,14 @@ func TestHandleConsentPost(t *testing.T) {
 	// screen on later ceremonies, so a scope the user no longer holds must never be written into
 	// it (#241 decision 3).
 	t.Run("A ticked scope the user no longer holds is not recorded", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1028,7 +1028,7 @@ func TestHandleConsentPost(t *testing.T) {
 				"the ceremony carries the filtered grant forward, not the ticked one")
 		}
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1046,13 +1046,13 @@ func TestHandleConsentPost(t *testing.T) {
 	// No expectation is registered for the consent read, either consent write, the audit or the
 	// context save, so a call reaching any of them fails the case. That absence IS the assertion.
 	t.Run("The filter failing closed records nothing", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1081,7 +1081,7 @@ func TestHandleConsentPost(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid backend:read", user).
 			Return("", errors.New("permission filter sentinel"))
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "permission filter sentinel")
 		})).Return()
 
@@ -1090,7 +1090,7 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a filter that could not answer must not send the ceremony on to /auth/issue")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1101,7 +1101,7 @@ func TestHandleConsentPost(t *testing.T) {
 	// who ticked nothing, which is a choice they made; this answers a selection an administrator
 	// emptied, which is not. Both are access_denied and the descriptions are what tell them apart.
 	t.Run("A selection the filter empties is refused, and says so differently", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1109,7 +1109,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1163,7 +1163,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		// No consent row is read and none is written, which the mock enforces by having no
 		// expectation for either call.
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1176,7 +1176,7 @@ func TestHandleConsentPost(t *testing.T) {
 	// internal tier survived to prove it: server_error swapped for access_denied in the fallback,
 	// and each of the two 500s deleted.
 	t.Run("A selection the filter empties, failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1184,7 +1184,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1234,14 +1234,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		// Still no consent row read and none written: a failed clear does not turn the refusal
 		// into a grant. The mock enforces it by having no expectation for either call.
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("A selection the filter empties, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1257,7 +1257,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1294,7 +1294,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it. Without this expectation the handler would
 		// answer nothing at all and the case would still pass.
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -1302,14 +1302,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("A selection the filter empties, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1321,7 +1321,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1357,7 +1357,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// 500, pinned on its own so a future edit cannot delete either copy unnoticed.
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -1365,14 +1365,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
 
 	t.Run("No consent given", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1380,7 +1380,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1421,12 +1421,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("No consent given, failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1434,7 +1434,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1465,12 +1465,12 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Contains(t, location, "error_description=Internal+server+error")
 		assert.NotContains(t, location, "access_denied")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("No consent given, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1482,7 +1482,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1503,7 +1503,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -1511,12 +1511,12 @@ func TestHandleConsentPost(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("No consent given, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
@@ -1528,7 +1528,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
@@ -1552,7 +1552,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// a future edit cannot delete either copy unnoticed.
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -1560,7 +1560,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
@@ -1781,14 +1781,14 @@ func TestHandleConsentPost(t *testing.T) {
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+				handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 				scopes := scopeList(tc.scopeCount)
 
@@ -1821,7 +1821,7 @@ func TestHandleConsentPost(t *testing.T) {
 				authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 				if tc.ceremonyMismatch {
-					expectCeremonyMismatch(t, httpHelper, auditLogger, rr, req)
+					expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
 
 					handler.ServeHTTP(rr, req)
 
@@ -1888,7 +1888,7 @@ func TestHandleConsentPost(t *testing.T) {
 					}
 				}
 
-				httpHelper.AssertExpectations(t)
+				pageRenderer.AssertExpectations(t)
 				authHelper.AssertExpectations(t)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
@@ -1899,14 +1899,14 @@ func TestHandleConsentPost(t *testing.T) {
 	// An existing consent row is replaced by the new selection rather than appended to, which is
 	// what the now-deleted consent.Scope = "" blanking used to ensure (#79).
 	t.Run("Existing consent is replaced, not appended to", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleConsentPost(pageRenderer, authHelper, database, nil, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		stubUserHoldsEveryScope(permissionChecker)
 
@@ -1948,7 +1948,7 @@ func TestHandleConsentPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)

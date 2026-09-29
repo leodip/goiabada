@@ -58,7 +58,7 @@ func withURLParam(req *http.Request, key, value string) *http.Request {
 // reads the handler makes carry the request's own context, one of them on a value derived from
 // the other, which is the ordinary two-hop shape across this package.
 func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
 	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
@@ -69,7 +69,7 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 	database.On("GetUserProfilePictureByUserId", theRequestsContext(), mock.Anything, int64(7)).
 		Return(&models.UserProfilePicture{UserId: 7, ContentType: "image/png", Picture: []byte{1, 2, 3}}, nil).Once()
 
-	HandleProfilePictureGet(httpHelper, database).ServeHTTP(rr, req)
+	HandleProfilePictureGet(pageRenderer, database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "image/png", rr.Header().Get("Content-Type"))
@@ -80,13 +80,13 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 // turns away reaches no port at all, so there is no context to get wrong. Without it the accept
 // arm would also pass on a handler that queried unconditionally.
 func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 
 	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
 	rr := httptest.NewRecorder()
 
-	HandleProfilePictureGet(httpHelper, database).ServeHTTP(rr, req)
+	HandleProfilePictureGet(pageRenderer, database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusNotFound, rr.Code)
 	database.AssertNotCalled(t, "GetUserBySubject", mock.Anything, mock.Anything, mock.Anything)
@@ -110,11 +110,11 @@ func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Reques
 // termination. Both the acquisition and the insert are matched on the request's context, so a
 // transaction opened on a context nobody can cancel fails here rather than in production.
 func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
+	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
@@ -146,7 +146,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	authHelper.On("ClearAuthContext", rr, req).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
-	HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger,
+	HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
 		userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
@@ -158,11 +158,11 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 // is never opened and the issuer is never reached. Without it the accept arm would also pass on a
 // handler that issued unconditionally.
 func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
-	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
+	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
@@ -188,7 +188,7 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	authHelper.On("SaveAuthContext", rr, req, mock.Anything).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
-	HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger,
+	HandleIssueGet(pageRenderer, authHelper, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
 		userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)

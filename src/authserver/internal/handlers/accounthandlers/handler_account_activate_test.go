@@ -188,8 +188,8 @@ func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedA
 // (no _httpStatus), since mail scanners treat a 4xx as a broken link. A single matcher
 // everywhere is deliberate, since these paths differing would tell a caller which of them
 // happened.
-func expectRenderedLinkExpired(httpHelper *mocks_handlers.HttpHelper) {
-	httpHelper.On("RenderTemplate",
+func expectRenderedLinkExpired(pageRenderer *mocks_handlers.PageRenderer) {
+	pageRenderer.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
 		"/layouts/auth_layout.html",
@@ -226,7 +226,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("a valid code marks the session and redirects to a clean URL", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -235,7 +235,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := linkFollowedRequest(code)
 		handler.ServeHTTP(rr, sent)
@@ -268,7 +268,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	// A consumed code is the same case: the activation deletes the row, so a link clicked twice
 	// resolves to nothing. It used to answer the 500 page with an error-level stack (#425).
 	t.Run("a code matching no row is refused", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -277,9 +277,9 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		codeHash := hashutil.HashString(code)
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
-		expectRenderedLinkExpired(httpHelper)
+		expectRenderedLinkExpired(pageRenderer)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -287,11 +287,11 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		assertRefusalLogged(t, logs, "unknown_code")
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("a hash hit whose stored code does not match is refused", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -303,9 +303,9 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		preReg, _ := preRegistrationWithCode(t, 7, activateTestEmail, "a-different-code", time.Now().UTC())
 		codeHash := hashutil.HashString(code)
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
-		expectRenderedLinkExpired(httpHelper)
+		expectRenderedLinkExpired(pageRenderer)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := linkFollowedRequest(code)
 		handler.ServeHTTP(rr, sent)
@@ -321,13 +321,13 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			"a refused code must not leave a usable marker behind")
 
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	// A server fault is not a refusal: a stored code that will not decrypt keeps the 500 page and
 	// its stack, and writes no refusal record that would file it under a user's old link.
 	t.Run("a stored code that will not decrypt stays a server error", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -337,24 +337,24 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		preReg.VerificationCodeEncrypted = []byte("not ciphertext")
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
-		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to decrypt verification code")
 		})).Once()
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), linkFollowedRequest(code))
 
 		assert.Empty(t, logs.Records(), "a server fault must not be logged as a refused link")
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	// The activation half of the same defect: the clean hop reads the marker alone, so two
 	// interleaved first hops used to make the redirect already in flight activate the other
 	// registration. First writer wins instead (#112 decision 13).
 	t.Run("a second link followed while one is in flight is refused", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -364,13 +364,13 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		// replaced, not for anything wrong with it.
 		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
-		expectRenderedLinkExpired(httpHelper)
+		expectRenderedLinkExpired(pageRenderer)
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
 			emaillinks.LinkMarkerFlowAccountActivate, 7, "the-first-hash")
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, sent)
 
@@ -390,7 +390,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		assert.Equal(t, int64(7), marker.Id)
 
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	// The same refusal against a live marker of the OTHER flow. Scoping the rule to one flow
@@ -399,7 +399,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	// it started in, which is the retarget in three navigations rather than one
 	// (#112 decision 14).
 	t.Run("a link followed while a reset continuation is in flight is refused", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -407,13 +407,13 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
-		expectRenderedLinkExpired(httpHelper)
+		expectRenderedLinkExpired(pageRenderer)
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
 			emaillinks.LinkMarkerFlowResetPassword, 42, "the-reset-hash")
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, sent)
 
@@ -431,11 +431,11 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			"the reset continuation must still own the session")
 
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("an expired code deletes the pending registration and asks for another", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -444,10 +444,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-6*time.Minute))
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
-		expectRenderedLinkExpired(httpHelper)
+		expectRenderedLinkExpired(pageRenderer)
 		logs := logtest.CaptureSlog(t)
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -455,7 +455,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		assertRefusalLogged(t, logs, "code_expired")
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("the code's lifetime boundary", func(t *testing.T) {
@@ -470,7 +470,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			{"just outside the window", time.Now().UTC().Add(-verificationCodeLifetime - 2*time.Second), true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				userCreator := mocks_accounthandlers.NewUserCreator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -480,10 +480,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 				database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 				if tc.expired {
 					database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
-					expectRenderedLinkExpired(httpHelper)
+					expectRenderedLinkExpired(pageRenderer)
 				}
 
-				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+				handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 				rr := httptest.NewRecorder()
 				handler.ServeHTTP(rr, linkFollowedRequest(code))
 
@@ -494,7 +494,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 				}
 
 				database.AssertExpectations(t)
-				httpHelper.AssertExpectations(t)
+				pageRenderer.AssertExpectations(t)
 			})
 		}
 	})
@@ -508,7 +508,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("the marker completes the activation", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -531,13 +531,13 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.AuditActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
-		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
+		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			"/account_register_activation_result.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 				_, expired := data["linkHasExpired"]
 				return !expired
 			})).Return(nil).Once()
 
-		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+		handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 		rr := httptest.NewRecorder()
 		sent := withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 		handler.ServeHTTP(rr, sent)
@@ -551,7 +551,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		database.AssertExpectations(t)
 		userCreator.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("every marker-attributable refusal renders the same page and creates nothing", func(t *testing.T) {
@@ -600,7 +600,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlers.NewHttpHelper(t)
+				pageRenderer := mocks_handlers.NewPageRenderer(t)
 				database := mocks_data.NewDatabase(t)
 				userCreator := mocks_accounthandlers.NewUserCreator(t)
 				auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -609,12 +609,12 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				if tc.resolves {
 					database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
 				}
-				expectRenderedLinkExpired(httpHelper)
+				expectRenderedLinkExpired(pageRenderer)
 
 				sent := tc.request(t, store)
 				logs := logtest.CaptureSlog(t)
 
-				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+				handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 				rr := httptest.NewRecorder()
 				handler.ServeHTTP(rr, sent)
 
@@ -623,7 +623,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 				database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 				database.AssertExpectations(t)
-				httpHelper.AssertExpectations(t)
+				pageRenderer.AssertExpectations(t)
 			})
 		}
 	})
@@ -657,7 +657,7 @@ func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			database := mocks_data.NewDatabase(t)
 			userCreator := mocks_accounthandlers.NewUserCreator(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -665,10 +665,10 @@ func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
 
 			_, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 			sent := withSelfRegistration(tc.request(t, store, codeHash), false)
-			httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
+			pageRenderer.On("NotFound", mock.Anything, mock.Anything).Once()
 			logs := logtest.CaptureSlog(t)
 
-			handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
+			handler := HandleAccountActivateGet(pageRenderer, store, database, userCreator, auditLogger, testDataCipher, testAdminConsoleBaseURL)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, sent)
 
@@ -677,7 +677,7 @@ func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
 			database.AssertNotCalled(t, "GetPreRegistrationByVerificationCodeHash", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 			userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 		})
 	}
 }

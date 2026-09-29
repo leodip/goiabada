@@ -8,7 +8,7 @@ import (
 )
 
 func HandleWellKnownOIDCConfigGet(
-	httpHelper HttpHelper,
+	jsonWriter JSONWriter,
 	baseURL string,
 ) http.HandlerFunc {
 
@@ -16,7 +16,7 @@ func HandleWellKnownOIDCConfigGet(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoSettings)
+			jsonWriter.JsonError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 
@@ -70,6 +70,6 @@ func HandleWellKnownOIDCConfigGet(
 			wellKnownConfig.RegistrationEndpoint = baseURL + "/connect/register"
 		}
 
-		httpHelper.EncodeJson(w, r, wellKnownConfig)
+		jsonWriter.EncodeJson(w, r, wellKnownConfig)
 	}
 }

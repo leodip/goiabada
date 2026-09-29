@@ -69,7 +69,7 @@ func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager 
 
 func TestHandleAuthorizeGet(t *testing.T) {
 	t.Run("Valid request with existing session", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -79,7 +79,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -149,7 +149,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -158,7 +158,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Valid request without existing session", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -168,7 +168,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -219,7 +219,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -228,7 +228,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Invalid client and redirect URI", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -237,7 +237,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -261,14 +261,14 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(validationError)
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["title"] == i18n.T(req.Context(), "auth_error.unable_to_authorize.title") &&
 				data["error"] == validationError.Localize(req.Context())
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
@@ -283,7 +283,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// redirecting validations would each fail this test if the branch let the request through to
 	// them. That is what pins the branch's position rather than merely its existence.
 	t.Run("Unsupported response_mode is answered 400 on a page, above everything that redirects", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -292,7 +292,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		// jwt is JARM, which this server does not implement, and it is what a client asking for an
 		// unsupported mode most plausibly asks for.
@@ -307,7 +307,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// _httpStatus is what RenderTemplate turns into the response code, so it is asserted here
 		// rather than on the recorder: the helper is a mock and writes nothing. The integration
 		// case asserts the 400 that actually reaches the wire.
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["title"] == i18n.T(req.Context(), "auth_error.unable_to_authorize.title") &&
 				data["error"] == i18n.T(req.Context(), "auth_error.unsupported_response_mode.message") &&
 				data["_httpStatus"] == http.StatusBadRequest
@@ -319,7 +319,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// mode must not be deferred either, which is the half of this that #213 introduced.
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
@@ -342,7 +342,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// reaches this branch. Correcting it changes what an implicit client receives and where it has
 	// to look for it, which belongs to its own change rather than to this gate.
 	t.Run("A supported response_mode the request may not use still reaches the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -352,7 +352,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&response_mode=query", nil)
@@ -389,7 +389,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Contains(t, location, "https://example.com?error=invalid_request")
 		assert.Contains(t, location, "Implicit+flow+requires+response_mode%3Dfragment")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
@@ -402,7 +402,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// is the id on the FIRST context saved, and stopping there keeps the setup to the two calls
 	// that matter.
 	t.Run("The saved auth context names a fresh ceremony", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -411,7 +411,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		seen := map[string]bool{}
 		for i := 0; i < 2; i++ {
@@ -427,7 +427,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 			validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(validationError).Once()
-			httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).Return(nil).Once()
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).Return(nil).Once()
 
 			handler.ServeHTTP(rr, req)
 
@@ -441,13 +441,13 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			}
 		}
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Invalid request", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -457,7 +457,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
@@ -500,13 +500,13 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com?error=")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Invalid scopes", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -516,7 +516,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
@@ -569,13 +569,13 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Invalid scopes with a failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -585,7 +585,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
@@ -620,20 +620,20 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// pageRenderer has no InternalServerError expectation, so the mock fails the test if the
 		// handler answers with a bare 500 instead of redirecting the client.
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location := rr.Result().Header.Get("Location")
 		assert.Contains(t, location, "https://example.com?error=server_error")
 		assert.Contains(t, location, "error_description=Internal+server+error")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Invalid scopes with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -651,7 +651,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
@@ -670,7 +670,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
 		// this expectation the handler would answer nothing at all.
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -693,13 +693,13 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// the mock's, so no redirect is committed.
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Invalid scopes with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -713,7 +713,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
@@ -733,7 +733,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// pinned separately so a future edit cannot delete either copy unnoticed.
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -754,13 +754,13 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Disabled user account", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -770,7 +770,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -830,7 +830,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com?error=access_denied")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -839,7 +839,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Missing auth context", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -848,7 +848,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -858,17 +858,17 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(handlerhelpers.ErrNoAuthContext)
 
 		// Expect the InternalServerError call
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == handlerhelpers.ErrNoAuthContext
 		})).Once()
 
 		handler.ServeHTTP(rr, req)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Valid request with AcrLevel2Optional", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -878,7 +878,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
@@ -943,7 +943,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -952,7 +952,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("POST request with form body succeeds", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -962,7 +962,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		form := url.Values{}
 		form.Set("client_id", "test-client")
@@ -1016,7 +1016,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1025,7 +1025,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("POST validation error redirects with form-body params", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1035,7 +1035,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		form := url.Values{}
@@ -1089,7 +1089,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.Contains(t, location, "https://example.com?error=invalid_request")
 		assert.Contains(t, location, "state=abc123")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
@@ -1100,7 +1100,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// AuthContext that's persisted to the session, so subsequent steps
 		// of the multi-step auth flow (/auth/pwd, /auth/otp, /auth/consent)
 		// see the same locale preference.
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1110,7 +1110,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET",
 			"/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&ui_locales=pt-BR%20es",
@@ -1171,7 +1171,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// body. r.FormValue covers both, so the same code path runs — but this
 		// pins behaviour that's easy to break if anything in the request
 		// pre-processing chain consumes the body.
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -1181,7 +1181,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		form := url.Values{}
 		form.Set("client_id", "test-client")
@@ -1270,7 +1270,7 @@ func testRegisteredDatabase(t *testing.T, registered ...string) *mocks_data.Data
 // administrator-created client is the case in which that weighing changes nothing, which is what
 // keeps these cases about the response (#108).
 //
-// It is also why every case below passes nil for httpHelper: the renderer is reached only when the
+// It is also why every case below passes nil for pageRenderer: the renderer is reached only when the
 // redirect is withheld, so a nil there says this input never withholds one. Seam 6 owns the case
 // that does, at the integration tier, where a rendered page can actually be read.
 func testRedirectError(code string, description string, responseMode string, redirectURI string,
@@ -1768,7 +1768,7 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 // on passing with this guard deleted.
 //
 // These are also the only cases in this file that reach the renderer, which is why they are the only
-// ones with a real httpHelper: its ten siblings pass nil precisely to say they never withhold a
+// ones with a real pageRenderer: its ten siblings pass nil precisely to say they never withhold a
 // redirect.
 func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *testing.T) {
 	for _, tc := range []struct {
@@ -1800,20 +1800,20 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
-			httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+			pageRenderer.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 				mock.MatchedBy(func(data map[string]interface{}) bool {
 					return data["destination"] == tc.destination
 				})).Return(nil)
 
-			err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), httpHelper, nil, testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
+			err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), pageRenderer, nil, testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
 
 			require.NoError(t, err)
 			assert.Empty(t, w.Header().Get("Location"), "a withheld redirect must never become a Location: %s", tc.why)
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 		})
 	}
 }
@@ -2016,11 +2016,11 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 // where a later edit would drop it. The end-to-end shape is the sequential-read case in
 // TestHandleAuthorizeGet_RegistrationReadFailsThenSucceeds (#241).
 func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+	pageRenderer.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			// The host, not the URI: redirectDestinationLabel reduces it, as its own table pins.
 			return data["destination"] == "legit.example"
@@ -2033,12 +2033,12 @@ func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	// No expectation on the database at all: the floor must short-circuit above the live gates, so
 	// a registration read reaching this mock fails the case. That is the ordering claim, and it is
 	// what stops a "helpful" edit from re-asking and taking the newer answer.
-	err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), httpHelper, nil, input)
+	err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), pageRenderer, nil, input)
 
 	require.NoError(t, err)
 	assert.Empty(t, w.Header().Get("Location"),
 		"a refusal already given must never be overturned by a second read: that is attack 1 of RFC 9700 4.11.2")
-	httpHelper.AssertExpectations(t)
+	pageRenderer.AssertExpectations(t)
 }
 
 // The three gates live in redirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
@@ -2085,7 +2085,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
@@ -2093,14 +2093,14 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 			stubRegisteredRedirectURI(database, "http://127.0.0.1/cb")
 
 			if tc.wantLocation == "" {
-				httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html",
+				pageRenderer.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html",
 					"/auth_redirect_blocked.html", mock.Anything).Return(nil)
 			}
 
 			input := testRedirectError("invalid_scope", "Invalid scope", "query",
 				"http://127.0.0.1:49152/cb", "", tc.responseType)
 
-			err := redirToClientWithError(w, r, database, httpHelper, nil, input)
+			err := redirToClientWithError(w, r, database, pageRenderer, nil, input)
 
 			require.NoError(t, err)
 			if tc.wantLocation == "" {
@@ -2108,7 +2108,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 			} else {
 				assert.Contains(t, w.Header().Get("Location"), tc.wantLocation, tc.why)
 			}
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 		})
 	}
 }
@@ -2124,10 +2124,10 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 // cases in TestHandleAuthorizeGet_PromptNone (#241).
 func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.T) {
 	// newRequest is per-subtest because the mocks key their expectations on the exact w and r.
-	setup := func(t *testing.T) (*mocks_handlers.HttpHelper, *mocks_handlers.AuthHelper,
+	setup := func(t *testing.T) (*mocks_handlers.PageRenderer, *mocks_handlers.AuthHelper,
 		*httptest.ResponseRecorder, *http.Request) {
 
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
@@ -2135,13 +2135,13 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		// The clear fails, which is the only path that builds the fallback at all.
 		authHelper.On("ClearAuthContext", w, r).Return(errors.New("the session store is unreachable"))
 
-		return httpHelper, authHelper, w, r
+		return pageRenderer, authHelper, w, r
 	}
 
 	t.Run("an earlier refusal survives, and is not re-asked", func(t *testing.T) {
-		httpHelper, authHelper, w, r := setup(t)
+		pageRenderer, authHelper, w, r := setup(t)
 
-		httpHelper.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html",
+		pageRenderer.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html",
 			"/auth_redirect_blocked.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 				return data["destination"] == "legit.example"
 			})).Return(nil)
@@ -2153,18 +2153,18 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		// No expectation on the database at all, exactly as TestRedirToClientWithError_HonoursAnEarlierRefusal
 		// does: a registration read reaching this mock fails the case. That is stronger than stubbing a
 		// recovered read and asserting it was ignored, because it proves the second read never happens.
-		answerClientWithError(w, r, mocks_data.NewDatabase(t), httpHelper, authHelper, nil, input)
+		answerClientWithError(w, r, mocks_data.NewDatabase(t), pageRenderer, authHelper, nil, input)
 
 		assert.Empty(t, w.Header().Get("Location"),
 			"swapping the code for server_error must not launder away a refusal the request already earned: "+
 				"a failing clear is a server fault, and it cannot be what buys the client its redirect back "+
 				"(RFC 9700 4.11.2 attack 1)")
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("the response type survives, so a native client still gets server_error", func(t *testing.T) {
-		httpHelper, authHelper, w, r := setup(t)
+		pageRenderer, authHelper, w, r := setup(t)
 
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "http://127.0.0.1/cb")
@@ -2172,18 +2172,18 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		input := testRedirectError("invalid_scope", "Invalid scope", "query",
 			"http://127.0.0.1:49152/cb", "", "code")
 
-		answerClientWithError(w, r, database, httpHelper, authHelper, nil, input)
+		answerClientWithError(w, r, database, pageRenderer, authHelper, nil, input)
 
 		assert.Contains(t, w.Header().Get("Location"), "http://127.0.0.1:49152/cb?error=server_error",
 			"the fallback runs the registration gate again with its own copy, so a dropped response type "+
 				"refuses the ephemeral port and the one error a native app most needs to see, the server's "+
 				"own fault, is the one it never receives (RFC 8252 7.3, RFC 6749 4.1.2.1)")
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("state survives", func(t *testing.T) {
-		httpHelper, authHelper, w, r := setup(t)
+		pageRenderer, authHelper, w, r := setup(t)
 
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -2191,7 +2191,7 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		input := testRedirectError("invalid_scope", "Invalid scope", "query", "https://legit.example/cb",
 			"abc123", "code")
 
-		answerClientWithError(w, r, database, httpHelper, authHelper, nil, input)
+		answerClientWithError(w, r, database, pageRenderer, authHelper, nil, input)
 
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "error=server_error")
@@ -2199,14 +2199,14 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 			"RFC 6749 4.1.2.1 requires state to be echoed on the error response when the request carried "+
 				"it, and the fallback swaps only the code and the description. Without it the client cannot "+
 				"match the failure to the request it made, which is the CSRF binding the parameter exists for")
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 	})
 }
 
 func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	t.Run("Valid implicit flow request with token response type", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2216,7 +2216,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -2274,14 +2274,14 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Valid implicit flow request with id_token token response type", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2291,7 +2291,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -2343,14 +2343,14 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Implicit flow disabled - validation error redirects with fragment", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2360,7 +2360,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
@@ -2407,14 +2407,14 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		assert.Contains(t, location, "https://example.com#")
 		assert.Contains(t, location, "error=unauthorized_client")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Client explicitly enables implicit flow overriding global", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2424,7 +2424,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
@@ -2477,7 +2477,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2531,7 +2531,7 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 
 func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	t.Run("Invalid id_token_hint bad signature - invalid_request", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2541,7 +2541,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=bad-jwt-token", nil)
@@ -2586,7 +2586,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Contains(t, location, "https://example.com?error=invalid_request")
 		assert.Contains(t, location, "error_description=")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2594,7 +2594,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("id_token_hint with wrong issuer - invalid_request", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2604,7 +2604,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-wrong-issuer", nil)
@@ -2656,7 +2656,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Contains(t, location, "https://example.com?error=invalid_request")
 		assert.Contains(t, location, "error_description=")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2666,7 +2666,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	// An access token of this server, with the right issuer and a real sub, is not an ID Token:
 	// refused and answered as the unparseable hint above is (#401).
 	t.Run("id_token_hint that is an access token - invalid_request", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2676,7 +2676,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=an-access-token", nil)
@@ -2731,7 +2731,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Equal(t, "invalid_request", location.Query().Get("error"))
 		assert.Equal(t, "The id_token_hint is invalid.", location.Query().Get("error_description"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2739,7 +2739,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("id_token_hint missing sub claim - invalid_request", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2749,7 +2749,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-no-sub", nil)
@@ -2800,7 +2800,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Contains(t, location, "https://example.com?error=invalid_request")
 		assert.Contains(t, location, "error_description=")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2808,7 +2808,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("Expired id_token_hint matching user - succeeds", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2818,7 +2818,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=expired-jwt-token", nil)
@@ -2891,7 +2891,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2900,7 +2900,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("SSO with id_token_hint matching session user - proceeds normally", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -2910,7 +2910,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-token", nil)
@@ -2983,7 +2983,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2992,7 +2992,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("SSO with id_token_hint different user - forces re-auth", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3002,7 +3002,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3077,7 +3077,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -3086,7 +3086,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with valid id_token_hint matching session user - succeeds", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3095,7 +3095,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=valid-jwt-token", nil)
@@ -3191,7 +3191,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), testBaseURL+"/auth/issue")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -3210,7 +3210,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	// Keep this case: once the predicate is right nothing else reaches this input, so it is the
 	// only thing that fails if the substring match comes back.
 	t.Run("prompt=none with a resource scope containing offline_access text - issues without consent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3219,7 +3219,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		const requestedScope = "openid res:offline_access_read"
 		userSubject := fake.UUID()
@@ -3307,7 +3307,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Contains(t, rr.Header().Get("Location"), testBaseURL+"/auth/issue")
 		database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -3318,7 +3318,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with valid id_token_hint different user - login_required", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3328,7 +3328,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3411,7 +3411,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
 			"the auth context must be cleared before the client response is committed")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -3420,7 +3420,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with a failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3430,7 +3430,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3498,7 +3498,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		// httpHelper has no InternalServerError expectation, so the mock fails the test if the
+		// pageRenderer has no InternalServerError expectation, so the mock fails the test if the
 		// handler answers with a bare 500 instead of redirecting the client.
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location := rr.Result().Header.Get("Location")
@@ -3506,7 +3506,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Contains(t, location, "error_description=Internal+server+error")
 		assert.NotContains(t, location, "login_required")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -3515,7 +3515,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3530,7 +3530,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3592,7 +3592,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -3600,7 +3600,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -3609,7 +3609,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3622,7 +3622,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3687,7 +3687,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		// above.
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
 		})).Once()
 
@@ -3695,7 +3695,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -3704,7 +3704,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("Rejects request parameter with request_not_supported", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3713,7 +3713,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=abc123&request=foo", nil)
@@ -3748,13 +3748,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Contains(t, location, "error=request_not_supported")
 		assert.Contains(t, location, "state=abc123")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Rejects request_uri parameter with request_uri_not_supported", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3763,7 +3763,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=xyz&request_uri=https://example.com/x", nil)
@@ -3797,13 +3797,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Contains(t, location, "error=request_uri_not_supported")
 		assert.Contains(t, location, "state=xyz")
 
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
 	})
 
 	t.Run("Rejects empty request parameter (key present, value empty)", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
@@ -3812,7 +3812,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&request=", nil)
@@ -3991,7 +3991,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
@@ -4000,7 +4000,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 			tokenParser := mocks_handlers.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+			handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(tc.redirectURI) +
@@ -4047,7 +4047,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 				authHelper.On("ClearAuthContext", rr, req).Return(nil)
 			}
 			if tc.want == blockedPage {
-				httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
+				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
 					"/auth_redirect_blocked.html", mock.Anything).Return(nil)
 			}
 
@@ -4068,7 +4068,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 				assert.Empty(t, location, "a withheld redirect must never become a Location: %s", tc.why)
 			}
 
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			authHelper.AssertExpectations(t)
 			authorizeValidator.AssertExpectations(t)
 		})
@@ -4108,7 +4108,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
@@ -4118,7 +4118,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 			tokenParser := mocks_handlers.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+			handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 			target := "/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb" +
@@ -4156,7 +4156,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			case "client":
 				authHelper.On("ClearAuthContext", rr, req).Return(nil)
 			case "500":
-				httpHelper.On("InternalServerError", rr, req, lookupErr).Return()
+				pageRenderer.On("InternalServerError", rr, req, lookupErr).Return()
 			}
 
 			handler.ServeHTTP(rr, req)
@@ -4174,7 +4174,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 					"a failed session lookup must not answer anybody: %s", tc.why)
 			}
 
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			authHelper.AssertExpectations(t)
 		})
 	}
@@ -4192,7 +4192,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 // and immediate paths byte-identical. That end-to-end equality belongs to seam 3; what is pinned
 // here is only that the parked value went through the filter at all.
 func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
@@ -4202,7 +4202,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	permissionChecker := mocks_handlers.NewPermissionChecker(t)
 	tokenParser := mocks_handlers.NewTokenParser(t)
 
-	handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+	handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil,
 		authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 	req := httptest.NewRequest("GET",
@@ -4306,7 +4306,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
@@ -4315,7 +4315,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 			tokenParser := mocks_handlers.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil,
+			handler := HandleAuthorizeGet(pageRenderer, authHelper, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
@@ -4355,7 +4355,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 
-			httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
 				"/auth_redirect_blocked.html", mock.Anything).Return(nil)
 
 			handler.ServeHTTP(rr, req)
@@ -4369,7 +4369,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			// and the second row would fail.
 			database.AssertNumberOfCalls(t, "GetRedirectURIsByClientId", tc.wantReads)
 
-			httpHelper.AssertExpectations(t)
+			pageRenderer.AssertExpectations(t)
 			authHelper.AssertExpectations(t)
 		})
 	}

@@ -20,7 +20,7 @@ type clientLogoDatabase interface {
 }
 
 func HandleClientLogoGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	database clientLogoDatabase,
 ) http.HandlerFunc {
 
@@ -33,7 +33,7 @@ func HandleClientLogoGet(
 
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, clientIdentifier)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -44,7 +44,7 @@ func HandleClientLogoGet(
 
 		clientLogo, err := database.GetClientLogoByClientId(r.Context(), nil, client.Id)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 

@@ -55,7 +55,7 @@ func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 //
 // Mirrors rejectResetPassword: audit, then render, at http.StatusBadRequest because a
 // submission was genuinely refused.
-func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w http.ResponseWriter,
+func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, w http.ResponseWriter,
 	r *http.Request, authContext *ceremony.AuthContext) {
 
 	const maxAuditedValueLength = 100
@@ -86,8 +86,8 @@ func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w ht
 		"_httpStatus": http.StatusBadRequest,
 	}
 
-	if err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
-		httpHelper.InternalServerError(w, r, err)
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }
 
@@ -109,7 +109,7 @@ func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w ht
 // The auth context is deliberately NOT touched, for rejectCeremonyMismatch's reason: the state it
 // holds belongs to the step the user is actually on, and advancing or clearing it here would let a
 // stale page cancel a live authorization. The client is not told either, for the same reason.
-func rejectAuthStateMismatch(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
+func rejectAuthStateMismatch(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
 	requiredState string, actualState string) {
 
 	slog.WarnContext(r.Context(), "auth state mismatch, refusing the request",
@@ -121,7 +121,7 @@ func rejectAuthStateMismatch(httpHelper HttpHelper, w http.ResponseWriter, r *ht
 		"_httpStatus": http.StatusBadRequest,
 	}
 
-	if err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
-		httpHelper.InternalServerError(w, r, err)
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }

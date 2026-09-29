@@ -27,7 +27,7 @@ type userinfoDatabase interface {
 }
 
 func HandleUserInfoGetPost(
-	httpHelper HttpHelper,
+	jsonWriter JSONWriter,
 	database userinfoDatabase,
 	auditLogger AuditLogger,
 	baseURL string,
@@ -37,19 +37,19 @@ func HandleUserInfoGetPost(
 		// Authentication and authorization handled by middleware
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("unable to get validated token from context"))
+			jsonWriter.JsonError(w, r, errs.New("unable to get validated token from context"))
 			return
 		}
 
 		sub := jwtToken.GetStringClaim("sub")
 		if len(sub) == 0 {
-			httpHelper.JsonError(w, r, errs.New("unable to get the sub claim from the access token"))
+			jsonWriter.JsonError(w, r, errs.New("unable to get the sub claim from the access token"))
 			return
 		}
 
 		user, err := database.GetUserBySubject(r.Context(), nil, sub)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonWriter.JsonError(w, r, err)
 			return
 		}
 
@@ -61,7 +61,7 @@ func HandleUserInfoGetPost(
 			// permitted but told the client to retry a request that can only fail again,
 			// where 401 tells it to obtain a new token, which is the whole point of the
 			// distinction (#279 decision 14).
-			httpHelper.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+			jsonWriter.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
 				"invalid_token", "The user could not be found.", http.StatusUnauthorized,
 				`Bearer error="invalid_token"`))
 			return
@@ -75,7 +75,7 @@ func HandleUserInfoGetPost(
 			// 401 invalid_token, for the reason the not-found branch above gives: the
 			// token is no longer valid for this account and the client's remedy is a new
 			// one, not a retry (#279 decision 14).
-			httpHelper.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+			jsonWriter.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
 				"invalid_token", "The user account is disabled.", http.StatusUnauthorized,
 				`Bearer error="invalid_token"`))
 			return
@@ -83,19 +83,19 @@ func HandleUserInfoGetPost(
 
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonWriter.JsonError(w, r, err)
 			return
 		}
 
 		err = database.GroupsLoadAttributes(r.Context(), nil, user.Groups)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonWriter.JsonError(w, r, err)
 			return
 		}
 
 		err = database.UserLoadAttributes(r.Context(), nil, user)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonWriter.JsonError(w, r, err)
 			return
 		}
 
@@ -123,6 +123,6 @@ func HandleUserInfoGetPost(
 		mapper.AddGroupClaims(claims, user, scopes)
 		mapper.AddAttributeClaims(claims, user, scopes)
 
-		httpHelper.EncodeJson(w, r, claims)
+		jsonWriter.EncodeJson(w, r, claims)
 	}
 }

@@ -41,11 +41,11 @@ type authIssueDatabase interface {
 }
 
 func HandleIssueGet(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	templateFS fs.FS,
 	codeIssuer CodeIssuer,
-	tokenIssuer TokenIssuer,
+	implicitTokenIssuer ImplicitTokenIssuer,
 	database authIssueDatabase,
 	auditLogger AuditLogger,
 	userSessionManager UserSessionManager,
@@ -61,14 +61,14 @@ func HandleIssueGet(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		requiredState := ceremony.AuthStateReadyToIssueCode
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -90,7 +90,7 @@ func HandleIssueGet(
 		// again.
 		issuingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -107,7 +107,7 @@ func HandleIssueGet(
 		if issuingClient != nil {
 			err = database.ClientLoadRedirectURIs(r.Context(), nil, issuingClient)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			for _, redirectURI := range issuingClient.RedirectURIs {
@@ -155,12 +155,12 @@ func HandleIssueGet(
 			// Built directly rather than through redirectErrorFromAuthContext, which fills in an
 			// error code, a description, a state and a response mode: this page carries none of
 			// them, and naming the two fields it does read says so.
-			err = renderRedirectBlocked(httpHelper, w, r, redirectErrorInput{
+			err = renderRedirectBlocked(pageRenderer, w, r, redirectErrorInput{
 				client:      issuingClient,
 				redirectURI: authContext.RedirectURI,
 			})
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -177,7 +177,7 @@ func HandleIssueGet(
 		if authContext.IdTokenHintSub != "" {
 			user, err = database.GetUserById(r.Context(), nil, authContext.UserId)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			if user == nil || user.Subject != authContext.IdTokenHintSub {
@@ -204,20 +204,20 @@ func HandleIssueGet(
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 						"error", refusalErr)
-					refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
+					refusalErr = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 					if refusalErr != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
-						httpHelper.InternalServerError(w, r, refusalErr)
+						pageRenderer.InternalServerError(w, r, refusalErr)
 					}
 					return
 				}
 
-				refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				refusalErr = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 					redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 						"The authenticated user does not match the id_token_hint"))
 				if refusalErr != nil {
-					httpHelper.InternalServerError(w, r, refusalErr)
+					pageRenderer.InternalServerError(w, r, refusalErr)
 					return
 				}
 				return
@@ -268,7 +268,7 @@ func HandleIssueGet(
 		if sessionIdentifier != "" {
 			ambientSession, err = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
@@ -290,7 +290,7 @@ func HandleIssueGet(
 		// ceremony would restart at level 1, mint a fresh session and fail again (#241).
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		sessionIsValid := userSessionManager.HasValidUserSession(ambientSession,
@@ -334,7 +334,7 @@ func HandleIssueGet(
 			}
 
 			refuseIssuanceUnusableSession(w, r, shape, authContext, issuingClient, ambientSession,
-				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger, baseURL)
+				sessionIdentifier, pageRenderer, authHelper, templateFS, database, auditLogger, baseURL)
 			return
 		}
 
@@ -353,12 +353,12 @@ func HandleIssueGet(
 		if user == nil {
 			user, err = database.GetUserById(r.Context(), nil, authContext.UserId)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 		}
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errs.Errorf("user %v not found", authContext.UserId))
+			pageRenderer.InternalServerError(w, r, errs.Errorf("user %v not found", authContext.UserId))
 			return
 		}
 
@@ -373,7 +373,7 @@ func HandleIssueGet(
 		}
 		effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), *scopeField, user)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -402,20 +402,20 @@ func HandleIssueGet(
 				// this condition (#141).
 				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 					"error", err)
-				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 					redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 				if err != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 				}
 				return
 			}
 
-			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+			err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied",
 					"The user is not authorized to access any of the requested scopes"))
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -429,9 +429,9 @@ func HandleIssueGet(
 		*scopeField = effectiveScope
 
 		if isImplicitFlow {
-			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, user, settings, authHelper, tokenIssuer, auditLogger)
+			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, user, settings, authHelper, implicitTokenIssuer, auditLogger)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
@@ -518,7 +518,7 @@ func HandleIssueGet(
 		})
 		if errors.Is(err, errIssuanceRefused) {
 			refuseIssuanceUnusableSession(w, r, sessionGone, authContext, issuingClient, ambientSession,
-				sessionIdentifier, httpHelper, authHelper, templateFS, database, auditLogger, baseURL)
+				sessionIdentifier, pageRenderer, authHelper, templateFS, database, auditLogger, baseURL)
 			return
 		}
 
@@ -528,7 +528,7 @@ func HandleIssueGet(
 		// fate indeterminate, which is the same contract that helper already carries, and the
 		// client is answered with a 500 rather than a code.
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
@@ -540,12 +540,12 @@ func HandleIssueGet(
 
 		err = authHelper.ClearAuthContext(w, r)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		err = issueAuthCode(w, r, templateFS, code, authContext.ResponseMode)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 		}
 	}
 }
@@ -604,7 +604,7 @@ func refuseIssuanceUnusableSession(
 	issuingClient *models.Client,
 	ambientSession *models.UserSession,
 	sessionIdentifier string,
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	templateFS fs.FS,
 	database authIssueDatabase,
@@ -672,19 +672,19 @@ func refuseIssuanceUnusableSession(
 			// server_error for exactly this condition (#141).
 			slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
 				"error", err)
-			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+			err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 				redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
 			if err != nil {
 				// Nowhere left to send the client, so the 500 is the last resort here.
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
-		err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+		err = redirToClientWithError(w, r, database, pageRenderer, templateFS,
 			redirectErrorFromAuthContext(authContext, issuingClient, oidc.ErrorLoginRequired,
 				"User authentication is required"))
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		return
@@ -707,7 +707,7 @@ func refuseIssuanceUnusableSession(
 	authContext.AuthState = ceremony.AuthStateRequiresLevel1
 	err := authHelper.SaveAuthContext(w, r, authContext)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, err)
+		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 	http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
@@ -728,7 +728,7 @@ func handleImplicitFlow(
 	user *models.User,
 	settings *models.Settings,
 	authHelper AuthHelper,
-	tokenIssuer TokenIssuer,
+	implicitTokenIssuer ImplicitTokenIssuer,
 	auditLogger AuditLogger,
 ) error {
 	// Determine what tokens to issue based on response_type
@@ -763,7 +763,7 @@ func handleImplicitFlow(
 		AuthStateGeneration: authContext.AuthStateGeneration,
 	}
 
-	tokenResponse, err := tokenIssuer.GenerateTokenResponseForImplicit(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
+	tokenResponse, err := implicitTokenIssuer.GenerateTokenResponseForImplicit(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
 	if err != nil {
 		return err
 	}
@@ -914,7 +914,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		// Render into a buffer, not straight to w, matching the error emitter's twin. Execute
 		// writes as it walks the template, so a template that parses and then fails part way
 		// through leaves a partial body and an implicit 200 already on the wire; the caller answers
-		// an error from here with httpHelper.InternalServerError, and a WriteHeader after the
+		// an error from here with pageRenderer.InternalServerError, and a WriteHeader after the
 		// response is committed changes nothing, so the client would be told 200 for a page that
 		// was never finished. Here that half-written page would be a form carrying an
 		// authorization code with no submit to deliver it. form_post.html is operator supplied

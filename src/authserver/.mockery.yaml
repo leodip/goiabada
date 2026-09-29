@@ -49,6 +49,10 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
+      ImplicitTokenIssuer:
+        config:
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       TokenParser:
         config:
           dir: "./internal/handlers/mocks"
@@ -61,7 +65,11 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
-      HttpHelper:
+      PageRenderer:
+        config:
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
+      JSONWriter:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"

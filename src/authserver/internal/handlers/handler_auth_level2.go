@@ -21,7 +21,7 @@ type authLevel2Database interface {
 }
 
 func HandleAuthLevel2Get(
-	httpHelper HttpHelper,
+	pageRenderer PageRenderer,
 	authHelper AuthHelper,
 	database authLevel2Database,
 	baseURL string,
@@ -36,14 +36,14 @@ func HandleAuthLevel2Get(
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
 			} else {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 			}
 			return
 		}
 
 		requiredState := ceremony.AuthStateRequiresLevel2
 		if authContext.AuthState != requiredState {
-			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
+			rejectAuthStateMismatch(pageRenderer, w, r, requiredState, authContext.AuthState)
 			return
 		}
 
@@ -52,17 +52,17 @@ func HandleAuthLevel2Get(
 
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		if client == nil {
-			httpHelper.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
+			pageRenderer.InternalServerError(w, r, errs.Errorf("client %v not found", authContext.ClientId))
 			return
 		}
 
 		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 		// GetUserById answers (nil, nil) for a row that is not there, so a user deleted
@@ -73,7 +73,7 @@ func HandleAuthLevel2Get(
 		// "every handler nil-checks except this one" is the kind of gap that regresses
 		// (#242 decision 5).
 		if user == nil {
-			httpHelper.InternalServerError(w, r, errs.New("user not found"))
+			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
 			return
 		}
 
@@ -101,7 +101,7 @@ func HandleAuthLevel2Get(
 				authContext.AuthState = ceremony.AuthStateLevel2OTP
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 					return
 				}
 				http.Redirect(w, r, baseURL+"/auth/otp", http.StatusFound)
@@ -110,7 +110,7 @@ func HandleAuthLevel2Get(
 				authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+					pageRenderer.InternalServerError(w, r, err)
 					return
 				}
 				http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)
@@ -120,13 +120,13 @@ func HandleAuthLevel2Get(
 			authContext.AuthState = ceremony.AuthStateLevel2OTP
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			http.Redirect(w, r, baseURL+"/auth/otp", http.StatusFound)
 		default:
 			// we should never reach this point
-			httpHelper.InternalServerError(w, r, errs.New("invalid targetAcrLevel: "+targetAcrLevel.String()))
+			pageRenderer.InternalServerError(w, r, errs.New("invalid targetAcrLevel: "+targetAcrLevel.String()))
 		}
 	}
 }

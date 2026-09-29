@@ -46,7 +46,7 @@ type tokenDatabase interface {
 }
 
 func HandleTokenPost(
-	httpHelper HttpHelper,
+	jsonWriter JSONWriter,
 	userSessionManager UserSessionManager,
 	database tokenDatabase,
 	tokenIssuer TokenIssuer,
@@ -61,7 +61,7 @@ func HandleTokenPost(
 		// record for every one. With the ROPC limiter on, its own ParseForm meets the failure
 		// first and this one succeeds on an empty form, which is refused below for what it lacks.
 		if err := r.ParseForm(); err != nil {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 				"The request body could not be parsed.", http.StatusBadRequest))
 			return
 		}
@@ -69,7 +69,7 @@ func HandleTokenPost(
 		// Extract client credentials - supports both client_secret_basic and client_secret_post
 		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(r)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			jsonWriter.JsonError(w, r, err)
 			return
 		}
 
@@ -109,7 +109,7 @@ func HandleTokenPost(
 		// refresh preserves the original token's scope, ROPC defaults to "openid"), so naming any
 		// one of those would be wrong for the other two.
 		if rawScope != "" && normalizedScope == "" && grantTypeConsumesScope(grantType) {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				"The 'scope' parameter was provided but contains no scopes. Either omit it entirely or supply one or more scopes separated by spaces.",
 				http.StatusBadRequest))
 			return
@@ -132,7 +132,7 @@ func HandleTokenPost(
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoSettings)
+			jsonWriter.JsonError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, &input)
@@ -147,10 +147,10 @@ func HandleTokenPost(
 			var reused *protocolvalidation.AuthCodeReusedError
 			if errors.As(err, &reused) {
 				if revokeErr := revokeAndAuditAuthCodeReuse(r.Context(), database, auditLogger, reused.Code); revokeErr != nil {
-					httpHelper.JsonError(w, r, revokeErr)
+					jsonWriter.JsonError(w, r, revokeErr)
 					return
 				}
-				httpHelper.JsonError(w, r, reused.Detail)
+				jsonWriter.JsonError(w, r, reused.Detail)
 				return
 			}
 			// Check if user is disabled and log audit event
@@ -259,7 +259,7 @@ func HandleTokenPost(
 				})
 			}
 
-			httpHelper.JsonError(w, r, err)
+			jsonWriter.JsonError(w, r, err)
 			return
 		}
 
@@ -277,7 +277,7 @@ func HandleTokenPost(
 			// lived, and it is the price of never issuing two token sets from one code.
 			claimed, err := database.MarkCodeAsUsed(r.Context(), nil, validateResult.CodeEntity.Id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 			if !claimed {
@@ -300,14 +300,14 @@ func HandleTokenPost(
 				slog.DebugContext(r.Context(), "code could not be claimed, rejecting the redemption",
 					"grant_type", "authorization_code",
 					"code_id", validateResult.CodeEntity.Id)
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"Code is invalid.", http.StatusBadRequest))
 				return
 			}
 
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(), settings, validateResult.CodeEntity)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 
@@ -317,13 +317,13 @@ func HandleTokenPost(
 
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
-			httpHelper.EncodeJson(w, r, tokenResp)
+			jsonWriter.EncodeJson(w, r, tokenResp)
 			return
 
 		case "client_credentials":
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(), settings, validateResult.Client, validateResult.Scope)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 
@@ -337,7 +337,7 @@ func HandleTokenPost(
 
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
-			httpHelper.EncodeJson(w, r, tokenResp)
+			jsonWriter.EncodeJson(w, r, tokenResp)
 			return
 
 		case "refresh_token":
@@ -355,7 +355,7 @@ func HandleTokenPost(
 				// window leaves the defining theft scenario uncontained.
 				revokedCount, err := database.RevokeRefreshTokenFamily(r.Context(), nil, refreshToken.FirstRefreshTokenJti)
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					jsonWriter.JsonError(w, r, err)
 					return
 				}
 
@@ -401,7 +401,7 @@ func HandleTokenPost(
 						"refresh_token_id", refreshToken.Id)
 				}
 
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
@@ -428,12 +428,12 @@ func HandleTokenPost(
 				// Same ROPC marker the containment block above reads to set replayFlow, so
 				// the two cannot disagree about what an ROPC token is.
 				if !validateResult.Client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled) {
-					httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
+					jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
 						"unauthorized_client", protocolvalidation.ROPCNotAuthorizedErrorMsg, http.StatusBadRequest))
 					return
 				}
 			} else if !validateResult.Client.AuthorizationCodeEnabled {
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
+				jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
 					"unauthorized_client", authCodeNotAuthorizedErrorMsg, http.StatusBadRequest))
 				return
 			}
@@ -471,14 +471,14 @@ func HandleTokenPost(
 			// a malicious replay from the token and the row alone.
 			claimed, err := database.MarkRefreshTokenAsRevoked(r.Context(), nil, refreshToken.Id)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 			if !claimed {
 				slog.DebugContext(r.Context(), "refresh token was no longer live at claim time, rejecting",
 					"grant_type", "refresh_token",
 					"refresh_token_id", refreshToken.Id)
-				httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 					"This refresh token has been revoked.", http.StatusBadRequest))
 				return
 			}
@@ -496,7 +496,7 @@ func HandleTokenPost(
 
 				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefreshROPC(r.Context(), settings, ropcInput)
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					jsonWriter.JsonError(w, r, err)
 					return
 				}
 
@@ -517,7 +517,7 @@ func HandleTokenPost(
 
 				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefresh(r.Context(), settings, refreshInput)
 				if err != nil {
-					httpHelper.JsonError(w, r, err)
+					jsonWriter.JsonError(w, r, err)
 					return
 				}
 
@@ -531,7 +531,7 @@ func HandleTokenPost(
 					userSession, err := userSessionManager.BumpUserSession(r.Context(), refreshToken.SessionIdentifier,
 						refreshToken.Code.ClientId, "", "", "")
 					if err != nil {
-						httpHelper.JsonError(w, r, err)
+						jsonWriter.JsonError(w, r, err)
 						return
 					}
 
@@ -550,7 +550,7 @@ func HandleTokenPost(
 
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
-			httpHelper.EncodeJson(w, r, tokenResp)
+			jsonWriter.EncodeJson(w, r, tokenResp)
 			return
 
 		case "password":
@@ -571,7 +571,7 @@ func HandleTokenPost(
 
 			tokenResp, err := tokenIssuer.GenerateTokenResponseForROPC(r.Context(), settings, ropcInput)
 			if err != nil {
-				httpHelper.JsonError(w, r, err)
+				jsonWriter.JsonError(w, r, err)
 				return
 			}
 
@@ -582,11 +582,11 @@ func HandleTokenPost(
 
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Pragma", "no-cache")
-			httpHelper.EncodeJson(w, r, tokenResp)
+			jsonWriter.EncodeJson(w, r, tokenResp)
 			return
 
 		default:
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type",
+			jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type",
 				"Unsupported grant_type.", http.StatusBadRequest))
 			return
 		}

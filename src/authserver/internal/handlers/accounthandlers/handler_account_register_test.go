@@ -46,8 +46,8 @@ func assertSelfRegistrationDisabledLogged(t *testing.T, logs *logtest.SlogCaptur
 
 func TestHandleAccountRegisterGet(t *testing.T) {
 	t.Run("Self registration enabled", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
-		handler := HandleAccountRegisterGet(httpHelper)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		handler := HandleAccountRegisterGet(pageRenderer)
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -59,17 +59,17 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("Self registration disabled", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
-		handler := HandleAccountRegisterGet(httpHelper)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		handler := HandleAccountRegisterGet(pageRenderer)
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -81,19 +81,19 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
-		httpHelper.On("NotFound", rr, req).Return().Once()
+		pageRenderer.On("NotFound", rr, req).Return().Once()
 		logs := logtest.CaptureSlog(t)
 
 		handler.ServeHTTP(rr, req)
 
 		assertSelfRegistrationDisabledLogged(t, logs)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 }
 
 func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("No email and email is required", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -101,7 +101,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/register", nil)
 		rr := httptest.NewRecorder()
@@ -113,18 +113,18 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Email is required."
 		}))
 	})
 
 	t.Run("Invalid email given", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -132,7 +132,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "invalid-email")
@@ -148,18 +148,18 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "invalid-email").Return(customerrors.NewErrorDetail("", "Please enter a valid email address."))
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Please enter a valid email address."
 		}))
 	})
 
 	t.Run("Email is already registered", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -167,7 +167,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "existing@example.com")
@@ -184,18 +184,18 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 
 		emailValidator.On("ValidateEmailAddress", "existing@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&models.User{}, nil)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Apologies, but this email address is already registered."
 		}))
 	})
 
 	t.Run("Pre registration already exists", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -203,7 +203,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "preregistered@example.com")
@@ -221,18 +221,18 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "preregistered@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(&models.PreRegistration{}, nil)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Apologies, but this email address is already registered."
 		}))
 	})
 
 	t.Run("Password not given", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -240,7 +240,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -258,12 +258,12 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Password is required."
 		}))
 	})
@@ -276,7 +276,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	// and userCreator are given no expectations, so reaching either fails the test on an
 	// unexpected call (#202).
 	t.Run("Password in the query alone", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -284,7 +284,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		// The email stays in the body, so the handler reaches the credential read the same
 		// way the neighbouring case does.
@@ -308,12 +308,12 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Password is required."
 		}))
 		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
@@ -329,7 +329,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	// the account would be created. passwordValidator and userCreator are given no
 	// expectations, so reaching either fails the test on an unexpected call (#202).
 	t.Run("Password confirmation in the query alone", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -337,7 +337,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -359,12 +359,12 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Password confirmation is required."
 		}))
 		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
@@ -374,7 +374,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	})
 
 	t.Run("Password confirmation is required", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -382,7 +382,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -401,18 +401,18 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Password confirmation is required."
 		}))
 	})
 
 	t.Run("Password confirmation does not match", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -420,7 +420,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -440,18 +440,18 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "The password confirmation does not match the password."
 		}))
 	})
 
 	t.Run("ValidatePassword fails", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -459,7 +459,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -480,18 +480,18 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "short").Return(customerrors.NewErrorDetail("", "The minimum length for the password is 8 characters"))
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "The minimum length for the password is 8 characters"
 		}))
 	})
 
 	t.Run("Self registration is disabled", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -499,7 +499,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -517,7 +517,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		// The not-found page, RFC 9110 section 15.5.5, rather than the 500 page it used to be.
-		httpHelper.On("NotFound", rr, req).Run(func(args mock.Arguments) {
+		pageRenderer.On("NotFound", rr, req).Run(func(args mock.Arguments) {
 			w := args.Get(0).(http.ResponseWriter)
 			w.WriteHeader(http.StatusNotFound)
 		}).Return().Once()
@@ -527,7 +527,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 
 		assert.Equal(t, http.StatusNotFound, rr.Code)
 		assertSelfRegistrationDisabledLogged(t, logs)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 
 		// Ensure that no other mock methods were called
 		emailValidator.AssertNotCalled(t, "ValidateEmailAddress", mock.Anything)
@@ -537,7 +537,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	})
 
 	t.Run("SMTP enabled and requires email verification", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -545,7 +545,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -597,7 +597,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return details["email"] == "test@example.com"
 		})).Return()
 
-		httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_register_activate.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_register_activate.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			link, ok := data["link"].(string)
 			if !ok {
 				return false
@@ -615,7 +615,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 				return input.To == "test@example.com" && input.Subject == "Activate your account"
 			})).Return(nil)
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_activation.html", mock.Anything).Return(nil)
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_activation.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -626,11 +626,11 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		passwordValidator.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 	})
 
 	t.Run("Direct registration without email verification", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -638,7 +638,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -669,7 +669,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return details["email"] == "test@example.com"
 		})).Return()
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
 			return ok && adminConsoleBaseUrl == testAdminConsoleBaseURL
 		})).Return(nil)
@@ -683,17 +683,17 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		passwordValidator.AssertExpectations(t)
 		userCreator.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 
 		// Ensure that these methods were not called
 		emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
-		httpHelper.AssertNotCalled(t, "RenderTemplateToBuffer",
+		pageRenderer.AssertNotCalled(t, "RenderTemplateToBuffer",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("SMTP enabled but does not require email verification", func(t *testing.T) {
-		httpHelper := mocks_handlers.NewHttpHelper(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -701,7 +701,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -737,7 +737,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return details["email"] == "test@example.com"
 		})).Return()
 
-		httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			link, ok := data["link"].(string)
 			return ok && link == testAdminConsoleBaseURL+"/account/profile"
 		})).Return(bytes.NewBuffer([]byte("email content")), nil)
@@ -747,7 +747,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 				return input.To == "test@example.com" && input.Subject == "Welcome!"
 			})).Return(nil)
 
-		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
 			return ok && adminConsoleBaseUrl == testAdminConsoleBaseURL
 		})).Return(nil)
@@ -762,7 +762,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		userCreator.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
-		httpHelper.AssertExpectations(t)
+		pageRenderer.AssertExpectations(t)
 
 		// Ensure no pre-registration is created on the no-verification path
 		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
@@ -797,7 +797,7 @@ func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
 			database := mocks_data.NewDatabase(t)
 			userCreator := mocks_accounthandlers.NewUserCreator(t)
 			emailValidator := mocks_accounthandlers.NewEmailValidator(t)
@@ -805,7 +805,7 @@ func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing
 			emailSender := mocks_handlers.NewEmailSender(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator,
+			handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator,
 				passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			form := url.Values{}
@@ -818,13 +818,13 @@ func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing
 			req = req.WithContext(ctx)
 
 			emailValidator.On("ValidateEmailAddress", "invalid-email").Return(testCase.err)
-			httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
 				"/account_register.html", mock.Anything).Return(nil)
 
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			httpHelper.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html",
+			pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html",
 				"/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 					return data["error"] == testCase.want
 				}))
