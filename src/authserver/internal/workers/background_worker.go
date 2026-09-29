@@ -23,21 +23,18 @@ const (
 	// not leave the next one late.
 	pollInterval = 5 * time.Minute
 
-	// usedCodeCleanupGrace keeps the used-code sweep away from codes that are still
-	// being redeemed. The token endpoint marks a code used and only then inserts the
-	// refresh token referencing it, so during token generation a healthy code looks
-	// exactly like a dead one to that sweep, and deleting it makes the insert fail on
+	// codeCleanupGrace keeps the code sweep away from codes that are still being
+	// redeemed. The token endpoint marks a code used and only then inserts the refresh
+	// token referencing it, so during token generation a healthy code looks exactly
+	// like a dead one to that sweep, and deleting it makes the insert fail on
 	// fk_refresh_tokens_code. The client gets a 500 instead of its tokens.
 	//
 	// Codes expire after 60 seconds (token_validator.go), so anything older than that
 	// can never be redeemed and can never gain a refresh token. Five minutes is that
-	// bound with generous room for clock skew and slow signing.
-	//
-	// The same cutoff also bounds the second class that sweep reaps, codes revoked
-	// while still unredeemed when a session was ended (#129). There the reason is only
-	// the 60 second lifetime rather than the foreign key race, so this value is already
-	// past what that class needs.
-	usedCodeCleanupGrace = 5 * time.Minute
+	// bound with generous room for clock skew and slow signing. It bounds every class
+	// the sweep reaps, used, revoked or never redeemed (#129, #436): past the lifetime
+	// each of them is dead for the same reason.
+	codeCleanupGrace = 5 * time.Minute
 
 	// startupDelay holds the first poll back so the server can finish coming up
 	// first. Unlike the unconditional sleep this replaces, it is interruptible.
@@ -62,7 +59,7 @@ type backgroundWorkerDatabase interface {
 	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
 	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
-	DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
+	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 }
@@ -161,8 +158,8 @@ func (w *Worker) poll(ctx context.Context) {
 //
 // Giving up single-flight is affordable here and is not affordable for the sweeps inside
 // performTask. This delete is idempotent and keyed on an indexed column, so two instances
-// running it in the same instant do the same harmless thing; the used-code sweep beside it
-// races the token endpoint's foreign key, which is what usedCodeCleanupGrace exists for.
+// running it in the same instant do the same harmless thing; the code sweep beside it
+// races the token endpoint's foreign key, which is what codeCleanupGrace exists for.
 // Do not move this call into performTask (#266 decision 19).
 func (w *Worker) reapBrowserSessions(ctx context.Context) {
 	if err := w.database.DeleteExpiredBrowserSessions(ctx, nil, time.Now().UTC()); err != nil {
@@ -233,11 +230,11 @@ func (w *Worker) performTask(ctx context.Context) {
 		return
 	}
 
-	err = w.database.DeleteUsedCodesWithoutRefreshTokens(ctx, nil, time.Now().UTC().Add(-usedCodeCleanupGrace))
+	err = w.database.DeleteCodesWithoutRefreshTokens(ctx, nil, time.Now().UTC().Add(-codeCleanupGrace))
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to delete used codes without refresh tokens", "error", err)
+		slog.ErrorContext(ctx, "unable to delete codes without refresh tokens", "error", err)
 	} else {
-		slog.InfoContext(ctx, "deleted used codes without refresh tokens")
+		slog.InfoContext(ctx, "deleted codes without refresh tokens")
 	}
 
 	if cancelled(ctx) {

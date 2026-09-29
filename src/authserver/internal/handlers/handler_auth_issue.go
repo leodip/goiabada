@@ -481,7 +481,8 @@ func HandleIssueGet(
 		// code, and that is a retry rather than a second grant. The code row stores only the
 		// plaintext's SHA-256 (models.Code.Code is db:"-"), and this 500 is answered before
 		// issueAuthCode, so the first code reaches nobody and cannot be redeemed; the reload's is
-		// the only one delivered. Clearing before minting would strand the user on a transient
+		// the only one delivered, and the worker's code sweep deletes the orphaned row once it is
+		// past its grace cutoff. Clearing before minting would strand the user on a transient
 		// mint fault where a reload now retries (#248 part 6, #436).
 		err = ceremonyStore.ClearAuthContext(w, r)
 		if err != nil {

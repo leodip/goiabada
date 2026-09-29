@@ -581,184 +581,187 @@ func createTestCodeOn(t *testing.T, db data.Database, clientId, userId int64) *m
 	return code
 }
 
-func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
+// createCodeRefreshToken inserts a refresh token descended from code. An expired one is past
+// both expires_at and max_lifetime, so DeleteExpiredRefreshTokens removes it.
+func createCodeRefreshToken(t *testing.T, code *models.Code, expired bool) *models.RefreshToken {
+	t.Helper()
+	offset := time.Hour
+	if expired {
+		offset = -time.Hour
+	}
+	refreshToken := &models.RefreshToken{
+		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
+		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
+		SessionIdentifier: code.SessionIdentifier,
+		RefreshTokenType:  "Bearer",
+		Scope:             "openid profile offline_access",
+		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Add(offset - time.Hour), Valid: true},
+		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(offset), Valid: true},
+		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(offset), Valid: true},
+		Revoked:           false,
+	}
+	if err := database.CreateRefreshToken(context.Background(), nil, refreshToken); err != nil {
+		t.Fatalf("Failed to create a refresh token for code %d: %v", code.Id, err)
+	}
+	return refreshToken
+}
+
+// TestDeleteCodesWithoutRefreshTokens holds the sweep to its one rule: every code past the
+// cutoff that no refresh token references is deleted, whether it was used, revoked or never
+// redeemed, and every code a refresh token references survives, revoked or not (#130, #436).
+//
+// A ROPC refresh token, whose code_id is NULL, is present for the whole test. Under the NOT IN
+// predicate this replaced, that one row made `id NOT IN (..., NULL)` UNKNOWN for every code, so
+// a used code with no refresh token was never reaped on any deployment that had issued a ROPC
+// token (#130). The used-without-token row is the one that fails if the NULL-unsafe form comes
+// back.
+//
+// The cutoff is varied rather than the rows, because Code.CreatedAt is dont-update tagged and a
+// row cannot be aged through the ORM: first the cutoff the worker passes, which every row is
+// younger than, then one every row is past.
+func TestDeleteCodesWithoutRefreshTokens(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	// Test Case 1: Used code without refresh token should be deleted
-	code1 := createTestCode(t, client.Id, user.Id)
-	code1.Used = true
-	err := database.UpdateCode(context.Background(), nil, code1)
-	if err != nil {
-		t.Fatalf("Failed to update code1 as used: %v", err)
-	}
-
-	// Test Case 2: Used code with refresh token should not be deleted
-	code2 := createTestCode(t, client.Id, user.Id)
-	code2.Used = true
-	err = database.UpdateCode(context.Background(), nil, code2)
-	if err != nil {
-		t.Fatalf("Failed to update code2 as used: %v", err)
-	}
-
-	// Create refresh token for code2
-	refreshToken := &models.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: code2.Id, Valid: true},
+	ropcToken := &models.RefreshToken{
+		CodeId:            sql.NullInt64{Valid: false},
+		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
 		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
-		SessionIdentifier: "test_session_" + fake.LetterN(6),
+		SessionIdentifier: "",
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour), Valid: true},
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true},
-		Revoked:           false,
 	}
-	err = database.CreateRefreshToken(context.Background(), nil, refreshToken)
-	if err != nil {
-		t.Fatalf("Failed to create refresh token: %v", err)
+	if err := database.CreateRefreshToken(context.Background(), nil, ropcToken); err != nil {
+		t.Fatalf("Failed to create the ROPC refresh token: %v", err)
+	}
+	// Removed at the end so it cannot change what a later test in this package proves.
+	t.Cleanup(func() {
+		if err := database.DeleteRefreshToken(context.Background(), nil, ropcToken.Id); err != nil {
+			t.Errorf("Failed to remove the ROPC refresh token: %v", err)
+		}
+	})
+
+	usedNoToken := createTestCode(t, client.Id, user.Id)
+	markCodeUsed(t, usedNoToken)
+
+	unused := createTestCode(t, client.Id, user.Id)
+
+	revokedUnused := createTestCode(t, client.Id, user.Id)
+	revokeCodesOf(t, revokedUnused)
+
+	revokedUsedNoToken := createTestCode(t, client.Id, user.Id)
+	revokeCodesOf(t, revokedUsedNoToken)
+	markCodeUsed(t, revokedUsedNoToken)
+
+	usedWithToken := createTestCode(t, client.Id, user.Id)
+	markCodeUsed(t, usedWithToken)
+	createCodeRefreshToken(t, usedWithToken, false)
+
+	// Revoked after redemption, with an unrevoked refresh token descended from it: a rotation
+	// that validated before a session termination inserts its child afterwards, so the
+	// termination's own token sweep never saw it and the code's revoked marker is the only thing
+	// that rejects it (#129). The stake is higher than losing a marker: fk_refresh_tokens_code is
+	// ON DELETE CASCADE, so a sweep reaching this code would delete the very descendant the marker
+	// exists to reject.
+	revokedUsedWithToken := createTestCode(t, client.Id, user.Id)
+	revokeCodesOf(t, revokedUsedWithToken)
+	markCodeUsed(t, revokedUsedWithToken)
+	createCodeRefreshToken(t, revokedUsedWithToken, false)
+
+	// Used, with a refresh token that has expired but is not yet swept: referenced until
+	// DeleteExpiredRefreshTokens runs, dead after.
+	usedExpiredToken := createTestCode(t, client.Id, user.Id)
+	markCodeUsed(t, usedExpiredToken)
+	createCodeRefreshToken(t, usedExpiredToken, true)
+
+	rows := []struct {
+		code   *models.Code
+		what   string
+		reaped bool
+	}{
+		{usedNoToken, "a used code with no refresh token (#130)", true},
+		{unused, "an unused, unrevoked code, an abandoned authorization (#436)", true},
+		{revokedUnused, "a code revoked while still unredeemed (#129)", true},
+		{revokedUsedNoToken, "a revoked, redeemed code with no refresh token", true},
+		{usedWithToken, "a used code a refresh token references", false},
+		{revokedUsedWithToken, "a revoked, redeemed code a refresh token references", false},
+		{usedExpiredToken, "a used code whose expired refresh token is not yet swept", false},
 	}
 
-	// Test Case 3: Unused code should not be deleted regardless of refresh token
-	code3 := createTestCode(t, client.Id, user.Id)
-	// code3 remains unused (Used = false by default)
-
-	// Cutoff in the future, so every code qualifies on age and these assertions keep
-	// testing what they were written to test: the used/refresh-token predicate. The age
-	// cutoff itself is covered by TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff.
-	err = database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour))
-	if err != nil {
-		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
+	// The worker's cutoff. Every row was created seconds ago, used or unused, so every row
+	// survives: this is what keeps the sweep away from a code mid-redemption.
+	if err := database.DeleteCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(-5*time.Minute)); err != nil {
+		t.Fatalf("Failed to run the sweep with the worker's cutoff: %v", err)
+	}
+	for _, row := range rows {
+		assertCodeExists(t, row.code.Id, true, row.what+", newer than the cutoff")
 	}
 
-	// Verify Test Case 1: Used code without refresh token should be deleted
-	deletedCode1, err := database.GetCodeById(context.Background(), nil, code1.Id)
-	if err != nil {
-		t.Fatalf("Error checking deleted code1: %v", err)
+	// A cutoff every row is past, so what remains is the refresh-token rule alone.
+	if err := database.DeleteCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
+		t.Fatalf("Failed to run the sweep with a future cutoff: %v", err)
 	}
-	if deletedCode1 != nil {
-		t.Error("Code1 (used, no refresh token) should have been deleted but still exists")
-	}
-
-	// Verify Test Case 2: Used code with refresh token should still exist
-	remainingCode2, err := database.GetCodeById(context.Background(), nil, code2.Id)
-	if err != nil {
-		t.Fatalf("Error checking code2: %v", err)
-	}
-	if remainingCode2 == nil {
-		t.Error("Code2 (used, has refresh token) should not have been deleted")
+	for _, row := range rows {
+		assertCodeExists(t, row.code.Id, !row.reaped, row.what+", past the cutoff")
 	}
 
-	// Verify Test Case 3: Unused code should still exist
-	remainingCode3, err := database.GetCodeById(context.Background(), nil, code3.Id)
+	ropcAfter, err := database.GetRefreshTokenById(context.Background(), nil, ropcToken.Id)
 	if err != nil {
-		t.Fatalf("Error checking code3: %v", err)
+		t.Fatalf("Failed to re-read the ROPC refresh token: %v", err)
 	}
-	if remainingCode3 == nil {
-		t.Error("Code3 (unused) should not have been deleted")
+	if ropcAfter == nil {
+		t.Error("the ROPC refresh token was deleted; the code sweep must touch no refresh token")
 	}
 
-	// Additional Test Case: Delete code whose refresh token has expired.
-	// The token below is also revoked, but that is incidental: since #128 the sweep
-	// deletes it solely because it is past both expires_at and max_lifetime.
-	code4 := createTestCode(t, client.Id, user.Id)
-	code4.Used = true
-	err = database.UpdateCode(context.Background(), nil, code4)
-	if err != nil {
-		t.Fatalf("Failed to update code4 as used: %v", err)
-	}
-
-	// Create an expired refresh token for code4 (revoked too, which no longer matters)
-	revokedRefreshToken := &models.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: code4.Id, Valid: true},
-		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
-		SessionIdentifier: "test_session_" + fake.LetterN(6),
-		RefreshTokenType:  "Bearer",
-		Scope:             "openid profile",
-		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Add(-2 * time.Hour), Valid: true},
-		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true},
-		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true},
-		Revoked:           true,
-	}
-	err = database.CreateRefreshToken(context.Background(), nil, revokedRefreshToken)
-	if err != nil {
-		t.Fatalf("Failed to create revoked refresh token: %v", err)
-	}
-
-	// Delete expired refresh tokens first
-	err = database.DeleteExpiredRefreshTokens(context.Background(), nil)
-	if err != nil {
+	// Once the expired refresh token is gone, its code has no descendant and is reaped.
+	if err := database.DeleteExpiredRefreshTokens(context.Background(), nil); err != nil {
 		t.Fatalf("Failed to delete expired refresh tokens: %v", err)
 	}
-
-	// Then delete used codes without valid refresh tokens. Future cutoff, as above.
-	err = database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour))
-	if err != nil {
-		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
+	if err := database.DeleteCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
+		t.Fatalf("Failed to run the sweep after the refresh-token sweep: %v", err)
 	}
-
-	// Verify code4 was deleted after its refresh token was removed
-	remainingCode4, err := database.GetCodeById(context.Background(), nil, code4.Id)
-	if err != nil {
-		t.Fatalf("Error checking code4: %v", err)
-	}
-	if remainingCode4 != nil {
-		t.Error("Code4 (used, expired refresh token) should have been deleted")
-	}
+	assertCodeExists(t, usedExpiredToken.Id, false, "a used code whose expired refresh token was swept")
+	assertCodeExists(t, usedWithToken.Id, true, "a used code a live refresh token references, after the refresh-token sweep")
 }
 
-// TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff guards the race that broke CI on
-// postgres: the token endpoint marks a code used and only afterwards inserts the refresh
-// token that references it, so for the duration of token generation a healthy code sits in
-// exactly the state this sweep selects, used with no refresh token. Deleting it there makes
-// the insert fail on fk_refresh_tokens_code and the client gets a 500 instead of tokens.
+// TestDeleteCodesWithoutRefreshTokens_AgeCutoff guards the race that broke CI on postgres: the
+// token endpoint marks a code used and only afterwards inserts the refresh token that references
+// it, so for the duration of token generation a healthy code has no descendant yet, which is
+// exactly what this sweep selects. Deleting it there makes the insert fail on
+// fk_refresh_tokens_code and the client gets a 500 instead of tokens.
 //
-// The ordering that opens the window arrived with the atomic-redemption fix (#77), which
-// moved MarkCodeAsUsed ahead of token generation. Before that the refresh token always
-// existed before the flag flipped, so the predicate could never match a live redemption.
+// The ordering that opens the window arrived with the atomic-redemption fix (#77), which moved
+// MarkCodeAsUsed ahead of token generation.
 //
-// A code created now must therefore survive a sweep whose cutoff is in the past, which is
-// what the background worker passes. Codes expire after 60 seconds, so anything older than
-// the cutoff can no longer be redeemed and is genuinely dead.
-func TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
+// A code created now must therefore survive a sweep whose cutoff is in the past, which is what
+// the background worker passes. Codes expire after 60 seconds, so anything older than the cutoff
+// can no longer be redeemed and is genuinely dead.
+func TestDeleteCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
 	// A code in exactly the mid-redemption state: used, no refresh token yet.
 	code := createTestCode(t, client.Id, user.Id)
-	code.Used = true
-	if err := database.UpdateCode(context.Background(), nil, code); err != nil {
-		t.Fatalf("Failed to mark code as used: %v", err)
-	}
+	markCodeUsed(t, code)
 
-	// Sweep with the cutoff the worker uses. The code was created seconds ago, so it is
-	// newer than the cutoff and must be left alone.
-	cutoff := time.Now().UTC().Add(-5 * time.Minute)
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, cutoff); err != nil {
+	// Sweep with the cutoff the worker uses. The code was created seconds ago, so it is newer
+	// than the cutoff and must be left alone.
+	if err := database.DeleteCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(-5*time.Minute)); err != nil {
 		t.Fatalf("Failed to run the sweep: %v", err)
 	}
+	assertCodeExists(t, code.Id, true, "a code marked used seconds ago; deleting it is the race "+
+		"that fails the token exchange with a foreign key violation on fk_refresh_tokens_code")
 
-	survived, err := database.GetCodeById(context.Background(), nil, code.Id)
-	if err != nil {
-		t.Fatalf("Error re-reading the code: %v", err)
+	// The same code once it is past the cutoff: no longer redeemable, so it can never gain a
+	// refresh token, and the sweep must reap it.
+	if err := database.DeleteCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
+		t.Fatalf("Failed to run the sweep with a future cutoff: %v", err)
 	}
-	if survived == nil {
-		t.Fatal("a code marked used seconds ago was deleted by the sweep; this is the " +
-			"race that fails the token exchange with a foreign key violation on " +
-			"fk_refresh_tokens_code")
-	}
-
-	// The same code once it is genuinely past the cutoff: no longer redeemable, so it can
-	// never gain a refresh token, and the sweep must reap it.
-	if deleteCodesErr := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); deleteCodesErr != nil {
-		t.Fatalf("Failed to run the sweep with a future cutoff: %v", deleteCodesErr)
-	}
-	reaped, err := database.GetCodeById(context.Background(), nil, code.Id)
-	if err != nil {
-		t.Fatalf("Error re-reading the code: %v", err)
-	}
-	if reaped != nil {
-		t.Error("a used code older than the cutoff and with no refresh token should have been deleted")
-	}
+	assertCodeExists(t, code.Id, false, "a used code older than the cutoff and with no refresh token")
 }
 
 // revokeCodesOf marks one code revoked through the only method that writes the column,
@@ -799,139 +802,6 @@ func assertCodeExists(t *testing.T, codeId int64, want bool, what string) {
 	if !want && code != nil {
 		t.Errorf("%s: survived, expected to be deleted", what)
 	}
-}
-
-// TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused covers the second class this sweep
-// reaps since #129: a code revoked while it was still unredeemed, which is what ending a
-// session leaves behind when the grant it marked had not been exchanged yet (decision 8).
-// Without it those rows accumulate forever, and unbounded growth is the defect that moved
-// the marker off a session-keyed registry in the first place.
-//
-// The cutoff is varied rather than the rows, following TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff
-// above, because Code.CreatedAt is dont-update tagged and a row cannot be aged through the
-// ORM.
-func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused(t *testing.T) {
-	client := createTestClient(t)
-	user := createTestUser(t)
-
-	// Revoked while still unredeemed: the row the extension exists for.
-	revokedUnused := createTestCode(t, client.Id, user.Id)
-	revokeCodesOf(t, revokedUnused)
-
-	// Revoked after redemption, with an unrevoked refresh token descended from it. Keep
-	// this row. It is the regression guard for the retention argument decision 8 rests on,
-	// that the marker outlives every descendant that could present it, and its value is
-	// invisible once the design is right. The descendant is deliberately unrevoked, which
-	// is gap 2's racing child: a rotation that validated before the termination inserts it
-	// afterwards, so the termination's own token sweep never saw it and the code's marker
-	// is the only thing that rejects it. The stake is therefore higher than losing a
-	// marker: fk_refresh_tokens_code is ON DELETE CASCADE, so a sweep reaching this code
-	// would delete the very descendant the marker exists to reject, and the token would
-	// stop being rejected because it stopped existing rather than because it was contained.
-	revokedUsedWithToken := createTestCode(t, client.Id, user.Id)
-	revokeCodesOf(t, revokedUsedWithToken)
-	markCodeUsed(t, revokedUsedWithToken)
-	racingChild := &models.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: revokedUsedWithToken.Id, Valid: true},
-		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
-		SessionIdentifier: revokedUsedWithToken.SessionIdentifier,
-		RefreshTokenType:  "Bearer",
-		Scope:             "openid profile offline_access",
-		IssuedAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
-		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour), Valid: true},
-		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true},
-		Revoked:           false,
-	}
-	if err := database.CreateRefreshToken(context.Background(), nil, racingChild); err != nil {
-		t.Fatalf("Failed to create the descendant refresh token: %v", err)
-	}
-
-	// Revoked after redemption with nothing referencing it. The pre-existing branch, and
-	// the proof that adding `used = false` to the new branch did not narrow the old one.
-	revokedUsedNoToken := createTestCode(t, client.Id, user.Id)
-	revokeCodesOf(t, revokedUsedNoToken)
-	markCodeUsed(t, revokedUsedNoToken)
-
-	// Unredeemed and never revoked: an abandoned ceremony's code. The negative control for
-	// the `revoked = true` term, and the only row that fails if the sweep is written to
-	// reap every unredeemed code.
-	unrevokedUnused := createTestCode(t, client.Id, user.Id)
-
-	// The cutoff the worker actually passes, first and while every row is still there.
-	// All four were created seconds ago, so all four must survive. This is the only
-	// assertion here that fails if the extension drops the shared created_at term, or
-	// states it per branch and gets one of them wrong.
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(-5*time.Minute)); err != nil {
-		t.Fatalf("Failed to run the sweep with the worker's cutoff: %v", err)
-	}
-	assertCodeExists(t, revokedUnused.Id, true, "a revoked, unredeemed code newer than the cutoff")
-	assertCodeExists(t, revokedUsedNoToken.Id, true, "a revoked, redeemed code newer than the cutoff")
-	assertCodeExists(t, revokedUsedWithToken.Id, true, "a revoked, redeemed code with a descendant refresh token, newer than the cutoff")
-	assertCodeExists(t, unrevokedUnused.Id, true, "an unrevoked, unredeemed code newer than the cutoff")
-
-	// Then a cutoff every row is past, so the remaining assertions are about the
-	// used/revoked predicate rather than about age.
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
-		t.Fatalf("Failed to run the sweep with a future cutoff: %v", err)
-	}
-	assertCodeExists(t, revokedUnused.Id, false, "a revoked, unredeemed code past the cutoff")
-	assertCodeExists(t, revokedUsedNoToken.Id, false, "a revoked, redeemed code with no refresh token, past the cutoff")
-	assertCodeExists(t, revokedUsedWithToken.Id, true,
-		"a revoked, redeemed code whose descendant refresh token is still there; the marker "+
-			"must outlive it, and deleting the code would cascade the descendant away")
-	assertCodeExists(t, unrevokedUnused.Id, true, "an unrevoked, unredeemed code past the cutoff")
-}
-
-// TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnusedWithRopcTokenPresent pins where the
-// NOT IN subquery sits, which is the one thing in the widened predicate that can ship inert.
-// ROPC refresh tokens carry code_id = NULL, and `x NOT IN (…, NULL)` is UNKNOWN rather than
-// TRUE, so the redeemed branch already matches nothing on any deployment that has issued one.
-// That is #130 and it is out of scope here. Keeping the subquery inside that branch is what
-// contains it: UNKNOWN OR TRUE is TRUE, so the revoked branch reaps anyway. Hoisting the
-// subquery beside the cutoff, which reads as the tidier factoring, makes the whole predicate
-// UNKNOWN and this method silently stops deleting anything at all.
-//
-// Separate from the test above rather than a row in it, because the NULL row changes what the
-// redeemed branch can prove: while it is present, a revoked and redeemed code with no refresh
-// token is no longer reaped either, which is #130 behaving as documented rather than a defect
-// in this change.
-func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnusedWithRopcTokenPresent(t *testing.T) {
-	client := createTestClient(t)
-	user := createTestUser(t)
-
-	// A ROPC-shaped refresh token: no originating code, so code_id is NULL. Removed at the
-	// end so it cannot change what a later test in this package proves about the sweep.
-	ropcToken := &models.RefreshToken{
-		CodeId:            sql.NullInt64{Valid: false},
-		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
-		SessionIdentifier: "",
-		RefreshTokenType:  "Bearer",
-		Scope:             "openid profile",
-		IssuedAt:          sql.NullTime{Time: time.Now().UTC(), Valid: true},
-		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour), Valid: true},
-		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true},
-	}
-	if err := database.CreateRefreshToken(context.Background(), nil, ropcToken); err != nil {
-		t.Fatalf("Failed to create the ROPC refresh token: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := database.DeleteRefreshToken(context.Background(), nil, ropcToken.Id); err != nil {
-			t.Errorf("Failed to remove the ROPC refresh token: %v", err)
-		}
-	})
-
-	revokedUnused := createTestCode(t, client.Id, user.Id)
-	revokeCodesOf(t, revokedUnused)
-
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
-		t.Fatalf("Failed to run the sweep: %v", err)
-	}
-	assertCodeExists(t, revokedUnused.Id, false,
-		"a revoked, unredeemed code swept while a refresh token with a NULL code_id exists; "+
-			"if this survived, the NOT IN subquery was hoisted out of the redeemed branch and "+
-			"the whole predicate is UNKNOWN")
 }
 
 // TestUpdateCode_DoesNotClobberAuthStateGeneration pins decision 11(b) of #106 for

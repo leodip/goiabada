@@ -2846,6 +2846,69 @@ func (_c *Database_DeleteCode_Call) RunAndReturn(run func(ctx context.Context, t
 	return _c
 }
 
+// DeleteCodesWithoutRefreshTokens provides a mock function for the type Database
+func (_mock *Database) DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error {
+	ret := _mock.Called(ctx, tx, createdBefore)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteCodesWithoutRefreshTokens")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, createdBefore)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteCodesWithoutRefreshTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteCodesWithoutRefreshTokens'
+type Database_DeleteCodesWithoutRefreshTokens_Call struct {
+	*mock.Call
+}
+
+// DeleteCodesWithoutRefreshTokens is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - createdBefore time.Time
+func (_e *Database_Expecter) DeleteCodesWithoutRefreshTokens(ctx any, tx any, createdBefore any) *Database_DeleteCodesWithoutRefreshTokens_Call {
+	return &Database_DeleteCodesWithoutRefreshTokens_Call{Call: _e.mock.On("DeleteCodesWithoutRefreshTokens", ctx, tx, createdBefore)}
+}
+
+func (_c *Database_DeleteCodesWithoutRefreshTokens_Call) Run(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time)) *Database_DeleteCodesWithoutRefreshTokens_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteCodesWithoutRefreshTokens_Call) Return(err error) *Database_DeleteCodesWithoutRefreshTokens_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteCodesWithoutRefreshTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error) *Database_DeleteCodesWithoutRefreshTokens_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteExpiredBrowserSessions provides a mock function for the type Database
 func (_mock *Database) DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error {
 	ret := _mock.Called(ctx, tx, now)
@@ -3733,69 +3796,6 @@ func (_c *Database_DeleteResource_Call) Return(err error) *Database_DeleteResour
 }
 
 func (_c *Database_DeleteResource_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, resourceId int64) error) *Database_DeleteResource_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteUsedCodesWithoutRefreshTokens provides a mock function for the type Database
-func (_mock *Database) DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error {
-	ret := _mock.Called(ctx, tx, createdBefore)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteUsedCodesWithoutRefreshTokens")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
-		r0 = returnFunc(ctx, tx, createdBefore)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_DeleteUsedCodesWithoutRefreshTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUsedCodesWithoutRefreshTokens'
-type Database_DeleteUsedCodesWithoutRefreshTokens_Call struct {
-	*mock.Call
-}
-
-// DeleteUsedCodesWithoutRefreshTokens is a helper method to define mock.On call
-//   - ctx context.Context
-//   - tx *sql.Tx
-//   - createdBefore time.Time
-func (_e *Database_Expecter) DeleteUsedCodesWithoutRefreshTokens(ctx any, tx any, createdBefore any) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
-	return &Database_DeleteUsedCodesWithoutRefreshTokens_Call{Call: _e.mock.On("DeleteUsedCodesWithoutRefreshTokens", ctx, tx, createdBefore)}
-}
-
-func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Run(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time)) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *sql.Tx
-		if args[1] != nil {
-			arg1 = args[1].(*sql.Tx)
-		}
-		var arg2 time.Time
-		if args[2] != nil {
-			arg2 = args[2].(time.Time)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Return(err error) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }
