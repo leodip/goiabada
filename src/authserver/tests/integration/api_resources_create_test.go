@@ -150,7 +150,7 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Equal(t, "application/json", resp2.Header.Get("Content-Type"))
-	assert.Contains(t, string(body2), "Access token required.")
+	assert.Contains(t, string(body2), "The access token is invalid.")
 
 	// Insufficient scope (a scope no route grants)
 	token := createClientCredentialsTokenWithoutRouteScope(t)

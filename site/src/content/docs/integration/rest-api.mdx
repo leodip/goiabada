@@ -175,7 +175,9 @@ All endpoints return errors in a consistent, flat format:
 Route on the **HTTP status code**, not the body.
 
 Common `error_code` categories:
-- `ACCESS_TOKEN_REQUIRED` - Missing or invalid bearer token
+- `ACCESS_TOKEN_REQUIRED` - Missing bearer token
+- `INVALID_TOKEN` - Bearer token is invalid, expired or its session has ended
+- `INVALID_REQUEST` - Bearer token sent in both the header and the body
 - `INVALID_REQUEST_BODY` - Malformed JSON in request
 - `VALIDATION_ERROR` - Input validation failed
 - `NOT_FOUND` - Resource not found

@@ -132,7 +132,7 @@ func TestAPIResourcesGet_InvalidToken(t *testing.T) {
 	// Assert error body matches middleware message
 	body, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-	assert.Contains(t, string(body), "Access token required.")
+	assert.Contains(t, string(body), "The access token is invalid.")
 }
 
 // Test insufficient scope returns 403 with proper error text

@@ -3,54 +3,34 @@ package middleware
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// emitAuthError writes the §6.3 admin/account API error envelope in English.
-// Bearer-token failures on /api/v1/* are a machine surface (Surface B/C):
-// responses do not localize. RFC 6750 §3 prescribes a WWW-Authenticate
-// Bearer header for 401/403 token failures, which we always set.
+// RequireBearerTokenScope requires a bearer token carrying requiredScope.
+func (m *MiddlewareBearerToken) RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handler {
+	return m.RequireBearerTokenScopeAnyOf([]string{requiredScope})
+}
+
+// RequireBearerTokenScopeAnyOf requires a bearer token carrying ANY of requiredScopes (OR logic).
 //
-// i18n surface: B — machine.
-func emitAuthError(w http.ResponseWriter, code, description string, statusCode int) {
-	errorParam := "invalid_token"
-	if statusCode == http.StatusForbidden {
-		errorParam = "insufficient_scope"
-	}
-	w.Header().Set("WWW-Authenticate",
-		`Bearer error="`+errorParam+`", error_description="`+description+`"`)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(api.ErrorResponse{
-		ErrorCode:        code,
-		ErrorDescription: description,
-	})
-}
-
-// RequireBearerTokenScope validates JWT token from context and checks required scope
-func RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handler {
-	return RequireBearerTokenScopeAnyOf([]string{requiredScope})
-}
-
-// RequireBearerTokenScopeAnyOf validates JWT token from context and checks if it has ANY of the required scopes (OR logic)
-func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) http.Handler {
+// No token in the context is a request that presented no bearer credential, since
+// JwtAuthorizationHeaderToContext has already refused every presented token it did not store. It
+// is answered 401 with the realm-only challenge: RFC 6750 section 3.1, a request lacking any
+// authentication information SHOULD NOT be told an error code (#435).
+func (m *MiddlewareBearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Get token from context (set by JwtAuthorizationHeaderToContext middleware)
 			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
 			if !ok {
-				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
+				m.refusals.missing(w, r)
 				return
 			}
 
@@ -64,7 +44,7 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 			}
 
 			if !hasRequiredScope {
-				emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", http.StatusForbidden)
+				m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.")
 				return
 			}
 
@@ -108,14 +88,14 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 // path is ever added that bypasses generateAccessTokenCore, this guard silently locks it
 // out of these endpoints. It fails closed, which is the right direction for a guard whose
 // job is to establish that a user is present.
-func RequireUserBoundToken() func(http.Handler) http.Handler {
+func (m *MiddlewareBearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Mirrors RequireBearerTokenScopeAnyOf exactly, so this guard introduces no new
 			// response shape for the "no token" case.
 			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
 			if !ok {
-				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
+				m.refusals.missing(w, r)
 				return
 			}
 
@@ -123,13 +103,12 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 				slog.WarnContext(r.Context(), "rejecting bearer token on a user-context endpoint: no auth_time claim, so the token was not issued for a user",
 					"sub", jwtToken.GetStringClaim("sub"))
 				// RFC 6750 §3.1 defines only invalid_request, invalid_token and
-				// insufficient_scope, none of which means "wrong token type". emitAuthError
+				// insufficient_scope, none of which means "wrong token type". forbidden
 				// maps every bearer 403 to insufficient_scope, which keeps the
-				// WWW-Authenticate header conformant; the JSON ErrorCode carries the precise
-				// reason, which is how every other guard in this file distinguishes its cases.
-				emitAuthError(w, "USER_CONTEXT_REQUIRED",
-					"This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted.",
-					http.StatusForbidden)
+				// WWW-Authenticate header conformant; on the API the JSON ErrorCode carries the
+				// precise reason, which is how every other guard in this file distinguishes its cases.
+				m.refusals.forbidden(w, r, "USER_CONTEXT_REQUIRED",
+					"This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted.")
 				return
 			}
 
@@ -187,7 +166,7 @@ type apiAuthDatabase interface {
 // Reads reqctx.BearerTokenFrom (set by JwtAuthorizationHeaderToContext),
 // not reqctx.ValidatedTokenFrom, so it works regardless of whether a scope
 // middleware ran first.
-func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handler {
+func (m *MiddlewareBearerToken) RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
@@ -208,24 +187,24 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 			sub := strings.TrimSpace(jwtToken.GetStringClaim("sub"))
 			if sub == "" {
 				slog.WarnContext(r.Context(), "rejecting bearer token: user token has no sub claim")
-				rejectInvalidToken(w, "Invalid token subject")
+				m.refusals.invalidToken(w, r, "Invalid token subject")
 				return
 			}
 
 			user, err := database.GetUserBySubject(r.Context(), nil, sub)
 			if err != nil {
-				apiresponse.WriteInternalServerError(w, r,
-					errs.Wrap(err, "failed to look up user for bearer token validation"))
+				m.refusals.internalError(w, r,
+					errs.Wrap(err, "failed to look up user for bearer token validation"), "")
 				return
 			}
 			if user == nil {
 				slog.WarnContext(r.Context(), "rejecting bearer token: subject does not resolve to a user")
-				rejectInvalidToken(w, "Session has been terminated")
+				m.refusals.invalidToken(w, r, "Session has been terminated")
 				return
 			}
 			if !user.Enabled {
 				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", user.Id)
-				rejectInvalidToken(w, "Session has been terminated")
+				m.refusals.invalidToken(w, r, "Session has been terminated")
 				return
 			}
 
@@ -238,7 +217,7 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 				if !wellFormed || generation != user.AuthStateGeneration {
 					slog.WarnContext(r.Context(), "rejecting bearer token: superseded authentication generation",
 						"user_id", user.Id)
-					rejectInvalidToken(w, "Session has been terminated")
+					m.refusals.invalidToken(w, r, "Session has been terminated")
 					return
 				}
 				next.ServeHTTP(w, r)
@@ -247,15 +226,15 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 
 			session, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sid)
 			if err != nil {
-				apiresponse.WriteInternalServerError(w, r,
-					errs.Wrap(err, "failed to look up user session for bearer token validation"), "sid", sid)
+				m.refusals.internalError(w, r,
+					errs.Wrap(err, "failed to look up user session for bearer token validation"), sid)
 				return
 			}
 
 			if session == nil {
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has been terminated",
 					"session_identifier", sid)
-				rejectInvalidToken(w, "Session has been terminated")
+				m.refusals.invalidToken(w, r, "Session has been terminated")
 				return
 			}
 
@@ -276,7 +255,7 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 				slog.WarnContext(r.Context(), "rejecting bearer token: session belongs to a different user",
 					"session_identifier", sid, "session_id", session.Id,
 					"session_user_id", session.UserId, "user_id", user.Id)
-				rejectInvalidToken(w, "Session has been terminated")
+				m.refusals.invalidToken(w, r, "Session has been terminated")
 				return
 			}
 
@@ -285,13 +264,13 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 				// Fail closed: without settings we cannot enforce idle/max-lifetime
 				// limits, and silently skipping the check would let an expired
 				// session ride a still-valid JWT past us.
-				apiresponse.WriteInternalServerError(w, r, reqctx.ErrNoSettings, "sid", sid)
+				m.refusals.internalError(w, r, reqctx.ErrNoSettings, sid)
 				return
 			}
 			if !session.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has expired",
 					"session_identifier", sid, "session_id", session.Id)
-				rejectInvalidToken(w, "Session has expired")
+				m.refusals.invalidToken(w, r, "Session has expired")
 				return
 			}
 
@@ -300,7 +279,7 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 			if session.AuthStateGeneration != user.AuthStateGeneration {
 				slog.WarnContext(r.Context(), "rejecting bearer token: session is on a superseded authentication generation",
 					"session_identifier", sid, "session_id", session.Id, "user_id", user.Id)
-				rejectInvalidToken(w, "Session has been terminated")
+				m.refusals.invalidToken(w, r, "Session has been terminated")
 				return
 			}
 
@@ -328,19 +307,4 @@ func tokenGeneration(jwtToken oauth.JwtToken) (int64, bool) {
 		return 0, true
 	}
 	return jwtToken.GetIntClaim("auth_state_generation")
-}
-
-// rejectInvalidToken sends an RFC 6750 §3 compliant 401 Unauthorized for the
-// bearer-token validation failure cases handled by RequireValidSession.
-//
-// i18n surface: B — machine.
-func rejectInvalidToken(w http.ResponseWriter, description string) {
-	w.Header().Set("WWW-Authenticate",
-		`Bearer error="invalid_token", error_description="`+description+`"`)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnauthorized)
-	_ = json.NewEncoder(w).Encode(api.ErrorResponse{
-		ErrorCode:        "INVALID_TOKEN",
-		ErrorDescription: description,
-	})
 }

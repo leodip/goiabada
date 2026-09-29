@@ -54,8 +54,12 @@ func (s *Server) initRoutes(root chi.Router) {
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
-	middlewareBearerToken := middleware.NewMiddlewareBearerToken(tokenParser)
-	authHeaderToContext := middlewareBearerToken.JwtAuthorizationHeaderToContext()
+	// Two bearer guard sets, one per surface, because the two surfaces promise different refusal
+	// bodies: the admin and account APIs their {error_code, error_description} envelope, /userinfo
+	// the RFC 6749 {error, error_description} shape its handler answers in. The routes choose the
+	// set; nothing reads the request path to decide (#435).
+	apiBearer := middleware.NewMiddlewareBearerTokenForAPI(tokenParser)
+	userinfoBearer := middleware.NewMiddlewareBearerTokenForUserInfo(tokenParser, httpHelper)
 
 	authServerConfig := &s.cfg.AuthServer
 	baseURL := authServerConfig.BaseURL
@@ -87,13 +91,13 @@ func (s *Server) initRoutes(root chi.Router) {
 	// /userinfo takes a user's access token whose scope carries openid, which is what OIDC Core 1.0
 	// section 5.3 says the endpoint exists for (#449). The scope check comes first, as on every
 	// user-token route (#104): a client credentials token can never carry openid, since that grant
-	// refuses every OpenID Connect scope, so it stops there with 403 INSUFFICIENT_SCOPE, and
+	// refuses every OpenID Connect scope, so it stops there with 403 insufficient_scope, and
 	// RequireUserBoundToken behind it is what would stop a client's token that ever carried it.
-	// Refresh and ID tokens never get this far: authHeaderToContext admits only an access token
+	// Refresh and ID tokens never get this far: the parse guard admits only an access token
 	// for authserver (#401). GET and POST are separate registrations: a guard added to only one of
 	// them leaves the other reachable.
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
+	root.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
+	root.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL))
 	root.Get("/health", handlers.HandleHealthCheckGet())
 	root.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	root.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
@@ -147,8 +151,8 @@ func (s *Server) initRoutes(root chi.Router) {
 		// never write the pair on a refusal (#247).
 		r.Use(middleware.MiddlewareNoStore())
 		r.Use(middleware.APIDebugMiddleware(authServerConfig.DebugAPIRequests))
-		r.Use(authHeaderToContext)
-		r.Use(middleware.RequireValidSession(s.database))
+		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		r.Use(apiBearer.RequireValidSession(s.database))
 
 		// Scope helper function
 		scope := func(perm string) string {
@@ -196,136 +200,136 @@ func (s *Server) initRoutes(root chi.Router) {
 		}
 
 		// User management routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/search", apihandlers.HandleAPIUsersSearchGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}", apihandlers.HandleAPIUserGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/enabled", apihandlers.HandleAPIUserEnabledPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(s.database, profileValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(s.database, addressValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/email", apihandlers.HandleAPIUserEmailPut(s.database, emailValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleAPIUserEmailVerificationCodePost(s.database, auditLogger, s.dataCipher))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleAPIUserPhonePut(s.database, phoneValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(s.database, passwordValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureGet(s.database, baseURL))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher, baseURL))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleAPIUserDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/search", apihandlers.HandleAPIUsersSearchGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}", apihandlers.HandleAPIUserGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/enabled", apihandlers.HandleAPIUserEnabledPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/profile", apihandlers.HandleAPIUserProfilePut(s.database, profileValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/address", apihandlers.HandleAPIUserAddressPut(s.database, addressValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/email", apihandlers.HandleAPIUserEmailPut(s.database, emailValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleAPIUserEmailVerificationCodePost(s.database, auditLogger, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleAPIUserPhonePut(s.database, phoneValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleAPIUserPasswordPut(s.database, passwordValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleAPIUserOTPPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureGet(s.database, baseURL))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleAPIUserProfilePictureDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleAPIUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher, baseURL))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleAPIUserDelete(s.database, auditLogger))
 
 		// User attributes routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/attributes", apihandlers.HandleAPIUserAttributesGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/user-attributes", apihandlers.HandleAPIUserAttributeCreatePost(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeUpdatePut(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/attributes", apihandlers.HandleAPIUserAttributesGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/user-attributes", apihandlers.HandleAPIUserAttributeCreatePost(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeUpdatePut(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-attributes/{id}", apihandlers.HandleAPIUserAttributeDelete(s.database, auditLogger))
 
 		// User session routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/sessions", apihandlers.HandleAPIUserSessionsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-sessions/{sessionIdentifier}", apihandlers.HandleAPIUserSessionGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleAPIUserSessionDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/sessions", apihandlers.HandleAPIUserSessionsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-sessions/{sessionIdentifier}", apihandlers.HandleAPIUserSessionGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleAPIUserSessionDelete(s.database, auditLogger))
 
 		// User consent routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleAPIUserConsentsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleAPIUserConsentDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleAPIUserConsentsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleAPIUserConsentDelete(s.database, auditLogger))
 
 		// Group management routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups", apihandlers.HandleAPIGroupsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/groups", apihandlers.HandleAPIGroupCreatePost(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}", apihandlers.HandleAPIGroupGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/groups/{id}", apihandlers.HandleAPIGroupUpdatePut(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/groups/{id}", apihandlers.HandleAPIGroupDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}/members", apihandlers.HandleAPIGroupMembersGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/groups/{id}/members", apihandlers.HandleAPIGroupMemberAddPost(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/groups/{id}/members/{userId}", apihandlers.HandleAPIGroupMemberDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups", apihandlers.HandleAPIGroupsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/groups", apihandlers.HandleAPIGroupCreatePost(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}", apihandlers.HandleAPIGroupGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/groups/{id}", apihandlers.HandleAPIGroupUpdatePut(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/groups/{id}", apihandlers.HandleAPIGroupDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}/members", apihandlers.HandleAPIGroupMembersGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/groups/{id}/members", apihandlers.HandleAPIGroupMemberAddPost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/groups/{id}/members/{userId}", apihandlers.HandleAPIGroupMemberDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/groups", apihandlers.HandleAPIUserGroupsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/groups", apihandlers.HandleAPIUserGroupsPut(s.database, auditLogger))
 
 		// Group search
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/search", apihandlers.HandleAPIGroupsSearchGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/search", apihandlers.HandleAPIGroupsSearchGet(s.database))
 
 		// Group attributes routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}/attributes", apihandlers.HandleAPIGroupAttributesGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/group-attributes", apihandlers.HandleAPIGroupAttributeCreatePost(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeUpdatePut(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}/attributes", apihandlers.HandleAPIGroupAttributesGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/group-attributes", apihandlers.HandleAPIGroupAttributeCreatePost(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeUpdatePut(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/group-attributes/{id}", apihandlers.HandleAPIGroupAttributeDelete(s.database, auditLogger))
 
 		// User permissions routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/permissions", apihandlers.HandleAPIUserPermissionsPut(s.database, auditLogger))
 
 		// Group permissions routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}/permissions", apihandlers.HandleAPIGroupPermissionsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/groups/{id}/permissions", apihandlers.HandleAPIGroupPermissionsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups/{id}/permissions", apihandlers.HandleAPIGroupPermissionsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/groups/{id}/permissions", apihandlers.HandleAPIGroupPermissionsPut(s.database, auditLogger))
 
 		// Users with a permission
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/permissions/{permissionId}/users", apihandlers.HandleAPIPermissionUsersGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/permissions/{permissionId}/users", apihandlers.HandleAPIPermissionUsersGet(s.database))
 
 		// Resources routes (part of settings domain - defines permissions structure)
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources", apihandlers.HandleAPIResourcesGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/resources", apihandlers.HandleAPIResourceCreatePost(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources/{id}", apihandlers.HandleAPIResourceGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/resources/{id}", apihandlers.HandleAPIResourceUpdatePut(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/resources/{id}", apihandlers.HandleAPIResourceDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/resources/{resourceId}/permissions", apihandlers.HandleAPIResourcePermissionsPut(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources", apihandlers.HandleAPIResourcesGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/resources", apihandlers.HandleAPIResourceCreatePost(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources/{id}", apihandlers.HandleAPIResourceGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/resources/{id}", apihandlers.HandleAPIResourceUpdatePut(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/resources/{id}", apihandlers.HandleAPIResourceDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources/{resourceId}/permissions", apihandlers.HandleAPIPermissionsByResourceGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/resources/{resourceId}/permissions", apihandlers.HandleAPIResourcePermissionsPut(s.database, identifierValidator, auditLogger))
 
 		// Client management routes
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients", apihandlers.HandleAPIClientsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleAPIClientGet(s.database, s.dataCipher))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/sessions", apihandlers.HandleAPIClientSessionsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients", apihandlers.HandleAPIClientCreatePost(s.database, identifierValidator, auditLogger, s.dataCipher))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}", apihandlers.HandleAPIClientUpdatePut(s.database, identifierValidator, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/authentication", apihandlers.HandleAPIClientAuthenticationPut(s.database, auditLogger, s.dataCipher))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/oauth2-flows", apihandlers.HandleAPIClientOAuth2FlowsPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/redirect-uris", apihandlers.HandleAPIClientRedirectURIsPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/web-origins", apihandlers.HandleAPIClientWebOriginsPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/tokens", apihandlers.HandleAPIClientTokensPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/permissions", apihandlers.HandleAPIClientPermissionsGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/permissions", apihandlers.HandleAPIClientPermissionsPut(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}", apihandlers.HandleAPIClientDelete(s.database, auditLogger))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/logo", apihandlers.HandleAPIClientLogoGet(s.database, baseURL))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients/{id}/logo", apihandlers.HandleAPIClientLogoPost(s.database, auditLogger, baseURL, maxUploadBytes))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}/logo", apihandlers.HandleAPIClientLogoDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients", apihandlers.HandleAPIClientsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleAPIClientGet(s.database, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/sessions", apihandlers.HandleAPIClientSessionsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients", apihandlers.HandleAPIClientCreatePost(s.database, identifierValidator, auditLogger, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}", apihandlers.HandleAPIClientUpdatePut(s.database, identifierValidator, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/authentication", apihandlers.HandleAPIClientAuthenticationPut(s.database, auditLogger, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/oauth2-flows", apihandlers.HandleAPIClientOAuth2FlowsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/redirect-uris", apihandlers.HandleAPIClientRedirectURIsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/web-origins", apihandlers.HandleAPIClientWebOriginsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/tokens", apihandlers.HandleAPIClientTokensPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/permissions", apihandlers.HandleAPIClientPermissionsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/permissions", apihandlers.HandleAPIClientPermissionsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}", apihandlers.HandleAPIClientDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/logo", apihandlers.HandleAPIClientLogoGet(s.database, baseURL))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Post("/clients/{id}/logo", apihandlers.HandleAPIClientLogoPost(s.database, auditLogger, baseURL, maxUploadBytes))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}/logo", apihandlers.HandleAPIClientLogoDelete(s.database, auditLogger))
 
 		// Settings - General
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/general", apihandlers.HandleAPISettingsGeneralGet())
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/general", apihandlers.HandleAPISettingsGeneralPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/general", apihandlers.HandleAPISettingsGeneralGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/general", apihandlers.HandleAPISettingsGeneralPut(s.database, auditLogger))
 
 		// Settings - Email
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleAPISettingsEmailGet())
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(s.database, emailValidator, auditLogger, s.dataCipher))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleAPISettingsEmailSendTestPost(emailValidator, emailSender, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleAPISettingsEmailGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(s.database, emailValidator, auditLogger, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleAPISettingsEmailSendTestPost(emailValidator, emailSender, auditLogger))
 
 		// Settings - Sessions
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet())
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/sessions", apihandlers.HandleAPISettingsSessionsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/sessions", apihandlers.HandleAPISettingsSessionsPut(s.database, auditLogger))
 
 		// Settings - UI Theme
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemeGet())
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemePut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemeGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemePut(s.database, auditLogger))
 
 		// Settings - Tokens
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet())
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/tokens", apihandlers.HandleAPISettingsTokensPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/tokens", apihandlers.HandleAPISettingsTokensPut(s.database, auditLogger))
 
 		// Settings - Keys
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/keys", apihandlers.HandleAPISettingsKeysGet(s.database))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/keys/rotate", apihandlers.HandleAPISettingsKeysRotatePost(s.database, auditLogger, s.dataCipher))
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/settings/keys/{id}", apihandlers.HandleAPISettingsKeyDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/keys", apihandlers.HandleAPISettingsKeysGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/keys/rotate", apihandlers.HandleAPISettingsKeysRotatePost(s.database, auditLogger, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/settings/keys/{id}", apihandlers.HandleAPISettingsKeyDelete(s.database, auditLogger))
 
 		// Settings - Audit Logs
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsGet())
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsPut(s.database, auditLogger))
 
 		// Audit Logs Viewer
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs", apihandlers.HandleAPIAuditLogsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs", apihandlers.HandleAPIAuditLogsGet(s.database))
 		// The catalog the auditEvent filter above accepts. Same read scope, because it describes
 		// that endpoint and tells a caller nothing the endpoint itself does not (#351).
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs/event-types", apihandlers.HandleAPIAuditEventTypesGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs/event-types", apihandlers.HandleAPIAuditEventTypesGet())
 
 		// Reference data routes (read-only, accessible by any admin scope)
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesRead)).Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesRead)).Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet())
 	})
 
 	// Account API routes (self-service)
@@ -334,13 +338,13 @@ func (s *Server) initRoutes(root chi.Router) {
 		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
 		r.Use(middleware.MiddlewareNoStore())
 		r.Use(middleware.APIDebugMiddleware(authServerConfig.DebugAPIRequests))
-		r.Use(authHeaderToContext)
-		r.Use(middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier))
+		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		r.Use(apiBearer.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier))
 		// After the scope check, so an insufficient-scope caller still receives the 403 it
 		// receives today. These handlers resolve the acting user from `sub`, which is the
 		// client identifier on a client_credentials token, so the token type must be gated.
-		r.Use(middleware.RequireUserBoundToken())
-		r.Use(middleware.RequireValidSession(s.database))
+		r.Use(apiBearer.RequireUserBoundToken())
+		r.Use(apiBearer.RequireValidSession(s.database))
 
 		r.Get("/profile", apihandlers.HandleAPIAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAPIAccountProfilePut(s.database, profileValidator, auditLogger))
@@ -403,11 +407,11 @@ func (s *Server) initRoutes(root chi.Router) {
 		// account API uses everywhere, and redacting it would blind the surface this
 		// middleware exists to make debuggable. What is lost is recoverable from the SQL
 		// log, which records the digest rather than the handle (#266).
-		r.Use(authHeaderToContext)
+		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		// One narrow permission of its own, deliberately not one of the manage-* admin
 		// API scopes: holding the admin console's client secret must not be a way to
 		// drive the whole admin API with no user present.
-		r.Use(middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.BrowserSessionsPermissionIdentifier))
+		r.Use(apiBearer.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.BrowserSessionsPermissionIdentifier))
 
 		// No RequireUserBoundToken and no RequireValidSession here, and both absences are
 		// deliberate. This endpoint is reached only by a client_credentials token, which

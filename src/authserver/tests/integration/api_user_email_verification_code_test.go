@@ -164,7 +164,7 @@ func TestAPIUserEmailVerificationCodePost_InvalidToken(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-	assert.Contains(t, string(body), "Access token required.")
+	assert.Contains(t, string(body), "The access token is invalid.")
 }
 
 func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {

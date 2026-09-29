@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,21 +60,19 @@ func assertUserinfoAdmits(t *testing.T, accessToken string, sub string) {
 }
 
 // assertUserinfoRefuses calls /userinfo by GET and by POST and asserts each answers status, with
-// the WWW-Authenticate error RFC 6750 section 3.1 names for it and, when errorCode is set, that
-// error_code in the body.
-func assertUserinfoRefuses(t *testing.T, accessToken string, status int, bearerError string, errorCode string) {
+// the WWW-Authenticate error RFC 6750 section 3.1 names for it, under the server's realm, and the
+// same error in the RFC 6749 {error, error_description} body the endpoint answers in (#435).
+func assertUserinfoRefuses(t *testing.T, accessToken string, status int, bearerError string) {
 	t.Helper()
 	for method, call := range map[string]func(*testing.T, string) *http.Response{"GET": userinfoGet, "POST": userinfoPost} {
 		resp := call(t, accessToken)
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		assert.Equal(t, status, resp.StatusCode, "%s /userinfo: %s", method, string(body))
-		assert.Contains(t, resp.Header.Get("WWW-Authenticate"), `error="`+bearerError+`"`, "%s /userinfo", method)
-		if errorCode != "" {
-			var errResp api.ErrorResponse
-			_ = json.Unmarshal(body, &errResp)
-			assert.Equal(t, errorCode, errResp.ErrorCode, "%s /userinfo: %s", method, string(body))
-		}
+		assert.Contains(t, resp.Header.Get("WWW-Authenticate"), `Bearer realm="goiabada", error="`+bearerError+`"`, "%s /userinfo", method)
+		var errResp map[string]string
+		require.NoError(t, json.Unmarshal(body, &errResp), "%s /userinfo: %s", method, string(body))
+		assert.Equal(t, bearerError, errResp["error"], "%s /userinfo: %s", method, string(body))
 	}
 }
 
@@ -224,7 +221,7 @@ func TestUserinfo_TokenWithoutOpenidIsRefused(t *testing.T) {
 	accessToken, _ := createUserAccessTokenWithScope(t,
 		constants.AuthServerResourceIdentifier+":"+constants.ManageAccountPermissionIdentifier)
 
-	assertUserinfoRefuses(t, accessToken, http.StatusForbidden, "insufficient_scope", "INSUFFICIENT_SCOPE")
+	assertUserinfoRefuses(t, accessToken, http.StatusForbidden, "insufficient_scope")
 }
 
 // TestUserinfo_ClaimScopesWithoutOpenid pins #449 decision 2: a claim scope without openid is still
@@ -245,7 +242,7 @@ func TestUserinfo_ClaimScopesWithoutOpenid(t *testing.T) {
 		if groupIdentifier != "" {
 			assert.Equal(t, []interface{}{groupIdentifier}, claims["groups"])
 		}
-		assertUserinfoRefuses(t, accessToken, http.StatusForbidden, "insufficient_scope", "INSUFFICIENT_SCOPE")
+		assertUserinfoRefuses(t, accessToken, http.StatusForbidden, "insufficient_scope")
 	}
 
 	for _, scope := range []string{"profile", "groups"} {
@@ -284,7 +281,7 @@ func TestUserinfo_EndedSessionIsRefused(t *testing.T) {
 	require.NotNil(t, session, "the code must be bound to a live session")
 	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
 
-	assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token", "")
+	assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token")
 }
 
 // TestUserinfo_LegacyAccessTokenCarryingTheAppendedScope is an access token issued before #449,

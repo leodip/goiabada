@@ -89,13 +89,15 @@ var apiErrorCodes = map[string]string{
 
 	// Authentication and authorization. A caller distinguishes "send a token", "the token is not
 	// good enough" and "the session is gone", and retries differently for each.
-	// ACCESS_TOKEN_REQUIRED and INSUFFICIENT_SCOPE are the bearer middleware's; the rest are
+	// ACCESS_TOKEN_REQUIRED, INVALID_REQUEST, INVALID_TOKEN, USER_CONTEXT_REQUIRED and
+	// INSUFFICIENT_SCOPE are the bearer middleware's, INVALID_TOKEN a handler's too; the rest are
 	// handlers'.
 	"ACCESS_TOKEN_REQUIRED": "401: no bearer token, so the caller obtains one.",
+	"INVALID_REQUEST":       "400: the bearer token was sent by two methods at once, or its access_token parameter twice: RFC 6750 section 3.1's invalid_request.",
 	"INVALID_TOKEN":         "401: the bearer token did not validate.",
 	"INVALID_SUBJECT":       "401: the token's subject is not a user this server knows.",
 	"INVALID_SESSION":       "401: the session behind the token is gone.",
-	"USER_CONTEXT_REQUIRED": "401: the endpoint needs a user, and the token carries none.",
+	"USER_CONTEXT_REQUIRED": "403: the endpoint needs a user, and the token carries none.",
 	"UNAUTHORIZED":          "401: the caller may not act on this resource.",
 	"INSUFFICIENT_SCOPE":    "403: the token's scopes do not cover the route.",
 	"FORBIDDEN":             "403: the caller may not act on this resource.",
@@ -126,7 +128,9 @@ var apiErrorCodeDirs = []string{
 var apiErrorCodeArg = map[string]int{
 	"writeJSONError": 2,
 	"WriteError":     2,
-	"emitAuthError":  1,
+	// (w, r, code, description): the bearer guards' 403, whose code says why the token does not
+	// reach the route. The API surface's writer forwards it to WriteError.
+	"forbidden": 2,
 	// (w, r, err, message, code): the 500 that keeps an operation code a caller acts on. Its own
 	// body forwards that code to writeJSONError, so it is a forwarder below as well.
 	"writeInternalServerErrorWithCode": 4,
@@ -141,7 +145,7 @@ var apiErrorCodeForwarders = map[string]bool{
 	"writeInternalServerErrorWithCode": true,
 	"WriteError":                       true,
 	"WriteInternalServerError":         true,
-	"emitAuthError":                    true,
+	"forbidden":                        true,
 }
 
 // emittedAPICode is one error_code written on this surface, located.
@@ -426,6 +430,19 @@ func writerValues(fset *token.FileSet, f *ast.File, rel string) []string {
 			declared[fn.Name] = true
 		}
 	}
+	// A method named in an interface type declares the writer as a FuncDecl does, and holds no
+	// value: the bearer guards' refusals interface declares forbidden, and each surface's
+	// implementation is a FuncDecl above (#435).
+	ast.Inspect(f, func(n ast.Node) bool {
+		if iface, ok := n.(*ast.InterfaceType); ok {
+			for _, method := range iface.Methods.List {
+				for _, name := range method.Names {
+					declared[name] = true
+				}
+			}
+		}
+		return true
+	})
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch it := n.(type) {
 		case *ast.SelectorExpr:
@@ -494,9 +511,9 @@ func HandleX() { apiresponse.WriteError(w, "Method not allowed", "METHOD_NOT_ALL
 			codes: []string{"METHOD_NOT_ALLOWED"},
 		},
 		{
-			name: "emitAuthError's second argument is a code",
+			name: "the bearer guards' forbidden takes its code third",
 			src: `package p
-func HandleX() { emitAuthError(w, "INSUFFICIENT_SCOPE", "Insufficient scope.", 403, true) }`,
+func HandleX() { m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.") }`,
 			codes: []string{"INSUFFICIENT_SCOPE"},
 		},
 		{
@@ -562,6 +579,13 @@ func HandleX() {
 	write(w, "Attribute not found", "ATTRIBUTE_NOT_FOUND", http.StatusNotFound)
 }`,
 			problems: 1,
+		},
+		{
+			name: "a writer declared as an interface method is a declaration, not a value",
+			src: `package p
+type refusals interface { forbidden(w http.ResponseWriter, r *http.Request, apiCode, description string) }
+func HandleX() { m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.") }`,
+			codes: []string{"INSUFFICIENT_SCOPE"},
 		},
 		{
 			name: "a code-shaped literal somewhere else is not a code",

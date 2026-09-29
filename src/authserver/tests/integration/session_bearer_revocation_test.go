@@ -56,7 +56,7 @@ func TestSession_AdminAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode, "token must be rejected once session is deleted")
 	wwwAuth := resp2.Header.Get("WWW-Authenticate")
-	assert.Contains(t, wwwAuth, `Bearer error="invalid_token"`)
+	assert.Contains(t, wwwAuth, `Bearer realm="goiabada", error="invalid_token"`)
 	assert.Contains(t, wwwAuth, "Session has been terminated")
 
 	body, _ := io.ReadAll(resp2.Body)
@@ -90,7 +90,7 @@ func TestSession_AccountAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 	wwwAuth := resp2.Header.Get("WWW-Authenticate")
-	assert.Contains(t, wwwAuth, `Bearer error="invalid_token"`)
+	assert.Contains(t, wwwAuth, `Bearer realm="goiabada", error="invalid_token"`)
 	assert.Contains(t, wwwAuth, "Session has been terminated")
 }
 

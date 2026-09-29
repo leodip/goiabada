@@ -8,9 +8,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/core/errs"
@@ -61,9 +62,7 @@ func HandleUserInfoGetPost(
 			// permitted but told the client to retry a request that can only fail again,
 			// where 401 tells it to obtain a new token, which is the whole point of the
 			// distinction (#279 decision 14).
-			jsonWriter.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
-				"invalid_token", "The user could not be found.", http.StatusUnauthorized,
-				`Bearer error="invalid_token"`))
+			jsonWriter.JsonError(w, r, invalidTokenRefusal("The user could not be found."))
 			return
 		}
 
@@ -75,9 +74,7 @@ func HandleUserInfoGetPost(
 			// 401 invalid_token, for the reason the not-found branch above gives: the
 			// token is no longer valid for this account and the client's remedy is a new
 			// one, not a retry (#279 decision 14).
-			jsonWriter.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
-				"invalid_token", "The user account is disabled.", http.StatusUnauthorized,
-				`Bearer error="invalid_token"`))
+			jsonWriter.JsonError(w, r, invalidTokenRefusal("The user account is disabled."))
 			return
 		}
 
@@ -125,4 +122,13 @@ func HandleUserInfoGetPost(
 
 		jsonWriter.EncodeJson(w, r, claims)
 	}
+}
+
+// invalidTokenRefusal is the handler's own 401 invalid_token, challenged exactly as the bearer
+// guards in front of it challenge theirs: through middleware.BearerChallenge, so the realm and the
+// conformed description are on every bearer challenge this endpoint writes (#435).
+func invalidTokenRefusal(description string) error {
+	return protocolvalidation.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+		"invalid_token", description, http.StatusUnauthorized,
+		middleware.BearerChallenge("invalid_token", description))
 }
