@@ -346,7 +346,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 		// It also sits AFTER the wasReused return above, so #77's containment cascade is
 		// not pre-empted. Reuse is the stronger signal and already revokes everything a
 		// revoked-code rejection would have refused, and the reuse error carries the code
-		// entity that drives revokeAndAuditAuthCodeReuse.
+		// entity that drives revocation.RevokeOnAuthCodeReuseTx.
 		if codeEntity.Revoked {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 				"Code is invalid.", http.StatusBadRequest)

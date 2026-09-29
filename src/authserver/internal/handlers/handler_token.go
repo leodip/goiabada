@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -29,20 +28,14 @@ const authCodeNotAuthorizedErrorMsg = "The client associated with the provided c
 // tokenDatabase is what the token endpoint needs: the code it marks used, the refresh tokens it
 // rotates and revokes, and the session those grants hang from.
 //
-// It embeds the revocation port because reuse detection revokes a family through
-// revocation.RevokeRefreshTokens.
+// It embeds the revocation port because the response to a reused code is
+// revocation.RevokeOnAuthCodeReuseTx, which opens its own transaction on this handle.
 type tokenDatabase interface {
 	revocation.Database
 
-	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
-	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)
-	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
 	MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error)
 	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
 	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
-	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 func HandleTokenPost(
@@ -146,10 +139,15 @@ func HandleTokenPost(
 			// an unauthenticated attacker.
 			var reused *protocolvalidation.AuthCodeReusedError
 			if errors.As(err, &reused) {
-				if revokeErr := revokeAndAuditAuthCodeReuse(r.Context(), database, auditLogger, reused.Code); revokeErr != nil {
+				// The audit row waits for the transaction to commit: it lists JTIs that were
+				// really revoked, and on SQLite an audit write inside the transaction would wait
+				// on the one connection the transaction holds.
+				result, revokeErr := revocation.RevokeOnAuthCodeReuseTx(r.Context(), database, reused.Code)
+				if revokeErr != nil {
 					jsonWriter.JsonError(w, r, revokeErr)
 					return
 				}
+				revocation.LogAuthCodeReuse(r.Context(), auditLogger, reused.Code, result)
 				jsonWriter.JsonError(w, r, reused.Detail)
 				return
 			}
@@ -591,131 +589,6 @@ func HandleTokenPost(
 			return
 		}
 	}
-}
-
-// revokeAndAuditAuthCodeReuse runs the RFC 6749 §10.5 response to a reused
-// authorization code: it revokes the associated token family/session and, only
-// on a successful revoke, emits the reuse audit event (so the audit reflects
-// real revoked JTIs). It is shared by the validator-driven sequential-reuse
-// path and the concurrent double-spend guard in the authorization_code grant
-// (#77). On a nil return the caller is responsible for writing the client-facing
-// invalid_grant response; on a non-nil error the caller must surface a 500.
-func revokeAndAuditAuthCodeReuse(ctx context.Context, database tokenDatabase, auditLogger AuditLogger, code *models.Code) error {
-	revokedJtis, err := revokeOnAuthCodeReuse(ctx, database, code)
-	if err != nil {
-		return err
-	}
-	if code != nil {
-		auditLogger.Log(ctx, audit.AuditAuthCodeReuseDetected, map[string]interface{}{
-			"clientId":                code.ClientId,
-			"userId":                  code.UserId,
-			"codeId":                  code.Id,
-			"sessionIdentifier":       code.SessionIdentifier,
-			"revokedRefreshTokenJtis": revokedJtis,
-		})
-	}
-	return nil
-}
-
-// revokeOnAuthCodeReuse revokes refresh tokens linked to the replayed code's
-// session and deletes the user session. All writes happen inside a single
-// transaction so any failure rolls the entire revocation back rather than
-// leaving partial state. The replay response itself must NOT look successful
-// when revocation fails, so callers should surface a 500 to the client.
-//
-// Its first statement takes the session row, ahead of every grant that hangs off
-// it, so that this response and a termination of the same session serialize on
-// that row (#139). See the comment on that statement for what it prevents.
-func revokeOnAuthCodeReuse(ctx context.Context, database tokenDatabase, code *models.Code) ([]string, error) {
-	if code == nil {
-		return nil, nil
-	}
-
-	// One transaction opened through RunInTransaction, so a deadlock reruns the body (#301). It
-	// is safe to rerun: every read is inside the closure, revokedJtis is whatever the committing
-	// attempt revoked, and the reuse audit event is the caller's, written after this returns.
-	var revokedJtis []string
-	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		// THE SESSION ROW FIRST, before any grant that hangs off it (#139). A termination of this
-		// session deletes that row as its first statement, so with this leading the two
-		// transactions serialize on the row and one simply waits. Without it this one takes
-		// refresh_tokens and then user_sessions while the termination takes user_sessions and
-		// then refresh_tokens, and the two deadlock on MySQL and SQL Server with this one the
-		// victim, which the retry would answer by rerunning it, at the cost of a rerun on every
-		// such race. The same statement also orders this response against an authorization
-		// ceremony for the same session, which takes the row before it inserts. This is a
-		// local reason for this transaction's first statement and obliges no other site (#301).
-		//
-		// The result is deliberately NOT a branch. This response revokes whatever tokens it finds
-		// whether or not the session row is still there, because an offline grant's tokens outlive
-		// their session by design; the acquisition is here for the order it imposes, not for the
-		// answer it returns. A code with no session identifier acquires nothing: no row carries an
-		// empty identifier, and the code-id-scoped fallback below touches no session row either.
-		if code.SessionIdentifier != "" {
-			if _, err := database.AcquireUserSessionRow(ctx, tx, code.SessionIdentifier); err != nil {
-				return err
-			}
-		}
-
-		var refreshTokens []*models.RefreshToken
-		var err error
-		if code.SessionIdentifier != "" {
-			refreshTokens, err = database.GetRefreshTokensBySessionIdentifier(ctx, tx, code.SessionIdentifier)
-		} else {
-			// Defensive fallback: auth-code-flow codes always carry a session
-			// identifier today, but if a future change ever produces a
-			// session-less auth code, fall back to revoking only the refresh
-			// tokens directly linked to this code so reuse still has teeth.
-			slog.WarnContext(ctx, "auth code reuse on a code without a session identifier, falling back to code-id-scoped revocation",
-				"code_id", code.Id)
-			refreshTokens, err = database.GetRefreshTokensByCodeId(ctx, tx, code.Id)
-		}
-		if err != nil {
-			return err
-		}
-
-		revokedJtis, err = revocation.RevokeRefreshTokens(ctx, database, tx, refreshTokens)
-		if err != nil {
-			return err
-		}
-
-		// Tear down the session only when we actually revoked tokens issued from the
-		// replayed code. If there were none to revoke, there is nothing to contain, and
-		// deleting the session would disrupt an unrelated/in-flight session. That is what
-		// makes concurrent redemption safe: a losing racer finds no committed tokens yet
-		// (revokedJtis is empty), so it leaves the winner's live session row in place
-		// instead of tearing it down out from under the winner's in-progress mint, which
-		// read that session for its refresh-token lifetime. (#77)
-		//
-		// The guard's OUTCOME is what #77 needs and it is unchanged. What changed is the
-		// argument for it: since the acquisition above is unconditional, a losing racer now
-		// HOLDS the session row for the rest of this transaction even in the case where it
-		// goes on to write nothing, so the winner's own session read can be made to wait
-		// where it previously never did. Measured on all four engines: on SQLite, PostgreSQL
-		// and MySQL the winner's read is unaffected, because MVCC readers do not block and
-		// SQLite serializes the two transactions anyway. On SQL Server, whose READ COMMITTED
-		// takes shared locks, that read waits for this whole transaction. A bounded wait on
-		// a handful of statements, and not a deadlock: this transaction takes no lock any
-		// mint holds. Paying it is what buys the absence of the deadlock the acquisition's own
-		// comment describes. (#139)
-		if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
-			session, err := database.GetUserSessionBySessionIdentifier(ctx, tx, code.SessionIdentifier)
-			if err != nil {
-				return err
-			}
-			if session != nil {
-				if err := database.DeleteUserSession(ctx, tx, session.Id); err != nil {
-					return err
-				}
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return revokedJtis, nil
 }
 
 // extractClientCredentials extracts client_id and client_secret from the request.

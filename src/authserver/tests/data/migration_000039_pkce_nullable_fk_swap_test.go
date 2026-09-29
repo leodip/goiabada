@@ -239,7 +239,7 @@ func TestMigration000039_RowValuesSurviveTheRebuild(t *testing.T) {
 
 // TestMigration000039_ChallengelessCodeIsStorable is the probe's failing insert turned
 // into a test, at seam 3. It is goal 3 stated at the boundary a caller actually crosses:
-// CodeIssuer.CreateAuthCode leaves both NullStrings at Valid:false when the authorization
+// CodeIssuer.IssueAuthCode leaves both NullStrings at Valid:false when the authorization
 // request carried no challenge, and on SQLite that insert has been failing with a 500 at
 // /auth/issue for every confidential client configured for PKCE-optional.
 //
@@ -501,7 +501,7 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape models.RefreshTok
 	return &token
 }
 
-// createChallengelessCode000039 builds exactly what CodeIssuer.CreateAuthCode builds when
+// createChallengelessCode000039 builds exactly what CodeIssuer.IssueAuthCode builds when
 // the authorization request carried no challenge: both NullStrings at their zero value,
 // which is Valid:false. It returns the error rather than requiring success, because being
 // refused is the assertion on one side of this migration.

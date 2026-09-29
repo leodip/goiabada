@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -430,7 +431,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 
 		require.NoError(t, err)
 		// The load-bearing case for #77: an empty return here is what tells
-		// revokeOnAuthCodeReuse to leave the session alone.
+		// RevokeOnAuthCodeReuse to leave the session alone.
 		assert.Empty(t, jtis)
 		db.AssertNotCalled(t, "UpdateRefreshToken", mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -1182,4 +1183,225 @@ func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T
 		// And the reported list follows the same order, which is what an auditor reads.
 		assert.Equal(t, []string{"sid-a", "sid-b", "sid-c"}, result.TerminatedSessionIdentifiers)
 	})
+}
+
+// reuseSid is the session a replayed code in the cases below was issued through.
+const reuseSid = "sid-reused"
+
+// TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst pins the one order the replay response keeps
+// on purpose: the session row is taken before any grant that hangs off it.
+//
+// The reason is local to this transaction and obliges no other site. A termination of the same
+// session deletes that row as its first statement, so with the acquisition leading the two
+// serialize on the row and one waits; written the other way round this transaction takes
+// refresh_tokens and then user_sessions while the termination takes them in the opposite order,
+// and the pair deadlocks on MySQL and SQL Server with the replay the victim. The retry would
+// answer that by rerunning it, at the cost of a rerun on every such race, and the replayed request
+// would answer 500 once the retries were spent (#139, #301).
+//
+// Order is the only thing a mock can answer here, and it is the thing that matters: what two real
+// transactions of these shapes do to each other is the data tier's, in
+// TestLockOrder_ReplayResponseAgainstTermination, which calls RevokeOnAuthCodeReuse itself.
+func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
+	t.Run("the session row is taken before any grant is read", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+
+		mocks_data.ExpectRunInTransaction(db, revokeTx)
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return(&models.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
+		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(nil).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
+		// RunInTransaction is recorded at entry, before the body runs, so it stands for the
+		// transaction's opening; the commit and the rollback are the helper's and never reach
+		// the mock.
+		assert.Equal(t, []string{
+			"RunInTransaction",
+			"AcquireUserSessionRow",
+			"GetRefreshTokensBySessionIdentifier",
+			"UpdateRefreshToken",
+			"GetUserSessionBySessionIdentifier",
+			"DeleteUserSession",
+		}, methodOrder(db), "the acquisition must be the transaction's first statement")
+	})
+
+	t.Run("the acquisition's answer is not a branch", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+
+		mocks_data.ExpectRunInTransaction(db, revokeTx)
+		// The row is already gone, which is ordinary: an offline grant's tokens are designed
+		// to outlive their session, and the background reapers remove idle sessions routinely.
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(false, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis,
+			"the replay must still revoke the grant's tokens when the session row has gone")
+		assert.True(t, token.Revoked)
+		db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("an acquisition that errors stops before any grant is read", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		boom := errors.New("connection refused")
+
+		stub := mocks_data.ExpectRunInTransaction(db, revokeTx)
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(false, boom).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.ErrorIs(t, err, boom,
+			"a statement that did not run has not established anything, so the caller gets a 500")
+		assert.Nil(t, result.RevokedRefreshTokenJtis, "the zero result on a failure")
+		db.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
+		assert.ErrorIs(t, stub.BodyErr, boom, "the body hands its error to the helper, which rolls back")
+	})
+
+	t.Run("a code with no session identifier acquires nothing", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+
+		mocks_data.ExpectRunInTransaction(db, revokeTx)
+		db.On("GetRefreshTokensByCodeId", mock.Anything, revokeTx, int64(42)).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
+		// No row carries an empty session identifier, so the statement would refuse the
+		// argument, and the code-id-scoped fallback writes no session row to order against.
+		db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("#77's guard survives the acquisition", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+
+		mocks_data.ExpectRunInTransaction(db, revokeTx)
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.NoError(t, err)
+		// Empty, and a list rather than nil, so the audit payload carries [].
+		require.NotNil(t, result.RevokedRefreshTokenJtis)
+		assert.Empty(t, result.RevokedRefreshTokenJtis)
+		// The losing racer of a concurrent redemption finds nothing to revoke and must leave
+		// the winner's session row in place. It HOLDS that row for the rest of the
+		// transaction, which is what the acquisition's comment is about, but it still must
+		// not delete it.
+		db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("a failure after the sweep yields the zero result", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		boom := errors.New("the delete failed")
+
+		mocks_data.ExpectRunInTransaction(db, revokeTx)
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return([]*models.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return(&models.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
+		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(boom).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		// The sweep succeeded and the transaction rolled back, so a caller auditing this result
+		// would list a revocation that never happened.
+		require.ErrorIs(t, err, boom)
+		assert.Nil(t, result.RevokedRefreshTokenJtis)
+	})
+}
+
+// TestRevokeOnAuthCodeReuse_RefusesAnUnusableCall holds the two preconditions at entry, where
+// RevokeUserAuthState holds its own: without a transaction the acquisition autocommits and releases
+// the row before the sweep, and without a code there is nothing to respond to. Neither reaches a
+// statement, and the wrapper opens no transaction for a nil code.
+func TestRevokeOnAuthCodeReuse_RefusesAnUnusableCall(t *testing.T) {
+	t.Run("a nil transaction", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+
+		result, err := RevokeOnAuthCodeReuse(context.Background(), db, nil, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires a transaction")
+		assert.Nil(t, result.RevokedRefreshTokenJtis)
+		assert.Empty(t, db.Calls, "no statement may run without the transaction")
+	})
+
+	t.Run("a nil code", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+
+		result, err := RevokeOnAuthCodeReuse(context.Background(), db, revokeTx, nil)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires the reused code")
+		assert.Nil(t, result.RevokedRefreshTokenJtis)
+		assert.Empty(t, db.Calls)
+	})
+
+	t.Run("a nil code handed to the wrapper opens no transaction", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, nil)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires the reused code")
+		assert.Nil(t, result.RevokedRefreshTokenJtis)
+		assert.Empty(t, db.Calls, "RunInTransaction must not be reached")
+	})
+}
+
+// reuseAuditRecorder records the one event LogAuthCodeReuse writes.
+type reuseAuditRecorder struct {
+	event   string
+	details map[string]interface{}
+	calls   int
+}
+
+func (r *reuseAuditRecorder) Log(_ context.Context, auditEvent string, details map[string]interface{}) {
+	r.event = auditEvent
+	r.details = details
+	r.calls++
+}
+
+// TestLogAuthCodeReuse_Payload pins the auth_code_reuse_detected payload field by field, which the
+// token endpoint wrote inline before the response moved here (#435).
+func TestLogAuthCodeReuse_Payload(t *testing.T) {
+	code := &models.Code{Id: 42, ClientId: 7, UserId: 13, SessionIdentifier: reuseSid}
+	recorder := &reuseAuditRecorder{}
+
+	LogAuthCodeReuse(context.Background(), recorder, code, AuthCodeReuseResult{RevokedRefreshTokenJtis: []string{"rt-1", "rt-2"}})
+
+	require.Equal(t, 1, recorder.calls)
+	assert.Equal(t, audit.AuditAuthCodeReuseDetected, recorder.event)
+	assert.Equal(t, map[string]interface{}{
+		"clientId":                int64(7),
+		"userId":                  int64(13),
+		"codeId":                  int64(42),
+		"sessionIdentifier":       reuseSid,
+		"revokedRefreshTokenJtis": []string{"rt-1", "rt-2"},
+	}, recorder.details)
 }

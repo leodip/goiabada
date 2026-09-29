@@ -11,7 +11,6 @@ package mocks_handlers
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -54,76 +53,70 @@ func (_m *CodeIssuer) EXPECT() *CodeIssuer_Expecter {
 	return &CodeIssuer_Expecter{mock: &_m.Mock}
 }
 
-// CreateAuthCode provides a mock function for the type CodeIssuer
-func (_mock *CodeIssuer) CreateAuthCode(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error) {
-	ret := _mock.Called(ctx, tx, input)
+// IssueAuthCodeTx provides a mock function for the type CodeIssuer
+func (_mock *CodeIssuer) IssueAuthCodeTx(ctx context.Context, input *issuance.CreateCodeInput) (*models.Code, error) {
+	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateAuthCode")
+		panic("no return value specified for IssueAuthCodeTx")
 	}
 
 	var r0 *models.Code
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *issuance.CreateCodeInput) (*models.Code, error)); ok {
-		return returnFunc(ctx, tx, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *issuance.CreateCodeInput) (*models.Code, error)); ok {
+		return returnFunc(ctx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *issuance.CreateCodeInput) *models.Code); ok {
-		r0 = returnFunc(ctx, tx, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *issuance.CreateCodeInput) *models.Code); ok {
+		r0 = returnFunc(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Code)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, *issuance.CreateCodeInput) error); ok {
-		r1 = returnFunc(ctx, tx, input)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *issuance.CreateCodeInput) error); ok {
+		r1 = returnFunc(ctx, input)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// CodeIssuer_CreateAuthCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateAuthCode'
-type CodeIssuer_CreateAuthCode_Call struct {
+// CodeIssuer_IssueAuthCodeTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IssueAuthCodeTx'
+type CodeIssuer_IssueAuthCodeTx_Call struct {
 	*mock.Call
 }
 
-// CreateAuthCode is a helper method to define mock.On call
+// IssueAuthCodeTx is a helper method to define mock.On call
 //   - ctx context.Context
-//   - tx *sql.Tx
 //   - input *issuance.CreateCodeInput
-func (_e *CodeIssuer_Expecter) CreateAuthCode(ctx any, tx any, input any) *CodeIssuer_CreateAuthCode_Call {
-	return &CodeIssuer_CreateAuthCode_Call{Call: _e.mock.On("CreateAuthCode", ctx, tx, input)}
+func (_e *CodeIssuer_Expecter) IssueAuthCodeTx(ctx any, input any) *CodeIssuer_IssueAuthCodeTx_Call {
+	return &CodeIssuer_IssueAuthCodeTx_Call{Call: _e.mock.On("IssueAuthCodeTx", ctx, input)}
 }
 
-func (_c *CodeIssuer_CreateAuthCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput)) *CodeIssuer_CreateAuthCode_Call {
+func (_c *CodeIssuer_IssueAuthCodeTx_Call) Run(run func(ctx context.Context, input *issuance.CreateCodeInput)) *CodeIssuer_IssueAuthCodeTx_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *sql.Tx
+		var arg1 *issuance.CreateCodeInput
 		if args[1] != nil {
-			arg1 = args[1].(*sql.Tx)
-		}
-		var arg2 *issuance.CreateCodeInput
-		if args[2] != nil {
-			arg2 = args[2].(*issuance.CreateCodeInput)
+			arg1 = args[1].(*issuance.CreateCodeInput)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
 }
 
-func (_c *CodeIssuer_CreateAuthCode_Call) Return(code *models.Code, err error) *CodeIssuer_CreateAuthCode_Call {
+func (_c *CodeIssuer_IssueAuthCodeTx_Call) Return(code *models.Code, err error) *CodeIssuer_IssueAuthCodeTx_Call {
 	_c.Call.Return(code, err)
 	return _c
 }
 
-func (_c *CodeIssuer_CreateAuthCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error)) *CodeIssuer_CreateAuthCode_Call {
+func (_c *CodeIssuer_IssueAuthCodeTx_Call) RunAndReturn(run func(ctx context.Context, input *issuance.CreateCodeInput) (*models.Code, error)) *CodeIssuer_IssueAuthCodeTx_Call {
 	_c.Call.Return(run)
 	return _c
 }

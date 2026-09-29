@@ -2,6 +2,7 @@ package issuance
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"testing"
@@ -17,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// assertAuthCodeShape pins what CreateAuthCode emits: a canonical v4 with its hyphens stripped,
+// assertAuthCodeShape pins what createAuthCode emits: a canonical v4 with its hyphens stripped,
 // followed by 96 characters of the security alphabet, 128 in all. The prefix is 32 hex digits
 // because a UUID is what produces it, so re-inserting the hyphens has to give something the
 // generator's own parser accepts. Nothing about the code's format may change while its consumers
@@ -72,7 +73,7 @@ func TestCreateAuthCode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
+	code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -145,7 +146,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 					persisted = args.Get(2).(*models.Code).UserAgent
 				}).Return(nil)
 
-			_, err := codeIssuer.CreateAuthCode(context.Background(), nil, &CreateCodeInput{
+			_, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
 				AuthContext: ceremony.AuthContext{
 					ClientId:       "test-client",
 					UserId:         123,
@@ -191,7 +192,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
+	code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -250,7 +251,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 				SessionIdentifier: "session123",
 			}
 
-			code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
+			code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, code)
@@ -281,7 +282,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
+	code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
 
 	assert.Error(t, err)
 	assert.Nil(t, code)
@@ -311,7 +312,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "deleted-client").
 		Return((*models.Client)(nil), nil)
 
-	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, &CreateCodeInput{
+	code, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
 		AuthContext:       ceremony.AuthContext{ClientId: "deleted-client", UserId: 123},
 		SessionIdentifier: "session123",
 	})
@@ -324,4 +325,186 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 	// gone, and its foreign key would refuse it anyway, with an error nobody could branch on.
 	mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything, mock.Anything)
 	mockDB.AssertExpectations(t)
+}
+
+// issueTx is an opaque non-nil transaction for the cases below: every statement is matched on it,
+// so a statement issued on the pool or on another transaction matches nothing.
+var issueTx = &sql.Tx{}
+
+const issueSid = "sid-issuing"
+
+func issueCodeInput() *CreateCodeInput {
+	return &CreateCodeInput{
+		AuthContext: ceremony.AuthContext{
+			ClientId:    "test-client",
+			UserId:      123,
+			Scope:       "openid profile",
+			RedirectURI: "https://example.com/callback",
+			AcrLevel:    models.AcrLevel1,
+			AuthMethods: "pwd",
+		},
+		SessionIdentifier: issueSid,
+	}
+}
+
+// TestIssueAuthCodeTx_TakesTheSessionRowBeforeTheInsert pins the transaction's shape, which is the
+// whole of what the issuer contributes to the #139 property: one RunInTransaction, and inside it
+// the acquisition, then the client lookup, then the insert, every one on that transaction. A mock
+// recording the sequence is the only place this choice is observable: the acquisition is a
+// single-row UPDATE of a column nothing reads. What two real transactions of this shape do to a
+// termination is the data tier's, in TestIssuanceOrdering_AgainstTermination, which calls
+// IssueAuthCode itself.
+func TestIssueAuthCodeTx_TakesTheSessionRowBeforeTheInsert(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+
+	var order []string
+	note := func(what string) func(mock.Arguments) {
+		return func(mock.Arguments) { order = append(order, what) }
+	}
+	mocks_data.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
+	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Run(note("session row")).Return(true, nil).Once()
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Run(note("client")).
+		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*models.Code")).Run(note("insert")).
+		Return(nil).Once()
+
+	code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
+
+	require.NoError(t, err)
+	require.NotNil(t, code)
+	assert.Equal(t, issueSid, code.SessionIdentifier, "the code is bound to the session whose row was taken")
+	assert.Equal(t, []string{"begin", "session row", "client", "insert", "commit"}, order,
+		"the session row is taken first, and all three statements share the one transaction")
+}
+
+// TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback holds the second SQLite self-deadlock hazard of
+// this move: either refusal reaches the caller only after the transaction has rolled back. The
+// caller answers a refusal through the server-side session store on a nil transaction, and on
+// SQLite that is the one connection the transaction holds, so a refusal handed back while it was
+// open would wait on itself (#139). Nothing is inserted on either row.
+func TestIssueAuthCodeTx_RefusesOnlyAfterTheRollback(t *testing.T) {
+	cases := []struct {
+		name     string
+		sentinel error
+		setup    func(db *mocks_data.Database)
+	}{
+		{
+			name:     "the session row is gone",
+			sentinel: ErrIssuingSessionGone,
+			setup: func(db *mocks_data.Database) {
+				db.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(false, nil).Once()
+			},
+		},
+		{
+			name:     "the client is gone",
+			sentinel: ErrIssuingClientGone,
+			setup: func(db *mocks_data.Database) {
+				db.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Once()
+				db.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Return(nil, nil).Once()
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+
+			var order []string
+			stub := mocks_data.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
+			tc.setup(mockDB)
+
+			code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
+			order = append(order, "returned")
+
+			require.ErrorIs(t, err, tc.sentinel, "the caller branches on the sentinel, so it must survive the helper")
+			assert.Nil(t, code)
+			assert.ErrorIs(t, stub.BodyErr, tc.sentinel, "the body hands the sentinel to the helper, which rolls back")
+			assert.Equal(t, []string{"begin", "rollback", "returned"}, order,
+				"the sentinel reaches the caller only after the rollback")
+			mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+
+	t.Run("a gone session is not looked up any further", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mocks_data.ExpectRunInTransaction(mockDB, issueTx)
+		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(false, nil).Once()
+
+		_, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
+
+		require.ErrorIs(t, err, ErrIssuingSessionGone)
+		assert.NotErrorIs(t, err, ErrIssuingClientGone, "the two refusals are distinct sentinels")
+		mockDB.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+// TestIssueAuthCode_RefusesANilTransaction holds the precondition at entry: on an autocommitted
+// statement the acquisition releases the row before the insert, which is the whole of what it buys.
+func TestIssueAuthCode_RefusesANilTransaction(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+
+	code, err := NewCodeIssuer(mockDB).IssueAuthCode(context.Background(), nil, issueCodeInput())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires a transaction")
+	assert.Nil(t, code)
+	assert.Empty(t, mockDB.Calls, "no statement may run without the transaction")
+}
+
+// TestIssueAuthCodeTx_FailuresAreNotRefusals: a statement that did not run has not established that
+// the session is gone, so an acquisition failure comes back as itself, never as a sentinel that
+// would restart a ceremony whose session is alive, and so does a commit the engine refuses.
+func TestIssueAuthCodeTx_FailuresAreNotRefusals(t *testing.T) {
+	boom := errors.New("connection refused")
+
+	t.Run("the acquisition fails", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		stub := mocks_data.ExpectRunInTransaction(mockDB, issueTx)
+		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(false, boom).Once()
+
+		code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
+
+		require.ErrorIs(t, err, boom)
+		assert.NotErrorIs(t, err, ErrIssuingSessionGone)
+		assert.Nil(t, code)
+		assert.ErrorIs(t, stub.BodyErr, boom)
+		mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("the commit fails", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mocks_data.ExpectRunInTransactionThenFail(mockDB, issueTx, boom)
+		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Once()
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
+			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*models.Code")).Return(nil).Once()
+
+		code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
+
+		// The code row's fate is indeterminate, so no code is handed out to be delivered.
+		require.ErrorIs(t, err, boom)
+		assert.Nil(t, code)
+	})
+}
+
+// TestIssueAuthCodeTx_ARerunReturnsTheCommittingAttemptsCode: a deadlock victim's body is rerun by
+// RunInTransaction (#301), and the first attempt's code never committed, so the code returned must
+// be the one the second attempt inserted.
+func TestIssueAuthCodeTx_ARerunReturnsTheCommittingAttemptsCode(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	mocks_data.ExpectRunInTransactionRerun(mockDB, issueTx)
+	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Twice()
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
+		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Twice()
+	var inserted []*models.Code
+	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*models.Code")).
+		Run(func(args mock.Arguments) { inserted = append(inserted, args.Get(2).(*models.Code)) }).
+		Return(nil).Twice()
+
+	code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
+
+	require.NoError(t, err)
+	require.Len(t, inserted, 2)
+	assert.Same(t, inserted[1], code, "the returned code is the committing attempt's")
+	assert.NotEqual(t, inserted[0].Code, code.Code)
 }
