@@ -221,6 +221,44 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
+	// The step-up rule refuses to judge a session level it does not know, and this hop answers 500
+	// where prompt=none answers interaction_required: each caller decides (#437).
+	t.Run("an unknown session level answers 500 and saves nothing", func(t *testing.T) {
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+
+		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, testBaseURL, testAdminConsoleBaseURL)
+
+		req, err := http.NewRequest("GET", "/auth/level1/completed", nil)
+		assert.NoError(t, err)
+		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "test-session"))
+		rr := httptest.NewRecorder()
+
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateLevel1PasswordCompleted,
+			ClientId:  "test-client",
+			UserId:    1,
+		}
+		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		userSession := &models.UserSession{Id: 1, UserId: 1, AcrLevel: "urn:goiabada:pwd"}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
+		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+			return strings.Contains(err.Error(), "invalid ACR level urn:goiabada:pwd")
+		})).Once()
+
+		handler.ServeHTTP(rr, req)
+
+		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+	})
+
 	t.Run("Successful flow, redirect to completed", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)

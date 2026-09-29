@@ -1,0 +1,127 @@
+package handlers
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+)
+
+// handlePromptNone's steps 4 to 6 through the handler: each answer the step-up rule gives reaches
+// its own description, and the rule's two answers keep step 5 between them. Which answer a session
+// gets is ceremony.StepUpOwed's table; this is the thin seam showing prompt=none consults it and in
+// what order (#437 seam 4).
+func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
+	testCases := []struct {
+		name            string
+		target          models.AcrLevel
+		sessionAcr      models.AcrLevel
+		sessionOtpGen   int64
+		userOtpGen      int64
+		userOTPEnabled  bool
+		wantDescription string
+	}{
+		{
+			// Step 5 would refuse too; step 4 is asked first.
+			name:            "a target above the session's level, before the missing authenticator",
+			target:          models.AcrLevel2Mandatory,
+			sessionAcr:      models.AcrLevel1,
+			userOTPEnabled:  false,
+			wantDescription: "Higher authentication level required",
+		},
+		{
+			name:            "an unknown session level is insufficient",
+			target:          models.AcrLevel1,
+			sessionAcr:      "urn:goiabada:pwd",
+			userOTPEnabled:  true,
+			wantDescription: "Higher authentication level required",
+		},
+		{
+			// Step 6 would refuse too; step 5 is asked first.
+			name:            "a mandatory target with no authenticator, before the changed configuration",
+			target:          models.AcrLevel2Mandatory,
+			sessionAcr:      models.AcrLevel2Mandatory,
+			sessionOtpGen:   2,
+			userOtpGen:      3,
+			userOTPEnabled:  false,
+			wantDescription: "Additional authentication setup required",
+		},
+		{
+			name:            "the authenticator changed since the session answered level 2",
+			target:          models.AcrLevel2Optional,
+			sessionAcr:      models.AcrLevel2Optional,
+			sessionOtpGen:   2,
+			userOtpGen:      3,
+			userOTPEnabled:  true,
+			wantDescription: "Authentication configuration has changed",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			stubRegisteredRedirectURI(database, "https://example.com")
+			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
+			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			tokenParser := mocks_handlers.NewTokenParser(t)
+
+			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
+				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+
+			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none", nil)
+			require.NoError(t, err)
+			ctx := reqctx.WithSettings(req.Context(), &models.Settings{PKCERequired: true, Issuer: "https://test-issuer.com"})
+			ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
+			req = req.WithContext(ctx)
+			rr := httptest.NewRecorder()
+
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
+			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
+			authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
+			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+			client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: tc.target}
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+
+			userSession := &models.UserSession{
+				Id:                  1,
+				UserId:              7,
+				AcrLevel:            tc.sessionAcr,
+				AuthMethods:         "pwd",
+				OtpConfigGeneration: tc.sessionOtpGen,
+				User: models.User{
+					Id:                  7,
+					Enabled:             true,
+					OTPEnabled:          tc.userOTPEnabled,
+					OtpConfigGeneration: tc.userOtpGen,
+				},
+			}
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
+			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+			userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
+			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusFound, rr.Code)
+			location, err := url.Parse(rr.Header().Get("Location"))
+			require.NoError(t, err)
+			assert.Equal(t, "interaction_required", location.Query().Get("error"))
+			assert.Equal(t, tc.wantDescription, location.Query().Get("error_description"))
+		})
+	}
+}

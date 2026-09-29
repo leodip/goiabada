@@ -2,7 +2,9 @@ package ceremony
 
 import (
 	"math"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -789,6 +791,230 @@ func TestInState(t *testing.T) {
 			ac := &AuthContext{AuthState: tc.actual}
 
 			assert.Equal(t, tc.want, ac.InState(tc.accepted...))
+		})
+	}
+}
+
+// =============================================================================
+// Tests for ParkDeferredError
+//
+// The whole table for parking. HandleAuthorizeGet's handler cases each park one error and read it
+// back; what the parked description may hold is decided here (#213, #437 seam 1).
+// =============================================================================
+
+func TestParkDeferredError(t *testing.T) {
+	testCases := []struct {
+		name            string
+		code            string
+		description     string
+		wantDescription string
+	}{
+		{
+			name:            "a conforming description is kept byte for byte",
+			code:            "invalid_request",
+			description:     "Invalid response_type parameter value.",
+			wantDescription: "Invalid response_type parameter value.",
+		},
+		{
+			// The double quote, the backslash and every non-ASCII rune are outside RFC 6749
+			// Appendix A.8's NQSCHAR, and each becomes one '?'.
+			name:            "forbidden characters are replaced before they are stored",
+			code:            "invalid_scope",
+			description:     "bad \"x\\y\" é",
+			wantDescription: "bad ?x?y? ?",
+		},
+		{
+			// A description interpolates request text, so the parked copy is bounded rather than
+			// carried at whatever length the request chose.
+			name:            "a long description is bounded before it is stored",
+			code:            "invalid_scope",
+			description:     strings.Repeat("a", 600),
+			wantDescription: strings.Repeat("a", 509) + "...",
+		},
+		{
+			name:            "an empty description stays empty",
+			code:            "invalid_request",
+			description:     "",
+			wantDescription: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ac := &AuthContext{
+				AuthState: AuthStateLevel1Password,
+				ClientId:  "client-1",
+				Scope:     "openid",
+				UserId:    7,
+			}
+
+			ac.ParkDeferredError(tc.code, tc.description)
+
+			assert.Equal(t, tc.code, ac.DeferredErrorCode)
+			assert.Equal(t, tc.wantDescription, ac.DeferredErrorDescription)
+			assert.Equal(t, AuthStateRequiresLevel1, ac.AuthState,
+				"a parked error is delivered after level 1, so the ceremony goes there")
+			assert.Equal(t, "client-1", ac.ClientId, "parking writes nothing else")
+			assert.Equal(t, "openid", ac.Scope, "parking writes nothing else")
+			assert.Equal(t, int64(7), ac.UserId, "parking writes nothing else")
+		})
+	}
+}
+
+// =============================================================================
+// Tests for RecordPasswordVerified and RecordOTPVerified
+//
+// The whole table for what a verified credential writes. The password and OTP handler cases each
+// check one verified submission reaches its save; which field it writes is decided here (#437 seam 1).
+// =============================================================================
+
+func TestRecordPasswordVerified(t *testing.T) {
+	// A zone other than UTC, so the test sees the conversion rather than a value already in UTC.
+	now := time.Date(2026, 9, 29, 12, 30, 0, 0, time.FixedZone("UTC-3", -3*60*60))
+
+	testCases := []struct {
+		name            string
+		existingMethods string
+		wantMethods     string
+	}{
+		{"a first password", "", "pwd"},
+		{"a password verified again is listed once", "pwd", "pwd"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			user := &models.User{Id: 42, AuthStateGeneration: 3, OtpConfigGeneration: 5}
+			ac := &AuthContext{
+				AuthState:   AuthStateLevel1Password,
+				AuthMethods: tc.existingMethods,
+				OTPKeyURL:   "otpauth://totp/kept",
+				Scope:       "openid",
+			}
+
+			ac.RecordPasswordVerified(user, now)
+
+			assert.Equal(t, int64(42), ac.UserId)
+			assert.Equal(t, int64(3), ac.AuthStateGeneration, "captured from the user the password was checked against (#106)")
+			require.NotNil(t, ac.OtpConfigGeneration)
+			assert.Equal(t, int64(5), *ac.OtpConfigGeneration, "captured for the create arm at /auth/completed (#242)")
+			assert.Equal(t, tc.wantMethods, ac.AuthMethods)
+			require.NotNil(t, ac.AuthenticatedAt)
+			assert.True(t, now.Equal(*ac.AuthenticatedAt), "the instant verified")
+			assert.Equal(t, time.UTC, ac.AuthenticatedAt.Location(), "stored in UTC")
+			assert.True(t, ac.Level1AuthCompleted, "level 1 was performed in this ceremony (#129)")
+			assert.Equal(t, AuthStateLevel1PasswordCompleted, ac.AuthState)
+			assert.Equal(t, "otpauth://totp/kept", ac.OTPKeyURL, "a password writes no OTP field")
+			assert.Equal(t, "openid", ac.Scope, "a password writes no request field")
+
+			// The capture is a copy: a later change to the user row read here does not reach the
+			// ceremony's snapshot.
+			user.OtpConfigGeneration = 6
+			assert.Equal(t, int64(5), *ac.OtpConfigGeneration)
+		})
+	}
+}
+
+func TestRecordOTPVerified(t *testing.T) {
+	now := time.Date(2026, 9, 29, 12, 30, 0, 0, time.FixedZone("UTC+2", 2*60*60))
+	captured := int64(4)
+
+	testCases := []struct {
+		name                string
+		existingMethods     string
+		existingGeneration  *int64
+		level1Completed     bool
+		enrolledGeneration  *int64
+		wantMethods         string
+		wantOtpConfigGenNil bool
+		wantOtpConfigGen    int64
+	}{
+		{
+			name:               "an enrolled user after a password keeps what level 2 captured",
+			existingMethods:    "pwd",
+			existingGeneration: &captured,
+			level1Completed:    true,
+			wantMethods:        "pwd otp",
+			wantOtpConfigGen:   4,
+		},
+		{
+			// The ceremony moved the counter by enrolling, so it promotes the value the increment
+			// returned rather than the one it asked the question against (#242).
+			name:               "an enrolment overwrites what level 2 captured",
+			existingMethods:    "pwd",
+			existingGeneration: &captured,
+			level1Completed:    true,
+			enrolledGeneration: func() *int64 { g := int64(5); return &g }(),
+			wantMethods:        "pwd otp",
+			wantOtpConfigGen:   5,
+		},
+		{
+			name:               "an enrolment on a context with no capture sets it",
+			existingMethods:    "pwd",
+			enrolledGeneration: func() *int64 { g := int64(1); return &g }(),
+			wantMethods:        "pwd otp",
+			wantOtpConfigGen:   1,
+		},
+		{
+			name:                "no enrolment and no capture leaves nothing to promote",
+			existingMethods:     "pwd",
+			wantMethods:         "pwd otp",
+			wantOtpConfigGenNil: true,
+		},
+		{
+			// A session reused at level 1 and stepping up: the session's methods came across, and
+			// OTP must not stand in for a level 1 this ceremony never performed (#129).
+			name:               "a step-up on a reused session leaves level 1 not completed",
+			existingMethods:    "pwd",
+			existingGeneration: &captured,
+			level1Completed:    false,
+			wantMethods:        "pwd otp",
+			wantOtpConfigGen:   4,
+		},
+		{
+			name:               "an otp verified again is listed once",
+			existingMethods:    "pwd otp",
+			existingGeneration: &captured,
+			level1Completed:    true,
+			wantMethods:        "pwd otp",
+			wantOtpConfigGen:   4,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ac := &AuthContext{
+				AuthState:           AuthStateLevel2OTP,
+				AuthMethods:         tc.existingMethods,
+				OtpConfigGeneration: tc.existingGeneration,
+				Level1AuthCompleted: tc.level1Completed,
+				OTPKeyURL:           "otpauth://totp/spent",
+				UserId:              42,
+				Scope:               "openid",
+			}
+
+			ac.RecordOTPVerified(now, tc.enrolledGeneration)
+
+			assert.Equal(t, tc.wantMethods, ac.AuthMethods)
+			if tc.wantOtpConfigGenNil {
+				assert.Nil(t, ac.OtpConfigGeneration)
+			} else {
+				require.NotNil(t, ac.OtpConfigGeneration)
+				assert.Equal(t, tc.wantOtpConfigGen, *ac.OtpConfigGeneration)
+			}
+			require.NotNil(t, ac.AuthenticatedAt)
+			assert.True(t, now.Equal(*ac.AuthenticatedAt), "the instant verified")
+			assert.Equal(t, time.UTC, ac.AuthenticatedAt.Location(), "stored in UTC")
+			assert.Equal(t, tc.level1Completed, ac.Level1AuthCompleted, "OTP never writes level 1 (#129)")
+			assert.Equal(t, AuthStateAuthenticationCompleted, ac.AuthState)
+			assert.Empty(t, ac.OTPKeyURL, "the spent enrolment key is cleared (#247)")
+			assert.Equal(t, int64(42), ac.UserId, "OTP writes no user")
+			assert.Equal(t, "openid", ac.Scope, "OTP writes no request field")
+
+			if tc.enrolledGeneration != nil {
+				// A copy: the caller's variable is not aliased by the ceremony.
+				*tc.enrolledGeneration += 100
+				assert.Equal(t, tc.wantOtpConfigGen, *ac.OtpConfigGeneration)
+			}
 		})
 	}
 }

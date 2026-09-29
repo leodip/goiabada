@@ -59,7 +59,7 @@ const (
 // write, refused outside the writer like an assignment, and its own body is where that write
 // happens, so the body is exempt. A method writing a request field that is not listed here is
 // therefore refused for the write in its body.
-var requestFieldSetters = []string{"SetTargetAcrLevel"}
+var requestFieldSetters = []string{"SetTargetAcrLevel", "ParkDeferredError"}
 
 // requestFieldWriter names the one function whose body may write a request field: the handler that
 // accepts the authorization request. Function literals inside it are inside it.
@@ -594,6 +594,10 @@ func (ac *AuthContext) SetTargetAcrLevel(level string) {
 	ac.TargetAcrLevel = level
 }
 
+func (ac *AuthContext) ParkDeferredError(code, description string) {
+	ac.State = code + description
+}
+
 func (ac *AuthContext) SetScope(scope string) {
 	ac.Scope = scope
 }
@@ -634,6 +638,7 @@ func HandleAuthorizeGet(state string) func() *ceremony.AuthContext {
 		*p = "x"
 		*ac = ceremony.AuthContext{"s", nil, "t", "u"}
 		ac.SetTargetAcrLevel("urn:goiabada:level1")
+		ac.ParkDeferredError("invalid_request", "parked")
 		return ac
 	}
 }
@@ -678,6 +683,7 @@ func issue(authContext *ceremony.AuthContext, other ceremony.AuthContext, w wrap
 	authContext.SetTargetAcrLevel("m")
 	set := authContext.SetTargetAcrLevel
 	(*ceremony.AuthContext).SetTargetAcrLevel(authContext, "n")
+	authContext.ParkDeferredError("o", "p")
 	_, _, _ = p, q, set
 }
 `)
@@ -774,6 +780,7 @@ func fixture(ac *ceremony.AuthContext) {
 		"authserver/internal/handlers/handler_auth_issue.go:26: calls SetTargetAcrLevel",
 		"authserver/internal/handlers/handler_auth_issue.go:27: calls SetTargetAcrLevel",
 		"authserver/internal/handlers/handler_auth_issue.go:28: calls SetTargetAcrLevel",
+		"authserver/internal/handlers/handler_auth_issue.go:29: calls ParkDeferredError",
 		"authserver/internal/issuance/code_issuer.go:8: assigns UILocales",
 		"authserver/internal/issuance/code_issuer.go:12: sets UILocales in an AuthContext literal",
 	}, requestFieldStrings(walk.found), "the finder matched the wrong set")

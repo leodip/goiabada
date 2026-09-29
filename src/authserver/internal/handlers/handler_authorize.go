@@ -407,19 +407,8 @@ func HandleAuthorizeGet(
 			// Park the error and go and authenticate. It is carried on the auth context, which
 			// the session store seals with an AEAD, so it is not a value the visitor can choose,
 			// and it is delivered at /auth/level1completed once level 1 credentials are verified.
-			//
-			// The description is conformed HERE and not only at the emitter. RFC 6749 Appendix
-			// A.8's character set is enforced in redirToClientWithError as well, and that filter
-			// is idempotent so the two paths stay byte-identical, but a bound applied at emission
-			// does nothing for a string already parked in the session: descriptions interpolate
-			// request text, so an unbounded one would be carried by every request of the
-			// ceremony that parked it. The bound itself is ConformErrorDescription's own
-			// maxErrorDescriptionBytes; it used to be attributed to the 50-chunk cap of the
-			// cookie store, which no longer exists (#213 decision 10, #266).
-			authContext.DeferredErrorCode = validationError.GetCode()
-			authContext.DeferredErrorDescription =
-				customerrors.ConformErrorDescription(validationError.GetDescription())
-			authContext.AuthState = ceremony.AuthStateRequiresLevel1
+			// ParkDeferredError conforms and bounds the description before it is stored.
+			authContext.ParkDeferredError(validationError.GetCode(), validationError.GetDescription())
 
 			saveAuthContextErr := ceremonyStore.SaveAuthContext(w, r, &authContext)
 			if saveAuthContextErr != nil {
@@ -699,17 +688,14 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 		}
 	}
 
-	// 4. Check ACR requirements
+	// 4. Check ACR requirements, through the step-up rule /auth/level1completed reads too. Steps 4
+	// and 6 are its two answers; step 5 sits between them so the order of the refusals is kept.
 	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-	sessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel.String())
-	if err != nil {
-		// Unknown session ACR, treat as insufficient
-		redirectWithError(oidc.ErrorInteractionRequired, "Higher authentication level required")
-		return
-	}
+	stepUp, stepUpErr := ceremony.StepUpOwed(targetAcrLevel, userSession)
 
-	// If target ACR is higher than session ACR, we need step-up (interaction required)
-	if targetAcrLevel.IsHigherThan(sessionAcrLevel) {
+	// An unknown session ACR is treated as insufficient. If the target ACR is higher than the
+	// session's, we need step-up (interaction required).
+	if stepUpErr != nil || stepUp == ceremony.StepUpLevel {
 		redirectWithError(oidc.ErrorInteractionRequired, "Higher authentication level required")
 		return
 	}
@@ -725,19 +711,16 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	}
 
 	// 6. The user's authenticator has changed since this session last answered the level 2
-	// question. userSession.User is already loaded on this path, for Enabled and OTPEnabled
-	// above, so the comparison costs no query.
+	// question, and the target asks it. userSession.User is already loaded on this path, for
+	// Enabled and OTPEnabled above, so the comparison costs no query.
 	//
 	// A reader only: it refuses and promotes nothing, because no interaction happened. That
 	// is what makes an identical second prompt=none request get the identical answer, where
 	// the boolean this replaced would have been a one-shot signal had either reader cleared
 	// it here (#242 decision 1).
-	if userSession.OtpConfigGeneration != userSession.User.OtpConfigGeneration {
-		// Only matters if target requires level2
-		if targetAcrLevel == models.AcrLevel2Optional || targetAcrLevel == models.AcrLevel2Mandatory {
-			redirectWithError(oidc.ErrorInteractionRequired, "Authentication configuration has changed")
-			return
-		}
+	if stepUp == ceremony.StepUpOtpConfigChanged {
+		redirectWithError(oidc.ErrorInteractionRequired, "Authentication configuration has changed")
+		return
 	}
 
 	// 7. Compute effective scopes (filter by user permissions)
