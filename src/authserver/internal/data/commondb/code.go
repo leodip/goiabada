@@ -318,63 +318,49 @@ func (d *CommonDatabase) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int6
 	return nil
 }
 
-// DeleteUsedCodesWithoutRefreshTokens reaps codes that can no longer produce anything,
-// and that are older than createdBefore. Two disjoint classes qualify, and the name is
-// kept for the first of them because renaming it would touch the interface, four engine
-// wrappers, the generated mocks and the worker for no behavioural gain:
+// DeleteCodesWithoutRefreshTokens reaps every code created before createdBefore that no
+// refresh token references. That one rule covers every code that can no longer produce
+// anything: one redeemed without a refresh token following, one revoked while still
+// unredeemed, which is what ending a session leaves behind (#129), and one never redeemed
+// at all, which is every authorization the client abandoned and the row a failed clear at
+// /auth/issue orphans (#248, #436). Before #436 the last class was kept forever, with the
+// IP address and user agent it records.
 //
-//   - codes that were marked used but never produced a refresh token, and
-//   - codes revoked while still unredeemed, which is what ending a session leaves behind
-//     when the grant it marked had not been exchanged yet (#129 decision 8).
+// The cutoff is required for correctness, not an optimisation. The token endpoint marks a
+// code used (handler_token.go, MarkCodeAsUsed) and only afterwards inserts the refresh
+// token that references it, so for the duration of token generation a healthy code has no
+// descendant yet. Deleting it there makes the insert fail on fk_refresh_tokens_code and the
+// client gets a 500 instead of its tokens; observed in CI on postgres. Past the 60 second
+// code lifetime (token_validator.go) no code can be redeemed, so none can gain a descendant
+// either. Callers pass a cutoff comfortably beyond that 60 seconds.
 //
-// Both share one cutoff, for different reasons. For the used class the age cutoff is not
-// an optimisation, it is required for correctness: the token endpoint marks a code used
-// (handler_token.go, MarkCodeAsUsed) and only afterwards inserts the refresh token that
-// references it, so for the duration of token generation a perfectly healthy code sits in
-// exactly the state that branch selects. Deleting it there makes the subsequent insert
-// fail on fk_refresh_tokens_code and the client gets a 500 instead of its tokens. Observed
-// in CI on postgres. For the revoked class the cutoff is simply the code lifetime: a code
-// is unredeemable 60 seconds after issuance (token_validator.go), so past that it can
-// never acquire a refresh token legitimately either. Callers should pass a cutoff
-// comfortably beyond that 60 seconds, which serves both.
+// An unused code needs no term of its own: MarkCodeAsUsed is the gate every redemption
+// passes before a refresh token is inserted, and since #129 it refuses a revoked row, so a
+// code that is unused or was revoked unused has no descendant and the refresh-token term
+// alone decides it.
 //
-// The subquery stays INSIDE the used branch rather than beside the cutoff, and that is
-// load bearing rather than formatting. ROPC refresh tokens carry code_id = NULL, and
-// `x NOT IN (…, NULL)` is UNKNOWN rather than TRUE, so the used branch already matches
-// nothing on any deployment that has issued one (#130 owns that). Since UNKNOWN OR TRUE
-// is TRUE, the revoked branch still reaps; hoisting the subquery out would make the whole
-// predicate UNKNOWN and this method would silently do nothing at all.
-//
-// The revoked branch needs no refresh-token term of its own because `used = false` is
-// stronger: MarkCodeAsUsed is the gate every redemption passes before a token is inserted,
-// and since #129 it refuses a revoked row outright, so an unused code has no descendants.
-// That term is also what keeps this sweep away from a live one, and the stake is higher
-// than losing a marker: fk_refresh_tokens_code is ON DELETE CASCADE, so reaching a used
-// code with a live refresh token would delete the very descendant the marker exists to
-// reject.
-func (d *CommonDatabase) DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error {
+// The term is a correlated NOT EXISTS rather than `id NOT IN (SELECT code_id ...)`. ROPC
+// refresh tokens carry code_id = NULL, and `x NOT IN (..., NULL)` is UNKNOWN rather than
+// TRUE, so the NOT IN form matched nothing on any deployment that had issued one (#130).
+// It is also what keeps this sweep away from a live code, and the stake is higher than
+// losing a replay marker: fk_refresh_tokens_code is ON DELETE CASCADE, so reaching a code
+// with a refresh token would delete the very descendant the marker exists to reject.
+func (d *CommonDatabase) DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error {
+	descendants := d.Flavor.NewSelectBuilder()
+	descendants.Select("1").From("refresh_tokens")
+	descendants.Where("refresh_tokens.code_id = codes.id")
+
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("codes")
 	deleteBuilder.Where(
 		deleteBuilder.LessThan("created_at", createdBefore),
-		deleteBuilder.Or(
-			deleteBuilder.And(
-				deleteBuilder.Equal("used", true),
-				deleteBuilder.NotIn("id",
-					d.Flavor.NewSelectBuilder().Select("code_id").From("refresh_tokens"),
-				),
-			),
-			deleteBuilder.And(
-				deleteBuilder.Equal("revoked", true),
-				deleteBuilder.Equal("used", false),
-			),
-		),
+		deleteBuilder.NotExists(descendants),
 	)
 
 	sql, args := deleteBuilder.Build()
 	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
-		return errs.Wrap(err, "unable to delete used codes without refresh tokens")
+		return errs.Wrap(err, "unable to delete codes without refresh tokens")
 	}
 
 	return nil

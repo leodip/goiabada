@@ -210,23 +210,21 @@ type Database interface {
 	DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error
-	// DeleteUsedCodesWithoutRefreshTokens reaps codes that can no longer produce
-	// anything: those redeemed but never followed by a refresh token, and those
-	// revoked while still unredeemed, which is what ending a session leaves behind
-	// when the grant it marked had not been exchanged yet (#129).
+	// DeleteCodesWithoutRefreshTokens reaps every code created before createdBefore
+	// that no refresh token references: redeemed without a refresh token following,
+	// revoked while still unredeemed (#129), or never redeemed at all (#436). The
+	// reference test is null-safe, so a ROPC refresh token's NULL code_id stops
+	// nothing (#130).
 	//
-	// createdBefore is a required grace cutoff shared by both, and only codes created
-	// before it are deleted. For the redeemed ones it is required for correctness:
-	// without it the sweep races the token endpoint, which marks a code used and only
-	// then inserts the refresh token that references it, so a code mid-redemption
-	// matches and its deletion fails the insert with a foreign key violation. For the
-	// revoked ones it is the 60 second code lifetime, past which the code can no
-	// longer be exchanged at all. A cutoff comfortably beyond 60 seconds serves both.
+	// createdBefore is a required grace cutoff. Without it the sweep races the token
+	// endpoint, which marks a code used and only then inserts the refresh token that
+	// references it, so a code mid-redemption matches and its deletion fails the
+	// insert with a foreign key violation. Past the 60 second code lifetime no code
+	// can gain a refresh token, so a cutoff comfortably beyond 60 seconds is safe.
 	//
-	// A revoked code that WAS redeemed is deliberately out of reach here while any
-	// refresh token still references it, because that marker is what rejects the
-	// token.
-	DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
+	// A code any refresh token still references is deliberately out of reach, revoked
+	// or not, because that marker is what rejects the token.
+	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
 
 	CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
 	UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error

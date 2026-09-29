@@ -29,7 +29,7 @@ func TestWorker_AuditLogRetention_Enabled(t *testing.T) {
 
 	// Mock other worker cleanup operations (they should still run)
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -64,7 +64,7 @@ func TestWorker_AuditLogRetention_Disabled(t *testing.T) {
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -94,7 +94,7 @@ func TestWorker_AuditLogRetention_BatchDeletion(t *testing.T) {
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -126,7 +126,7 @@ func TestWorker_AuditLogRetention_MaxBatches(t *testing.T) {
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -158,7 +158,7 @@ func TestWorker_AuditLogRetention_Error(t *testing.T) {
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -191,7 +191,7 @@ func TestWorker_AuditLogRetention_NoDeletion(t *testing.T) {
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -348,7 +348,7 @@ func TestJitter(t *testing.T) {
 // whether the task ran at all rather than on its internals.
 func expectFullCleanup(mockDB *mocks.Database) {
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
@@ -439,7 +439,7 @@ func TestWorker_PerformTask_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	worker := NewWorker(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	assert.NotPanics(t, func() {
@@ -451,6 +451,32 @@ func TestWorker_PerformTask_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	mockDB.AssertNumberOfCalls(t, "DeleteExpiredSessions", 0)
 }
 
+// The code sweep is handed a cutoff codeCleanupGrace in the past. A cutoff at or after now
+// would reap a code mid-redemption and fail the token endpoint's refresh-token insert on
+// fk_refresh_tokens_code; the sweep's own data tests hold what it does with the cutoff.
+func TestWorker_PerformTask_SweepsCodesPastTheGrace(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	var createdBefore time.Time
+	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { createdBefore = args.Get(2).(time.Time) }).
+		Return(nil).Once()
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+
+	before := time.Now().UTC()
+	worker.performTask(context.Background())
+	after := time.Now().UTC()
+
+	mockDB.AssertExpectations(t)
+	assert.Greater(t, codeCleanupGrace, 60*time.Second, "the grace must exceed the 60 second code lifetime")
+	assert.False(t, createdBefore.Before(before.Add(-codeCleanupGrace)),
+		"cutoff %v is further back than the grace from the start of the run", createdBefore)
+	assert.False(t, createdBefore.After(after.Add(-codeCleanupGrace)),
+		"cutoff %v is less than the grace behind the end of the run", createdBefore)
+}
+
 // One failing step must not stop the others: this is housekeeping, so the run
 // should get through as much as it can.
 func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
@@ -459,7 +485,7 @@ func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
@@ -487,7 +513,7 @@ func TestWorker_PerformTask_StopsEarlyWhenCancelled(t *testing.T) {
 	worker.performTask(ctx)
 
 	// Nothing after the first step may have run.
-	mockDB.AssertNumberOfCalls(t, "DeleteUsedCodesWithoutRefreshTokens", 0)
+	mockDB.AssertNumberOfCalls(t, "DeleteCodesWithoutRefreshTokens", 0)
 	mockDB.AssertNumberOfCalls(t, "GetSettingsById", 0)
 	mockDB.AssertExpectations(t)
 }

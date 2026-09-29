@@ -67,7 +67,7 @@ func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 	worker.poll(lifecycleContext())
 
 	mockDB.AssertNotCalled(t, "DeleteExpiredRefreshTokens", mock.Anything, mock.Anything)
-	mockDB.AssertNotCalled(t, "DeleteUsedCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything)
 	mockDB.AssertNotCalled(t, "DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything)
 	mockDB.AssertNotCalled(t, "DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -81,7 +81,7 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 	worker := NewWorker(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", theWorkersContext(), mock.Anything).Return(nil).Once()
-	mockDB.On("DeleteUsedCodesWithoutRefreshTokens", theWorkersContext(), mock.Anything, mock.Anything).
+	mockDB.On("DeleteCodesWithoutRefreshTokens", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 	// The settings row is absent, which stops the task before the two session sweeps. That keeps
 	// this case about the context and not about the sweep order, which its own tests own.
