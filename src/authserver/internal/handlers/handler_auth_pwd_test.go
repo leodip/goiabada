@@ -800,7 +800,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				// the integration tier notices (#129 decision 15).
 				ac.Level1AuthCompleted &&
 				// Captured from the user whose credentials were just verified. Thin on
-				// purpose: token_issuer_auth_state_generation_test.go owns the tables.
+				// purpose: issuance/auth_state_generation_test.go owns the tables.
 				ac.AuthStateGeneration == 7 &&
 				// The OTP configuration generation is captured here too, so a ceremony that
 				// creates a session without passing through /auth/level2 stamps the user's

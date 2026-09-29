@@ -258,9 +258,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 	// The four cases below are characterization, written for #387 before the claims mapper
 	// that will serve this endpoint and issuance from one implementation. Each pins a place
-	// where userinfo and issuance/token_issuer.go deliberately disagree today, so the
+	// where userinfo and issuance/claims.go deliberately disagree today, so the
 	// extraction has to carry the disagreement across as an input rather than merge it away.
-	// Their counterparts live in issuance/token_issuer_test.go.
+	// Their counterparts live in issuance/claims_test.go.
 
 	// Divergence 1, userinfo's side. updated_at sits inside the profile arm here, where
 	// issuance emits it for any scope beyond openid alone, so at scope=openid email the two

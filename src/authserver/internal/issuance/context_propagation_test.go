@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -39,16 +38,14 @@ func issuanceCallerContext() context.Context {
 
 func propagationCodeInput() *CreateCodeInput {
 	return &CreateCodeInput{
-		AuthContext: ceremony.AuthContext{
-			ClientId:     "test-client",
-			UserId:       123,
-			Scope:        "openid profile",
-			RedirectURI:  "https://example.com/callback",
-			ResponseMode: "query",
-			IpAddress:    "127.0.0.1",
-			AcrLevel:     models.AcrLevel1,
-			AuthMethods:  "pwd",
-		},
+		ClientId:          "test-client",
+		UserId:            123,
+		Scope:             "openid profile",
+		RedirectURI:       "https://example.com/callback",
+		ResponseMode:      "query",
+		IpAddress:         "127.0.0.1",
+		AcrLevel:          models.AcrLevel1,
+		AuthMethods:       "pwd",
 		SessionIdentifier: "session-propagation",
 	}
 }

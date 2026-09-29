@@ -8,9 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/stretchr/testify/assert"
@@ -54,23 +52,21 @@ func TestCreateAuthCode(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		AuthContext: ceremony.AuthContext{
-			ClientId:            "test-client",
-			UserId:              123,
-			ConsentedScope:      "openid profile",
-			Scope:               "openid profile email",
-			CodeChallenge:       "challenge",
-			CodeChallengeMethod: "S256",
-			RedirectURI:         "https://example.com/callback",
-			State:               "state123",
-			Nonce:               "nonce456",
-			UserAgent:           "Mozilla/5.0",
-			ResponseMode:        "query",
-			IpAddress:           "127.0.0.1",
-			AcrLevel:            models.AcrLevel1,
-			AuthMethods:         "pwd",
-		},
-		SessionIdentifier: "session123",
+		ClientId:            "test-client",
+		UserId:              123,
+		ConsentedScope:      "openid profile",
+		Scope:               "openid profile email",
+		CodeChallenge:       "challenge",
+		CodeChallengeMethod: "S256",
+		RedirectURI:         "https://example.com/callback",
+		State:               "state123",
+		Nonce:               "nonce456",
+		UserAgent:           "Mozilla/5.0",
+		ResponseMode:        "query",
+		IpAddress:           "127.0.0.1",
+		AcrLevel:            models.AcrLevel1,
+		AuthMethods:         "pwd",
+		SessionIdentifier:   "session123",
 	}
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, input)
@@ -147,18 +143,16 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 				}).Return(nil)
 
 			_, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
-				AuthContext: ceremony.AuthContext{
-					ClientId:       "test-client",
-					UserId:         123,
-					ConsentedScope: "openid",
-					Scope:          "openid",
-					RedirectURI:    "https://example.com/callback",
-					UserAgent:      tc.userAgent,
-					ResponseMode:   "query",
-					IpAddress:      "127.0.0.1",
-					AcrLevel:       models.AcrLevel1,
-					AuthMethods:    "pwd",
-				},
+				ClientId:          "test-client",
+				UserId:            123,
+				ConsentedScope:    "openid",
+				Scope:             "openid",
+				RedirectURI:       "https://example.com/callback",
+				UserAgent:         tc.userAgent,
+				ResponseMode:      "query",
+				IpAddress:         "127.0.0.1",
+				AcrLevel:          models.AcrLevel1,
+				AuthMethods:       "pwd",
 				SessionIdentifier: "session123",
 			})
 
@@ -184,11 +178,9 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		AuthContext: ceremony.AuthContext{
-			ClientId: "test-client",
-			UserId:   123,
-			// ResponseMode is intentionally left empty
-		},
+		ClientId: "test-client",
+		UserId:   123,
+		// ResponseMode is intentionally left empty
 		SessionIdentifier: "session123",
 	}
 
@@ -242,12 +234,10 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			input := &CreateCodeInput{
-				AuthContext: ceremony.AuthContext{
-					ClientId:       "test-client",
-					UserId:         123,
-					ConsentedScope: tc.consentedScope,
-					Scope:          tc.scope,
-				},
+				ClientId:          "test-client",
+				UserId:            123,
+				ConsentedScope:    tc.consentedScope,
+				Scope:             tc.scope,
 				SessionIdentifier: "session123",
 			}
 
@@ -275,10 +265,8 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(errors.New("database error"))
 
 	input := &CreateCodeInput{
-		AuthContext: ceremony.AuthContext{
-			ClientId: "test-client",
-			UserId:   123,
-		},
+		ClientId:          "test-client",
+		UserId:            123,
 		SessionIdentifier: "session123",
 	}
 
@@ -313,7 +301,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 		Return((*models.Client)(nil), nil)
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
-		AuthContext:       ceremony.AuthContext{ClientId: "deleted-client", UserId: 123},
+		ClientId: "deleted-client", UserId: 123,
 		SessionIdentifier: "session123",
 	})
 
@@ -335,14 +323,12 @@ const issueSid = "sid-issuing"
 
 func issueCodeInput() *CreateCodeInput {
 	return &CreateCodeInput{
-		AuthContext: ceremony.AuthContext{
-			ClientId:    "test-client",
-			UserId:      123,
-			Scope:       "openid profile",
-			RedirectURI: "https://example.com/callback",
-			AcrLevel:    models.AcrLevel1,
-			AuthMethods: "pwd",
-		},
+		ClientId:          "test-client",
+		UserId:            123,
+		Scope:             "openid profile",
+		RedirectURI:       "https://example.com/callback",
+		AcrLevel:          models.AcrLevel1,
+		AuthMethods:       "pwd",
 		SessionIdentifier: issueSid,
 	}
 }

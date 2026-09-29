@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -24,14 +23,12 @@ type issuanceOutcome struct {
 // ceremonyCodeInput is the code a ceremony for this client, user and session asks the issuer for.
 func ceremonyCodeInput(client *models.Client, user *models.User, sessionIdentifier string) *issuance.CreateCodeInput {
 	return &issuance.CreateCodeInput{
-		AuthContext: ceremony.AuthContext{
-			ClientId:    client.ClientIdentifier,
-			UserId:      user.Id,
-			RedirectURI: "https://example.com/callback",
-			Scope:       "openid profile",
-			AcrLevel:    "urn:goiabada:level1",
-			AuthMethods: "pwd",
-		},
+		ClientId:          client.ClientIdentifier,
+		UserId:            user.Id,
+		RedirectURI:       "https://example.com/callback",
+		Scope:             "openid profile",
+		AcrLevel:          "urn:goiabada:level1",
+		AuthMethods:       "pwd",
 		SessionIdentifier: sessionIdentifier,
 	}
 }

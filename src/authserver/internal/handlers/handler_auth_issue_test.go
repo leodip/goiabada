@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -175,8 +176,7 @@ func TestHandleIssueGet(t *testing.T) {
 			State:       "test-state",
 		}
 		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
-			return reflect.DeepEqual(input.AuthContext, *authContext) &&
-				input.SessionIdentifier == liveSessionIdentifier
+			return reflect.DeepEqual(input, newCreateCodeInput(authContext, liveSessionIdentifier))
 		})).Return(mockCode, nil)
 
 		// Mock audit logging
@@ -757,8 +757,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 		// wrong row and order nothing.
 		var order []string
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
-			return reflect.DeepEqual(input.AuthContext, *f.authContext) &&
-				input.SessionIdentifier == liveSessionIdentifier
+			return reflect.DeepEqual(input, newCreateCodeInput(f.authContext, liveSessionIdentifier))
 		})).Run(func(mock.Arguments) { order = append(order, "issued") }).
 			Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
@@ -3206,7 +3205,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:       "test-state",
 		}
 		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
-			return reflect.DeepEqual(input.AuthContext, *authContext)
+			return reflect.DeepEqual(input, newCreateCodeInput(authContext, liveSessionIdentifier))
 		})).Return(mockCode, nil)
 
 		// Mock audit logging
@@ -3576,7 +3575,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			State:       "test-state",
 		}
 		codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
-			return reflect.DeepEqual(input.AuthContext, *authContext)
+			return reflect.DeepEqual(input, newCreateCodeInput(authContext, liveSessionIdentifier))
 		})).Return(mockCode, nil)
 
 		// Mock audit logging
@@ -4137,8 +4136,8 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 
 			if tc.wantIssued {
 				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
-					return input.AuthContext.Scope == tc.wantScope &&
-						input.AuthContext.ConsentedScope == tc.wantConsented
+					return input.Scope == tc.wantScope &&
+						input.ConsentedScope == tc.wantConsented
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
@@ -4624,4 +4623,64 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
+}
+
+// TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom holds the one place /auth/issue hands
+// the ceremony to issuance. Issuance used to embed the whole AuthContext, so nothing could be left
+// behind; now it names seventeen fields and the handler copies them, and a field copied from the
+// wrong source or not at all would write a code that silently lacks it (#437). Every source field
+// carries a distinct value, so a swap between two string fields fails as well as an omission.
+func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
+	authenticatedAt := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	authContext := &ceremony.AuthContext{
+		ClientId:            "client-identifier",
+		RedirectURI:         "https://app.example/callback",
+		ResponseMode:        "form_post",
+		Scope:               "openid profile email",
+		ConsentedScope:      "openid profile",
+		CodeChallenge:       "challenge-value",
+		CodeChallengeMethod: "S256",
+		State:               "state-value",
+		Nonce:               "nonce-value",
+		UserAgent:           "user-agent-value",
+		IpAddress:           "203.0.113.7",
+		UserId:              42,
+		AcrLevel:            models.AcrLevel2Optional,
+		AuthMethods:         "pwd otp",
+		AuthenticatedAt:     &authenticatedAt,
+		AuthStateGeneration: 9,
+		// Ceremony state issuance does not read, set so that copying it anywhere would show.
+		CeremonyId: "ceremony-id",
+		AuthState:  ceremony.AuthStateReadyToIssueCode,
+	}
+
+	got := newCreateCodeInput(authContext, "session-identifier")
+
+	assert.Equal(t, &issuance.CreateCodeInput{
+		ClientId:            "client-identifier",
+		RedirectURI:         "https://app.example/callback",
+		ResponseMode:        "form_post",
+		Scope:               "openid profile email",
+		ConsentedScope:      "openid profile",
+		CodeChallenge:       "challenge-value",
+		CodeChallengeMethod: "S256",
+		State:               "state-value",
+		Nonce:               "nonce-value",
+		UserAgent:           "user-agent-value",
+		IpAddress:           "203.0.113.7",
+		UserId:              42,
+		AcrLevel:            models.AcrLevel2Optional,
+		AuthMethods:         "pwd otp",
+		AuthenticatedAt:     &authenticatedAt,
+		AuthStateGeneration: 9,
+		SessionIdentifier:   "session-identifier",
+	}, got)
+
+	// A field added to CreateCodeInput and not copied here is left zero, which the literal above
+	// would not notice until someone remembered to extend it.
+	value := reflect.ValueOf(*got)
+	for i := 0; i < value.NumField(); i++ {
+		assert.Falsef(t, value.Field(i).IsZero(), "CreateCodeInput.%s is never copied from the ceremony",
+			value.Type().Field(i).Name)
+	}
 }
