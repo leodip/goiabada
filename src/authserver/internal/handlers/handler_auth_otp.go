@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -359,23 +358,19 @@ func HandleAuthOtpPost(
 			return
 		}
 
+		// The generation an enrolment below establishes, handed to RecordOTPVerified; nil when the
+		// user was already enrolled.
+		var enrolledGeneration *int64
 		if !user.OTPEnabled {
 			// is enrolling to TOTP now. The seed is encrypted at rest, the user written and the
 			// OTP configuration generation's advance committed together, so there is no state in
 			// which the authenticator is on and no session knows (#242 decision 2).
-			enrolledGeneration, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, secretKey)
+			generation, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, secretKey)
 			if establishErr != nil {
 				pageRenderer.InternalServerError(w, r, establishErr)
 				return
 			}
-
-			// Overwrite what /auth/level2 captured with the value the increment returned.
-			// This ceremony asked the level 2 question against generation N and has just
-			// answered it by MOVING the counter to N+1, so promoting N at /auth/completed
-			// would leave the session it is about to bind owing another second-factor prompt
-			// immediately. The value comes from the read-back rather than from N+1 computed
-			// here, so a concurrent change cannot be laundered into it (#242).
-			authContext.OtpConfigGeneration = &enrolledGeneration
+			enrolledGeneration = &generation
 
 			auditLogger.Log(r.Context(), audit.AuditEnabledOTP, map[string]interface{}{
 				"userId": user.Id,
@@ -388,25 +383,7 @@ func HandleAuthOtpPost(
 			"userId": user.Id,
 		})
 
-		authContext.AddAuthMethod(oidc.AuthMethodOTP)
-		// Mark that real authentication occurred — used by handler_auth_completed
-		// to decide whether to refresh the session's AuthTime.
-		//
-		// Deliberately does NOT set authContext.Level1AuthCompleted. OTP is level 2, and a
-		// ceremony can arrive here having reused a session rather than entered a password,
-		// so verifying OTP is no proof of level 1 and must not let a ceremony recreate a
-		// session that was ended mid-flight (#129 decision 15).
-		utcNow := time.Now().UTC()
-		authContext.AuthenticatedAt = &utcNow
-		authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
-		// The enrolment key has done its work: this ceremony has just proved the user holds
-		// the authenticator, and nothing downstream reads the field. Leaving it set carries a
-		// spent credential through /auth/completed, /auth/consent and /auth/issue, and leaves
-		// it in the cookie of a ceremony abandoned after enrolling until a later
-		// /auth/authorize replaces the context, whose ceiling is the cookie's own one-year
-		// maximum age. Same discipline as otpcredential.Establish, which stores the seed
-		// encrypted and keeps no plaintext copy of it (#82, #247).
-		authContext.OTPKeyURL = ""
+		authContext.RecordOTPVerified(time.Now(), enrolledGeneration)
 
 		// Rotate the browser session's identifier here too, for the same reason the
 		// password handler does: a credential has just been verified, and that is a

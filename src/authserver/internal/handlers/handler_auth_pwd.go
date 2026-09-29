@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
@@ -259,31 +258,7 @@ func HandleAuthPwdPost(
 			"userId": user.Id,
 		})
 
-		authContext.UserId = user.Id
-		// Capture the generation the credentials were verified against. If a credential
-		// change lands while the rest of this ceremony completes, the code it eventually
-		// issues carries this older value and is rejected at redemption, which is the
-		// intended direction (#106 decision 11 rule 1).
-		authContext.AuthStateGeneration = user.AuthStateGeneration
-		// Capture the user's OTP configuration generation too. This is the value the create
-		// arm at /auth/completed stamps onto a brand new session, and it is always present
-		// there because that arm refuses to mint a session without Level1AuthCompleted,
-		// which is set only here. /auth/level2 overwrites it on every arm with a value read
-		// no earlier, so a ceremony that answers the level 2 question promotes what that
-		// answer was given against (#242 decision 3).
-		otpConfigGeneration := user.OtpConfigGeneration
-		authContext.OtpConfigGeneration = &otpConfigGeneration
-		authContext.AddAuthMethod(oidc.AuthMethodPassword)
-		// Mark that real authentication occurred — used by handler_auth_completed
-		// to decide whether to refresh the session's AuthTime.
-		utcNow := time.Now().UTC()
-		authContext.AuthenticatedAt = &utcNow
-		// This ceremony performed level 1, so it may create a session even when the one it
-		// started on has gone. This is the only writer of the field, deliberately: the OTP
-		// handler also sets AuthenticatedAt, and level 2 alone must not stand in for level 1
-		// at the gate in handler_auth_completed (#129 decisions 6 and 15).
-		authContext.Level1AuthCompleted = true
-		authContext.AuthState = ceremony.AuthStateLevel1PasswordCompleted
+		authContext.RecordPasswordVerified(user, time.Now())
 
 		// Rotate the browser session's identifier here, the instant a credential is
 		// accepted, and not only at /auth/completed where the user session is minted.

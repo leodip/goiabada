@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/core/customerrors"
 )
 
 // AuthState is one state of the authorization ceremony's machine: the value AuthContext.AuthState
@@ -196,6 +197,81 @@ type AuthContext struct {
 
 func (ac *AuthContext) SetScope(scope string) {
 	ac.Scope = oidc.NormalizeScope(scope)
+}
+
+// ParkDeferredError carries an authorization error across the login ceremony instead of
+// redirecting an anonymous visitor to a host the client chose, and sends the ceremony to
+// requires_level_1; /auth/level1completed delivers it once level 1 credentials are verified (RFC
+// 9700 4.11.2, #213).
+//
+// The description is conformed HERE and not only at the emitter. RFC 6749 Appendix A.8's character
+// set is enforced when the redirect is written as well, and that filter is idempotent so the two
+// paths stay byte-identical, but a bound applied at emission does nothing for a string already
+// parked in the session: descriptions interpolate request text, so an unbounded one would be carried
+// by every request of the ceremony that parked it (#213 decision 10, #266).
+//
+// Both fields are request fields, so this is a setter the request-field guard holds to
+// HandleAuthorizeGet like a direct write (#437).
+func (ac *AuthContext) ParkDeferredError(code, description string) {
+	ac.DeferredErrorCode = code
+	ac.DeferredErrorDescription = customerrors.ConformErrorDescription(description)
+	ac.AuthState = AuthStateRequiresLevel1
+}
+
+// RecordPasswordVerified records that this ceremony verified user's password at now, which is
+// level 1 performed here rather than inherited from a session.
+//
+//   - AuthStateGeneration is captured from the user the credentials were verified against. If a
+//     credential change lands while the rest of this ceremony completes, the code it eventually
+//     issues carries this older value and is rejected at redemption, which is the intended
+//     direction (#106 decision 11 rule 1).
+//   - OtpConfigGeneration is captured too. It is the value the create arm at /auth/completed stamps
+//     onto a brand new session, always present there because that arm refuses to mint a session
+//     without Level1AuthCompleted. /auth/level2 overwrites it on every arm with a value read no
+//     earlier, so a ceremony that answers the level 2 question promotes what that answer was given
+//     against (#242 decision 3).
+//   - AuthenticatedAt marks that real authentication occurred, which /auth/completed reads to decide
+//     whether to refresh the session's auth time.
+//   - Level1AuthCompleted is written here and nowhere else, deliberately: RecordOTPVerified sets
+//     AuthenticatedAt as well, and level 2 alone must not stand in for level 1 at /auth/completed's
+//     create gate (#129 decisions 6 and 15).
+func (ac *AuthContext) RecordPasswordVerified(user *models.User, now time.Time) {
+	ac.UserId = user.Id
+	ac.AuthStateGeneration = user.AuthStateGeneration
+	otpConfigGeneration := user.OtpConfigGeneration
+	ac.OtpConfigGeneration = &otpConfigGeneration
+	ac.AddAuthMethod(oidc.AuthMethodPassword)
+	authenticatedAt := now.UTC()
+	ac.AuthenticatedAt = &authenticatedAt
+	ac.Level1AuthCompleted = true
+	ac.AuthState = AuthStateLevel1PasswordCompleted
+}
+
+// RecordOTPVerified records that this ceremony verified a one-time code at now. enrolledGeneration
+// is the otp_config_generation an enrolment in this ceremony established, nil when the user was
+// already enrolled.
+//
+//   - An enrolment overwrites what /auth/level2 captured with the value the increment returned. The
+//     ceremony asked the level 2 question against generation N and answered it by MOVING the counter
+//     to N+1, so promoting N at /auth/completed would leave the session it binds owing another
+//     second-factor prompt at once. The caller passes the read-back rather than N+1, so a concurrent
+//     change cannot be laundered into it (#242).
+//   - Level1AuthCompleted is deliberately left alone. OTP is level 2, and a ceremony can arrive here
+//     having reused a session rather than entered a password, so verifying OTP is no proof of level
+//     1 and must not let a ceremony recreate a session that was ended mid-flight (#129 decision 15).
+//   - OTPKeyURL is cleared: the enrolment key has done its work, and leaving it set carries a spent
+//     credential through the rest of the ceremony and leaves it in the session of one abandoned
+//     after enrolling (#82, #247).
+func (ac *AuthContext) RecordOTPVerified(now time.Time, enrolledGeneration *int64) {
+	if enrolledGeneration != nil {
+		generation := *enrolledGeneration
+		ac.OtpConfigGeneration = &generation
+	}
+	ac.AddAuthMethod(oidc.AuthMethodOTP)
+	authenticatedAt := now.UTC()
+	ac.AuthenticatedAt = &authenticatedAt
+	ac.AuthState = AuthStateAuthenticationCompleted
+	ac.OTPKeyURL = ""
 }
 
 // Restart sends the ceremony back to requires_level_1 keeping the request and discarding the

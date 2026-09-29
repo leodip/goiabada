@@ -276,8 +276,8 @@ Valid if ALL true:
 2. `now <= Started + MaxLifetimeSeconds`
 3. If `max_age` param: `now <= AuthTime + max_age` (`Started` when `AuthTime` is zero)
 
-### ACR Step-Up Logic (`handler_auth_level1.go`)
-Uses `models.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
+### ACR Step-Up Logic (`ceremony/step_up.go`)
+One rule, `StepUpOwed`, read by `HandleAuthLevel1CompletedGet` and `handlePromptNone`. Uses `models.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)

@@ -127,61 +127,33 @@ func HandleAuthLevel1CompletedGet(
 
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
 
-		// should we redirect to level 2 auth?
-		shouldRedirectToLevel2 := false
 		// The session only counts when it belongs to the user this ceremony authenticated. The
-		// browser may still hold user A's session cookie while user B signs in, and the block below
-		// would then decide B's step-up from A's ACR: an A session already at or above the target
-		// sends B straight to /auth/completed with a password only, skipping the second factor a
-		// level2 client asked for. A session belonging to anyone else is treated as no session, so
-		// the target alone decides, and A's OTP configuration snapshot is left alone (#133).
+		// browser may still hold user A's session cookie while user B signs in, and the step-up
+		// would then be decided from A's ACR: an A session already at or above the target sends B
+		// straight to /auth/completed with a password only, skipping the second factor a level2
+		// client asked for. A session belonging to anyone else is treated as no session, so the
+		// target alone decides, and A's OTP configuration snapshot is left alone (#133).
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		hasValidUserSession := userSessionManager.HasValidUserSession(userSession,
+		var reusableSession *models.UserSession
+		if userSessionManager.HasValidUserSession(userSession,
 			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
-			authContext.RequestedMaxAge()) && authContext.OwnsSession(userSession)
-
-		if hasValidUserSession {
-			// Parse the session's ACR level
-			acrLevelFromSession, acrLevelErr := models.AcrLevelFromString(userSession.AcrLevel.String())
-			if acrLevelErr != nil {
-				pageRenderer.InternalServerError(w, r, acrLevelErr)
-				return
-			}
-
-			// Step-up required if target ACR is higher than session ACR.
-			// Uses models.AcrLevel.IsHigherThan() as the single source of truth.
-			if targetAcrLevel.IsHigherThan(acrLevelFromSession) {
-				shouldRedirectToLevel2 = true
-			}
-
-			// The user's authenticator has changed since this session last answered the level
-			// 2 question, so ask it again. Both numbers are already in hand: UserSessionLoadUser
-			// above populated userSession.User, so the comparison costs no query.
-			//
-			// **This block writes nothing, and that is the fix.** It used to clear a boolean
-			// here and commit it, which meant a visitor who closed the browser at the OTP form
-			// had already spent the re-prompt: the next ceremony found the flag clear and let
-			// them through with a password. A comparison cannot be consumed by reading it, so
-			// the obligation stands until /auth/completed records that a ceremony actually
-			// answered it (#242 decision 1).
-			//
-			// != rather than <, so a snapshot somehow ahead of the counter re-prompts too. That
-			// should not happen, and if it does the fail-closed answer is the one to give. It is
-			// also what makes migration 000031's -1 seed work with no special case.
-			if userSession.OtpConfigGeneration != userSession.User.OtpConfigGeneration &&
-				targetAcrLevel.IsHigherThan(models.AcrLevel1) {
-				shouldRedirectToLevel2 = true
-			}
-		} else if targetAcrLevel.IsHigherThan(models.AcrLevel1) {
-			// No valid session and target requires level2
-			shouldRedirectToLevel2 = true
+			authContext.RequestedMaxAge()) && authContext.OwnsSession(userSession) {
+			reusableSession = userSession
 		}
 
-		if shouldRedirectToLevel2 {
+		// UserSessionLoadUser above populated userSession.User, so the rule's OTP configuration
+		// comparison costs no query.
+		stepUp, err := ceremony.StepUpOwed(targetAcrLevel, reusableSession)
+		if err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+			return
+		}
+
+		if stepUp != ceremony.StepUpNone {
 			// We need to redirect to level 2
 			authContext.AuthState = ceremony.AuthStateRequiresLevel2
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)

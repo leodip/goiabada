@@ -79,42 +79,42 @@ func HandleAuthLevel2Get(
 		otpConfigGeneration := user.OtpConfigGeneration
 		authContext.OtpConfigGeneration = &otpConfigGeneration
 
-		// is OTP optional or mandatory?
-		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-		switch targetAcrLevel {
-		case models.AcrLevel2Optional:
-			// optional
-			// if user has OTP enabled, we'll ask for it
-			if user.OTPEnabled {
-				authContext.AuthState = ceremony.AuthStateLevel2OTP
-				err = ceremonyStore.SaveAuthContext(w, r, authContext)
-				if err != nil {
-					pageRenderer.InternalServerError(w, r, err)
-					return
-				}
-				http.Redirect(w, r, baseURL+"/auth/otp", http.StatusFound)
-			} else {
-				// user without OTP, we'll skip it
-				authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
-				err = ceremonyStore.SaveAuthContext(w, r, authContext)
-				if err != nil {
-					pageRenderer.InternalServerError(w, r, err)
-					return
-				}
-				http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)
-			}
-		case models.AcrLevel2Mandatory:
-			// OTP is mandatory
-			authContext.AuthState = ceremony.AuthStateLevel2OTP
-			err = ceremonyStore.SaveAuthContext(w, r, authContext)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-			http.Redirect(w, r, baseURL+"/auth/otp", http.StatusFound)
-		default:
-			// we should never reach this point
-			pageRenderer.InternalServerError(w, r, errs.New("invalid targetAcrLevel: "+targetAcrLevel.String()))
+		nextState, nextPath, err := decideLevel2Arm(authContext.GetTargetAcrLevel(client.DefaultAcrLevel), user.OTPEnabled)
+		if err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+			return
 		}
+
+		authContext.AuthState = nextState
+		err = ceremonyStore.SaveAuthContext(w, r, authContext)
+		if err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+			return
+		}
+		//nolint:gosec // G710: nextPath is one of decideLevel2Arm's two constant routes, under the configured base URL
+		http.Redirect(w, r, baseURL+nextPath, http.StatusFound)
+	}
+}
+
+// decideLevel2Arm is /auth/level2's choice of second factor, from the ceremony's target and
+// whether the user has an authenticator: the state the ceremony moves to and the route it goes to.
+// Today there is one second factor, OTP.
+//
+//   - level2_optional asks for OTP when the user has it enabled, and otherwise skips it, which is
+//     the one path that bypasses /auth/otp entirely.
+//   - level2_mandatory always asks; a user with no authenticator enrols at /auth/otp.
+//   - Any other target never reaches this hop, since /auth/level1completed sends only a target above
+//     level 1 here, and is answered with an error.
+func decideLevel2Arm(target models.AcrLevel, userHasOTP bool) (ceremony.AuthState, string, error) {
+	switch target {
+	case models.AcrLevel2Optional:
+		if userHasOTP {
+			return ceremony.AuthStateLevel2OTP, "/auth/otp", nil
+		}
+		return ceremony.AuthStateAuthenticationCompleted, "/auth/completed", nil
+	case models.AcrLevel2Mandatory:
+		return ceremony.AuthStateLevel2OTP, "/auth/otp", nil
+	default:
+		return "", "", errs.New("invalid targetAcrLevel: " + target.String())
 	}
 }

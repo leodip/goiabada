@@ -193,10 +193,10 @@ func HandleAuthCompletedGet(
 			// never reached /auth/level2, which can only happen when the snapshot already
 			// matched, so there is nothing to promote. The ACR gate is needed because the
 			// password handler captures too: without it a prompt=login ceremony at a level 1
-			// client would discharge a level 2 obligation it never addressed. It is the same
-			// predicate /auth/level1completed uses to decide the step-up, so the two agree by
-			// construction (#242 decision 3).
-			if authContext.OtpConfigGeneration != nil && targetAcrLevel.IsHigherThan(models.AcrLevel1) {
+			// client would discharge a level 2 obligation it never addressed. It is the level
+			// test ceremony.StepUpOwed applies when /auth/level1completed decides the step-up, so
+			// the two agree by construction (#242 decision 3).
+			if authContext.OtpConfigGeneration != nil && ceremony.TargetRequiresSecondFactor(targetAcrLevel) {
 				sessionErr = database.PromoteUserSessionOtpConfigGeneration(r.Context(), nil, bumpedSession.Id,
 					*authContext.OtpConfigGeneration)
 				if sessionErr != nil {
