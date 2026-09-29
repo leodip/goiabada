@@ -124,6 +124,15 @@ const (
 	ErrCodeProfileZoneInfoInvalid   = "validator.profile.zone_info_invalid"
 	ErrCodeProfileLocaleInvalid     = "validator.profile.locale_invalid"
 
+	// Image validator — profile picture and client logo uploads, from
+	// authserver/internal/imageupload.
+	ErrCodeImageTooLarge           = "validator.image.too_large" // Args: {"max": int64}
+	ErrCodeImageEmpty              = "validator.image.empty"
+	ErrCodeImageUnsupportedType    = "validator.image.unsupported_type"
+	ErrCodeImageUndecodable        = "validator.image.undecodable"
+	ErrCodeImageDimensionsTooSmall = "validator.image.dimensions_too_small" // Args: {"min": int}
+	ErrCodeImageDimensionsTooLarge = "validator.image.dimensions_too_large" // Args: {"max": int}
+
 	// Authorize endpoint, client and redirect_uri validation. These seven are
 	// the only authorize-endpoint errors represented here, and the reason is
 	// where they come out rather than what they say: RFC 6749 4.1.2.1 forbids

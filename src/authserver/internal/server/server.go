@@ -23,7 +23,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/imaging"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/workers"
@@ -519,9 +518,10 @@ const (
 // body keeps answering for it: the uploads, the session endpoints and the account OTP PUT.
 //
 // profilePictureMaxSizeBytes is GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES, read once at startup, so
-// raising it raises the upload rows with it.
+// raising it raises the upload rows with it. config.Load holds it positive and at most
+// config.MaxProfilePictureMaxSizeBytes, which is what keeps the sum below from wrapping (#435).
 func bodyLimitPolicy(profilePictureMaxSizeBytes int64) custom_middleware.BodyLimitPolicy {
-	uploadLimit := imaging.MaxFileSize(profilePictureMaxSizeBytes) + uploadMultipartAllowance
+	uploadLimit := profilePictureMaxSizeBytes + uploadMultipartAllowance
 
 	return custom_middleware.BodyLimitPolicy{
 		Default: defaultBodyLimit,

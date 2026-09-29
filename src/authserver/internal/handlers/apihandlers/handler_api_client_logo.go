@@ -3,14 +3,13 @@ package apihandlers
 import (
 	"context"
 	"database/sql"
-	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/imaging"
+	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 )
@@ -59,39 +58,14 @@ func HandleAPIClientLogoPost(
 			return
 		}
 
-		// Get max file size from config
-		maxFileSize := imaging.MaxFileSize(maxUploadBytes)
-
-		// Limit request body size
-		r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+1024) // extra for multipart overhead
-
-		// Parse multipart form
-		//nolint:gosec // G120: bounded by the MaxBytesReader above and the server's request-body table; G120 flags every multipart parse
-		err = r.ParseMultipartForm(maxFileSize)
-		if err != nil {
-			writeJSONError(w, "File too large or invalid form data", "FILE_TOO_LARGE", http.StatusBadRequest)
+		fileData, ok := readUploadedImage(w, r, maxUploadBytes)
+		if !ok {
 			return
 		}
 
-		// Get the file from the form
-		file, _, err := r.FormFile("picture")
+		result, err := imageupload.Validate(fileData, maxUploadBytes)
 		if err != nil {
-			writeJSONError(w, "No picture file provided", "NO_FILE", http.StatusBadRequest)
-			return
-		}
-		defer func() { _ = file.Close() }()
-
-		// Read file data
-		fileData, err := io.ReadAll(file)
-		if err != nil {
-			writeInternalServerError(w, r, err)
-			return
-		}
-
-		// Validate the image
-		result := imaging.ValidateProfilePicture(fileData, maxFileSize)
-		if !result.Valid {
-			writeJSONError(w, result.Error, "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, err)
 			return
 		}
 

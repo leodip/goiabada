@@ -226,7 +226,10 @@ func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
+	// The catalog key and its English sentence, through writeValidationError, as every other
+	// validator on this API answers (#435).
+	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
+	assert.Equal(t, "The image type is not supported. Allowed types are JPEG, PNG, GIF and WebP.", response["error_description"])
 }
 
 // The size cap is the one the handler was handed, not the configured default: an image the
@@ -254,8 +257,8 @@ func TestHandleAPIClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.
 
 	var response map[string]interface{}
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
-	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
-	assert.Equal(t, "file size exceeds maximum allowed size of 64 bytes", response["error_description"])
+	assert.Equal(t, "validator.image.too_large", response["error_code"])
+	assert.Equal(t, "The image can be at most 64 bytes.", response["error_description"])
 }
 
 func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {

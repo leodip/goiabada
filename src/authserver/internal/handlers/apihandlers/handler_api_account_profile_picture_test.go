@@ -225,8 +225,9 @@ func TestHandleAPIAccountProfilePicturePost_NoFile(t *testing.T) {
 	sub := fake.UUID()
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}
 
-	req, _ := http.NewRequest("POST", "/api/v1/account/profile-picture", nil)
-	req.Header.Set("Content-Type", "multipart/form-data")
+	// A well-formed multipart form whose file is under another field name.
+	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "avatar", createTestPNG(100, 100))
+	require.NoError(t, err)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
@@ -235,6 +236,35 @@ func TestHandleAPIAccountProfilePicturePost_NoFile(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	assert.Equal(t, "NO_FILE", response["error_code"])
+}
+
+// A body past the handed cap and its multipart overhead is refused before any image is read, with
+// the code it has always carried.
+func TestHandleAPIAccountProfilePicturePost_BodyOverTheBound(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+
+	handler := HandleAPIAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
+
+	sub := fake.UUID()
+	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+
+	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", bytes.Repeat([]byte{0xAB}, 64+2048))
+	require.NoError(t, err)
+	req = setTokenContext(req, sub)
+	rr := httptest.NewRecorder()
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	assert.Equal(t, "FILE_TOO_LARGE", response["error_code"])
 }
 
 func TestHandleAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
@@ -262,7 +292,10 @@ func TestHandleAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
+	// The catalog key and its English sentence, through writeValidationError, as every other
+	// validator on this API answers (#435).
+	assert.Equal(t, "validator.image.unsupported_type", response["error_code"])
+	assert.Equal(t, "The image type is not supported. Allowed types are JPEG, PNG, GIF and WebP.", response["error_description"])
 }
 
 // The size cap is the one the handler was handed, not the configured default: an image the
@@ -291,8 +324,8 @@ func TestHandleAPIAccountProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(
 
 	var response map[string]interface{}
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
-	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
-	assert.Equal(t, "file size exceeds maximum allowed size of 64 bytes", response["error_description"])
+	assert.Equal(t, "validator.image.too_large", response["error_code"])
+	assert.Equal(t, "The image can be at most 64 bytes.", response["error_description"])
 }
 
 func TestHandleAPIAccountProfilePicturePost_CreateNew(t *testing.T) {
