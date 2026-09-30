@@ -789,26 +789,26 @@ const revokeClientId = int64(4242)
 func clientGrantFixture() []*models.RefreshToken {
 	return []*models.RefreshToken{
 		{
-			Id: 1, RefreshTokenJti: "rt-client-session",
+			Id: 1, RefreshTokenJti: "rt-client-session", FirstRefreshTokenJti: "fam-session",
 			SessionIdentifier: "sid-client",
 			RefreshTokenType:  "Refresh",
 			CodeId:            sql.NullInt64{Int64: 31, Valid: true},
 		},
 		{
-			Id: 2, RefreshTokenJti: "rt-client-offline",
+			Id: 2, RefreshTokenJti: "rt-client-offline", FirstRefreshTokenJti: "fam-offline",
 			SessionIdentifier: "",
 			RefreshTokenType:  "Offline",
 			CodeId:            sql.NullInt64{Int64: 32, Valid: true},
 		},
 		{
-			Id: 3, RefreshTokenJti: "rt-client-ropc",
+			Id: 3, RefreshTokenJti: "rt-client-ropc", FirstRefreshTokenJti: "fam-ropc",
 			SessionIdentifier: "",
 			RefreshTokenType:  "Offline",
 			CodeId:            sql.NullInt64{Valid: false},
 			ClientId:          sql.NullInt64{Int64: revokeClientId, Valid: true},
 		},
 		{
-			Id: 4, RefreshTokenJti: "rt-client-gone",
+			Id: 4, RefreshTokenJti: "rt-client-gone", FirstRefreshTokenJti: "fam-session",
 			SessionIdentifier: "sid-client",
 			RefreshTokenType:  "Refresh",
 			CodeId:            sql.NullInt64{Int64: 34, Valid: true},
@@ -826,6 +826,8 @@ func TestRevokeClientGrants_MarksTheCodesThenSweepsTheTokens(t *testing.T) {
 
 	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(3), nil).Once()
 	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
+	// Each family once, although rt-client-gone shares one with rt-client-session (#259).
+	expectClientFamilyRecords(db, "fam-session", "fam-offline", "fam-ropc")
 	// The three live tokens only. rt-client-gone is not written again.
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
@@ -858,6 +860,10 @@ func TestRevokeClientGrants_MarksTheCodesThenSweepsTheTokens(t *testing.T) {
 	marker := callIndex(t, db, "RevokeCodesByClientId")
 	sweep := callIndex(t, db, "GetRefreshTokensByClientId")
 	assert.Less(t, marker, sweep, "the codes are marked before the tokens are swept")
+	// The families are recorded before any token is written, so the record is what a rotation that
+	// has no live row yet finds, whatever the sweep missed (#259).
+	assert.Less(t, callIndex(t, db, "RecordRefreshTokenFamilyRevoked"), callIndex(t, db, "UpdateRefreshToken"),
+		"the families are recorded before the tokens are swept")
 
 	// The negative controls, and the reason this seam is worth having separately from
 	// RevokeUserAuthState. A client-scoped action must not advance anybody's generation, must not
@@ -1038,6 +1044,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
+				expectClientFamilyRecords(db, "fam-session", "fam-offline", "fam-ropc")
 				db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(boom).Once()
 			},
 		},

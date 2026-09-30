@@ -506,6 +506,18 @@ type Database interface {
 	// error rather than a no-op, since on a revocation path it can only be a caller
 	// bug (#128).
 	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
+	// RecordRefreshTokenFamilyRevoked writes the durable record that a rotation family is
+	// revoked, and reports whether this call wrote it. A family already recorded is left as it
+	// was. A sweep of live rows cannot catch a child a rotation inserts after the sweep, and a
+	// record outlives every member, so a child born into a recorded family is refused (#132,
+	// #259). Two overlapping first writes of one family lose on the key as ErrUniqueViolation,
+	// and the caller reruns its transaction once.
+	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
+	// IsRefreshTokenFamilyRevoked reports whether a rotation family has a revocation record.
+	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	// DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families that have no
+	// refresh token left, which is when a record has nothing left to refuse.
+	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)

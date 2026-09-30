@@ -60,7 +60,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -134,7 +134,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -209,7 +209,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -298,7 +298,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 
 	// Now generate the third refresh token
 	thirdRefreshTime := initialTime
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), settings, code, code.Scope, thirdRefreshTime, privKey, "test-key-id", secondRefreshToken)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, thirdRefreshTime, privKey, "test-key-id", secondRefreshToken)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -460,7 +460,7 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(tt.mockUserSession, nil)
 			}
 
-			maxLifetime, err := tokenIssuer.getRefreshTokenMaxLifetime(context.Background(), tt.refreshTokenType, now, settings, client, sessionIdentifier)
+			maxLifetime, err := tokenIssuer.getRefreshTokenMaxLifetime(context.Background(), nil, tt.refreshTokenType, now, settings, client, sessionIdentifier)
 
 			if tt.expectedError {
 				assert.Error(t, err)

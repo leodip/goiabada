@@ -21,7 +21,12 @@ func grantIsOffline(authorizedScope string, sessionIdentifier string) bool {
 		sessionIdentifier == ""
 }
 
-func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
+// generateRefreshToken signs a refresh token for a code-descended grant and inserts its row.
+//
+// tx is the transaction the row is inserted in and the session read behind the max lifetime runs
+// in, nil for a grant that runs in none. A rotation hands over its own, so the child commits with
+// the claim on its parent and the check of the family's revocation record (#132, #437).
+func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *models.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
@@ -47,7 +52,7 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models
 			return "", 0, err
 		}
 
-		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, TokenTypeOffline, now, settings,
+		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, tx, TokenTypeOffline, now, settings,
 			&code.Client, code.SessionIdentifier)
 		if err != nil {
 			return "", 0, err
@@ -74,7 +79,7 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models
 			return "", 0, err
 		}
 
-		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, TokenTypeRefresh, now, settings, &code.Client, code.SessionIdentifier)
+		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, tx, TokenTypeRefresh, now, settings, &code.Client, code.SessionIdentifier)
 		if err != nil {
 			return "", 0, err
 		}
@@ -118,7 +123,7 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models
 	} else {
 		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
 	}
-	err := t.database.CreateRefreshToken(ctx, nil, refreshTokenEntity)
+	err := t.database.CreateRefreshToken(ctx, tx, refreshTokenEntity)
 	if err != nil {
 		return "", 0, err
 	}
@@ -152,7 +157,11 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now 
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, refreshTokenType TokenType, now time.Time, settings *models.Settings,
+// getRefreshTokenMaxLifetime is the instant a grant's refresh tokens stop being redeemable. A
+// session-bound token reads the session it is bound to, on tx when the caller holds one: sqlitedb
+// has one connection, so a read on nil waits on the connection the caller's transaction holds
+// until the context expires (#139, #437).
+func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx, refreshTokenType TokenType, now time.Time, settings *models.Settings,
 	client *models.Client, sessionIdentifier string) (int64, error) {
 	switch refreshTokenType {
 	case TokenTypeOffline:
@@ -163,7 +172,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, refreshTok
 		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
 	case TokenTypeRefresh:
-		userSession, err := t.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
+		userSession, err := t.database.GetUserSessionBySessionIdentifier(ctx, tx, sessionIdentifier)
 		if err != nil {
 			return 0, err
 		}
@@ -182,7 +191,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, refreshTok
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
 // Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
 // instead of referencing a Code entity.
-func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *models.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
@@ -250,7 +259,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, settings 
 		refreshTokenEntity.AuthenticatedAt = sql.NullTime{Time: input.AuthenticatedAt, Valid: true}
 	}
 
-	err = t.database.CreateRefreshToken(ctx, nil, refreshTokenEntity)
+	err = t.database.CreateRefreshToken(ctx, tx, refreshTokenEntity)
 	if err != nil {
 		return "", 0, err
 	}

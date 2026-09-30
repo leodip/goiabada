@@ -150,7 +150,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tokenStr, err := issuer.generateAccessToken(context.Background(), settings, tc.code, tc.scope, now, privKey, "test-kid", tc.parent)
+			tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, tc.code, tc.scope, now, privKey, "test-kid", tc.parent)
 			require.NoError(t, err, "generateAccessToken")
 
 			claims := parseAccessTokenClaims(t, tokenStr)
@@ -188,7 +188,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 	t.Run("initial code exchange takes the code's generation", func(t *testing.T) {
 		// code 7 against a user already at 9: reading the user would emit 9.
 		code := generationTestCode("openid", sid, 7, 9)
-		tokenStr, err := issuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", nil)
+		tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})
@@ -199,7 +199,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// promoted to 7 while its code stayed at 3, and the user has since reached 9.
 		code := generationTestCode("openid", sid, 3, 9)
 		parent := &models.RefreshToken{RefreshTokenType: TokenTypeRefresh.String(), AuthStateGeneration: 7}
-		tokenStr, err := issuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", parent)
+		tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})
@@ -220,7 +220,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			User:   &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 7},
 			Scope:  "openid",
 		}
-		tokenStr, err := issuer.generateROPCAccessToken(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", nil)
+		tokenStr, err := issuer.generateROPCAccessToken(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err)
 
 		claims := parseAccessTokenClaims(t, tokenStr)
@@ -239,7 +239,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			Scope:  "openid",
 		}
 		parent := &models.RefreshToken{RefreshTokenType: TokenTypeOffline.String(), AuthStateGeneration: 7}
-		tokenStr, err := issuer.generateROPCAccessToken(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", parent)
+		tokenStr, err := issuer.generateROPCAccessToken(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})
@@ -331,7 +331,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", nil)
+		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err, "generateRefreshToken")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
@@ -357,7 +357,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", parent)
+		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err, "generateRefreshToken")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
@@ -378,7 +378,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", nil)
+		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err, "generateRefreshTokenForROPC")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
@@ -408,7 +408,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", parent)
+		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err, "generateRefreshTokenForROPC")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)

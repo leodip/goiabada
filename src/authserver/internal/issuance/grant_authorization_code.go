@@ -100,7 +100,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 	}
 
 	// nil parent: this is the initial code exchange, so the code is the authorizing credential.
-	accessTokenStr, err := t.generateAccessToken(ctx, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
+	accessTokenStr, err := t.generateAccessToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	scopes := strings.Split(code.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateIdToken(ctx, settings, code, code.Scope, now, privKey, keyIdentifier)
+		idTokenStr, idTokenErr := t.generateIdToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
@@ -120,7 +120,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}

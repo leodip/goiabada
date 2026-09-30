@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -30,6 +31,7 @@ type Database interface {
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
 	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
+	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
 	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
 	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
@@ -669,6 +671,18 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 		return ClientGrantRevocationResult{}, err
 	}
 
+	// A record for every family the client holds a token of, live or not, written before the
+	// sweep and in the same transaction. The sweep below reaches only the rows that exist now, and
+	// a rotation that claimed its parent and has not inserted its child has no live row to reach:
+	// that child then commits live into a family the operator believes is revoked (#259). The record
+	// outlives the sweep, the validator refuses a token whose family has one, and the rotation checks
+	// it again inside its own transaction, so the child is refused at the next refresh or never
+	// inserted. A revoked member counts too: its sibling may be the one mid-rotation.
+	err = recordClientFamilies(ctx, db, tx, tokens)
+	if err != nil {
+		return ClientGrantRevocationResult{}, err
+	}
+
 	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
 	if err != nil {
 		return ClientGrantRevocationResult{}, err
@@ -682,8 +696,30 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 
 // RevocationReasonClientBecamePublic is the reason recorded on AuditRevokedClientGrants. A
 // constant beside the RevocationReason* group above, for the same reason those are constants: a
-// log consumer needs something to match against, and there is one place to add the next site.
+// log consumer needs something to match against, and there is one place to add the next site. It
+// is also the reason a family's revocation record carries when RevokeClientGrants wrote it.
 const RevocationReasonClientBecamePublic = "client_became_public"
+
+// recordClientFamilies writes the revocation record of every distinct rotation family among the
+// given refresh tokens, each once. A token with no family identifier carries no family to record:
+// no issuer writes one, and RecordRefreshTokenFamilyRevoked refuses an empty jti as a caller bug.
+func recordClientFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*models.RefreshToken) error {
+	seen := make(map[string]struct{}, len(tokens))
+	for _, rt := range tokens {
+		jti := rt.FirstRefreshTokenJti
+		if jti == "" {
+			continue
+		}
+		if _, done := seen[jti]; done {
+			continue
+		}
+		seen[jti] = struct{}{}
+		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, jti, RevocationReasonClientBecamePublic); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // RevokeClientGrantsTx runs a narrow client write and RevokeClientGrants inside ONE transaction
 // and commits it, returning the result for the caller to audit AFTER the commit. It is
@@ -727,8 +763,12 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 	// a deadlock reruns both together (#301). Safe to rerun: the write is the compare-and-set
 	// SetClientPublic followed by an idempotent UpdateClient, its answer is asked again on every
 	// attempt, and result is the committing attempt's.
+	//
+	// A family's record is written by a read-then-insert, so a containment of the same family that
+	// overlaps this transaction can win the key first. The helper reruns the body once, which then
+	// reads the record the containment committed and leaves it as it is.
 	var result ClientGrantRevocationResult
-	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		revoke, err := write(tx)
 		if err != nil {
 			return err

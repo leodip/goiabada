@@ -60,7 +60,10 @@ type tokenGenerationInput struct {
 // (the token may have been promoted while the code was not), and its scope can differ
 // from the request's, since a caller may down-scope offline_access away without the
 // grant ceasing to be offline (#106 decisions 9 and 13).
-func (t *TokenIssuer) generateAccessToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
+//
+// tx is the transaction the grant runs in, nil for one that runs in none, as generateAccessTokenCore
+// states. A refresh hands over the one its rotation runs in (#132, #437).
+func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
 	parentRefreshToken *models.RefreshToken) (string, error) {
 
@@ -75,15 +78,15 @@ func (t *TokenIssuer) generateAccessToken(ctx context.Context, settings *models.
 		input.GrantIsOffline = parentRefreshToken.RefreshTokenType == TokenTypeOffline.String()
 	}
 
-	return t.generateAccessTokenCore(ctx, nil, settings, input, now, signingKey, keyIdentifier)
+	return t.generateAccessTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
-func (t *TokenIssuer) generateIdToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
+func (t *TokenIssuer) generateIdToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
-	return t.generateIdTokenCore(ctx, nil, settings, input, now, signingKey, keyIdentifier)
+	return t.generateIdTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
 // claimMapper builds the user-claims mapper for one token type. The two fields after the port are
@@ -368,7 +371,7 @@ func (t *TokenIssuer) calculateAtHash(accessToken string) string {
 // generation with the current one, laundering it forward (#106 decision 13).
 //
 // ROPC grants are always offline, so no access token here ever carries sid.
-func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
 	parentRefreshToken *models.RefreshToken) (string, error) {
 
@@ -382,16 +385,16 @@ func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, settings *mod
 		tokenInput.AuthStateGeneration = parentRefreshToken.AuthStateGeneration
 	}
 
-	return t.generateAccessTokenCore(ctx, nil, settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateAccessTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateROPCIdToken creates an id_token for ROPC flow.
-func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
-	return t.generateIdTokenCore(ctx, nil, settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateIdTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // authMethodsToArray converts a space-separated auth methods string to a JSON array

@@ -52,12 +52,13 @@ const (
 )
 
 // backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
-// the sweeper, and the seven deletes it sweeps with.
+// the sweeper, and the eight deletes it sweeps with.
 type backgroundWorkerDatabase interface {
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error
 	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
+	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
 	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
@@ -244,6 +245,20 @@ func (w *Worker) performTask(ctx context.Context) {
 		slog.ErrorContext(ctx, "unable to delete expired refresh tokens", "error", err)
 	} else {
 		slog.InfoContext(ctx, "deleted expired refresh tokens")
+	}
+
+	if cancelled(ctx) {
+		return
+	}
+
+	// After the tokens, since a family's record is removed when its last token is. A record whose
+	// family still has a member, live or revoked, stays: it is what refuses a child born into a
+	// revoked family (#132, #259).
+	err = w.database.DeleteOrphanedRefreshTokenFamilyRevocations(ctx, nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to delete orphaned refresh token family revocations", "error", err)
+	} else {
+		slog.InfoContext(ctx, "deleted orphaned refresh token family revocations")
 	}
 
 	if cancelled(ctx) {
