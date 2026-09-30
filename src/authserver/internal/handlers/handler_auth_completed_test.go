@@ -2730,3 +2730,111 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.AssertExpectations(t)
 	})
 }
+
+// Each write of the reuse arm, failing: the answer is the 500 with that write's error, and nothing
+// after it runs, so neither the bump's audit event nor the ceremony's next state is written for a
+// binding that did not complete. The ceremony takes every step of the arm (rotation, AuthTime
+// refresh, promotion), so each case fails one step and stubs the ones before it (#437).
+func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
+	const (
+		regenerate = iota
+		bump
+		refreshAuthTime
+		promote
+	)
+
+	testCases := []struct {
+		name     string
+		failedAt int
+	}{
+		{name: "the identifier rotation fails before the bump", failedAt: regenerate},
+		{name: "the bump fails", failedAt: bump},
+		{name: "the AuthTime refresh fails", failedAt: refreshAuthTime},
+		{name: "the OTP generation promotion fails", failedAt: promote},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
+			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+
+			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
+				auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+
+			req, _ := http.NewRequest("GET", "/auth/completed", nil)
+			req = withSessionSettings(req)
+			sessionIdentifier := "test-session"
+			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+			rr := httptest.NewRecorder()
+
+			captured := int64(4)
+			authenticatedAt := time.Now().UTC().Add(-time.Minute)
+			authContext := &ceremony.AuthContext{
+				AuthState:           ceremony.AuthStateAuthenticationCompleted,
+				ClientId:            "test-client",
+				UserId:              1,
+				Scope:               "openid",
+				AuthMethods:         "pwd otp",
+				AuthenticatedAt:     &authenticatedAt,
+				OtpConfigGeneration: &captured,
+			}
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+			userSession := &models.UserSession{Id: 9, UserId: 1, AcrLevel: models.AcrLevel1, AuthMethods: "pwd"}
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+			client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel2Optional}
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+			userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
+				mock.AnythingOfType("*int64")).Return(true)
+
+			failure := errors.New("write failed")
+			errAt := func(step int) error {
+				if step == tc.failedAt {
+					return failure
+				}
+				return nil
+			}
+
+			ceremonyStore.On("RegenerateSession", rr, req).Return(errAt(regenerate)).Once()
+			if tc.failedAt > regenerate {
+				bumpErr := errAt(bump)
+				var bumped *models.UserSession
+				if bumpErr == nil {
+					bumped = userSession
+				}
+				userSessionManager.On("BumpUserSession", mock.Anything, sessionIdentifier, int64(1),
+					"pwd otp", models.AcrLevel2Optional, "").Return(bumped, bumpErr).Once()
+			}
+			if tc.failedAt > bump {
+				database.On("UpdateUserSession", mock.Anything, mock.Anything, userSession).Return(errAt(refreshAuthTime)).Once()
+			}
+			if tc.failedAt > refreshAuthTime {
+				database.On("PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, int64(9), int64(4)).
+					Return(errAt(promote)).Once()
+			}
+			pageRenderer.On("InternalServerError", rr, req, failure).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditBumpedUserSession, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+			if tc.failedAt < bump {
+				userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything,
+					mock.Anything, mock.Anything, mock.Anything)
+			}
+			if tc.failedAt < refreshAuthTime {
+				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
+			}
+			if tc.failedAt < promote {
+				database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything,
+					mock.Anything, mock.Anything)
+			}
+		})
+	}
+}
