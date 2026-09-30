@@ -139,6 +139,15 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 		return "openid", nil
 	}
 
+	// The token endpoint has normalized the scope, so this counts what the refresh token row
+	// stores (models.ScopeMaxBytes). Here and not above the password check: everything before this
+	// line is the caller proving the grant, and a request that has not proved it is told nothing
+	// about its scope, so a wrong password with an over-long scope is still invalid_grant and is
+	// still charged to the rate limiter (#137, #219, #437).
+	if err := scopeBound.check(scope); err != nil {
+		return "", err
+	}
+
 	validatedScopes := []string{}
 
 	for _, scopeStr := range oidc.SplitScope(scope) {

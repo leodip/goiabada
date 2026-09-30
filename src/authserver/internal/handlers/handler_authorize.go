@@ -354,6 +354,7 @@ func HandleAuthorizeGet(
 						ImplicitGrantEnabled: client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
 						Scope:                authContext.Scope,
 						Nonce:                authContext.Nonce,
+						State:                authContext.State,
 						MaxAge:               authContext.MaxAge,
 					})
 				if validationErr != nil {
