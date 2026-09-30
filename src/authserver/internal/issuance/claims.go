@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"slices"
 	"strings"
@@ -74,7 +75,7 @@ func (t *TokenIssuer) generateAccessToken(ctx context.Context, settings *models.
 		input.GrantIsOffline = parentRefreshToken.RefreshTokenType == TokenTypeOffline.String()
 	}
 
-	return t.generateAccessTokenCore(ctx, settings, input, now, signingKey, keyIdentifier)
+	return t.generateAccessTokenCore(ctx, nil, settings, input, now, signingKey, keyIdentifier)
 }
 
 func (t *TokenIssuer) generateIdToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
@@ -82,7 +83,7 @@ func (t *TokenIssuer) generateIdToken(ctx context.Context, settings *models.Sett
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
-	return t.generateIdTokenCore(ctx, settings, input, now, signingKey, keyIdentifier)
+	return t.generateIdTokenCore(ctx, nil, settings, input, now, signingKey, keyIdentifier)
 }
 
 // claimMapper builds the user-claims mapper for one token type. The two fields after the port are
@@ -113,7 +114,13 @@ func tokenLifetimeSeconds(settings *models.Settings, client *models.Client) int 
 
 // generateAccessTokenCore creates an access token using the unified tokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *models.Settings, input *tokenGenerationInput,
+//
+// tx is the transaction the issuance runs in, nil when it runs in none, and it reaches the one read
+// the builder makes, the claim mapper's picture lookup. A caller that holds a transaction hands it
+// over, because on sqlitedb's single connection a read on nil waits for the connection that
+// transaction holds until the context expires, and the picture claim is dropped without an error
+// (#437).
+func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *tokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -195,7 +202,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 	mapper := t.claimMapper(userclaims.InclusionAccessToken)
 
 	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
-		mapper.AddOpenIdConnectClaims(ctx, claims, input.User, scopes)
+		mapper.AddOpenIdConnectClaims(ctx, tx, claims, input.User, scopes)
 	}
 
 	// groups and attributes (using the IncludeInAccessToken filter), outside the OIDC claim
@@ -213,8 +220,9 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 }
 
 // generateIdTokenCore creates an id_token using the unified tokenGenerationInput.
-// This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.Settings, input *tokenGenerationInput,
+// This is the single implementation used by all OAuth flows (auth code, implicit, ROPC). tx is
+// generateAccessTokenCore's.
+func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *tokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -269,7 +277,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.
 	mapper := t.claimMapper(userclaims.InclusionIdToken)
 
 	if includeOpenIDConnectClaimsInIdToken {
-		mapper.AddOpenIdConnectClaims(ctx, claims, input.User, scopes)
+		mapper.AddOpenIdConnectClaims(ctx, tx, claims, input.User, scopes)
 	}
 
 	// groups and attributes (using the IncludeInIdToken filter), outside the OIDC claim setting
@@ -374,7 +382,7 @@ func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, settings *mod
 		tokenInput.AuthStateGeneration = parentRefreshToken.AuthStateGeneration
 	}
 
-	return t.generateAccessTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateAccessTokenCore(ctx, nil, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateROPCIdToken creates an id_token for ROPC flow.
@@ -383,7 +391,7 @@ func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, settings *models.
 
 	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
-	return t.generateIdTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateIdTokenCore(ctx, nil, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // authMethodsToArray converts a space-separated auth methods string to a JSON array

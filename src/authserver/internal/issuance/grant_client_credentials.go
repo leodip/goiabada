@@ -25,7 +25,7 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 		Scope:     scope,
 	}
 
-	privKey, keyIdentifier, err := t.loadSigningKey(ctx)
+	privKey, keyIdentifier, err := t.loadSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

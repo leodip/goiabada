@@ -275,6 +275,14 @@ func SupportedResponseModes() []string {
 // spelling of each.
 var supportedResponseTypes = []string{"code", "token", "id_token", "id_token token"}
 
+// ImplicitNotAuthorizedErrorMsg is the refusal for a client that may not use the implicit grant. Two
+// places emit it: ValidateRequest, which refuses a new request, and /auth/issue, which refuses a
+// ceremony whose client had the grant switched off while it sat on a step. They have to say the same
+// thing, as ROPCNotAuthorizedErrorMsg does for its two (#197).
+const ImplicitNotAuthorizedErrorMsg = "The client is not authorized to use the implicit grant type. " +
+	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows', " +
+	"or enable it globally in 'Settings > General'."
+
 // SupportedResponseTypes is the discovery document's response_types_supported. It lists every
 // response type the server implements whatever the implicit switch says, as OIDC Discovery 1.0
 // section 3 defines the field ("values that this OP supports"); a client not allowed the implicit
@@ -337,8 +345,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	// Check if implicit flow is authorized for this client
 	if isImplicitFlow && !input.ImplicitGrantEnabled {
 		return customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
-			"The client is not authorized to use the implicit grant type. To enable it, go to the client's settings in the admin console under 'OAuth2 flows', or enable it globally in 'Settings > General'.",
-			http.StatusBadRequest)
+			ImplicitNotAuthorizedErrorMsg, http.StatusBadRequest)
 	}
 
 	// OIDC: id_token requires openid scope

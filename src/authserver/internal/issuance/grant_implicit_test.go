@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
+func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
@@ -45,13 +45,13 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 		Groups:   []models.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
-	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -64,7 +64,9 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 		AuthenticatedAt:   authenticatedAt,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, false)
+	armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -92,7 +94,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
+func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
@@ -127,13 +129,13 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 		Groups:        []models.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
-	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	input := &ImplicitGrantInput{
@@ -147,7 +149,9 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 		AuthenticatedAt:   authenticatedAt,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, false, true)
+	armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, false, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -181,7 +185,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
+func TestIssueImplicitTx_BothTokens(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
@@ -216,13 +220,13 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 		Groups:        []models.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
-	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	input := &ImplicitGrantInput{
@@ -236,7 +240,9 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 		AuthenticatedAt:   authenticatedAt,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
+	armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -269,7 +275,7 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
+func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 	// This test verifies that implicit flow NEVER issues a refresh token
 	// per RFC 6749 Section 4.2.2
 	mockDB := mocks_data.NewDatabase(t)
@@ -295,13 +301,13 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 		Groups:  []models.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
-	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 
 	// Request with offline_access scope - should NOT result in refresh token for implicit flow
 	input := &ImplicitGrantInput{
@@ -315,7 +321,9 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 		AuthenticatedAt: time.Now().UTC(),
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, false)
+	armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -327,7 +335,7 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T) {
+func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
@@ -353,13 +361,13 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 		Groups:  []models.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
-	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -372,7 +380,9 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 		AuthenticatedAt:   time.Now().UTC(),
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, false)
+	armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -388,7 +398,7 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) {
+func TestIssueImplicitTx_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
@@ -423,13 +433,13 @@ func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) 
 		},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
-	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 	// Note: UserHasProfilePicture not called because we don't have "profile" scope
 
 	input := &ImplicitGrantInput{
@@ -443,7 +453,9 @@ func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) 
 		AuthenticatedAt:   time.Now().UTC(),
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
+	armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+	response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 

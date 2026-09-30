@@ -53,12 +53,12 @@ func (_m *ImplicitTokenIssuer) EXPECT() *ImplicitTokenIssuer_Expecter {
 	return &ImplicitTokenIssuer_Expecter{mock: &_m.Mock}
 }
 
-// GenerateTokenResponseForImplicit provides a mock function for the type ImplicitTokenIssuer
-func (_mock *ImplicitTokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error) {
+// IssueImplicitTx provides a mock function for the type ImplicitTokenIssuer
+func (_mock *ImplicitTokenIssuer) IssueImplicitTx(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error) {
 	ret := _mock.Called(ctx, settings, input, issueAccessToken, issueIdToken)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateTokenResponseForImplicit")
+		panic("no return value specified for IssueImplicitTx")
 	}
 
 	var r0 *issuance.ImplicitGrantResponse
@@ -81,22 +81,22 @@ func (_mock *ImplicitTokenIssuer) GenerateTokenResponseForImplicit(ctx context.C
 	return r0, r1
 }
 
-// ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateTokenResponseForImplicit'
-type ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call struct {
+// ImplicitTokenIssuer_IssueImplicitTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IssueImplicitTx'
+type ImplicitTokenIssuer_IssueImplicitTx_Call struct {
 	*mock.Call
 }
 
-// GenerateTokenResponseForImplicit is a helper method to define mock.On call
+// IssueImplicitTx is a helper method to define mock.On call
 //   - ctx context.Context
 //   - settings *models.Settings
 //   - input *issuance.ImplicitGrantInput
 //   - issueAccessToken bool
 //   - issueIdToken bool
-func (_e *ImplicitTokenIssuer_Expecter) GenerateTokenResponseForImplicit(ctx any, settings any, input any, issueAccessToken any, issueIdToken any) *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call {
-	return &ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call{Call: _e.mock.On("GenerateTokenResponseForImplicit", ctx, settings, input, issueAccessToken, issueIdToken)}
+func (_e *ImplicitTokenIssuer_Expecter) IssueImplicitTx(ctx any, settings any, input any, issueAccessToken any, issueIdToken any) *ImplicitTokenIssuer_IssueImplicitTx_Call {
+	return &ImplicitTokenIssuer_IssueImplicitTx_Call{Call: _e.mock.On("IssueImplicitTx", ctx, settings, input, issueAccessToken, issueIdToken)}
 }
 
-func (_c *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call) Run(run func(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool)) *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call {
+func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) Run(run func(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool)) *ImplicitTokenIssuer_IssueImplicitTx_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -129,12 +129,12 @@ func (_c *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call) Run(run fun
 	return _c
 }
 
-func (_c *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call) Return(implicitGrantResponse *issuance.ImplicitGrantResponse, err error) *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call {
+func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) Return(implicitGrantResponse *issuance.ImplicitGrantResponse, err error) *ImplicitTokenIssuer_IssueImplicitTx_Call {
 	_c.Call.Return(implicitGrantResponse, err)
 	return _c
 }
 
-func (_c *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)) *ImplicitTokenIssuer_GenerateTokenResponseForImplicit_Call {
+func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)) *ImplicitTokenIssuer_IssueImplicitTx_Call {
 	_c.Call.Return(run)
 	return _c
 }

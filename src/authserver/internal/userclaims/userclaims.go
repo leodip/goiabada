@@ -113,7 +113,13 @@ type Mapper struct {
 // A failed picture lookup is not an error here and never has been: the claim is omitted and the
 // rest of the response stands, because a user who cannot be told whether they have a picture still
 // has a name and an email.
-func (m Mapper) AddOpenIdConnectClaims(ctx context.Context, claims jwt.MapClaims, user *models.User, scopes []string) {
+//
+// tx is the transaction the caller runs in, nil for one that runs in none, and the picture lookup
+// is made on it. That is not a nicety: this method swallows a failed lookup, so a caller that holds
+// a transaction and reads on nil gets no error for it. sqlitedb has one connection, the read waits
+// for the connection the caller's transaction is holding until the context expires, and the
+// picture claim is silently dropped (#437). /userinfo runs in no transaction and passes nil.
+func (m Mapper) AddOpenIdConnectClaims(ctx context.Context, tx *sql.Tx, claims jwt.MapClaims, user *models.User, scopes []string) {
 
 	if slices.Contains(scopes, "profile") {
 		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
@@ -132,7 +138,7 @@ func (m Mapper) AddOpenIdConnectClaims(ctx context.Context, claims jwt.MapClaims
 		addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
 		addClaimIfNotEmpty(claims, "locale", user.Locale)
 
-		hasPicture, err := m.Database.UserHasProfilePicture(ctx, nil, user.Id)
+		hasPicture, err := m.Database.UserHasProfilePicture(ctx, tx, user.Id)
 		if err == nil && hasPicture {
 			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", m.BaseURL, user.Subject)
 		}

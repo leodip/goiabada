@@ -81,7 +81,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -176,7 +176,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 	// because the code doesn't check for pictures when OIDC claims aren't included
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -256,7 +256,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -321,7 +321,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 
 	// NOTE: No UserHasProfilePicture mock needed - email scope doesn't check for pictures
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -389,7 +389,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -657,7 +657,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -717,7 +717,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 
 	// NOTE: No UserHasProfilePicture mock needed when scope excludes profile
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -781,7 +781,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 
 	// NOTE: No UserHasProfilePicture mock needed - email scope doesn't check for pictures
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -857,7 +857,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	// Mock: User HAS a profile picture
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), userId).Return(true, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -931,7 +931,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 

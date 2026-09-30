@@ -21,14 +21,20 @@ type AuthorizationCodeGrant struct {
 
 func (*AuthorizationCodeGrant) GrantType() oidc.GrantType { return oidc.GrantTypeAuthorizationCode }
 
+// AuthorizationCodeNotSupportedErrorMsg is the refusal for a client that may not use the authorization
+// code flow. Two places emit it: the token endpoint, which refuses a redemption, and /auth/issue, which
+// refuses a ceremony whose client had the flow switched off while it sat on a step. They have to say
+// the same thing, because an operator switching the flow off is doing one act with two consequences.
+// Exported for the second user, which lives in the handlers package (#197).
+const AuthorizationCodeNotSupportedErrorMsg = "The client associated with the provided client_id does not support authorization code flow."
+
 // validateAuthorizationCodeGrant validates a code redemption (RFC 6749 section 4.1.3) for a client
 // ValidateTokenRequest has already found and found enabled.
 func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, client *models.Client,
 	input *ValidateTokenRequestInput) (*AuthorizationCodeGrant, error) {
 	if !client.AuthorizationCodeEnabled {
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
-			"The client associated with the provided client_id does not support authorization code flow.",
-			http.StatusBadRequest)
+			AuthorizationCodeNotSupportedErrorMsg, http.StatusBadRequest)
 	}
 
 	if len(input.Code) == 0 {

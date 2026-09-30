@@ -58,7 +58,7 @@ func HandleAuthLevel2Get(
 		// mid-ceremony reaches the dereference below. Byte-identical to the six sibling
 		// ceremony handlers that already check this (HandleAuthOtpGet, HandleAuthOtpPost,
 		// HandleConsentGet, HandleConsentPost, HandleAuthCompletedGet and
-		// handleImplicitFlow): consistency is the point rather than a side benefit, because
+		// issueImplicitGrant): consistency is the point rather than a side benefit, because
 		// "every handler nil-checks except this one" is the kind of gap that regresses
 		// (#242 decision 5).
 		if user == nil {

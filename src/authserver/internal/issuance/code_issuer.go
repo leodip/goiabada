@@ -29,12 +29,13 @@ import (
 // diagnosis by having no frames of its own (#279 decision 5).
 var ErrIssuingClientGone = errors.New("the client this ceremony is issuing for no longer exists")
 
-// ErrIssuingSessionGone is returned by IssueAuthCode when the session the ceremony binds its code
-// to no longer has a row. /auth/issue answers it as it answers ErrIssuingClientGone: the browser
-// restarts at level 1, or a silent request is told login_required. What removed the row cannot be
-// told from here, which is #129's own finding: an explicit termination, a logout in another tab and
-// either background reaper all look alike (#139 decisions 3 and 9). A package-level sentinel on
-// stdlib errors.New, for the reason ErrIssuingClientGone states.
+// ErrIssuingSessionGone is returned by IssueAuthCode, and by IssueImplicit for the tokens it signs,
+// when the session the ceremony binds its grant to no longer has a row. /auth/issue answers it as
+// it answers ErrIssuingClientGone: the browser restarts at level 1, or a silent request is told
+// login_required. What removed the row cannot be told from here, which is #129's own finding: an
+// explicit termination, a logout in another tab and either background reaper all look alike (#139
+// decisions 3 and 9). A package-level sentinel on stdlib errors.New, for the reason
+// ErrIssuingClientGone states.
 var ErrIssuingSessionGone = errors.New("the session this ceremony is issuing for no longer exists")
 
 // codeIssuerDatabase is what the code issuer needs: the session row it takes, the client it issues

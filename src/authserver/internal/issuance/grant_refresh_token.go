@@ -202,7 +202,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, settings *model
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	privKey, keyIdentifier, err := t.loadSigningKey(ctx)
+	privKey, keyIdentifier, err := t.loadSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, settings *model
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	privKey, keyIdentifier, err := t.loadSigningKey(ctx)
+	privKey, keyIdentifier, err := t.loadSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

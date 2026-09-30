@@ -55,7 +55,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.S
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	privKey, keyIdentifier, err := t.loadSigningKey(ctx)
+	privKey, keyIdentifier, err := t.loadSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

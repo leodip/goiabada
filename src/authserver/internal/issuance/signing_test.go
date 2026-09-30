@@ -62,7 +62,7 @@ func TestLoadSigningKey(t *testing.T) {
 			// its issuance inside one yet.
 			mockDB.On("GetCurrentSigningKey", context.Background(), (*sql.Tx)(nil)).Return(tc.keyPair, tc.readErr).Once()
 
-			privKey, keyIdentifier, err := tokenIssuer.loadSigningKey(context.Background())
+			privKey, keyIdentifier, err := tokenIssuer.loadSigningKey(context.Background(), nil)
 
 			if tc.wantErr != "" {
 				require.Error(t, err)

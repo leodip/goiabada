@@ -70,7 +70,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	privKey, keyIdentifier, err := t.loadSigningKey(ctx)
+	privKey, keyIdentifier, err := t.loadSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

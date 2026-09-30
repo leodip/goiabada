@@ -159,7 +159,7 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			claims := make(jwt.MapClaims)
 
-			mapper.AddOpenIdConnectClaims(context.Background(), claims, tc.user, tc.scopes)
+			mapper.AddOpenIdConnectClaims(context.Background(), nil, claims, tc.user, tc.scopes)
 
 			for key, expectedValue := range tc.expected {
 				assert.Equal(t, expectedValue, claims[key], "Mismatch for claim: %s", key)
@@ -235,7 +235,7 @@ func TestAddOpenIdConnectClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) 
 			}
 
 			claims := jwt.MapClaims{}
-			idTokenMapper(mockDB).AddOpenIdConnectClaims(context.Background(), claims, user, test.scopes)
+			idTokenMapper(mockDB).AddOpenIdConnectClaims(context.Background(), nil, claims, user, test.scopes)
 
 			if test.carries {
 				assert.Equal(t, updatedAt.Unix(), claims["updated_at"])
@@ -259,7 +259,7 @@ func TestAddOpenIdConnectClaims_UpdatedAtDoesNotDependOnTheTokenType(t *testing.
 			Inclusion: inclusion}
 
 		claims := jwt.MapClaims{}
-		mapper.AddOpenIdConnectClaims(context.Background(), claims, user, []string{"openid", "email"})
+		mapper.AddOpenIdConnectClaims(context.Background(), nil, claims, user, []string{"openid", "email"})
 		assert.NotContains(t, claims, "updated_at",
 			"no profile scope, so neither token type carries the claim")
 	}
@@ -283,7 +283,7 @@ func TestAddOpenIdConnectClaims_CarriesTheCallersContext(t *testing.T) {
 
 		claims := jwt.MapClaims{}
 		idTokenMapper(mockDB).
-			AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "profile"})
+			AddOpenIdConnectClaims(ctx, nil, claims, user, []string{"openid", "profile"})
 
 		assert.Equal(t, "http://localhost:8081/userinfo/picture/sub-42", claims["picture"])
 		mockDB.AssertExpectations(t)
@@ -294,10 +294,44 @@ func TestAddOpenIdConnectClaims_CarriesTheCallersContext(t *testing.T) {
 
 		claims := jwt.MapClaims{}
 		idTokenMapper(mockDB).
-			AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "email"})
+			AddOpenIdConnectClaims(ctx, nil, claims, user, []string{"openid", "email"})
 
 		assert.NotContains(t, claims, "picture")
 		mockDB.AssertNotCalled(t, "UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+// TestAddOpenIdConnectClaims_ReadsThePictureOnTheTransactionItIsHanded is #437's: an issuance that
+// holds a transaction hands it here, and the picture lookup is made on it. The lookup's failure is
+// swallowed, so a read made on nil while the caller holds sqlitedb's one connection waits for that
+// connection until the context expires and the picture claim is dropped without an error; only the
+// claim's absence would show it. The expectations name the transaction, so the read on nil matches
+// nothing and the case fails, and the nil case is the other half: /userinfo runs in no transaction
+// and reads on none.
+func TestAddOpenIdConnectClaims_ReadsThePictureOnTheTransactionItIsHanded(t *testing.T) {
+	user := &models.User{Id: 42, Subject: "sub-42", GivenName: "Ada"}
+
+	t.Run("the transaction it is handed", func(t *testing.T) {
+		tx := &sql.Tx{}
+		mockDB := mocks_data.NewDatabase(t)
+		mockDB.On("UserHasProfilePicture", mock.Anything, tx, int64(42)).Return(true, nil).Once()
+
+		claims := jwt.MapClaims{}
+		idTokenMapper(mockDB).AddOpenIdConnectClaims(context.Background(), tx, claims, user, []string{"openid", "profile"})
+
+		assert.Equal(t, "http://localhost:8081/userinfo/picture/sub-42", claims["picture"])
+		mockDB.AssertExpectations(t)
+	})
+
+	t.Run("no transaction, when it is handed none", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockDB.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(true, nil).Once()
+
+		claims := jwt.MapClaims{}
+		idTokenMapper(mockDB).AddOpenIdConnectClaims(context.Background(), nil, claims, user, []string{"openid", "profile"})
+
+		assert.Equal(t, "http://localhost:8081/userinfo/picture/sub-42", claims["picture"])
+		mockDB.AssertExpectations(t)
 	})
 }
 
@@ -311,7 +345,7 @@ func TestAddOpenIdConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T
 	user := &models.User{Id: 9, Subject: "sub-9", GivenName: "Ada"}
 	claims := jwt.MapClaims{}
 	idTokenMapper(mockDB).
-		AddOpenIdConnectClaims(context.Background(), claims, user, []string{"openid", "profile"})
+		AddOpenIdConnectClaims(context.Background(), nil, claims, user, []string{"openid", "profile"})
 
 	assert.NotContains(t, claims, "picture")
 	assert.Equal(t, "Ada", claims["given_name"])
@@ -606,7 +640,7 @@ func TestAddressClaim(t *testing.T) {
 func TestAddOpenIdConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 	claims := jwt.MapClaims{}
 	idTokenMapper(mocks_data.NewDatabase(t)).
-		AddOpenIdConnectClaims(context.Background(), claims, &models.User{Id: 4}, []string{"openid", "address"})
+		AddOpenIdConnectClaims(context.Background(), nil, claims, &models.User{Id: 4}, []string{"openid", "address"})
 
 	assert.NotContains(t, claims, "address")
 }

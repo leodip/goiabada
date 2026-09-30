@@ -116,7 +116,7 @@ func HandleUserInfoGetPost(
 			BaseURL:   baseURL,
 			Inclusion: userclaims.InclusionIdToken,
 		}
-		mapper.AddOpenIdConnectClaims(r.Context(), claims, user, scopes)
+		mapper.AddOpenIdConnectClaims(r.Context(), nil, claims, user, scopes)
 		mapper.AddGroupClaims(claims, user, scopes)
 		mapper.AddAttributeClaims(claims, user, scopes)
 
