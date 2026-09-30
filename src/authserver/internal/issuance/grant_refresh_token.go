@@ -195,10 +195,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, settings *model
 		scopeToUse = scopeRequested
 	}
 
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if code.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
-	}
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &code.Client)
 
 	var tokenResponse = oauth.TokenResponse{
 		TokenType: TokenTypeBearer.String(),
@@ -294,10 +291,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, settings *model
 		scopeToUse = scopeRequested
 	}
 
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if parent.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = parent.Client.TokenExpirationInSeconds
-	}
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &parent.Client)
 
 	var tokenResponse = oauth.TokenResponse{
 		TokenType: TokenTypeBearer.String(),

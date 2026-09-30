@@ -100,6 +100,17 @@ func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Map
 	}
 }
 
+// tokenLifetimeSeconds is how long an access or ID token lives: the client's own lifetime when it
+// sets one, else the server's. A client's 0 means it inherits the setting. Every grant reads it
+// here; client credentials once kept its own copy of the lifetime and read the setting alone,
+// ignoring an override every other grant honoured (#437).
+func tokenLifetimeSeconds(settings *models.Settings, client *models.Client) int {
+	if client.TokenExpirationInSeconds > 0 {
+		return client.TokenExpirationInSeconds
+	}
+	return settings.TokenExpirationInSeconds
+}
+
 // generateAccessTokenCore creates an access token using the unified tokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
 func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *models.Settings, input *tokenGenerationInput,
@@ -164,10 +175,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 
 	claims["typ"] = TokenTypeBearer.String()
 
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
 	claims["scope"] = input.Scope
@@ -234,10 +242,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.
 	// ID token audience is always the client identifier
 	claims["aud"] = input.Client.ClientIdentifier
 
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
 

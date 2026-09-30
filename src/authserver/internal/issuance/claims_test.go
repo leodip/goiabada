@@ -630,6 +630,30 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "updated_at", -30*time.Minute, "updated_at should be 30 minutes ago")
 }
 
+// The one lifetime rule every grant reads (#437 decision 11): a client's positive lifetime wins,
+// and anything else inherits the server's.
+func TestTokenLifetimeSeconds(t *testing.T) {
+	settings := &models.Settings{TokenExpirationInSeconds: 3600}
+
+	tests := []struct {
+		name           string
+		clientLifetime int
+		expected       int
+	}{
+		{name: "client override wins", clientLifetime: 900, expected: 900},
+		{name: "override longer than the setting wins too", clientLifetime: 7200, expected: 7200},
+		{name: "zero inherits the setting", clientLifetime: 0, expected: 3600},
+		{name: "a negative value inherits the setting", clientLifetime: -1, expected: 3600},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &models.Client{TokenExpirationInSeconds: tt.clientLifetime}
+			assert.Equal(t, tt.expected, tokenLifetimeSeconds(settings, client))
+		})
+	}
+}
+
 func TestCalculateAtHash(t *testing.T) {
 	tokenIssuer := &TokenIssuer{}
 

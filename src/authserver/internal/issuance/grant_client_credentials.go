@@ -17,9 +17,11 @@ import (
 func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *models.Settings,
 	client *models.Client, scope string) (*oauth.TokenResponse, error) {
 
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, client)
+
 	var tokenResponse = oauth.TokenResponse{
 		TokenType: TokenTypeBearer.String(),
-		ExpiresIn: int64(settings.TokenExpirationInSeconds),
+		ExpiresIn: int64(tokenExpirationInSeconds),
 		Scope:     scope,
 	}
 
@@ -62,7 +64,7 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 		claims["aud"] = audCollection
 	}
 	claims["typ"] = TokenTypeBearer.String()
-	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
 	claims["scope"] = scope
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
