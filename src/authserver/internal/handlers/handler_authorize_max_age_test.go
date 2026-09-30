@@ -138,7 +138,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.handler.ServeHTTP(f.rr, f.req)
 
 		require.Equal(t, http.StatusFound, f.rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", f.rr.Header().Get("Location"))
+		assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1")
 		require.NotNil(t, f.saved)
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, f.saved.AuthState)
 		assert.Equal(t, "invalid_request", f.saved.DeferredErrorCode)

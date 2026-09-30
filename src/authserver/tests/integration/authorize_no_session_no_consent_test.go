@@ -714,7 +714,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 
 	// Verify that the user can't proceed to the next step. 400 like every other gated step; this
 	// one answered 500 until #436 put it behind the same gate (#248 part 1).
-	resp = loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/level1completed")
+	resp = loadPage(t, httpClient, stepURLOfTheSameCeremony(t, redirectLocation, "/auth/level1completed"))
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -830,7 +830,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	// is a request the server will not process rather than a server fault. Before #279 decision
 	// 21 every one of these answered a 500 page with a stack and a request id, and the ordinary
 	// way to reach one is the browser's Back button.
-	resp = loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/completed")
+	resp = loadPage(t, httpClient, stepURLOfTheSameCeremony(t, redirectLocation, "/auth/completed"))
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -955,7 +955,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	// is a request the server will not process rather than a server fault. Before #279 decision
 	// 21 every one of these answered a 500 page with a stack and a request id, and the ordinary
 	// way to reach one is the browser's Back button.
-	resp = loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/completed")
+	resp = loadPage(t, httpClient, stepURLOfTheSameCeremony(t, redirectLocation, "/auth/completed"))
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

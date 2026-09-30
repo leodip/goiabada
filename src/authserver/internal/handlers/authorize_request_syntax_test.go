@@ -73,7 +73,7 @@ func parkedBy(t *testing.T, e *authorizeEndpoint, query string) *ceremony.AuthCo
 
 	rr := e.get(t, query)
 
-	assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+	assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 	require.NotNil(t, saved, "the request was neither parked nor sent to the login")
 	return saved
 }
@@ -262,7 +262,7 @@ func TestHandleAuthorizeGet_SelectAccountIsAnsweredAsUnsupported(t *testing.T) {
 
 		rr := e.get(t, syntaxQuery(map[string]string{"prompt": "select_account login"}))
 
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 		require.NotNil(t, saved)
 		assert.Equal(t, "account_selection_required", saved.DeferredErrorCode)
 	})

@@ -21,12 +21,13 @@ func HandleAuthLevel2Get(
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database authLevel2Database,
+	auditLogger AuditLogger,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -92,7 +93,7 @@ func HandleAuthLevel2Get(
 			return
 		}
 		//nolint:gosec // G710: nextPath is one of decideLevel2Arm's two constant routes, under the configured base URL
-		http.Redirect(w, r, baseURL+nextPath, http.StatusFound)
+		http.Redirect(w, r, ceremonyStepURL(baseURL, nextPath, authContext), http.StatusFound)
 	}
 }
 

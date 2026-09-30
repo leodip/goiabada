@@ -21,9 +21,10 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{}
@@ -44,13 +45,15 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateReadyToIssueCode,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -67,14 +70,16 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresLevel2,
-			ClientId:  "test-client",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresLevel2,
+			ClientId:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -96,15 +101,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresLevel2,
-			ClientId:  "test-client",
-			UserId:    1,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresLevel2,
+			ClientId:   "test-client",
+			UserId:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -130,7 +137,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/otp", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/otp?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -142,15 +149,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresLevel2,
-			ClientId:  "test-client",
-			UserId:    1,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresLevel2,
+			ClientId:   "test-client",
+			UserId:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -181,7 +190,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -193,15 +202,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresLevel2,
-			ClientId:  "test-client",
-			UserId:    1,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresLevel2,
+			ClientId:   "test-client",
+			UserId:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -226,7 +237,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/otp", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/otp?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -243,15 +254,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresLevel2,
-			ClientId:  "test-client",
-			UserId:    1,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresLevel2,
+			ClientId:   "test-client",
+			UserId:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -285,15 +298,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/level2", nil)
+		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresLevel2,
-			ClientId:  "test-client",
-			UserId:    1,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresLevel2,
+			ClientId:   "test-client",
+			UserId:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 

@@ -230,14 +230,14 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusFound, rr.Code)
-			assert.Equal(t, testBaseURL+tc.wantLocation, rr.Header().Get("Location"))
-
 			require.Len(t, saves, 1, "each exit saves the auth context exactly once")
 			saved := saves[0]
+			assert.Equal(t, saved.CeremonyId, assertStepLocation(t, rr.Header().Get("Location"), tc.wantLocation),
+				"the redirect names the ceremony this request just saved")
 			assert.Equal(t, tc.wantState, saved.AuthState)
 			assert.Equal(t, tc.wantDeferred, saved.DeferredErrorCode)
 
-			assert.Len(t, saved.CeremonyId, ceremonyIdLength)
+			assert.Len(t, saved.CeremonyId, ceremony.IdLength)
 			assert.Equal(t, "test-client", saved.ClientId)
 			assert.Equal(t, "https://example.com", saved.RedirectURI)
 			assert.Equal(t, "code", saved.ResponseType)

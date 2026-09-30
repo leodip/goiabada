@@ -33,7 +33,7 @@ func abandonedAttempt(state ceremony.AuthState) *ceremony.AuthContext {
 	authenticatedAt := time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
 	otpConfigGeneration := int64(4)
 	return &ceremony.AuthContext{
-		CeremonyId:          "ceremony-1",
+		CeremonyId:          testCeremonyId,
 		ClientId:            "test-client",
 		RedirectURI:         "https://example.com/callback",
 		ResponseType:        "code",
@@ -66,7 +66,7 @@ func abandonedAttempt(state ceremony.AuthState) *ceremony.AuthContext {
 // RequestedScope, the state requires_level_1 and nothing else.
 func restartedRequest() ceremony.AuthContext {
 	return ceremony.AuthContext{
-		CeremonyId:          "ceremony-1",
+		CeremonyId:          testCeremonyId,
 		ClientId:            "test-client",
 		RedirectURI:         "https://example.com/callback",
 		ResponseType:        "code",
@@ -99,7 +99,7 @@ func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 		auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 	sessionIdentifier := "terminated-session"
-	req, _ := http.NewRequest("GET", "/auth/completed", nil)
+	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 	req = withSessionSettings(req)
 	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 	rr := httptest.NewRecorder()
@@ -123,7 +123,8 @@ func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+	assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+		"the restart goes on naming the ceremony it kept")
 	require.NotNil(t, saved)
 	assert.Equal(t, restartedRequest(), *saved)
 }
@@ -160,7 +161,8 @@ func TestRestartRoute2_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+	assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+		"the restart goes on naming the ceremony it kept")
 	require.NotNil(t, saved)
 	assert.Equal(t, restartedRequest(), *saved)
 }
@@ -183,13 +185,14 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 		auditLogger, permissions.NewPermissionChecker(database), testBaseURL, testAdminConsoleBaseURL)
 
 	sessionIdentifier := "new-test-session"
-	req, _ := http.NewRequest("GET", "/auth/completed", nil)
+	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 	req = withSessionSettings(req)
 	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 	rr := httptest.NewRecorder()
 
 	pwdAuthTime := time.Now().UTC().Add(-time.Minute)
 	authContext := &ceremony.AuthContext{
+		CeremonyId:          testCeremonyId,
 		AuthState:           ceremony.AuthStateAuthenticationCompleted,
 		ClientId:            "test-client",
 		RedirectURI:         "https://example.com/callback",

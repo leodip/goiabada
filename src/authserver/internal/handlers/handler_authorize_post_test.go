@@ -368,14 +368,14 @@ func TestHandleAuthorizeGet_ARequestHandleRunsTheCeremonyFromTheParkedRequest(t 
 	e.stubLoggedOutBrowser()
 	capture(&direct)(t, e)
 	rr := e.get(t, parked.Encode())
-	require.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+	assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 	e = newBoundedAuthorizeEndpoint(t)
 	e.stubLoggedOutBrowser()
 	capture(&replayed)(t, e)
 	e.consumes(parkedHandle, parked, true)
 	rr = e.get(t, handleQuery(parkedHandle))
-	require.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+	assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 	e.assertExpectations(t)
 
 	require.NotEmpty(t, direct.CeremonyId)
@@ -425,7 +425,7 @@ func TestHandleAuthorizeGet_ARequestHandleBesideAnotherParameterIsRefused(t *tes
 
 		rr := e.get(t, handleQuery(parkedHandle)+"&utm_source=newsletter")
 
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 		e.assertExpectations(t)
 	})
 }
@@ -493,7 +493,7 @@ func TestHandleAuthorizeGet_AnUnusableRequestHandleIsOneAnswer(t *testing.T) {
 
 		rr := e.get(t, handleQuery(parkedHandle)+"&"+handleQuery(parkedHandle))
 
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 		e.assertExpectations(t)
 	})
 }

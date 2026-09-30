@@ -77,7 +77,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -110,7 +110,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -118,7 +118,8 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresConsent, // Unexpected state
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresConsent, // Unexpected state
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -155,6 +156,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// Mock auth context - note: ResponseType "code" means authorization code flow, not implicit
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -235,13 +237,14 @@ func TestHandleIssueGet(t *testing.T) {
 		// cookie session, and leaves it out of the request context. It is also the shape
 		// grantIsOffline reads as an offline grant, so a code issued here would produce a
 		// refresh token with a max lifetime and no session to check.
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -263,7 +266,8 @@ func TestHandleIssueGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+		assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+			"the restart names the ceremony it kept")
 		assert.NotNil(t, savedAuthContext)
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
@@ -296,6 +300,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -317,7 +322,8 @@ func TestHandleIssueGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+		assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+			"the restart names the ceremony it kept")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -343,13 +349,14 @@ func TestHandleIssueGet(t *testing.T) {
 		// than from the consent screen: it validated and bumped the session, redirected here,
 		// and the session was ended in that hop. Restarting level 1 would render a password
 		// form, which this request forbids (#129 decision 16).
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -414,7 +421,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -422,6 +429,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -481,7 +489,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -489,6 +497,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -538,7 +547,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -546,6 +555,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -597,6 +607,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -644,6 +655,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -699,6 +711,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 	// above the dispatch passes and the issuer is the only thing left that can refuse.
 	issuanceAuthContext := func(prompt string) *ceremony.AuthContext {
 		return &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -859,7 +872,8 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			// The same answer the liveness read gives for the same condition, which is what makes
 			// refuseIssuanceUnusableSession one implementation rather than two that agree today.
 			assert.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Contains(t, f.rr.Header().Get("Location"), "/auth/level1")
+			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"),
+				"the restart names the ceremony it kept")
 			assert.NotContains(t, f.rr.Header().Get("Location"), "code=")
 			require.NotNil(t, savedAuthContext)
 			assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
@@ -990,6 +1004,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
+				CeremonyId:   testCeremonyId,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
@@ -1016,7 +1031,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusFound, rr.Code)
-			assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+			assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+				"the restart names the ceremony it kept")
 			assert.NotNil(t, savedAuthContext)
 			assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
@@ -1081,6 +1097,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
+				CeremonyId:   testCeremonyId,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
@@ -1148,6 +1165,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
@@ -1231,6 +1249,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -1293,6 +1312,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -1343,7 +1363,7 @@ const liveSessionIdentifier = "session-identifier-abc"
 // a code have to opt in (#129 stage 6).
 func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.Request {
 	t.Helper()
-	req, err := http.NewRequest("GET", "/auth/issue", nil)
+	req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 	assert.NoError(t, err)
 	req = withSessionSettings(req)
 	return withSessionSettings(req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)))
@@ -1506,7 +1526,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		// The issuer is handed the request's own settings, matched by identity below.
@@ -1517,6 +1537,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
@@ -1604,13 +1625,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
@@ -1689,13 +1711,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
@@ -1779,13 +1802,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			ClientId:       "test-client",
 			UserId:         123,
@@ -1845,7 +1869,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -1853,6 +1877,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "unknown-client",
@@ -1902,7 +1927,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -1910,6 +1935,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -1949,13 +1975,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
@@ -1990,7 +2017,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("Access token only", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2016,7 +2043,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("ID token only", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2040,7 +2067,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("Both access token and ID token", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2066,7 +2093,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("No state parameter", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2094,7 +2121,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	// an omitted one, so nothing is echoed for it.
 	t.Run("State with whitespace only is echoed exactly", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2116,7 +2143,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	// base64 state values are full of, "#" truncates, and "&" splits one field into two.
 	t.Run("A state is echoed byte for byte", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2138,7 +2165,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	// query branch, which replaces a registered state because it is writing into the query (#146).
 	t.Run("A registered query is left alone, state included", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2156,7 +2183,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("No scope in response", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2208,7 +2235,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 				r = withSessionSettings(r)
 
 				tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2243,7 +2270,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -2251,6 +2278,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -2288,7 +2316,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -2296,6 +2324,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -2336,13 +2365,14 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
@@ -2458,7 +2488,7 @@ func TestIsImplicitFlow_EdgeCases(t *testing.T) {
 func TestIssueAuthCode(t *testing.T) {
 	t.Run("Query response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2475,7 +2505,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Fragment response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2492,7 +2522,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Form post response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2518,7 +2548,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Default to query response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2535,7 +2565,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Error parsing template", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2601,7 +2631,7 @@ func TestIssueAuthCode(t *testing.T) {
 			} {
 				t.Run(tc.name+", response_mode "+mode.name, func(t *testing.T) {
 					w := httptest.NewRecorder()
-					r := httptest.NewRequest("GET", "/auth/issue", nil)
+					r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 					r = withSessionSettings(r)
 					code := &models.Code{
 						Code:        "test_code",
@@ -2640,7 +2670,7 @@ func TestIssueAuthCode(t *testing.T) {
 	// cases in TestIssueAuthCode_RegisteredQuery are the ones that tell the two apart.
 	t.Run("A registered query survives the addition of code and state", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2671,7 +2701,7 @@ func TestIssueAuthCode(t *testing.T) {
 func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("query mode replaces a registered state and keeps the rest", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2690,7 +2720,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("query mode replaces a registered code as well", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2711,7 +2741,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("query mode preserves a registered query that does not round-trip", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2731,7 +2761,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("fragment mode leaves the registered query alone", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2754,7 +2784,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	// place and both assertions fail (#146, decision 13).
 	t.Run("query mode drops a registered state the request did not supply", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2774,7 +2804,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("query mode drops a registered error from a success response", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
@@ -2805,7 +2835,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 func TestIssueAuthCode_StateEmission(t *testing.T) {
 	t.Run("an empty state is omitted in query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
@@ -2817,7 +2847,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 	t.Run("an empty state is omitted in fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
@@ -2829,7 +2859,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 	t.Run("a whitespace-only state is echoed exactly in query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
@@ -2841,7 +2871,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 	t.Run("a whitespace-only state is echoed exactly in fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
@@ -2862,7 +2892,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 	t.Run("query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
@@ -2875,7 +2905,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 	t.Run("fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
@@ -2888,7 +2918,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 	t.Run("form_post mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
@@ -2916,7 +2946,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 	t.Run("both headers are set on a rendered page", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
@@ -2933,7 +2963,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 
 	t.Run("neither header is set when the render failed", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
@@ -2963,7 +2993,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 // what makes a mid-render failure reachable in a real deployment rather than only under a stub.
 func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/auth/issue", nil)
+	r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 	r = withSessionSettings(r)
 	code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
@@ -3022,7 +3052,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 				r = withSessionSettings(r)
 				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
@@ -3094,7 +3124,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 				r = withSessionSettings(r)
 				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
@@ -3173,6 +3203,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// Create authContext with IdTokenHintSub matching the user's subject
 		userSubject := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
@@ -3247,7 +3278,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3258,6 +3289,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
@@ -3331,7 +3363,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3341,6 +3373,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
@@ -3408,7 +3441,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3418,6 +3451,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
@@ -3477,7 +3511,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3487,6 +3521,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
@@ -3548,6 +3583,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Create authContext with empty IdTokenHintSub (no hint provided)
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
@@ -3616,7 +3652,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/issue", nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3631,6 +3667,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Run(func(args mock.Arguments) {
 			stubClientProvenanceLookup(database)
 			savedAuthContext = &ceremony.AuthContext{
+				CeremonyId:     testCeremonyId,
 				AuthState:      ceremony.AuthStateReadyToIssueCode,
 				Scope:          "openid profile",
 				ClientId:       "test-client",
@@ -3770,6 +3807,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
+				CeremonyId:   testCeremonyId,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
@@ -3870,6 +3908,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	// The hint names user A; the ceremony authenticated user B. On its own that is answered with
 	// login_required AT THE CLIENT'S REDIRECT URI.
 	authContext := &ceremony.AuthContext{
+		CeremonyId:     testCeremonyId,
 		AuthState:      ceremony.AuthStateReadyToIssueCode,
 		Scope:          "openid profile",
 		ClientId:       "test-client",
@@ -3948,6 +3987,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
+				CeremonyId:   testCeremonyId,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
@@ -4098,6 +4138,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
+				CeremonyId:     testCeremonyId,
 				AuthState:      ceremony.AuthStateReadyToIssueCode,
 				Scope:          tc.scope,
 				ConsentedScope: tc.consentedScope,
@@ -4248,6 +4289,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
+				CeremonyId:   testCeremonyId,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
@@ -4323,6 +4365,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -4393,6 +4436,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
@@ -4458,6 +4502,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		t.Helper()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:     testCeremonyId,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "backend:read backend:write",
 			ConsentedScope: "backend:read",

@@ -73,11 +73,12 @@ func HandleConsentGet(
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database consentDatabase,
+	auditLogger AuditLogger,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -162,7 +163,7 @@ func HandleConsentGet(
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
+		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
 	}
 }
 
@@ -190,21 +191,12 @@ func HandleConsentPost(
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		// loadAuthContext refuses a submission naming another ceremony before the AuthState check, so
+		// a form left open in another tab gets the 400 mismatch page rather than the 500 that a
+		// replaced context's state would produce, and before the btnSubmit/btnCancel dispatch, so a
+		// stale cancel cannot clear the auth context of the ceremony that is actually current (#79).
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
-			return
-		}
-
-		// Before the AuthState check, so a form left open in another tab gets the 400 mismatch
-		// page rather than the 500 that a replaced context's state would produce. Before the
-		// btnSubmit/btnCancel dispatch too, so a stale cancel cannot clear the auth context of
-		// the ceremony that is actually current (#79).
-		//
-		// r.PostFormValue rather than r.FormValue: this form posts to action="", so r.Form
-		// would let /auth/consent?ceremonyId=... supply the id, and only the submitted body is
-		// a submission. Same reasoning as the selection read below.
-		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
-			rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
 			return
 		}
 
@@ -316,7 +308,7 @@ func HandleConsentPost(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
+			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
 		}
 	}
 }

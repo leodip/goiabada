@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +50,50 @@ func assertRedirect(t *testing.T, response *http.Response, location string) stri
 	}
 	assert.Equal(t, location, redirectLocation.Path)
 
+	// Every redirect between two ceremony routes names the sign-in it belongs to, so a step is
+	// judged by the ceremony it names and a tab of a replaced sign-in cannot act on the newer one
+	// (#246 decision 22). Checked here so that every flow test that follows a Location asserts it.
+	if ceremonyRoutes[redirectLocation.Path] {
+		ceremonyIds := redirectLocation.Query()[ceremony.QueryParameter]
+		if assert.Len(t, ceremonyIds, 1, "a redirect to %s names exactly one ceremony: %s", location,
+			redirectLocation.String()) {
+			assert.True(t, ceremony.IsWellFormedId(ceremonyIds[0]),
+				"the ceremony a redirect to %s names is an id: %q", location, ceremonyIds[0])
+		}
+		assert.Len(t, redirectLocation.Query(), 1, "a redirect between ceremony routes carries the ceremony and nothing else")
+	}
+
 	return redirectLocation.String()
+}
+
+// stepURLOfTheSameCeremony is the URL of another step of the ceremony a redirect Location names: the
+// route under the base URL, naming the same ceremony. It is what a user reaches by typing a step's
+// address, or by going back to one, while still in the sign-in the Location belongs to.
+func stepURLOfTheSameCeremony(t *testing.T, location string, path string) string {
+	t.Helper()
+
+	parsed, err := url.Parse(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ceremonyId := parsed.Query().Get(ceremony.QueryParameter)
+	if ceremonyId == "" {
+		t.Fatalf("the location %q names no ceremony", location)
+	}
+	return appConfig.AuthServer.BaseURL + path + "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+}
+
+// ceremonyRoutes are the routes of the ceremony between /auth/authorize and /auth/issue, each of
+// which is reached by a redirect that names its ceremony.
+var ceremonyRoutes = map[string]bool{
+	"/auth/level1":          true,
+	"/auth/pwd":             true,
+	"/auth/level1completed": true,
+	"/auth/level2":          true,
+	"/auth/otp":             true,
+	"/auth/completed":       true,
+	"/auth/consent":         true,
+	"/auth/issue":           true,
 }
 
 // followParkedAuthorizePost does what a browser does with the answer to a POST to

@@ -41,7 +41,7 @@
         {{end}}
 
         <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "account.register.button" }}</button>
-        <div class='mt-4 text-center'>{{ T $.ctx "account.register.have_account_prompt" }} <a href="/auth/pwd"><span
+        <div class='mt-4 text-center'>{{ T $.ctx "account.register.have_account_prompt" }} <a href="/auth/pwd{{if .ceremonyId}}?ceremony={{.ceremonyId}}{{end}}"><span
             class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">{{ T $.ctx "account.register.login_link" }}</span></a>
         </div>
 

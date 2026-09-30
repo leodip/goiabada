@@ -144,7 +144,7 @@ func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *te
 
 			rr := e.get(t, boundedQuery(tc.overrides))
 
-			assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+			assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 			e.assertExpectations(t)
 		})
 	}
@@ -194,7 +194,7 @@ func TestHandleAuthorizeGet_AValueAtTheBoundProceeds(t *testing.T) {
 
 			rr := e.get(t, boundedQuery(tc.overrides))
 
-			assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"),
+			assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1",
 				"the request was refused instead of going on to the login")
 			e.assertExpectations(t)
 		})

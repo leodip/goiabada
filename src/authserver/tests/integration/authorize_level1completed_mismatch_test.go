@@ -87,7 +87,7 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 
 	// The ceremony is on level1_password. /auth/level1completed accepts
 	// level1_password_completed and level1_existing_session only.
-	mismatch := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/level1completed")
+	mismatch := loadPage(t, httpClient, stepURLOfTheSameCeremony(t, pwdLocation, "/auth/level1completed"))
 	defer func() { _ = mismatch.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, mismatch.StatusCode,

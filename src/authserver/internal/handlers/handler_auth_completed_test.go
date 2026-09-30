@@ -35,7 +35,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		// The reuse bump records the browser's address, read as the rest of the server reads
 		// it, so the session holds the latest address it was seen from (#243).
 		req.RemoteAddr = "203.0.113.7:4444"
@@ -44,10 +44,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// SSO reuse: AuthenticatedAt is nil (not set by password handler)
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateAuthenticationCompleted,
-			ClientId:  "test-client",
-			UserId:    1,
-			Scope:     "openid profile",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateAuthenticationCompleted,
+			ClientId:   "test-client",
+			UserId:     1,
+			Scope:      "openid profile",
 		}
 
 		sessionIdentifier := "test-session"
@@ -102,7 +103,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		// Ordinary single sign-on raises nothing: the ceremony recorded no methods and the
 		// target ACR is the one the session already holds. Rotating here would replace the
@@ -181,7 +182,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -190,6 +191,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// in exactly this shape.
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
@@ -303,7 +305,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		// The event exists to name both parties: without previousUserId an operator cannot tell
 		// a browser changing hands from an administrator ending a session.
@@ -370,12 +372,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
@@ -451,7 +454,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -476,13 +479,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req.RemoteAddr = "203.0.113.7:4444"
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
@@ -564,7 +568,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		assertNotAttempted(t, database, "RunInTransaction", "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "DeleteUserSession")
@@ -610,13 +614,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{}, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-			req, _ := http.NewRequest("GET", "/auth/completed", nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req.RemoteAddr = "203.0.113.7:4444"
 			req = withSessionSettings(req)
 			rr := httptest.NewRecorder()
 
 			pwdAuthTime := time.Now().UTC()
 			authContext := &ceremony.AuthContext{
+				CeremonyId:          testCeremonyId,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
 				ClientId:            "test-client",
 				UserId:              1,
@@ -688,12 +693,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
@@ -799,12 +805,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
@@ -909,7 +916,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -921,6 +928,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the two apart. "now" would pass against either behaviour (#252 decision 8).
 		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
 		authContext := &ceremony.AuthContext{
+			CeremonyId:      testCeremonyId,
 			AuthState:       ceremony.AuthStateAuthenticationCompleted,
 			ClientId:        "test-client",
 			UserId:          1,
@@ -989,7 +997,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1017,7 +1025,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -1025,6 +1033,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// yields for an absent RFC 3339 timestamp.
 		var zeroAuthenticatedAt time.Time
 		authContext := &ceremony.AuthContext{
+			CeremonyId:      testCeremonyId,
 			AuthState:       ceremony.AuthStateAuthenticationCompleted,
 			ClientId:        "test-client",
 			UserId:          1,
@@ -1086,7 +1095,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1107,7 +1116,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -1120,6 +1129,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// with "now" the assertion would pass against either behaviour (#252 decision 8).
 		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
 		authContext := &ceremony.AuthContext{
+			CeremonyId:  testCeremonyId,
 			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
@@ -1186,7 +1196,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1217,13 +1227,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// 4 rather than 0, so the assertion below cannot also pass against a hard-coded zero.
 		captured := int64(4)
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
@@ -1289,7 +1300,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.EqualValues(t, 4, userSession.OtpConfigGeneration,
 			"the in-memory session must carry what was written, since the ACR below is taken against it")
 
@@ -1316,12 +1327,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		captured := int64(4)
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
@@ -1410,11 +1422,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:  testCeremonyId,
 			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
@@ -1499,13 +1512,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		captured := int64(4)
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
@@ -1587,7 +1601,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -1615,12 +1629,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateReadyToIssueCode,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -1643,13 +1658,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateAuthenticationCompleted,
-			ClientId:  "test-client",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateAuthenticationCompleted,
+			ClientId:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -1684,12 +1700,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -1786,11 +1803,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -1879,11 +1897,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -1968,11 +1987,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -2052,12 +2072,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -2152,11 +2173,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -2238,11 +2260,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -2322,11 +2345,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
@@ -2406,13 +2430,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Positive control for the #129 gate, as in the subtest above.
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:  testCeremonyId,
 			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
@@ -2476,7 +2501,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/consent", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2497,13 +2522,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Positive control for the #129 gate, as in the two subtests above.
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:  testCeremonyId,
 			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
@@ -2566,7 +2592,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/consent", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2600,7 +2626,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -2609,6 +2635,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// AuthenticatedAt and Level1AuthCompleted are unset. The session was then ended
 		// mid-flight.
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
@@ -2649,7 +2676,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2670,7 +2697,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -2680,6 +2707,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// reading userReallyAuthenticated recreates the session here; this gate must not.
 		otpAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
+			CeremonyId:          testCeremonyId,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
@@ -2720,7 +2748,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2765,7 +2793,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
 				auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-			req, _ := http.NewRequest("GET", "/auth/completed", nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 			req = withSessionSettings(req)
 			sessionIdentifier := "test-session"
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -2774,6 +2802,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			captured := int64(4)
 			authenticatedAt := time.Now().UTC().Add(-time.Minute)
 			authContext := &ceremony.AuthContext{
+				CeremonyId:          testCeremonyId,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
 				ClientId:            "test-client",
 				UserId:              1,

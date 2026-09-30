@@ -36,12 +36,13 @@ func HandleAuthOtpGet(
 	ceremonyStore CeremonyStore,
 	database authOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
+	auditLogger AuditLogger,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -193,21 +194,14 @@ func HandleAuthOtpPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		// loadAuthContext refuses a submission naming another ceremony before the AuthState check, so
+		// an OTP prompt left open in another tab gets the 400 mismatch page rather than the 500 that
+		// a replaced context's state would produce, and before the code is looked at: MatchStep is
+		// never reached, so TryConsumeUserOTPStep is never reached either, and a stale submission
+		// cannot burn a step of a passcode the ceremony the user is actually on still needs (#79,
+		// #111 decision 3).
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
-			return
-		}
-
-		// Before the AuthState check, so an OTP prompt left open in another tab gets the 400
-		// mismatch page rather than the 500 that a replaced context's state would produce. And
-		// before the code is looked at: MatchStep is never reached, so TryConsumeUserOTPStep is
-		// never reached either, and a stale submission cannot burn a step of a passcode the
-		// ceremony the user is actually on still needs (#79, #111 decision 3).
-		//
-		// r.PostFormValue rather than r.FormValue, as on the other two bound forms: this form
-		// posts to action="" and only the submitted body is a submission.
-		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
-			rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
 			return
 		}
 
@@ -411,6 +405,6 @@ func HandleAuthOtpPost(
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)
+		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/completed", authContext), http.StatusFound)
 	}
 }
