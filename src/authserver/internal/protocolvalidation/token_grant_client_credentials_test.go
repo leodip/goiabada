@@ -187,7 +187,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "Client authentication failed.", customErr.GetDescription())
+		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.GetDescription())
 	})
 
 	t.Run("Valid scope", func(t *testing.T) {

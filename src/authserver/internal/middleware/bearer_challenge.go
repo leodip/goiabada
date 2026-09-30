@@ -1,14 +1,18 @@
 package middleware
 
-import "github.com/leodip/goiabada/core/customerrors"
+import (
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/core/customerrors"
+)
 
 // BearerRealm is the realm every bearer challenge this server writes carries. One value, because
 // /userinfo and the admin and account APIs accept the same access tokens: RFC 9110 section 11.5
 // defines a protection space as the origin plus the realm, and these routes are one protection
 // space. The realm is also what gives a challenge with no error an auth-param at all, which
 // RFC 6750 section 3 requires of every Bearer challenge ("MUST be followed by one or more
-// auth-param values") (#435).
-const BearerRealm = "goiabada"
+// auth-param values") (#435). Its one definition is protocolvalidation.ChallengeRealm, which the token
+// endpoint's Basic challenge reads too, so the two cannot name two realms (#437).
+const BearerRealm = protocolvalidation.ChallengeRealm
 
 // BearerChallenge builds the WWW-Authenticate value for a bearer refusal: `Bearer
 // realm="goiabada"`, then `error="<errorCode>"` when errorCode is set, then

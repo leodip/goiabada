@@ -76,10 +76,6 @@ type ValidateTokenRequestInput struct {
 	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
 	Username string
 	Password string
-	// UsedBasicAuth indicates if the client used HTTP Basic Authentication (Authorization header).
-	// Per RFC 6749 Section 5.2, when client auth fails and Basic auth was used, the server
-	// MUST respond with 401 and include WWW-Authenticate header.
-	UsedBasicAuth bool
 }
 
 // TokenGrant is what a validated token request is: one type per grant, declared beside the method
@@ -105,13 +101,14 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 	if err != nil {
 		return nil, err
 	}
+	// An unknown client and a disabled one are failed client authentications, RFC 6749 section
+	// 5.2's invalid_client, whose own example is the unknown client: until #437 they answered
+	// invalid_request and invalid_grant at 400. The descriptions are unchanged.
 	if client == nil {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-			"Client does not exist.", http.StatusBadRequest)
+		return nil, invalidClientError(clientDoesNotExistErrorMsg)
 	}
 	if !client.Enabled {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Client is disabled.",
-			http.StatusBadRequest)
+		return nil, invalidClientError(clientDisabledErrorMsg)
 	}
 
 	// Whether the grant is redeemed here at all is the grant table's answer, read after the

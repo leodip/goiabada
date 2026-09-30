@@ -2,6 +2,21 @@ package protocolvalidation
 
 import "github.com/leodip/goiabada/core/customerrors"
 
+// ChallengeRealm is the realm of every challenge this server writes, the Basic challenge the token
+// endpoint answers invalid_client with and the Bearer challenge of /userinfo and the admin and
+// account APIs, which middleware.BearerRealm names. RFC 7617 section 2 makes the realm REQUIRED on a
+// Basic challenge, RFC 6750 section 3 wants an auth-param on every Bearer one, and RFC 9110 section
+// 11.5 defines a protection space as the origin plus the realm, so one value keeps this server one
+// protection space. It is declared here rather than in middleware because middleware imports this
+// package, never the reverse (#435, #437).
+const ChallengeRealm = "goiabada"
+
+// BasicChallenge is the WWW-Authenticate value on every invalid_client the token endpoint answers,
+// whether the client sent its credentials in the Authorization header or in the form body. RFC 9110
+// section 15.5.2 requires a challenge on every 401, and RFC 7617 section 2 a quoted realm on a Basic
+// one; before #437 only a failed Basic attempt got one, and a bare "Basic" at that.
+const BasicChallenge = `Basic realm="` + ChallengeRealm + `"`
+
 // NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate builds an ErrorDetail carrying a
 // WWW-Authenticate challenge. Per RFC 6749 section 5.2, a client that attempted to authenticate
 // through the Authorization header and failed must be answered 401 with that header, and per

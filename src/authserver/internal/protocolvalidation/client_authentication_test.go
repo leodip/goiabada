@@ -19,13 +19,15 @@ import (
 )
 
 // TestValidateTokenRequest_ClientAuthentication is authenticateClient's table, one row per grant
-// that authenticates, per way a secret can be wrong, and per way it can arrive (the Authorization
-// header or the form body). It is driven through the exported method (seam 2), so every row also
-// proves where in its grant's order authentication sits: each grant's fixture arms only the reads
-// that come before it, and a row that passes arms the one read or refusal that comes next.
+// that authenticates and per way a secret can be wrong. It is driven through the exported method
+// (seam 2), so every row also proves where in its grant's order authentication sits: each grant's
+// fixture arms only the reads that come before it, and a row that passes arms the one read or
+// refusal that comes next.
 //
-// The texts are today's, two of them per grant pair: client credentials and password answer a
-// wrong secret with the short one, authorization code and refresh token with the long one (#437).
+// Every grant answers a wrong secret with the one text, and every invalid_client carries
+// BasicChallenge. How the secret arrived, the Authorization header or the form body, no longer
+// reaches the validator, so it is not a column here; the handler's and the integration tier's
+// cases cover both transports (#437).
 func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	const theSecret = "the_client_secret"
 
@@ -40,10 +42,9 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	// grant-specific fields; passed arms what comes after and asserts that authentication let the
 	// request through to it.
 	type grantFixture struct {
-		grant          oidc.GrantType
-		wrongSecretMsg string
-		arrange        func(t *testing.T, mockDB *mocks_data.Database, client *models.Client, input *ValidateTokenRequestInput)
-		passed         func(t *testing.T, mockDB *mocks_data.Database, client *models.Client,
+		grant   oidc.GrantType
+		arrange func(t *testing.T, mockDB *mocks_data.Database, client *models.Client, input *ValidateTokenRequestInput)
+		passed  func(t *testing.T, mockDB *mocks_data.Database, client *models.Client,
 			result TokenGrant, err error)
 	}
 
@@ -59,8 +60,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 
 	fixtures := []grantFixture{
 		{
-			grant:          oidc.GrantTypeAuthorizationCode,
-			wrongSecretMsg: "Client authentication failed. Please review your client_secret.",
+			grant: oidc.GrantTypeAuthorizationCode,
 			arrange: func(t *testing.T, mockDB *mocks_data.Database, client *models.Client, input *ValidateTokenRequestInput) {
 				client.AuthorizationCodeEnabled = true
 				input.Code = "the_code"
@@ -92,8 +92,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			},
 		},
 		{
-			grant:          oidc.GrantTypeClientCredentials,
-			wrongSecretMsg: "Client authentication failed.",
+			grant: oidc.GrantTypeClientCredentials,
 			arrange: func(t *testing.T, _ *mocks_data.Database, client *models.Client, _ *ValidateTokenRequestInput) {
 				client.ClientCredentialsEnabled = true
 			},
@@ -104,8 +103,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			},
 		},
 		{
-			grant:          oidc.GrantTypeRefreshToken,
-			wrongSecretMsg: "Client authentication failed. Please review your client_secret.",
+			grant: oidc.GrantTypeRefreshToken,
 			// Authentication is the first thing the refresh grant does; no refresh_token is sent,
 			// so the refusal that follows it is the missing parameter.
 			arrange: func(*testing.T, *mocks_data.Database, *models.Client, *ValidateTokenRequestInput) {},
@@ -116,8 +114,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			},
 		},
 		{
-			grant:          oidc.GrantTypePassword,
-			wrongSecretMsg: "Client authentication failed.",
+			grant: oidc.GrantTypePassword,
 			arrange: func(t *testing.T, _ *mocks_data.Database, client *models.Client, input *ValidateTokenRequestInput) {
 				enabled := true
 				client.ResourceOwnerPasswordCredentialsEnabled = &enabled
@@ -133,44 +130,31 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	}
 
 	type row struct {
-		name      string
-		isPublic  bool
-		secret    string
-		basicAuth bool
+		name     string
+		isPublic bool
+		secret   string
 		// want is the refusal authentication gives; nil means it lets the request through.
-		want func(f grantFixture) *refusal
+		want *refusal
 	}
 
-	required := func(challenge string) func(grantFixture) *refusal {
-		return func(grantFixture) *refusal {
-			return &refusal{"invalid_client", clientSecretRequiredErrorMsg, http.StatusUnauthorized, challenge}
-		}
-	}
-	wrong := func(challenge string) func(grantFixture) *refusal {
-		return func(f grantFixture) *refusal {
-			return &refusal{"invalid_client", f.wrongSecretMsg, http.StatusUnauthorized, challenge}
-		}
-	}
-	superfluous := func(grantFixture) *refusal {
-		return &refusal{"invalid_request", clientSecretNotRequiredErrorMsg, http.StatusBadRequest, ""}
-	}
-	through := func(grantFixture) *refusal { return nil }
+	required := &refusal{"invalid_client", "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.",
+		http.StatusUnauthorized, `Basic realm="goiabada"`}
+	// The one wrong-secret answer, for every grant (#437 decision 8).
+	wrong := &refusal{"invalid_client", "Client authentication failed. Please review your client_secret.",
+		http.StatusUnauthorized, `Basic realm="goiabada"`}
+	// A public client that sends a secret is refused without a challenge, because it is not a
+	// failed authentication (#245 decision 11).
+	superfluous := &refusal{"invalid_request", clientSecretNotRequiredErrorMsg, http.StatusBadRequest, ""}
 
 	rows := []row{
-		{"confidential, no secret, form body", false, "", false, required("")},
-		{"confidential, no secret, Basic", false, "", true, required("Basic")},
-		{"confidential, wrong secret, form body", false, "not_the_secret", false, wrong("")},
-		{"confidential, wrong secret, Basic", false, "not_the_secret", true, wrong("Basic")},
+		{"confidential, no secret", false, "", required},
+		{"confidential, wrong secret", false, "not_the_secret", wrong},
 		// One byte short and one byte over: the comparison is of the whole value.
-		{"confidential, secret missing its last byte", false, theSecret[:len(theSecret)-1], false, wrong("")},
-		{"confidential, secret with a byte appended", false, theSecret + "x", false, wrong("")},
-		{"confidential, right secret, form body", false, theSecret, false, through},
-		{"confidential, right secret, Basic", false, theSecret, true, through},
-		// A public client that sends a secret is refused whichever way it arrived, and without a
-		// challenge, because it is not a failed authentication (#245 decision 11).
-		{"public, superfluous secret, form body", true, "any_secret", false, superfluous},
-		{"public, superfluous secret, Basic", true, "any_secret", true, superfluous},
-		{"public, no secret", true, "", false, through},
+		{"confidential, secret missing its last byte", false, theSecret[:len(theSecret)-1], wrong},
+		{"confidential, secret with a byte appended", false, theSecret + "x", wrong},
+		{"confidential, right secret", false, theSecret, nil},
+		{"public, superfluous secret", true, "any_secret", superfluous},
+		{"public, no secret", true, "", nil},
 	}
 
 	for _, f := range fixtures {
@@ -190,10 +174,9 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 					ClientSecretEncrypted: encryptedSecret,
 				}
 				input := &ValidateTokenRequestInput{
-					GrantType:     f.grant,
-					ClientId:      "the_client",
-					ClientSecret:  r.secret,
-					UsedBasicAuth: r.basicAuth,
+					GrantType:    f.grant,
+					ClientId:     "the_client",
+					ClientSecret: r.secret,
 				}
 				settings := &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 
@@ -211,7 +194,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 					return
 				}
 
-				want := r.want(f)
+				want := r.want
 				if want == nil && f.grant == oidc.GrantTypeClientCredentials {
 					mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil).Once()
 					mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -230,5 +213,88 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				refusedWith(t, err, *want)
 			})
 		}
+	}
+}
+
+// TestValidateTokenRequest_PreludeInvalidClient pins the checks ValidateTokenRequest runs before it
+// looks at the grant: an unknown and a disabled client are invalid_client, 401, with the Basic
+// challenge and their descriptions unchanged, for every grant and for a grant the token endpoint
+// does not accept, which shows the prelude answers ahead of the grant check. A missing client_id is
+// the one prelude refusal that stays invalid_request, 400, with no challenge: no client was named, so
+// none failed to authenticate (#437 decision 9).
+func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
+	const basicChallenge = `Basic realm="goiabada"`
+
+	grants := []oidc.GrantType{
+		oidc.GrantTypeAuthorizationCode,
+		oidc.GrantTypeClientCredentials,
+		oidc.GrantTypeRefreshToken,
+		oidc.GrantTypePassword,
+		oidc.GrantTypeImplicit,
+		"not_a_grant",
+	}
+
+	rows := []struct {
+		name string
+		// client is what the lookup returns; nil is an unknown client.
+		client      *models.Client
+		code        string
+		description string
+		status      int
+		challenge   string
+	}{
+		{"unknown client", nil,
+			"invalid_client", "Client does not exist.", http.StatusUnauthorized, basicChallenge},
+		{"disabled confidential client", &models.Client{ClientIdentifier: "the_client", Enabled: false},
+			"invalid_client", "Client is disabled.", http.StatusUnauthorized, basicChallenge},
+		// A public client has no secret to fail, and is still refused the same way when disabled.
+		{"disabled public client", &models.Client{ClientIdentifier: "the_client", Enabled: false, IsPublic: true},
+			"invalid_client", "Client is disabled.", http.StatusUnauthorized, basicChallenge},
+		// The passing control: the same client enabled gets past the prelude, to the grant check
+		// for a grant the endpoint does not accept.
+		{"enabled client, unaccepted grant", &models.Client{ClientIdentifier: "the_client", Enabled: true},
+			"unsupported_grant_type", "Unsupported grant_type.", http.StatusBadRequest, ""},
+	}
+
+	for _, grant := range grants {
+		for _, r := range rows {
+			if r.code == "unsupported_grant_type" && grant.AcceptedAtTokenEndpoint() {
+				continue
+			}
+			t.Run(grant.String()+": "+r.name, func(t *testing.T) {
+				mockDB := mocks_data.NewDatabase(t)
+				validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
+					mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").Return(r.client, nil).Once()
+
+				result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{},
+					&ValidateTokenRequestInput{GrantType: grant, ClientId: "the_client", ClientSecret: "a_secret"})
+
+				assert.Nil(t, result)
+				var detail *customerrors.ErrorDetail
+				require.ErrorAs(t, err, &detail)
+				assert.Equal(t, r.code, detail.GetCode())
+				assert.Equal(t, r.description, detail.GetDescription())
+				assert.Equal(t, r.status, detail.GetHttpStatusCode())
+				assert.Equal(t, r.challenge, detail.GetWWWAuthenticate())
+			})
+		}
+
+		t.Run(grant.String()+": missing client_id", func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
+				mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+
+			result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{},
+				&ValidateTokenRequestInput{GrantType: grant, ClientSecret: "a_secret"})
+
+			assert.Nil(t, result)
+			var detail *customerrors.ErrorDetail
+			require.ErrorAs(t, err, &detail)
+			assert.Equal(t, "invalid_request", detail.GetCode())
+			assert.Equal(t, "Missing required client_id parameter.", detail.GetDescription())
+			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+			assert.Empty(t, detail.GetWWWAuthenticate())
+		})
 	}
 }

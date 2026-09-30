@@ -284,14 +284,14 @@ Cache-Control: no-store
 Pragma: no-cache
 ```
 
-For client authentication failures, the response uses HTTP 401 status code with a `WWW-Authenticate` header when HTTP Basic authentication was attempted:
+For client authentication failures, the response uses HTTP 401 status code with a `WWW-Authenticate` header, whether the client sent its credentials with HTTP Basic authentication or in the request body:
 
 ```
 HTTP/1.1 401 Unauthorized
 Content-Type: application/json
 Cache-Control: no-store
 Pragma: no-cache
-WWW-Authenticate: Basic
+WWW-Authenticate: Basic realm="goiabada"
 ```
 
 The response body contains error details:

@@ -446,7 +446,9 @@ func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_client", data["error"])
-	assert.Contains(t, data["error_description"], "Client authentication failed")
+	// The one wrong-secret text every grant answers; the password grant answered a shorter one
+	// until #437.
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 
 // TestROPC_UserWith2FAEnabled tests that users with 2FA enabled cannot use ROPC

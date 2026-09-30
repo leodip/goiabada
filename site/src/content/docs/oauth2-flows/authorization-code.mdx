@@ -242,11 +242,11 @@ Pragma: no-cache
 }
 ```
 
-For client authentication failures (HTTP 401), a `WWW-Authenticate` header is included when HTTP Basic authentication was used:
+For client authentication failures (HTTP 401), a `WWW-Authenticate` header is included:
 
 ```
 HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Basic
+WWW-Authenticate: Basic realm="goiabada"
 ```
 
 Common error codes:

@@ -83,7 +83,7 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	}
 
 	// Extract client credentials - supports both client_secret_basic and client_secret_post
-	clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(r)
+	clientId, clientSecret, err := extractClientCredentials(r)
 	if err != nil {
 		return nil, err
 	}
@@ -139,9 +139,8 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 		Scope:        normalizedScope,
 		RefreshToken: r.PostForm.Get("refresh_token"),
 		// ROPC parameters (RFC 6749 Section 4.3)
-		Username:      r.PostForm.Get("username"),
-		Password:      r.PostForm.Get("password"),
-		UsedBasicAuth: usedBasicAuth,
+		Username: r.PostForm.Get("username"),
+		Password: r.PostForm.Get("password"),
 	}, nil
 }
 
@@ -247,13 +246,14 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// an unknown user, a disabled user and a 2FA-blocked user, which is exactly the
 	// set AuditROPCAuthFailed is documented to mean.
 	//
-	// ErrClientDisabled is the one exception, and it is the reason this is not a
-	// bare code test: that check runs before the grant-type switch and before any
-	// credential is read, so it is an invalid_grant that guessed nothing.
+	// The checks that run before the grant is looked at read no credential either, and none
+	// of them answers invalid_grant: a missing client_id is invalid_request, an unknown or
+	// disabled client invalid_client. The disabled client was invalid_grant until #437 and had
+	// to be excluded here by value (#219); if a prelude refusal ever becomes invalid_grant
+	// again, it needs that exclusion back.
 	var errDetail *customerrors.ErrorDetail
 	if errors.As(err, &errDetail) &&
-		input.GrantType == oidc.GrantTypePassword && errDetail.GetCode() == "invalid_grant" &&
-		!errors.Is(err, protocolvalidation.ErrClientDisabled) {
+		input.GrantType == oidc.GrantTypePassword && errDetail.GetCode() == "invalid_grant" {
 
 		credentialFailures.RecordCredentialFailure(r)
 		auditLogger.Log(r.Context(), audit.AuditROPCAuthFailed, map[string]interface{}{
@@ -302,8 +302,9 @@ func (tr tokenResponder) writeTokenResponse(w http.ResponseWriter, r *http.Reque
 // extractClientCredentials extracts client_id and client_secret from the request.
 // It supports both client_secret_basic (Authorization header) and client_secret_post (form body).
 // Per RFC 6749 clients MUST NOT use more than one authentication method per request.
-// Returns usedBasicAuth=true if the client used HTTP Basic Authentication.
-func extractClientCredentials(r *http.Request) (clientId, clientSecret string, usedBasicAuth bool, err error) {
+// Which of the two was used is not returned: every invalid_client carries the same challenge
+// whichever it was (#437).
+func extractClientCredentials(r *http.Request) (clientId, clientSecret string, err error) {
 	// Check for Basic auth in Authorization header
 	basicClientId, basicClientSecret, hasBasicAuth := parseBasicAuth(r.Header.Get("Authorization"))
 
@@ -314,7 +315,7 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, u
 
 	// RFC 6749 clients MUST NOT use more than one authentication method
 	if hasBasicAuth && hasPostAuth {
-		return "", "", false, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return "", "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"Client authentication failed: multiple authentication methods provided. "+
 				"Use either HTTP Basic authentication OR client_secret in the request body, but not both.",
 			http.StatusBadRequest)
@@ -322,11 +323,11 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, u
 
 	// Use Basic auth if present
 	if hasBasicAuth {
-		return basicClientId, basicClientSecret, true, nil
+		return basicClientId, basicClientSecret, nil
 	}
 
 	// Fall back to POST body credentials
-	return postClientId, postClientSecret, false, nil
+	return postClientId, postClientSecret, nil
 }
 
 // parseBasicAuth parses an HTTP Basic Authentication header value.

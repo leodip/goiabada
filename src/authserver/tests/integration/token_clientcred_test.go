@@ -84,7 +84,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, "wrong_secret")
 
 	assert.Equal(t, "invalid_client", data["error"])
-	assert.Equal(t, "Client authentication failed.", data["error_description"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 
 // ============================================================================
@@ -174,7 +174,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
 	assert.Equal(t, "invalid_client", data["error"])
-	assert.Equal(t, "Client authentication failed.", data["error_description"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 
 func TestToken_ClientCred_InvalidScope(t *testing.T) {
