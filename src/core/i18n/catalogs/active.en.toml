@@ -120,6 +120,9 @@
 # Wording kept byte for byte from the error_description this condition used to redirect, so an
 # integrator meets the same sentence now that it is answered on a page instead (#213).
 "auth_error.unsupported_response_mode.message" = "Invalid response_mode parameter. Supported values are: query, fragment, form_post."
+# The two below are answered on the page because the request cannot say where a redirect would go (#228).
+"auth_error.malformed_request.message" = "The authorization request could not be read: one of its parameters is not correctly encoded."
+"auth_error.conflicting_parameter.message" = "The {{.parameter}} parameter was included more than once with different values."
 
 # --- Withheld redirect for a self-registered client (auth_redirect_blocked.html)
 # Neutral about why the request stopped on purpose: this page is reached both by someone who

@@ -116,6 +116,8 @@
 "auth_error.rate_limited.message" = "Chegaram muitas solicitações deste navegador, ou para esta conta, em pouco tempo. Aguarde alguns minutos e tente novamente."
 "auth_error.unable_to_authorize.title" = "Não foi possível autorizar"
 "auth_error.unsupported_response_mode.message" = "Parâmetro response_mode inválido. Os valores aceitos são: query, fragment, form_post."
+"auth_error.malformed_request.message" = "Não foi possível ler a solicitação de autorização: um de seus parâmetros não está codificado corretamente."
+"auth_error.conflicting_parameter.message" = "O parâmetro {{.parameter}} foi enviado mais de uma vez com valores diferentes."
 
 # --- Redirecionamento retido para cliente auto-registrado (auth_redirect_blocked.html)
 # Neutro de propósito quanto ao motivo: esta página é vista tanto por quem recusou quanto por quem
