@@ -25,9 +25,10 @@ import (
 // entry. A new top-level package is not, which is why #387 names each capability package it lifts
 // out of here as it lands: the interfaces leaving this directory would otherwise stop being
 // guarded by the move itself, which is the silent-unguarding shape #333 exists to refuse. bootstrap
-// is named for the same reason: it declares the seed's ports, and #424 created it.
+// is named for the same reason: it declares the seed's ports, and #424 created it. userconsent too:
+// its port left handler_consent.go with the consent writer (#437).
 func TestHandlers_NoDeadInterfaces(t *testing.T) {
 	testutil.AssertNoDeadInterfaces(t, "authserver/internal/handlers", "authserver/internal/revocation",
 		"authserver/internal/emaillinks", "authserver/internal/otpcredential",
-		"authserver/internal/userclaims", "authserver/internal/bootstrap")
+		"authserver/internal/userclaims", "authserver/internal/userconsent", "authserver/internal/bootstrap")
 }

@@ -292,6 +292,10 @@ var slogSpreadSites = []slogSpreadSite{
 // writes no record today -- a failed picture lookup omits the claim silently, as it did at both
 // sites before the move -- and the rule is what refuses one written there later without the
 // request's context (#387).
+//
+// authserver/internal/userconsent is listed by the commit that creates it, on the same terms: the
+// consent row's read and write ran inside HandleConsentPost, already here, and its one caller is
+// the consent screen's submission. It writes no record today (#437).
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -315,6 +319,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/otp",
 	"authserver/internal/otpcredential",
 	"authserver/internal/userclaims",
+	"authserver/internal/userconsent",
 	"authserver/internal/imageupload",
 	"authserver/internal/uithemes",
 	"adminconsole/internal/handlers",
