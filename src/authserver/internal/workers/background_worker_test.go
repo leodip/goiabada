@@ -571,12 +571,87 @@ func TestWorker_Poll_ReapsBrowserSessionsEvenWhenTheClaimIsLost(t *testing.T) {
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	worker.poll(context.Background())
 
 	mockDB.AssertExpectations(t)
 	mockDB.AssertNumberOfCalls(t, "DeleteExpiredBrowserSessions", 1)
 	mockDB.AssertNumberOfCalls(t, "DeleteExpiredRefreshTokens", 0)
+}
+
+// TestWorker_Poll_ReapsAuthorizeRequestsEvenWhenTheClaimIsLost is the same pin for the parked
+// authorization requests (#437). A POST to /auth/authorize writes a row per request and the
+// endpoint is not rate limited, so the physical bound has to sit within one poll of the five
+// minute lifetime. Behind the twelve hour claim the sweep would delete them 144 times later and no
+// behaviour test would notice, since an expired request already reads as absent.
+func TestWorker_Poll_ReapsAuthorizeRequestsEvenWhenTheClaimIsLost(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	worker.poll(context.Background())
+
+	mockDB.AssertExpectations(t)
+	mockDB.AssertNumberOfCalls(t, "DeleteExpiredAuthorizeRequests", 1)
+}
+
+// TestWorker_Poll_AuthorizeRequestReapFailureStopsNothingElse: the two reaps and the claim are
+// independent housekeeping, so a failing one is logged and the others still run.
+func TestWorker_Poll_AuthorizeRequestReapFailureStopsNothingElse(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("database is down")).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	worker.poll(context.Background())
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestWorker_Poll_BrowserSessionReapFailureStillReapsAuthorizeRequests is the other direction.
+func TestWorker_Poll_BrowserSessionReapFailureStillReapsAuthorizeRequests(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("database is down")).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	worker.poll(context.Background())
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestWorker_Poll_ReapsAuthorizeRequestsWithACurrentTimestamp: the cutoff is the instant of the
+// poll, so a request expires against wall-clock time.
+func TestWorker_Poll_ReapsAuthorizeRequestsWithACurrentTimestamp(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	var gotNow time.Time
+	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { gotNow = args.Get(2).(time.Time) }).Return(nil).Once()
+	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(false, nil).Once()
+
+	before := time.Now().UTC()
+	worker.poll(context.Background())
+	after := time.Now().UTC()
+
+	assert.False(t, gotNow.Before(before))
+	assert.False(t, gotNow.After(after))
 }
 
 // TestWorker_Poll_ReapsBrowserSessionsBeforeClaiming: a failing reap is logged and the poll
@@ -588,6 +663,7 @@ func TestWorker_Poll_ReapFailureDoesNotStopTheClaim(t *testing.T) {
 
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("database is down")).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 
@@ -605,6 +681,7 @@ func TestWorker_Poll_ReapsWithACurrentTimestamp(t *testing.T) {
 	var gotNow time.Time
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { gotNow = args.Get(2).(time.Time) }).Return(nil).Once()
+	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 

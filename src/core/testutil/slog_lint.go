@@ -296,6 +296,10 @@ var slogSpreadSites = []slogSpreadSite{
 // authserver/internal/userconsent is listed by the commit that creates it, on the same terms: the
 // consent row's read and write ran inside HandleConsentPost, already here, and its one caller is
 // the consent screen's submission. It writes no record today (#437).
+//
+// authserver/internal/authorizerequest is listed on the same terms: its two operations run while
+// a POST to /auth/authorize is answered and while the GET that follows it is, and it writes one
+// record, for a parked row that does not parse (#437).
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -320,6 +324,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/otpcredential",
 	"authserver/internal/userclaims",
 	"authserver/internal/userconsent",
+	"authserver/internal/authorizerequest",
 	"authserver/internal/imageupload",
 	"authserver/internal/uithemes",
 	"adminconsole/internal/handlers",

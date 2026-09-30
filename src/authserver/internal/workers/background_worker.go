@@ -52,8 +52,9 @@ const (
 )
 
 // backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
-// the sweeper, and the six deletes it sweeps with.
+// the sweeper, and the seven deletes it sweeps with.
 type backgroundWorkerDatabase interface {
+	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error
 	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
@@ -135,13 +136,32 @@ func (w *Worker) run(ctx context.Context) {
 
 // poll is what one tick of the worker does, and the two halves are deliberately unequal.
 //
-// The browser session reap runs on every instance every time, outside the claim. The rest
-// of the cleanup runs on at most one instance every cleanupInterval, behind the claim. Both
-// calls live here rather than inline in run so the pairing is one thing a test can exercise
-// without waiting out the startup delay (#266 decision 19).
+// The browser session reap and the parked authorization request reap run on every instance every
+// time, outside the claim. The rest of the cleanup runs on at most one instance every
+// cleanupInterval, behind the claim. The calls live here rather than inline in run so the pairing
+// is one thing a test can exercise without waiting out the startup delay (#266 decision 19, #437).
 func (w *Worker) poll(ctx context.Context) {
 	w.reapBrowserSessions(ctx)
+	w.reapAuthorizeRequests(ctx)
 	w.runIfClaimed(ctx)
+}
+
+// reapAuthorizeRequests deletes parked authorization requests whose expires_at has passed.
+//
+// It is the second sweep that runs outside the claim, for the reason the first one does. A POST to
+// /auth/authorize writes a row after checking the client and redirect URI and before anything else,
+// and the endpoint is not rate limited, so an unauthenticated caller can produce rows as fast as it
+// can send requests, each as large as the request it sent. A request stops being consumable after
+// five minutes (authorizerequest.Lifetime), and on the twelve hour claim the row would go on
+// EXISTING for up to twelve. Every five minutes keeps the physical bound within one poll of the
+// logical one, the relationship #266 decision 19 argued for browser sessions.
+//
+// Single-flight is given up on the same terms: the delete is idempotent and keyed on an indexed
+// column. Do not move this call into performTask (#437).
+func (w *Worker) reapAuthorizeRequests(ctx context.Context) {
+	if err := w.database.DeleteExpiredAuthorizeRequests(ctx, nil, time.Now().UTC()); err != nil {
+		slog.ErrorContext(ctx, "unable to delete expired authorize requests", "error", err)
+	}
 }
 
 // reapBrowserSessions deletes browser sessions whose expires_at has passed.

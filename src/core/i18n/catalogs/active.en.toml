@@ -123,6 +123,10 @@
 # The two below are answered on the page because the request cannot say where a redirect would go (#228).
 "auth_error.malformed_request.message" = "The authorization request could not be read: one of its parameters is not correctly encoded."
 "auth_error.conflicting_parameter.message" = "The {{.parameter}} parameter was included more than once with different values."
+# A POST to the authorization endpoint is parked and answered with a redirect that carries a
+# one-time handle (#246). The page says the same whether the handle expired, was used already, never
+# existed or arrived beside other parameters, so it reveals nothing about which.
+"auth_error.request_handle_unusable.message" = "This sign-in link is no longer valid. It may have expired, it may have been used already, or it may have been changed. Go back to the application you were signing in to and start again."
 
 # --- Withheld redirect for a self-registered client (auth_redirect_blocked.html)
 # Neutral about why the request stopped on purpose: this page is reached both by someone who

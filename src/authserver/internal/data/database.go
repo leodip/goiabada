@@ -436,6 +436,19 @@ type Database interface {
 	// stops the table growing.
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
 
+	// A parked authorization request is what a POST to /auth/authorize leaves for the GET it
+	// answers with (#246, #437). Keyed on the handle's digest, like a browser session on its
+	// identifier's.
+	CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest) error
+	// GetAuthorizeRequestByHandleHash returns the live request, or nil: `now` is an active-expiry
+	// predicate, so an expired row reads as absent whether or not the sweep has reached it.
+	GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*models.AuthorizeRequest, error)
+	// ClaimAuthorizeRequest deletes one request and reports whether THIS call did, the one-winner
+	// claim in MarkCodeAsUsed's shape: only the caller told true may act on what it read.
+	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error)
+	// DeleteExpiredAuthorizeRequests reaps on expires_at alone.
+	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
+
 	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
 	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
 	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*models.UserConsent, error)

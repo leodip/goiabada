@@ -251,6 +251,78 @@ func (_c *Database_BeginTransaction_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// ClaimAuthorizeRequest provides a mock function for the type Database
+func (_mock *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error) {
+	ret := _mock.Called(ctx, tx, authorizeRequestId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClaimAuthorizeRequest")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, authorizeRequestId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) bool); ok {
+		r0 = returnFunc(ctx, tx, authorizeRequestId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, authorizeRequestId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_ClaimAuthorizeRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClaimAuthorizeRequest'
+type Database_ClaimAuthorizeRequest_Call struct {
+	*mock.Call
+}
+
+// ClaimAuthorizeRequest is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - authorizeRequestId int64
+func (_e *Database_Expecter) ClaimAuthorizeRequest(ctx any, tx any, authorizeRequestId any) *Database_ClaimAuthorizeRequest_Call {
+	return &Database_ClaimAuthorizeRequest_Call{Call: _e.mock.On("ClaimAuthorizeRequest", ctx, tx, authorizeRequestId)}
+}
+
+func (_c *Database_ClaimAuthorizeRequest_Call) Run(run func(ctx context.Context, tx *sql.Tx, authorizeRequestId int64)) *Database_ClaimAuthorizeRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ClaimAuthorizeRequest_Call) Return(b bool, err error) *Database_ClaimAuthorizeRequest_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_ClaimAuthorizeRequest_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error)) *Database_ClaimAuthorizeRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClearPendingOTPEnrollment provides a mock function for the type Database
 func (_mock *Database) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error {
 	ret := _mock.Called(ctx, tx, userId)
@@ -889,6 +961,69 @@ func (_c *Database_CreateAuditLog_Call) Return(err error) *Database_CreateAuditL
 }
 
 func (_c *Database_CreateAuditLog_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error) *Database_CreateAuditLog_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateAuthorizeRequest provides a mock function for the type Database
+func (_mock *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest) error {
+	ret := _mock.Called(ctx, tx, authorizeRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateAuthorizeRequest")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.AuthorizeRequest) error); ok {
+		r0 = returnFunc(ctx, tx, authorizeRequest)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateAuthorizeRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateAuthorizeRequest'
+type Database_CreateAuthorizeRequest_Call struct {
+	*mock.Call
+}
+
+// CreateAuthorizeRequest is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - authorizeRequest *models.AuthorizeRequest
+func (_e *Database_Expecter) CreateAuthorizeRequest(ctx any, tx any, authorizeRequest any) *Database_CreateAuthorizeRequest_Call {
+	return &Database_CreateAuthorizeRequest_Call{Call: _e.mock.On("CreateAuthorizeRequest", ctx, tx, authorizeRequest)}
+}
+
+func (_c *Database_CreateAuthorizeRequest_Call) Run(run func(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest)) *Database_CreateAuthorizeRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.AuthorizeRequest
+		if args[2] != nil {
+			arg2 = args[2].(*models.AuthorizeRequest)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateAuthorizeRequest_Call) Return(err error) *Database_CreateAuthorizeRequest_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateAuthorizeRequest_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest) error) *Database_CreateAuthorizeRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2909,6 +3044,69 @@ func (_c *Database_DeleteCodesWithoutRefreshTokens_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// DeleteExpiredAuthorizeRequests provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(ctx, tx, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteExpiredAuthorizeRequests")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, now)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteExpiredAuthorizeRequests_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredAuthorizeRequests'
+type Database_DeleteExpiredAuthorizeRequests_Call struct {
+	*mock.Call
+}
+
+// DeleteExpiredAuthorizeRequests is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - now time.Time
+func (_e *Database_Expecter) DeleteExpiredAuthorizeRequests(ctx any, tx any, now any) *Database_DeleteExpiredAuthorizeRequests_Call {
+	return &Database_DeleteExpiredAuthorizeRequests_Call{Call: _e.mock.On("DeleteExpiredAuthorizeRequests", ctx, tx, now)}
+}
+
+func (_c *Database_DeleteExpiredAuthorizeRequests_Call) Run(run func(ctx context.Context, tx *sql.Tx, now time.Time)) *Database_DeleteExpiredAuthorizeRequests_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteExpiredAuthorizeRequests_Call) Return(err error) *Database_DeleteExpiredAuthorizeRequests_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteExpiredAuthorizeRequests_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredAuthorizeRequests_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteExpiredBrowserSessions provides a mock function for the type Database
 func (_mock *Database) DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error {
 	ret := _mock.Called(ctx, tx, now)
@@ -4887,6 +5085,86 @@ func (_c *Database_GetAuditLogsPaginated_Call) Return(auditLogs []models.AuditLo
 }
 
 func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)) *Database_GetAuditLogsPaginated_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAuthorizeRequestByHandleHash provides a mock function for the type Database
+func (_mock *Database) GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*models.AuthorizeRequest, error) {
+	ret := _mock.Called(ctx, tx, handleHash, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAuthorizeRequestByHandleHash")
+	}
+
+	var r0 *models.AuthorizeRequest
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) (*models.AuthorizeRequest, error)); ok {
+		return returnFunc(ctx, tx, handleHash, now)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) *models.AuthorizeRequest); ok {
+		r0 = returnFunc(ctx, tx, handleHash, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*models.AuthorizeRequest)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, handleHash, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetAuthorizeRequestByHandleHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAuthorizeRequestByHandleHash'
+type Database_GetAuthorizeRequestByHandleHash_Call struct {
+	*mock.Call
+}
+
+// GetAuthorizeRequestByHandleHash is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - handleHash string
+//   - now time.Time
+func (_e *Database_Expecter) GetAuthorizeRequestByHandleHash(ctx any, tx any, handleHash any, now any) *Database_GetAuthorizeRequestByHandleHash_Call {
+	return &Database_GetAuthorizeRequestByHandleHash_Call{Call: _e.mock.On("GetAuthorizeRequestByHandleHash", ctx, tx, handleHash, now)}
+}
+
+func (_c *Database_GetAuthorizeRequestByHandleHash_Call) Run(run func(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time)) *Database_GetAuthorizeRequestByHandleHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetAuthorizeRequestByHandleHash_Call) Return(authorizeRequest *models.AuthorizeRequest, err error) *Database_GetAuthorizeRequestByHandleHash_Call {
+	_c.Call.Return(authorizeRequest, err)
+	return _c
+}
+
+func (_c *Database_GetAuthorizeRequestByHandleHash_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*models.AuthorizeRequest, error)) *Database_GetAuthorizeRequestByHandleHash_Call {
 	_c.Call.Return(run)
 	return _c
 }

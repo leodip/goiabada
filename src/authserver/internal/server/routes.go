@@ -116,9 +116,11 @@ func (s *Server) initRoutes(branches appBranches) {
 	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	pages.Route("/auth", func(r chi.Router) {
-		authorizeHandler := handlers.HandleAuthorizeGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, baseURL)
-		r.Get("/authorize", authorizeHandler)
-		r.Post("/authorize", authorizeHandler)
+		// A POST is parked and answered with a 303 to a GET, which runs the ceremony from it: the
+		// POST arrives cross-site without the Lax session cookie and must not touch the browser's
+		// own session (#246).
+		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, baseURL))
+		r.Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authorizeValidator, s.database, baseURL))
 		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, ceremonyStore, baseURL, adminConsoleBaseURL))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, baseURL, adminConsoleBaseURL))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, ceremonyStore, s.database, baseURL, adminConsoleBaseURL))

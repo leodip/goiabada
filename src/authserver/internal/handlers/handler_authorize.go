@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authorizerequest"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -81,8 +82,10 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 }
 
 // authorizeDatabase is what the authorization endpoint needs: the client and its redirect URIs,
-// the consent already given, and the session a browser may arrive with.
+// the consent already given, the session a browser may arrive with, and the request a POST parked
+// for a GET carrying its handle.
 type authorizeDatabase interface {
+	authorizerequest.Consuming
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
 	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.RedirectURI, error)
@@ -107,31 +110,22 @@ func HandleAuthorizeGet(
 
 		requestId := middleware.GetReqID(r.Context())
 
-		// The refusal page, which is how this handler answers anything it must not send to the
-		// client. The status is a parameter because the conditions that reach it differ on it: a bad
-		// client_id or redirect_uri has always answered 200, while an unsupported response_mode is
-		// answered 400 because OIDC Core 3.1.2.6 names that code (#213), and a request that cannot be
-		// parsed or repeats a delivery parameter is 400 as the malformed request it is (#228).
-		renderErrorUi := func(message string, httpStatus int) {
-			bind := map[string]interface{}{
-				"title":       i18n.T(r.Context(), "auth_error.unable_to_authorize.title"),
-				"error":       message,
-				"_httpStatus": httpStatus,
-			}
-
-			renderTemplateErr := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
-			if renderTemplateErr != nil {
-				pageRenderer.InternalServerError(w, r, renderTemplateErr)
-			}
-		}
-
 		// A request that does not parse is answered on the page and never by redirect: a malformed
 		// escape drops the field it sits in, so the client_id or redirect_uri the redirect would be
 		// built from may be one the client never sent. Before #228 the failure was ignored and the
 		// request went on without that field.
 		params, err := authorizeParameters(r)
 		if err != nil {
-			renderErrorUi(i18n.T(r.Context(), "auth_error.malformed_request.message"), http.StatusBadRequest)
+			renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), "auth_error.malformed_request.message"), http.StatusBadRequest)
+			return
+		}
+
+		// A GET carrying request_handle is the second half of a POST: the request it names was
+		// parked by HandleAuthorizePost, and the ceremony runs from what that held, exactly as it
+		// would from the same parameters in this query string. This request's cookie is the
+		// browser's own, which is why the POST answered with a redirect to it (#246).
+		params, ok := resolveParkedAuthorizeRequest(w, r, pageRenderer, database, params)
+		if !ok {
 			return
 		}
 
@@ -187,79 +181,17 @@ func HandleAuthorizeGet(
 		// 10 tags / 256 bytes — so we don't bloat the server-side session
 		// store this context lives in, which #266 moved out of the cookie,
 		// or accept attacker-controlled junk. params covers both query
-		// (GET) and form body (POST).
-		if uiLocales := i18n.SanitizeUILocales(params.Get("ui_locales")); len(uiLocales) > 0 {
+		// (GET) and form body, and the request parked by a POST.
+		uiLocales := authorizeUILocales(params)
+		if len(uiLocales) > 0 {
 			authContext.UILocales = uiLocales
-			// The global locale middleware ran on this request but only sees
-			// the query string. If the value came from the form body
-			// (typical POST authorize), refine the current request's
-			// localizer now so any browser-visible response on this request
-			// (error pages, the level1 password page) renders in the chosen
-			// locale.
-			r = r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
 		}
+		r = withUILocales(r, uiLocales)
 
-		// The parameters that decide where an answer goes and how it is encoded are checked for
-		// repeats first, above everything that could redirect: with two client_ids, redirect_uris,
-		// response_types or response_modes there is no single answer to "where does this response
-		// go, and in what form", so it goes nowhere and the page answers instead. RFC 6749 4.1.2.1
-		// already keeps a bad client_id or redirect_uri off the client for the same reason (#228).
-		if name := protocolvalidation.ConflictingParameter(params, authorizeDeliveryParameters); name != "" {
-			renderErrorUi(i18n.T(r.Context(), "auth_error.conflicting_parameter.message",
-				map[string]any{"parameter": name}), http.StatusBadRequest)
-			return
-		}
-
-		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &protocolvalidation.ValidateClientAndRedirectURIInput{
-			RequestId:    requestId,
-			ClientId:     authContext.ClientId,
-			RedirectURI:  authContext.RedirectURI,
-			ResponseType: authContext.ResponseType,
-		})
-
-		if err != nil {
-			// Localized, unlike every other error this handler answers, because this one is
-			// rendered rather than redirected: RFC 6749 4.1.2.1 forbids sending a bad client_id
-			// or redirect_uri anywhere, so the page is the whole answer and OIDC Core requires
-			// an OP to honour ui_locales for the user interface. The localizer on r was already
-			// refined from ui_locales above. Anything that is not a LocalizedError is a database
-			// failure from inside the validator, which answered 500 before this change too
-			// (#213 decision 9).
-			var localizedErr *i18n.LocalizedError
-			if errors.As(err, &localizedErr) {
-				renderErrorUi(localizedErr.Localize(r.Context()), http.StatusOK)
-				return
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-		}
-
-		// An unsupported response_mode is answered here, above every validation that answers by
-		// redirect, because it is the one failure that cannot be answered by redirect at all.
-		//
-		// OpenID Connect Core 1.0 section 3.1.2.6 closes with an explicit exception to the rule
-		// that returns errors to the redirect URI: "If the Response Mode value is not supported,
-		// the Authorization Server returns an HTTP response code of 400 (Bad Request) without
-		// Error Response parameters, since understanding the Response Mode is necessary to know
-		// how to return those parameters." So the check precedes all five, not just the one that
-		// would have caught it: whichever error a request carries, this server cannot encode it in
-		// a mechanism it does not implement, and falling through to the query default would answer
-		// in a mode the client did not ask for and may not read.
-		//
-		// Applied to every authorization request rather than only to an OIDC Authentication
-		// Request. The sentence's reasoning does not turn on the scope, and OAuth 2.0 Multiple
-		// Response Type Encoding Practices section 2.1, which defines response_mode, states no
-		// behaviour for an unsupported value, so extending it contradicts nothing (#213
-		// decision 11).
-		//
-		// ValidateRequest's other response_mode rule is deliberately left where it is: an implicit
-		// request asking for query or form_post is asking for a mode this server understands and
-		// simply may not use for tokens, so that error can be, and is, delivered as a redirect the
-		// client can parse.
-		if !protocolvalidation.IsSupportedResponseMode(authContext.ResponseMode) {
-			renderErrorUi(i18n.T(r.Context(), "auth_error.unsupported_response_mode.message"),
-				http.StatusBadRequest)
+		// The answers that go on the page and never by redirect: a delivery parameter repeated,
+		// a client_id or redirect_uri that names nowhere safe, a response_mode this server cannot
+		// encode. HandleAuthorizePost asks the same question before it parks a request.
+		if refuseUnaddressableAuthorizeRequest(w, r, pageRenderer, authorizeValidator, requestId, params) {
 			return
 		}
 
@@ -502,6 +434,116 @@ func authorizeParameters(r *http.Request) (url.Values, error) {
 		return nil, err
 	}
 	return r.Form, nil
+}
+
+// renderAuthorizeRefusal is the refusal page, which is how the authorization endpoint answers
+// anything it must not send to the client. The status is a parameter because the conditions that
+// reach it differ on it: a bad client_id or redirect_uri has always answered 200, while an
+// unsupported response_mode is answered 400 because OIDC Core 3.1.2.6 names that code (#213), and
+// a request that cannot be parsed, repeats a delivery parameter or names a handle that is no longer
+// good is 400 as the malformed request it is (#228, #246).
+func renderAuthorizeRefusal(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, message string, httpStatus int) {
+	bind := map[string]interface{}{
+		"title":       i18n.T(r.Context(), "auth_error.unable_to_authorize.title"),
+		"error":       message,
+		"_httpStatus": httpStatus,
+	}
+
+	renderTemplateErr := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
+	if renderTemplateErr != nil {
+		pageRenderer.InternalServerError(w, r, renderTemplateErr)
+	}
+}
+
+// authorizeUILocales is the ui_locales hint an authorization request states, sanitized: BCP 47
+// shaped, and capped at 10 tags and 256 bytes.
+func authorizeUILocales(params url.Values) []string {
+	return i18n.SanitizeUILocales(params.Get("ui_locales"))
+}
+
+// withUILocales refines the request's localizer to the ui_locales hint. The global locale
+// middleware ran on this request but only sees the query string, so a hint that came in a form
+// body, or in a request parked by a POST, has to be applied here for anything browser-visible on
+// this request (the refusal page, the level 1 password page) to render in the chosen locale.
+func withUILocales(r *http.Request, uiLocales []string) *http.Request {
+	if len(uiLocales) == 0 {
+		return r
+	}
+	return r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
+}
+
+// refuseUnaddressableAuthorizeRequest answers, on the refusal page and never by redirect, an
+// authorization request the server cannot address an answer to, and reports whether it did. It is
+// the one place that rule is written: HandleAuthorizeGet asks it before it loads the client, and
+// HandleAuthorizePost before it parks a request, so a request the GET would refuse without a trace
+// costs a POST no row either.
+func refuseUnaddressableAuthorizeRequest(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
+	authorizeValidator AuthorizeValidator, requestId string, params url.Values) bool {
+
+	// The parameters that decide where an answer goes and how it is encoded are checked for
+	// repeats first, above everything that could redirect: with two client_ids, redirect_uris,
+	// response_types or response_modes there is no single answer to "where does this response
+	// go, and in what form", so it goes nowhere and the page answers instead. RFC 6749 4.1.2.1
+	// already keeps a bad client_id or redirect_uri off the client for the same reason (#228).
+	if name := protocolvalidation.ConflictingParameter(params, authorizeDeliveryParameters); name != "" {
+		renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), "auth_error.conflicting_parameter.message",
+			map[string]any{"parameter": name}), http.StatusBadRequest)
+		return true
+	}
+
+	err := authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &protocolvalidation.ValidateClientAndRedirectURIInput{
+		RequestId:    requestId,
+		ClientId:     params.Get("client_id"),
+		RedirectURI:  params.Get("redirect_uri"),
+		ResponseType: params.Get("response_type"),
+	})
+
+	if err != nil {
+		// Localized, unlike every other error this endpoint answers, because this one is
+		// rendered rather than redirected: RFC 6749 4.1.2.1 forbids sending a bad client_id
+		// or redirect_uri anywhere, so the page is the whole answer and OIDC Core requires
+		// an OP to honour ui_locales for the user interface. The localizer on r was already
+		// refined from ui_locales by the caller. Anything that is not a LocalizedError is a
+		// database failure from inside the validator, which answered 500 before this change
+		// too (#213 decision 9).
+		var localizedErr *i18n.LocalizedError
+		if errors.As(err, &localizedErr) {
+			renderAuthorizeRefusal(pageRenderer, w, r, localizedErr.Localize(r.Context()), http.StatusOK)
+		} else {
+			pageRenderer.InternalServerError(w, r, err)
+		}
+		return true
+	}
+
+	// An unsupported response_mode is answered here, above every validation that answers by
+	// redirect, because it is the one failure that cannot be answered by redirect at all.
+	//
+	// OpenID Connect Core 1.0 section 3.1.2.6 closes with an explicit exception to the rule
+	// that returns errors to the redirect URI: "If the Response Mode value is not supported,
+	// the Authorization Server returns an HTTP response code of 400 (Bad Request) without
+	// Error Response parameters, since understanding the Response Mode is necessary to know
+	// how to return those parameters." So the check precedes all five, not just the one that
+	// would have caught it: whichever error a request carries, this server cannot encode it in
+	// a mechanism it does not implement, and falling through to the query default would answer
+	// in a mode the client did not ask for and may not read.
+	//
+	// Applied to every authorization request rather than only to an OIDC Authentication
+	// Request. The sentence's reasoning does not turn on the scope, and OAuth 2.0 Multiple
+	// Response Type Encoding Practices section 2.1, which defines response_mode, states no
+	// behaviour for an unsupported value, so extending it contradicts nothing (#213
+	// decision 11).
+	//
+	// ValidateRequest's other response_mode rule is deliberately left where it is: an implicit
+	// request asking for query or form_post is asking for a mode this server understands and
+	// simply may not use for tokens, so that error can be, and is, delivered as a redirect the
+	// client can parse.
+	if !protocolvalidation.IsSupportedResponseMode(params.Get("response_mode")) {
+		renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), "auth_error.unsupported_response_mode.message"),
+			http.StatusBadRequest)
+		return true
+	}
+
+	return false
 }
 
 // authorizeValidation is what validateAuthorizeRequest found: the first refusal, or nil when the

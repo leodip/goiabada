@@ -75,6 +75,10 @@ func TestAuthorize_PostRequest(t *testing.T) {
 			}
 			defer func() { _ = resp.Body.Close() }()
 
+			// The POST is parked and answered with a 303 to a GET, which runs the ceremony (#246).
+			resp = followParkedAuthorizePost(t, httpClient, resp)
+			defer func() { _ = resp.Body.Close() }()
+
 			assertRedirect(t, resp, "/auth/level1")
 		})
 	}
