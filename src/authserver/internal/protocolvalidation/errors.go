@@ -2,24 +2,13 @@ package protocolvalidation
 
 import "github.com/leodip/goiabada/core/customerrors"
 
-// The three comparison targets the token validator constructs at the point of failure. Only this
+// The two comparison targets the token validator constructs at the point of failure. Only this
 // server issues or redeems a grant, so #385 moved them out of core/customerrors and beside the
 // validator that produces each; the admin console names none of them.
 var (
 	ErrUserDisabled = customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 		"The user account is disabled.", 400)
-	// ErrClientDisabled is a comparison target, like ErrUserDisabled: the token validator
-	// constructs this same value and errors.Is matches it by value through
-	// customerrors.ErrorDetail.Is.
-	//
-	// It exists because it is the one invalid_grant a password grant can produce without any
-	// credential having been read. The check runs before the grant-type switch, so treating
-	// every invalid_grant on a password grant as a guess against the account would charge an
-	// account's failure budget, and write a ropc_auth_failed audit row naming a username
-	// nothing ever compared, for a request that merely named a disabled client (#219).
-	ErrClientDisabled = customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-		"Client is disabled.", 400)
-	// ErrCodeRedirectURIDeregistered is a comparison target, like the two above: the token
+	// ErrCodeRedirectURIDeregistered is a comparison target, like the one above: the token
 	// validator constructs this same value when redeeming an authorization code whose own
 	// redirect URI is no longer registered on the client, and errors.Is matches it by value
 	// through customerrors.ErrorDetail.Is.

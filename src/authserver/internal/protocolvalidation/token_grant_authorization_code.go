@@ -117,7 +117,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 		}
 	}
 
-	err = val.authenticateClient(client, input.ClientSecret, input.UsedBasicAuth, wrongClientSecretErrorMsg)
+	err = val.authenticateClient(client, input.ClientSecret)
 	if err != nil {
 		return nil, err
 	}

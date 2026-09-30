@@ -83,7 +83,7 @@ func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client does not exist.", data["error_description"])
 }
 

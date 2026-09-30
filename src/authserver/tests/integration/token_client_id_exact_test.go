@@ -65,7 +65,7 @@ func TestToken_ClientIdCaseVariantIsRefused(t *testing.T) {
 		"grant_type": {"invalid_grant_type"},
 		"client_id":  {strings.ToUpper(client.ClientIdentifier)},
 	})
-	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client does not exist.", data["error_description"])
 }
 
@@ -93,6 +93,6 @@ func TestToken_ClientIdTrailingSpaceIsRefused(t *testing.T) {
 		"grant_type": {"invalid_grant_type"},
 		"client_id":  {client.ClientIdentifier + " "},
 	})
-	assert.Equal(t, "invalid_request", data["error"])
+	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client does not exist.", data["error_description"])
 }

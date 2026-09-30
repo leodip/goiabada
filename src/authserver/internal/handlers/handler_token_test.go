@@ -682,11 +682,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
-		assert.True(t, usedBasicAuth)
 	})
 
 	t.Run("POST body only - credentials extracted from form", func(t *testing.T) {
@@ -696,11 +695,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
-		assert.False(t, usedBasicAuth)
 	})
 
 	t.Run("Both methods provided - returns error", func(t *testing.T) {
@@ -712,11 +710,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.Error(t, err)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
-		assert.False(t, usedBasicAuth)
 
 		errDetail, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
@@ -731,11 +728,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
-		assert.False(t, usedBasicAuth)
 	})
 
 	t.Run("Basic auth with client_id in POST but no client_secret - allowed", func(t *testing.T) {
@@ -748,11 +744,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
-		assert.True(t, usedBasicAuth)
 	})
 
 	t.Run("Invalid Basic auth header falls back to POST body", func(t *testing.T) {
@@ -764,11 +759,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic invalid-base64!")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
-		assert.False(t, usedBasicAuth)
 	})
 
 	t.Run("Bearer token header does not interfere with POST body", func(t *testing.T) {
@@ -780,11 +774,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer some-access-token")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
-		assert.False(t, usedBasicAuth)
 	})
 
 	t.Run("Empty client_secret in POST body is not considered authentication", func(t *testing.T) {
@@ -797,11 +790,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
-		assert.True(t, usedBasicAuth)
 	})
 
 	t.Run("Public client - only client_id in POST, no secret", func(t *testing.T) {
@@ -811,11 +803,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, usedBasicAuth, err := extractClientCredentials(req)
+		clientId, clientSecret, err := extractClientCredentials(req)
 		assert.NoError(t, err)
 		assert.Equal(t, "public-client", clientId)
 		assert.Equal(t, "", clientSecret)
-		assert.False(t, usedBasicAuth)
 	})
 }
 
@@ -1708,8 +1699,8 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		})
 	})
 
-	// The three error codes that are not a guess against the account, plus the one
-	// invalid_grant that is not. Each names the gate that must not charge it.
+	// The three error codes that are not a guess against the account. Each names the gate that
+	// must not charge it.
 	notCharged := []struct {
 		name string
 		err  error
@@ -1724,9 +1715,10 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		{"invalid_client, the client failed to authenticate",
 			customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
 				"Client authentication failed.", http.StatusUnauthorized)},
-		{"invalid_grant, but the client is disabled and no credential was read",
-			customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"Client is disabled.", http.StatusBadRequest)},
+		// Before #437 this was invalid_grant and needed an exclusion by value of its own (#219).
+		{"invalid_client, the client is disabled and no credential was read",
+			protocolvalidation.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+				"Client is disabled.", http.StatusUnauthorized, protocolvalidation.BasicChallenge)},
 	}
 	for _, tc := range notCharged {
 		t.Run(tc.name+" spends nothing", func(t *testing.T) {

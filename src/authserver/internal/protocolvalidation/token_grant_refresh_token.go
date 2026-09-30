@@ -63,7 +63,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// so a thief replaying a token whose flow happens to be switched off would leave the
 	// rotation family live and nothing in the audit log. Whether a theft is detected must
 	// not depend on which switches are on (#250).
-	if err := val.authenticateClient(client, input.ClientSecret, input.UsedBasicAuth, wrongClientSecretErrorMsg); err != nil {
+	if err := val.authenticateClient(client, input.ClientSecret); err != nil {
 		return nil, err
 	}
 

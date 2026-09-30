@@ -89,9 +89,10 @@ func TestValidateTokenRequest(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
+		assert.Equal(t, "invalid_client", customErr.GetCode())
 		assert.Equal(t, "Client does not exist.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, 401, customErr.GetHttpStatusCode())
+		assert.Equal(t, `Basic realm="goiabada"`, customErr.GetWWWAuthenticate())
 	})
 
 	t.Run("Client is disabled", func(t *testing.T) {
@@ -115,9 +116,10 @@ func TestValidateTokenRequest(t *testing.T) {
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
+		assert.Equal(t, "invalid_client", customErr.GetCode())
 		assert.Equal(t, "Client is disabled.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, 401, customErr.GetHttpStatusCode())
+		assert.Equal(t, `Basic realm="goiabada"`, customErr.GetWWWAuthenticate())
 	})
 
 	// The rows below consult oidc's grant table through the exported method; the table's own rows
