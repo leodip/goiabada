@@ -847,11 +847,12 @@ func TestValidateScopes_MaximumNumberOfScopes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	// Assuming a theoretical maximum of 100 scopes
+	// Assuming a theoretical maximum of 100 scopes. The names are short so the whole scope stays
+	// under models.ScopeMaxBytes; the bound has its own cases in parameter_bounds_test.go (#437).
 	scopes := make([]string, 100)
 	for i := 0; i < 100; i++ {
-		resourceName := fmt.Sprintf("resource%d", i)
-		permissionName := fmt.Sprintf("permission%d", i)
+		resourceName := fmt.Sprintf("r%d", i)
+		permissionName := fmt.Sprintf("p%d", i)
 		scopes[i] = fmt.Sprintf("%s:%s", resourceName, permissionName)
 
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, resourceName).Return(&models.Resource{Id: int64(i)}, nil)

@@ -71,12 +71,12 @@ The authorize endpoint is used to request authorization codes via the browser. T
     <tr>
       <td style="white-space: nowrap;"><code>state</code></td>
       <td>Recommended</td>
-      <td>Any string. Goiabada will echo back the state value on the token response, for CSRF/replay protection.</td>
+      <td>Any string up to 2048 bytes. Goiabada will echo back the state value in the authorization response, for CSRF/replay protection.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>nonce</code></td>
       <td>Conditional</td>
-      <td>Any string. Goiabada will echo back the nonce value in the ID token, as a claim, for replay protection. <strong>Required</strong> when using implicit flow with <code>id_token</code>.</td>
+      <td>Any string up to 2048 bytes. Goiabada will echo back the nonce value in the ID token, as a claim, for replay protection. <strong>Required</strong> when using implicit flow with <code>id_token</code>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>max_age</code></td>

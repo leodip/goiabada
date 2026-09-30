@@ -52,7 +52,8 @@ type ValidateRequestInput struct {
 	PKCERequired         bool
 	ImplicitGrantEnabled bool   // Whether implicit flow is allowed for this client
 	Scope                string // Needed to validate openid requirement for id_token
-	Nonce                string // Needed to validate nonce requirement for id_token
+	Nonce                string // Needed to validate nonce requirement for id_token, and bounded (#437)
+	State                string // Bounded, because the ceremony stores it (#437)
 	MaxAge               string // The raw max_age parameter, empty when absent
 }
 
@@ -62,6 +63,9 @@ func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValida
 	}
 }
 
+// ValidateScopes validates the scope of an authorization request, as HandleAuthorizeGet stores it:
+// AuthContext.SetScope has already dropped duplicates and collapsed whitespace, so the bound below
+// counts the value that is saved in the consent, the code and the refresh token (#437).
 func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
 
 	scopes := oidc.SplitScope(scope)
@@ -70,6 +74,13 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 			"The 'scope' parameter is missing. Ensure to include one or more scopes, separated by spaces. Scopes can be an OpenID Connect scope, a resource:permission scope, or a combination of both.",
 			http.StatusBadRequest)
+	}
+
+	// Before the first lookup, so a scope of hundreds of values costs no query. The column it must
+	// fit is three tables wide (models.ScopeMaxBytes), and one that did not fit would be granted
+	// here and refused as a 500 after the user had signed in (#437).
+	if err := scopeBound.check(scope); err != nil {
+		return err
 	}
 
 	for _, scopeStr := range scopes {
@@ -330,6 +341,19 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"The 'nonce' parameter is required for implicit flow when requesting an id_token.",
 			http.StatusBadRequest)
+	}
+
+	// The two free-form values the ceremony carries to codes.state and codes.nonce. RFC 6749 and
+	// OIDC Core set no length on either, so the bound is the columns' (models.StateMaxBytes,
+	// models.NonceMaxBytes), and it holds for every response type: the ceremony carries both
+	// whatever is issued, and one rule is simpler to state to an integrator than three. Without
+	// it a longer value is accepted here and refused by the column, as a 500, at /auth/issue
+	// after the user has signed in (#437).
+	if err := stateBound.check(input.State); err != nil {
+		return err
+	}
+	if err := nonceBound.check(input.Nonce); err != nil {
+		return err
 	}
 
 	// PKCE validation only applies to authorization code flow
