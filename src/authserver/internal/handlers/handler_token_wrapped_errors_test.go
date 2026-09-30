@@ -67,29 +67,62 @@ func expectJsonErrorWithDetail(jsonWriter *mocks_handlers.JSONWriter) *error {
 	return &captured
 }
 
-// A wrapped ErrUserDisabled still writes the audit row and still answers with the validator's own
-// 400 and sentence, rather than the generic server error a lost match produces.
+// A wrapped UserDisabledError still writes the audit row and still answers with the validator's own
+// 400 and sentence, rather than the generic server error a lost match produces. One row per
+// wording the validator gives it: the code and refresh grants' generic refusals, which name
+// nothing about the account (#137), and the password grant's plain one.
 func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
-	// Equal by value to the sentinel rather than the sentinel itself, which is how the token
-	// validator returns it: ErrorDetail.Is is what makes errors.Is match this copy.
-	disabled := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-		"The user account is disabled.", http.StatusBadRequest)
-	require.ErrorIs(t, disabled, protocolvalidation.ErrUserDisabled)
+	for _, description := range []string{
+		"Code is invalid.",
+		"The refresh token is invalid.",
+		"The user account is disabled.",
+	} {
+		t.Run(description, func(t *testing.T) {
+			disabled := &protocolvalidation.UserDisabledError{Detail: customerrors.NewErrorDetailWithHttpStatusCode(
+				"invalid_grant", description, http.StatusBadRequest)}
 
-	jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
-		errs.Wrap(disabled, "unable to validate the token request"))
+			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
+				errs.Wrap(disabled, "unable to validate the token request"))
 
-	auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return().Once()
-	captured := expectJsonErrorWithDetail(jsonWriter)
+			auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, map[string]interface{}{
+				"clientId": "test_client",
+			}).Return().Once()
+			captured := expectJsonErrorWithDetail(jsonWriter)
 
-	handler.ServeHTTP(rr, req)
+			handler.ServeHTTP(rr, req)
 
-	// The handler hands the wrapped error through as it arrived; the writer reads the detail out of
-	// it with errors.As, which is how it reaches the wire (#435).
-	var detail *customerrors.ErrorDetail
-	require.ErrorAs(t, *captured, &detail)
-	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
-	assert.Equal(t, "The user account is disabled.", detail.GetDescription())
+			// The handler hands the wrapped error through as it arrived; the writer reads the
+			// detail out of it with errors.As, which is how it reaches the wire (#435).
+			var detail *customerrors.ErrorDetail
+			require.ErrorAs(t, *captured, &detail)
+			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+			assert.Equal(t, description, detail.GetDescription())
+		})
+	}
+}
+
+// The negative control: the same generic refusals, arriving as plain details as the validator
+// returns them for a superseded generation, a revoked code or a missing row, write no
+// user_disabled row. A match by value, which the handler made until #137, would write one for all
+// of them. The audit logger has no expectation, so any row fails the case.
+func TestHandleTokenPost_GenericRefusalWritesNoUserDisabledRow(t *testing.T) {
+	for _, description := range []string{
+		"Code is invalid.",
+		"The refresh token is invalid.",
+	} {
+		t.Run(description, func(t *testing.T) {
+			refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", description,
+				http.StatusBadRequest)
+
+			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t, refusal)
+			captured := expectJsonErrorWithDetail(jsonWriter)
+
+			handler.ServeHTTP(rr, req)
+
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditUserDisabled, mock.Anything)
+			assert.Same(t, refusal, *captured)
+		})
+	}
 }
 
 // The same for the deregistered-redirect-URI sentinel, the other by-value comparison this handler

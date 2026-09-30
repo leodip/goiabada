@@ -172,8 +172,12 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 		revocation.LogAuthCodeReuse(r.Context(), auditLogger, reused.Code, result)
 		return reused.Detail
 	}
-	// Check if user is disabled and log audit event
-	if errors.Is(err, protocolvalidation.ErrUserDisabled) {
+	// A grant refused because its user is disabled, on the code, refresh or password grant.
+	// Matched by type, never by the answer's value: a code or refresh grant answers with its
+	// generic refusal, which other failures share, so that the answer tells an unauthenticated
+	// presenter nothing about the account (#137).
+	var userDisabled *protocolvalidation.UserDisabledError
+	if errors.As(err, &userDisabled) {
 		auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 			"clientId": input.ClientId,
 		})
@@ -183,9 +187,9 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// authorization code whose own redirect URI has been deregistered since it was
 	// minted, and this is what makes that refusal answerable from the admin console
 	// and GET /api/v1/admin/audit-logs rather than only from a server log file
-	// (decision 10). Matched by value against the sentinel for the reason the
-	// ErrUserDisabled block above is: the code is invalid_grant, which 22 unrelated
-	// failures also carry, so a bare code test would name the wrong ones.
+	// (decision 10). Matched by value against the sentinel, because the code is
+	// invalid_grant, which 22 unrelated failures also carry, so a bare code test would
+	// name the wrong ones; the value is unique to this refusal.
 	//
 	// clientIdentifier, the string from the request, rather than the numeric clientId
 	// the issuance events use, for the reason AuditTokenScopeDenied gives: the

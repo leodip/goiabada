@@ -1544,7 +1544,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 // through to the client rather than swallowing it or turning it into a 500.
 //
 // It also pins that neither audit branch fires. The generation rejection is invalid_grant,
-// which is not ErrUserDisabled and not invalid_scope, so a superseded refresh token must not
+// which is not a UserDisabledError and not invalid_scope, so a superseded refresh token must not
 // be recorded as either. Stage 5 adds the event that does cover this.
 func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	jsonWriter := mocks_handlers.NewJSONWriter(t)
@@ -1561,7 +1561,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
-	// The exact error the validator's two refresh branches return on a generation mismatch.
+	// The exact error the validator's refresh grant returns on a generation mismatch.
 	supersededErr := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 		"The refresh token is invalid because it was superseded.", http.StatusBadRequest)
 
@@ -1693,6 +1693,25 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = "203.0.113.7:5000"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
+		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.AuditROPCAuthFailed, map[string]interface{}{
+			"email":            username,
+			"clientIdentifier": "app",
+		})
+	})
+
+	// A disabled user is refused through UserDisabledError, whose detail is still the plain
+	// invalid_grant the predicate charges: the password was compared, so this is a guess against
+	// the account, and the wrapper must not hide the detail from it (#137).
+	t.Run("a disabled user spends the budget and emits both user_disabled and ropc_auth_failed", func(t *testing.T) {
+		disabled := &protocolvalidation.UserDisabledError{Detail: customerrors.NewErrorDetailWithHttpStatusCode(
+			"invalid_grant", "The user account is disabled.", http.StatusBadRequest)}
+		assert.True(t, spends(t, disabled), "a disabled user's refusal compared the password, so it is charged")
+
+		handler, auditLogger := newHandler(t, disabled)
+		assert.Equal(t, http.StatusOK, post(handler))
+		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.AuditUserDisabled, map[string]interface{}{
+			"clientId": "app",
+		})
 		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.AuditROPCAuthFailed, map[string]interface{}{
 			"email":            username,
 			"clientIdentifier": "app",

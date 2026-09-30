@@ -89,34 +89,6 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 			http.StatusBadRequest)
 	}
 
-	// User-state and code-age checks only apply to first-use exchanges.
-	// On reuse, those failures would mask the revocation signal we want
-	// to deliver after the auth gate (client_secret + PKCE) passes below.
-	if !wasReused {
-		if !codeEntity.User.Enabled {
-			return nil, ErrUserDisabled
-		}
-
-		// The generation boundary (#106). A code carries the generation its ceremony
-		// authenticated under, so a code issued before a credential change no longer
-		// matches and cannot be redeemed. That covers both an outstanding code and a
-		// ceremony that straddled the change, neither of which the revocation sweep can
-		// reach: the sweep can only act on rows that exist when it runs.
-		//
-		// Inside the !wasReused guard for the same reason as the checks around it: on
-		// reuse the revocation signal must not be masked by a different rejection.
-		if codeEntity.AuthStateGeneration != codeEntity.User.AuthStateGeneration {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"Code is invalid.", http.StatusBadRequest)
-		}
-
-		const authCodeExpirationInSeconds = 60
-		if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"Code has expired.", http.StatusBadRequest)
-		}
-	}
-
 	err = val.authenticateClient(client, input.ClientSecret)
 	if err != nil {
 		return nil, err
@@ -175,21 +147,47 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 		}
 	}
 
+	// Everything from here to the end of the method reads the state of the grant or of its user,
+	// and all of it sits below client authentication and PKCE, so a presenter holding a stolen
+	// code learns from the answer whether that state moved only after proving it may redeem the
+	// code. Until #137 the user-enabled, generation and expiry checks ran above both, and a wrong
+	// verifier answered "Invalid code_verifier (PKCE)." for an untouched account and "Code is
+	// invalid." for one whose password had changed: the wording was generic, but which of the two
+	// came back was the signal. A check added above authentication reopens that.
+	//
+	// All of it also sits below the wasReused return, so #77's containment cascade is not
+	// pre-empted by a refusal that happens to apply to the used code as well. Reuse is the
+	// stronger signal and already revokes everything these would have refused, and the reuse
+	// error carries the code entity that drives revocation.RevokeOnAuthCodeReuseTx.
+
+	// A disabled user's code is refused with the flat wording the generation check below gives,
+	// never with one naming the account (#137). UserDisabledError is what still tells the handler
+	// to write AuditUserDisabled.
+	if !codeEntity.User.Enabled {
+		return nil, userDisabled("Code is invalid.")
+	}
+
+	// The generation boundary (#106). A code carries the generation its ceremony
+	// authenticated under, so a code issued before a credential change no longer
+	// matches and cannot be redeemed. That covers both an outstanding code and a
+	// ceremony that straddled the change, neither of which the revocation sweep can
+	// reach: the sweep can only act on rows that exist when it runs.
+	if codeEntity.AuthStateGeneration != codeEntity.User.AuthStateGeneration {
+		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			"Code is invalid.", http.StatusBadRequest)
+	}
+
+	// Named plainly, unlike the refusals around it: a code's age says nothing about the account,
+	// and the caller has proved it may redeem the code, so it knows when it was issued.
+	const authCodeExpirationInSeconds = 60
+	if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
+		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			"Code has expired.", http.StatusBadRequest)
+	}
+
 	// The termination boundary (#129 decision 4). Ending a session marks every code
 	// that session authorized, so a code marked here belongs to a grant that was
 	// explicitly cut off.
-	//
-	// Deliberately NOT up in the !wasReused block with the user-enabled, generation
-	// and expiry checks, even though it reads like one of them. That block runs before
-	// client authentication and before PKCE, so a presenter holding a stolen code
-	// learns from it whether the account's state moved without proving anything, which
-	// is the disclosure #137 exists to close. Adding a new member to that class would
-	// be going backwards.
-	//
-	// It also sits AFTER the wasReused return above, so #77's containment cascade is
-	// not pre-empted. Reuse is the stronger signal and already revokes everything a
-	// revoked-code rejection would have refused, and the reuse error carries the code
-	// entity that drives revocation.RevokeOnAuthCodeReuseTx.
 	if codeEntity.Revoked {
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest)
@@ -216,10 +214,6 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// behind an older grant, and refusing on absence would break every one of them. The
 	// cost of that choice is stated: this reaches a pre-fix grant only while its session
 	// row survives, which by default is two hours of idling or twenty-four of lifetime.
-	//
-	// Placed here rather than in the !wasReused block above for the same reason the revoked
-	// check is: that block runs before client authentication and PKCE, so anything added to
-	// it tells an unauthenticated presenter something about the grant's state (#137).
 	//
 	// Both columns compared are NOT NULL, so the zero-equals-zero vacuity that an
 	// incomplete test fixture can produce cannot arise against a real database.
@@ -257,11 +251,11 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// /auth/authorize, so it admits nothing that was refused there.
 	//
 	// Placed at the very END of the arm, below the revoked and ownership checks, and below
-	// client authentication and PKCE for the #137 reason those two give: an unauthenticated
-	// presenter of a stolen code must not learn from the answer whether the grant's state
-	// moved. Last rather than merely late because this is the one refusal in the group that
-	// says what happened; a revoked or cross-bound code must keep the flat "Code is
-	// invalid." it has today, and it would not if this ran first.
+	// client authentication and PKCE for the #137 reason the group's opening comment gives: an
+	// unauthenticated presenter of a stolen code must not learn from the answer whether the
+	// grant's state moved. Last rather than merely late because this is the one refusal about
+	// the grant's state that says what happened; a revoked or cross-bound code must keep the
+	// flat "Code is invalid." it has today, and it would not if this ran first.
 	//
 	// A failed load is PROPAGATED, not read as a refusal, matching the ownership lookup
 	// above: an unreachable database says nothing about whether the URI is registered.

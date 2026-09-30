@@ -25,9 +25,10 @@ import (
 const invalidGenerationMessage = "The refresh token is invalid because it was superseded."
 
 // invalidRefreshTokenMessage is the refusal that says nothing about why: a validly signed token
-// with no row, and an ROPC token issued before its grant's authentication instant was recorded
-// (#128, #125). Neither reason is something a client acts on differently, and naming the first
-// would confirm which JTIs were ever issued.
+// with no row, an ROPC token issued before its grant's authentication instant was recorded, and a
+// token whose user is disabled (#128, #125, #137). None of these is something a client acts on
+// differently, naming the first would confirm which JTIs were ever issued, and naming the last
+// would tell whoever holds a stolen token what became of the account.
 const invalidRefreshTokenMessage = "The refresh token is invalid."
 
 // RefreshTokenGrant is a validated refresh: the presented token as it was read, which may already be
@@ -111,6 +112,8 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	var tokenClientId int64
 	var tokenUserId int64
 	var tokenScope string
+	// tokenUser is the grant's user as loaded: the token row's for ROPC, the code's otherwise.
+	var tokenUser *models.User
 
 	if isROPCToken {
 		// ROPC refresh token - load User and Client directly from RefreshToken
@@ -126,18 +129,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		tokenClientId = refreshToken.ClientId.Int64
 		tokenUserId = refreshToken.UserId.Int64
 		tokenScope = refreshToken.Scope
-
-		if !refreshToken.User.Enabled {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"The user account is disabled.",
-				http.StatusBadRequest)
-		}
-
-		// Read from the TOKEN row, not from any joined record (#106 decision 11(a)).
-		if refreshToken.AuthStateGeneration != refreshToken.User.AuthStateGeneration {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				invalidGenerationMessage, http.StatusBadRequest)
-		}
+		tokenUser = &refreshToken.User
 	} else {
 		// Auth code flow refresh token - load Code and User from Code
 		err = val.database.RefreshTokenLoadCode(ctx, nil, refreshToken)
@@ -153,27 +145,34 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		tokenClientId = refreshToken.Code.ClientId
 		tokenUserId = refreshToken.Code.UserId
 		tokenScope = refreshToken.Code.Scope
-
-		if !refreshToken.Code.User.Enabled {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				"The user account is disabled.",
-				http.StatusBadRequest)
-		}
-
-		// refreshToken.AuthStateGeneration, NOT refreshToken.Code.AuthStateGeneration.
-		// The two legitimately differ: a self-service password change promotes the
-		// preserved session's tokens to the new generation while their codes stay on the
-		// old one, so reading the code here would reject exactly the tokens decision 4
-		// exists to keep working (#106 decision 11(a)).
-		if refreshToken.AuthStateGeneration != refreshToken.Code.User.AuthStateGeneration {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-				invalidGenerationMessage, http.StatusBadRequest)
-		}
+		tokenUser = &refreshToken.Code.User
 	}
 
 	if tokenClientId != client.Id {
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
+	}
+
+	// The user's state is read only below the ownership check, for both shapes of token. A
+	// public client_id is no secret, so until #137 anyone holding a stolen refresh token could
+	// present it under any public client and tell three outcomes apart: "does not belong to the
+	// client" for an untouched account, "The user account is disabled." and the superseded
+	// wording. A check on the grant's user placed above ownership reopens that.
+	//
+	// A disabled user's token gets the wording that says nothing about why (#137), and
+	// UserDisabledError is what still tells the handler to write AuditUserDisabled.
+	if !tokenUser.Enabled {
+		return nil, userDisabled(invalidRefreshTokenMessage)
+	}
+
+	// The generation boundary (#106), read from the TOKEN row, not from any joined record (#106
+	// decision 11(a)): refreshToken.AuthStateGeneration, NOT refreshToken.Code.AuthStateGeneration.
+	// The two legitimately differ on the code shape: a self-service password change promotes the
+	// preserved session's tokens to the new generation while their codes stay on the old one, so
+	// reading the code here would reject exactly the tokens #106 decision 4 exists to keep working.
+	if refreshToken.AuthStateGeneration != tokenUser.AuthStateGeneration {
+		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			invalidGenerationMessage, http.StatusBadRequest)
 	}
 
 	// An ROPC token issued before migration 000051 records no authentication instant, so no

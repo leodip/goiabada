@@ -551,9 +551,12 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
-	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	assert.True(t, ok)
+	// Still named plainly, unlike a disabled user's code or refresh token (#137): this caller
+	// has just proved the password. The type is what the handler writes AuditUserDisabled from.
+	var disabled *UserDisabledError
+	require.ErrorAs(t, err, &disabled)
+	var customErr *customerrors.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_grant", customErr.GetCode())
 	assert.Equal(t, "The user account is disabled.", customErr.GetDescription())
 	assert.Equal(t, 400, customErr.GetHttpStatusCode())
