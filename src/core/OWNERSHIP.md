@@ -402,6 +402,7 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `Jwk` | both-apps | — |
 | `core/oauth` | `Jwks` | both-apps | — |
 | `core/oauth` | `JwtToken` | both-apps | — |
+| `core/oauth` | `SplitSpaceDelimited` | kernel | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
 | `core/sessionstore` | `Backend` | kernel | — |
 | `core/sessionstore` | `BrowserSessionCookie` | reachable | — |

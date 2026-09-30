@@ -57,7 +57,7 @@ func TestToken_UpdatedAt_RidesWithTheProfileScope(t *testing.T) {
 					"client_id":     {code.Client.ClientIdentifier},
 					"code":          {code.Code},
 					"redirect_uri":  {code.RedirectURI},
-					"code_verifier": {"code-verifier"},
+					"code_verifier": {testCodeVerifier},
 					"client_secret": {clientSecret},
 				})
 

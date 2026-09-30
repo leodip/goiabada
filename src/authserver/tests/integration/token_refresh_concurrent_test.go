@@ -70,7 +70,7 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	})
 	require.NotNil(t, data["refresh_token"], "the authorization code exchange must return a refresh token")

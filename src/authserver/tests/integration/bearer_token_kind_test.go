@@ -278,7 +278,7 @@ func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
 			"&redirect_uri=" + url.QueryEscape(code.RedirectURI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
-			"&code_challenge=" + oauth.GeneratePKCECodeChallenge("code-verifier") +
+			"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
 			"&scope=openid" +
 			"&state=" + fake.LetterN(8) +
 			"&prompt=none" +

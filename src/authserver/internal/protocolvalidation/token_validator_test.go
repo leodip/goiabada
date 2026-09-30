@@ -554,7 +554,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 				Scope:         "openid",
 				CreatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
 				Revoked:       true,
-				CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("the_correct_verifier_long_enough_x"), Valid: true},
+				CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 				Client:        *client,
 				User:          models.User{Id: 7, Enabled: true},
 			}
@@ -569,7 +569,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 				ClientId:     "test_client",
 				Code:         "the-code",
 				RedirectURI:  "https://example.com/cb",
-				CodeVerifier: "the_wrong_verifier_long_enough_yyy",
+				CodeVerifier: wrongCodeVerifier,
 			})
 
 			assert.Nil(t, result)

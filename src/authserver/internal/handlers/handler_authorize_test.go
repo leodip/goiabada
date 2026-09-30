@@ -1923,9 +1923,20 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			redirectURI:  "http://127.0.0.1:49152/cb",
 			responseType: "code code",
 			want:         false,
-			why: "read off the token sequence rather than off ParseResponseType, which collapses duplicates and " +
-				"ignores unrecognised values, so \"code code\" and \"code foo\" are HasCode && !HasToken && " +
-				"!HasIdToken and must not buy an arbitrary port. The same reasoning as the validator's own gate",
+			why: "IsCodeOnly is true for the exact type \"code\" and for nothing that merely contains it: the " +
+				"parser reports \"code code\" as repeated and \"code foo\" as unrecognised (#244), so neither " +
+				"buys an arbitrary port. The same reasoning as the validator's own gate",
+		},
+		{
+			name: "an unrecognised token beside code buys no loopback port",
+			database: func(t *testing.T) *mocks_data.Database {
+				return registeredDatabase(t, "http://127.0.0.1/cb")
+			},
+			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			redirectURI:  "http://127.0.0.1:49152/cb",
+			responseType: "code foo",
+			want:         false,
+			why:          "the unrecognised word is what refuses it, since the same row with the word removed is the code flow",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2010,9 +2021,9 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 			name:         "a duplicated code token does not",
 			responseType: "code code",
 			wantLocation: "",
-			why: "the gate reads the token sequence rather than ParseResponseType's booleans, and this row " +
+			why: "the gate is ParseResponseType's IsCodeOnly, which reports the duplicate (#244), and this row " +
 				"proves the emitter hands over the raw string rather than a re-derived boolean that would " +
-				"collapse the duplicate",
+				"collapse it",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

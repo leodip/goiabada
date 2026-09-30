@@ -114,7 +114,7 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
-	const codeVerifier = "code-verifier-second-client"
+	const codeVerifier = testCodeVerifier + "-second-client"
 	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code&code_challenge_method=S256" +
@@ -147,7 +147,7 @@ func TestToken_Refresh_Replay_ContainsFamily(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
-		code.Code, code.RedirectURI, "code-verifier")
+		code.Code, code.RedirectURI, testCodeVerifier)
 
 	// A legitimate rotation: rt1 retires, rt2 is live.
 	rt2 := rotateRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
@@ -190,9 +190,9 @@ func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
 		"the fixture is only meaningful if both codes share one browser session")
 
 	rtA1 := exchangeAuthCode(t, httpClient, codeA.Client.ClientIdentifier, secretA,
-		codeA.Code, codeA.RedirectURI, "code-verifier")
+		codeA.Code, codeA.RedirectURI, testCodeVerifier)
 	rtB1 := exchangeAuthCode(t, httpClient, clientB.ClientIdentifier, secretB,
-		rawCodeB, redirectB, "code-verifier-second-client")
+		rawCodeB, redirectB, testCodeVerifier+"-second-client")
 
 	rtA2 := rotateRefreshToken(t, httpClient, codeA.Client.ClientIdentifier, secretA, rtA1)
 
@@ -274,7 +274,7 @@ func TestToken_Refresh_Replay_RepeatIsANoOp(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
-		code.Code, code.RedirectURI, "code-verifier")
+		code.Code, code.RedirectURI, testCodeVerifier)
 	rt2 := rotateRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
 
 	// First replay: this is the one that contains the family.

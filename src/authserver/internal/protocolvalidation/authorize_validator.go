@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // authorizeValidatorDatabase is what the authorize request validator needs: the client and its
@@ -63,9 +64,13 @@ func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValida
 	}
 }
 
-// ValidateScopes validates the scope of an authorization request, as HandleAuthorizeGet stores it:
-// AuthContext.SetScope has already dropped duplicates and collapsed whitespace, so the bound below
-// counts the value that is saved in the consent, the code and the refresh token (#437).
+// ValidateScopes validates the scope of an authorization request, as the client asked for it,
+// normalized: duplicates dropped and whitespace collapsed (oidc.NormalizeScope), which is what
+// AuthContext.SetScope stores. What is stored can only be shorter, when the response type does not
+// honour offline_access (ResponseTypeInfo.ScopeHonoured), so the bound below still counts at least
+// the value that is saved in the consent, the code and the refresh token (#437). It validates the
+// request rather than the stored value so that a request for offline_access alone is refused for
+// what it is on every response type, and not called missing where the response type emptied it.
 func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
 
 	scopes := oidc.SplitScope(scope)
@@ -81,6 +86,17 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 	// here and refused as a 500 after the user had signed in (#437).
 	if err := scopeBound.check(scope); err != nil {
 		return err
+	}
+
+	// offline_access asks for a refresh token to outlive the session, and asks for nothing else: on
+	// its own the request names no resource and no claim, and an access token cannot be signed
+	// without an audience. Accepted, it was granted here and the code exchange then answered 500
+	// after it had claimed the code (#244). It is refused as an invalid scope, which RFC 6749
+	// 4.1.2.1 names for a scope that is "invalid, unknown, or malformed".
+	if !slices.ContainsFunc(scopes, func(s string) bool { return !oidc.IsOfflineAccessScope(s) }) {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			"The 'scope' parameter holds only 'offline_access', which grants nothing by itself. Include at least one other scope, such as 'openid' or a resource:permission scope.",
+			http.StatusBadRequest)
 	}
 
 	for _, scopeStr := range scopes {
@@ -162,15 +178,12 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	// arbitrary loopback ports for implicit responses, which carry tokens directly in the
 	// fragment where PKCE cannot mitigate interception.
 	//
-	// Tested on the token sequence rather than on rtInfo's booleans: ParseResponseType
-	// ignores unrecognised values and collapses duplicates, so HasCode && !HasToken &&
-	// !HasIdToken is also true for "code foo" and "code code". And not as
-	// !rtInfo.IsImplicitFlow(), because response_type is not validated until
-	// ValidateRequest, which runs after this check, so that negative test is true for
-	// "code token" and for garbage such as "foo". This check is what scopes loopback port
-	// flexibility to the authorization code flow (#41).
-	responseTypes := strings.Fields(input.ResponseType)
-	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
+	// Read as IsCodeOnly rather than as !rtInfo.IsImplicitFlow(), because response_type is not
+	// validated until ValidateRequest, which runs after this check, so that negative test is true
+	// for "code token" and for garbage such as "foo". IsCodeOnly is true for the exact type "code"
+	// alone, which is what scopes loopback port flexibility to the authorization code flow
+	// (#41, #244).
+	allowLoopbackPortFlexibility := rtInfo.IsCodeOnly()
 
 	if len(input.RedirectURI) == 0 {
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURIMissing, nil)
@@ -273,7 +286,7 @@ func SupportedResponseTypes() []string {
 func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
 
 	// Check for empty/missing response_type first
-	if strings.TrimSpace(input.ResponseType) == "" {
+	if len(oauth.SplitSpaceDelimited(input.ResponseType)) == 0 {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"The response_type parameter is missing.", http.StatusBadRequest)
 	}
@@ -305,6 +318,15 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		validResponseType = rtInfo.HasToken && rtInfo.HasIdToken && !rtInfo.HasCode
 	}
 
+	// A value the parser did not recognise, or one it saw twice, makes the request unsupported
+	// however many recognised types remain: RFC 6749 3.1.1 makes response_type a list of values
+	// and 3.1.2.4 answers one the server does not support with unsupported_response_type. The
+	// count above counted "code foo" and "code code" as the single type they collapse to, and
+	// accepted both as "code" (#244).
+	if rtInfo.Unrecognised || rtInfo.Repeated {
+		validResponseType = false
+	}
+
 	if !validResponseType {
 		return customerrors.NewErrorDetailWithHttpStatusCode("unsupported_response_type",
 			"The authorization server does not support this response_type. Supported values: "+
@@ -321,15 +343,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	// OIDC: id_token requires openid scope
 	if rtInfo.HasIdToken {
-		scopes := strings.Fields(input.Scope)
-		hasOpenid := false
-		for _, s := range scopes {
-			if s == "openid" {
-				hasOpenid = true
-				break
-			}
-		}
-		if !hasOpenid {
+		if !slices.Contains(oidc.SplitScope(input.Scope), "openid") {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 				"The 'openid' scope is required when requesting an id_token.",
 				http.StatusBadRequest)
@@ -368,10 +382,13 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 					"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
 			}
 
-			if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+			if !hasPKCELength(input.CodeChallenge) {
 				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 					"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
 					http.StatusBadRequest)
+			}
+			if !isPKCECharset(input.CodeChallenge) {
+				return codeChallengeCharsetRefusal()
 			}
 		} else if pkceProvided {
 			// PKCE is optional but was provided - validate format (strict mode)
@@ -380,10 +397,13 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 					"Invalid code_challenge_method. Only 'S256' is supported.", http.StatusBadRequest)
 			}
 
-			if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+			if !hasPKCELength(input.CodeChallenge) {
 				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 					"The code_challenge parameter is incorrect. It should be 43 to 128 characters long.",
 					http.StatusBadRequest)
+			}
+			if !isPKCECharset(input.CodeChallenge) {
+				return codeChallengeCharsetRefusal()
 			}
 		}
 		// If PKCE is not required and not provided, that's fine - skip validation
@@ -427,9 +447,15 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 // or an error if the prompt value is invalid or contains conflicting values.
 //
 // Per OIDC Core 1.0 Section 3.1.2.1:
-// - Valid values: none, login, consent, select_account (select_account not implemented)
+// - Values the specification defines: none, login, consent, select_account
 // - prompt=none cannot be combined with other values
 // - Other values can be combined (e.g., "login consent")
+//
+// select_account is a known value this server cannot honour, as it has no way to ask an end user to
+// pick one of several accounts. It is answered account_selection_required, the code OIDC Core
+// 3.1.2.6 names for "the End-User is REQUIRED to select a session at the Authorization Server",
+// rather than invalid_request, which said the value was not one: the request is well formed and the
+// server is what cannot serve it. discovery's prompt_values_supported does not list it (#244).
 func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
 	// Empty or whitespace-only prompt is valid (treated as absent)
 	trimmed := strings.TrimSpace(prompt)
@@ -445,10 +471,10 @@ func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
 
 	// Validate each value
 	validValues := map[string]bool{
-		"none":    true,
-		"login":   true,
-		"consent": true,
-		// "select_account" is not implemented in this phase
+		"none":           true,
+		"login":          true,
+		"consent":        true,
+		"select_account": true,
 	}
 
 	hasNone := false
@@ -468,6 +494,14 @@ func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
 			"prompt=none cannot be combined with other values", http.StatusBadRequest)
 	}
 
+	// After the two refusals above, so that "none select_account" is still the combination error
+	// and an unknown value still names itself.
+	if slices.Contains(values, "select_account") {
+		return "", customerrors.NewErrorDetailWithHttpStatusCode("account_selection_required",
+			"prompt=select_account is not supported: the authorization server cannot ask the end user to select an account.",
+			http.StatusBadRequest)
+	}
+
 	// Return normalized string (single-space-delimited)
 	return strings.Join(values, " "), nil
 }
@@ -475,8 +509,9 @@ func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
 // parsePromptValues parses a prompt string into individual values.
 // It handles multiple spaces and deduplicates values while preserving order.
 func parsePromptValues(prompt string) []string {
-	// strings.Fields handles multiple spaces and trims
-	fields := strings.Fields(prompt)
+	// The one splitter every space-delimited parameter reads through, so this and the handler's
+	// silence test read a prompt the same way (#244).
+	fields := oauth.SplitSpaceDelimited(prompt)
 
 	// Deduplicate while preserving order
 	seen := make(map[string]bool)

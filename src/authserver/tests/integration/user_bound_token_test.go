@@ -313,7 +313,7 @@ func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
 		"client_secret": {clientSecret},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	})
 
 	refreshToken, ok := data["refresh_token"].(string)

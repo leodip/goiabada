@@ -321,7 +321,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	}
 
 	httpClient := createHttpClient(t)
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
@@ -368,7 +368,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now use prompt=none with proper PKCE
-	codeVerifier2 := "code-verifier-two"
+	codeVerifier2 := testCodeVerifier + "-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := "test-nonce-" + fake.LetterN(16)
@@ -476,7 +476,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	// First login
-	codeVerifier1 := "code-verifier-one"
+	codeVerifier1 := testCodeVerifier + "-one"
 	codeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
@@ -537,7 +537,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	sub1 := claims1["sub"].(string)
 
 	// prompt=none to get token2
-	codeVerifier2 := "code-verifier-two"
+	codeVerifier2 := testCodeVerifier + "-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
@@ -633,7 +633,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 
 	httpClient := createHttpClient(t)
 
-	codeVerifier1 := "code-verifier-one"
+	codeVerifier1 := testCodeVerifier + "-one"
 	codeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
@@ -696,7 +696,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	// Wait to ensure different timestamp
 	time.Sleep(200 * time.Millisecond)
 
-	codeVerifier2 := "code-verifier-two"
+	codeVerifier2 := testCodeVerifier + "-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
@@ -793,7 +793,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	// Create session
-	codeVerifierSession := "session-code-verifier"
+	codeVerifierSession := testCodeVerifier + "-session"
 	codeChallengeSession := oauth.GeneratePKCECodeChallenge(codeVerifierSession)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
@@ -839,7 +839,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// prompt=none with PKCE
-	correctVerifier := "correct-verifier"
+	correctVerifier := testCodeVerifier + "-correct"
 	correctChallenge := oauth.GeneratePKCECodeChallenge(correctVerifier)
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
@@ -874,7 +874,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		"client_secret": {clientSecret},
 		"code":          {codeVal},
 		"redirect_uri":  {redirectUri.URI},
-		"code_verifier": {"wrong-verifier-value"},
+		"code_verifier": {testCodeVerifier + "-wrong"},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
@@ -953,7 +953,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	}
 
 	httpClient := createHttpClient(t)
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
@@ -1010,7 +1010,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now use prompt=none with offline_access
-	codeVerifier2 := "code-verifier-two"
+	codeVerifier2 := testCodeVerifier + "-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
@@ -1131,7 +1131,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	}
 
 	httpClient := createHttpClient(t)
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 
@@ -1177,7 +1177,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now use prompt=none with a specific nonce
-	codeVerifier2 := "code-verifier-two"
+	codeVerifier2 := testCodeVerifier + "-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 	testNonce := "test-nonce-" + fake.LetterN(16)
@@ -1278,7 +1278,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	}
 
 	httpClient := createHttpClient(t)
-	codeVerifier := "initial-code-verifier"
+	codeVerifier := testCodeVerifier + "-initial"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 
@@ -1324,7 +1324,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	_, _ = getCodeAndStateFromUrl(t, resp)
 
 	// Now use prompt=none with a NEW PKCE code_challenge/verifier pair
-	pkceVerifier := "pkce-verifier-for-prompt-none-test"
+	pkceVerifier := testCodeVerifier + "-prompt-none"
 	pkceChallenge := oauth.GeneratePKCECodeChallenge(pkceVerifier)
 	requestState2 := fake.LetterN(8)
 

@@ -71,7 +71,7 @@ func redeemCode(t *testing.T, httpClient *http.Client, code *models.Code, client
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}
 	if clientSecret != "" {
 		form.Set("client_secret", clientSecret)

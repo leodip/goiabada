@@ -553,7 +553,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		}
 	}
 
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
@@ -698,7 +698,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		}
 	}
 
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)

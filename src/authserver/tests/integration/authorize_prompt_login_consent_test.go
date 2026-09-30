@@ -664,7 +664,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	}
 
 	httpClient := createHttpClient(t)
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 
@@ -730,7 +730,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	time.Sleep(1100 * time.Millisecond)
 
 	// Re-authenticate with prompt=login at T2
-	codeVerifier2 := "code-verifier-two"
+	codeVerifier2 := testCodeVerifier + "-two"
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 

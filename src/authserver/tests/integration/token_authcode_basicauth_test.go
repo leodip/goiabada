@@ -24,7 +24,7 @@ func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
 		"grant_type":    {"authorization_code"},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}
 
 	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
@@ -51,7 +51,7 @@ func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
 		"grant_type":    {"authorization_code"},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}
 
 	// Use wrong secret in Basic auth
@@ -74,7 +74,7 @@ func TestToken_AuthCode_ClientSecretBasic_BothMethodsProvided(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret}, // Also in form body
 	}
 

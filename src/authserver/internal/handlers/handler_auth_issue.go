@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -309,11 +308,9 @@ type issuanceFacts struct {
 //     harm the check exists to prevent. A missing client has no registrations at all, so the
 //     question is answered rather than errored. Loopback port flexibility is the caller's gate to
 //     compute, per urlutil's package contract (#41), and this is
-//     validator.ValidateClientAndRedirectURI's own test applied to the stored response type, read
-//     off the token sequence rather than off ParseResponseType's booleans for the reason stated
-//     there: the parser ignores unrecognised values and collapses duplicates, so "code code" and
-//     "code foo" are true for HasCode && !HasToken && !HasIdToken and must not buy an arbitrary
-//     loopback port.
+//     validator.ValidateClientAndRedirectURI's own test applied to the stored response type:
+//     IsCodeOnly, true for the exact type "code", so "code code" and "code foo", which a ceremony
+//     stored before #244 can hold, do not buy an arbitrary loopback port.
 //  2. An id_token_hint names the ceremony's user. OIDC Core 3.1.2.2: "The Authorization Server MUST
 //     NOT reply with an ID Token or Access Token for a different user, even if they have an active
 //     session with the Authorization Server." A user who no longer exists is not the hint's either.
@@ -352,8 +349,7 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	if !f.registrationLoaded {
 		return issuanceAnswer{}, issuanceFactRegistration
 	}
-	responseTypes := strings.Fields(f.responseType)
-	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
+	allowLoopbackPortFlexibility := protocolvalidation.ParseResponseType(f.responseType).IsCodeOnly()
 	if !urlutil.RedirectURIIsRegistered(f.registeredRedirectURIs, f.redirectURI, allowLoopbackPortFlexibility) {
 		return decided(issuanceRefuseUnregisteredRedirect)
 	}

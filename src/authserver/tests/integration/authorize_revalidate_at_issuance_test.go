@@ -170,7 +170,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 // only the idle timeout refuses. Before #241 this yielded a usable code, the access token worked,
 // and the first refresh answered invalid_grant.
 func TestSessionExpiredOnConsentScreen_NoCodeIsIssued(t *testing.T) {
-	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), "code-verifier", nil)
+	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), testCodeVerifier, nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, parked.user.Id)
@@ -225,7 +225,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 
 	clientSecret := fake.LetterN(32)
 	parked := parkOnConsentScreen(t, "openid profile "+readScope+" "+writeScope,
-		clientSecret, "code-verifier", []string{readScope, writeScope})
+		clientSecret, testCodeVerifier, []string{readScope, writeScope})
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})
@@ -260,7 +260,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 			"grant_type":    {"authorization_code"},
 			"code":          {codeVal},
 			"redirect_uri":  {parked.redirectURI.URI},
-			"code_verifier": {"code-verifier"},
+			"code_verifier": {testCodeVerifier},
 			"client_id":     {parked.client.ClientIdentifier},
 			"client_secret": {clientSecret},
 		})
@@ -290,7 +290,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 // redirect would be as wrong as a code (RFC 9700 section 4.11.2). The refusal is therefore
 // rendered locally, on the page the error emitter already withholds a redirect through.
 func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
-	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), "code-verifier", nil)
+	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), testCodeVerifier, nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})
@@ -354,7 +354,7 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 // The two cases together are the property: whatever a ceremony in progress has to say to a client,
 // it says nothing at all to a callback the client no longer has.
 func TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither(t *testing.T) {
-	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), "code-verifier", nil)
+	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), testCodeVerifier, nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	// The window opens before the submission here rather than after it, because this refusal is
@@ -408,7 +408,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 
 	clientSecret := fake.LetterN(32)
 	parked := parkOnConsentScreen(t, "openid profile "+readScope+" "+writeScope,
-		clientSecret, "code-verifier", []string{readScope, writeScope})
+		clientSecret, testCodeVerifier, []string{readScope, writeScope})
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	// The window: the consent screen is rendered and on it, with both boxes offered, and the
@@ -442,7 +442,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 			"grant_type":    {"authorization_code"},
 			"code":          {codeVal},
 			"redirect_uri":  {parked.redirectURI.URI},
-			"code_verifier": {"code-verifier"},
+			"code_verifier": {testCodeVerifier},
 			"client_id":     {parked.client.ClientIdentifier},
 			"client_secret": {clientSecret},
 		})

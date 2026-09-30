@@ -204,7 +204,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "invalid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -245,7 +245,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/wrong_callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -289,7 +289,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -338,7 +338,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -353,7 +353,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		codeEntity := &models.Code{
 			CodeHash:      "hash_of_valid_code",
 			RedirectURI:   "https://example.com/callback",
-			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("code_verifier"), Valid: true},
+			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 			Client: models.Client{
 				ClientIdentifier: "client1",
 			},
@@ -396,7 +396,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -411,7 +411,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		codeEntity := &models.Code{
 			CodeHash:      "hash_of_valid_code",
 			RedirectURI:   "https://example.com/callback",
-			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("code_verifier"), Valid: true},
+			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 			Client: models.Client{
 				ClientIdentifier: "client1",
 			},
@@ -455,7 +455,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "invalid_code_verifier",
+			CodeVerifier: wrongCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -512,7 +512,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "non_public_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 			// ClientSecret is intentionally left empty
 		}
 
@@ -572,7 +572,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "confidential_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 			ClientSecret: "incorrect_secret",
 		}
 
@@ -638,7 +638,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "public_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 			ClientSecret: "unnecessary_secret", // Public client shouldn't provide this
 		}
 
@@ -698,7 +698,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:     "valid_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "valid_code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -721,7 +721,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				Time:  time.Now().UTC().Add(-30 * time.Second), // Code created 30 seconds ago
 				Valid: true,
 			},
-			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("valid_code_verifier"), Valid: true},
+			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil).Once()
@@ -747,7 +747,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		settings := &models.Settings{}
 		ctx := context.Background()
 
-		codeVerifier := "valid_code_verifier_for_public_client"
+		codeVerifier := testCodeVerifier
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
 			ClientId:     "public_client",
@@ -829,9 +829,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			SessionIdentifier: "session-abc",
 		}
 		if withPKCE {
-			// SHA256 of "code_verifier" base64url-encoded.
+			// SHA256 of testCodeVerifier base64url-encoded.
 			c.CodeChallenge = sql.NullString{
-				String: oauth.GeneratePKCECodeChallenge("code_verifier"),
+				String: oauth.GeneratePKCECodeChallenge(testCodeVerifier),
 				Valid:  true,
 			}
 		}
@@ -853,7 +853,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -950,7 +950,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		client := &models.Client{
@@ -1013,7 +1013,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			ClientId:     "attacker_client",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		codeEntity := reusedCodeFixture(victimClient, true)
@@ -1057,7 +1057,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://attacker.example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		codeEntity := reusedCodeFixture(client, true)
@@ -1195,7 +1195,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "wrong_verifier",
+			CodeVerifier: wrongCodeVerifier,
 		}
 
 		codeEntity := reusedCodeFixture(client, true)
@@ -1239,7 +1239,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			ClientId:     "client1",
 			Code:         "totally_unknown_code",
 			RedirectURI:  "https://example.com/callback",
-			CodeVerifier: "code_verifier",
+			CodeVerifier: testCodeVerifier,
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
@@ -2072,8 +2072,8 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		// than the strict-mode rejection of an unexpected one, and it must not reach the
 		// registration read. Again: no ClientLoadRedirectURIs expectation, deliberately.
 		validator, input, settings := setup(t, "https://example.com/callback",
-			nil, nil, oauth.GeneratePKCECodeChallenge("the_right_verifier"))
-		input.CodeVerifier = "the_wrong_verifier"
+			nil, nil, oauth.GeneratePKCECodeChallenge(testCodeVerifier))
+		input.CodeVerifier = wrongCodeVerifier
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 

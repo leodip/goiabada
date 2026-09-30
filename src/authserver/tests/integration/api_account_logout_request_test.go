@@ -37,7 +37,7 @@ func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, strin
 		"client_secret": {clientSecret},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
 	accessToken, ok := data["access_token"].(string)
@@ -296,7 +296,7 @@ func logoutWithHint(t *testing.T, grant *offlineGrant, idToken string) {
 func sessionBoundGrantOnSameSession(t *testing.T, grant *offlineGrant) (string, string) {
 	t.Helper()
 
-	const codeVerifier = "code-verifier-logout"
+	const codeVerifier = testCodeVerifier + "-logout"
 	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	exchanged := grant.exchange(t, grant.codeFromSameSession(t, scope, codeVerifier), codeVerifier)
 

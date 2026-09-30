@@ -21,6 +21,11 @@
 // and the tier refuses a new symbol here that neither application names (#385). JwtInfo
 // went the same way in #424, to adminconsole/internal/oauthclient, once the auth
 // server's one method returning it was found to have no caller.
+//
+// SplitSpaceDelimited is the grammar of the five space-delimited request parameters. It is
+// here because core/i18n reads ui_locales through it in a middleware both processes mount,
+// and the auth server reads scope, response_type, prompt and acr_values through it, so
+// neither side can hold the rule alone (#244).
 package oauth
 
 import (

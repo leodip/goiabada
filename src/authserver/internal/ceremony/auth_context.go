@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // AuthState is one state of the authorization ceremony's machine: the value AuthContext.AuthState
@@ -393,13 +394,14 @@ func (ac *AuthContext) OwnsSession(userSession *models.UserSession) bool {
 }
 
 // parseAcrValuesFromAuthorizeRequest reads acr_values, which OIDC Core 1.0 section 3.1.2.1 defines
-// as a space-separated string, through oidc.SplitScope, the one splitter for the space-delimited
-// parameters, keeping each recognised level once in request order. SplitScope also trims each value
-// with strings.TrimSpace, so a value padded with Unicode whitespace is recognised; that can only
-// raise the target, because computeTargetAcrLevel floors it at the client's default (#436).
+// as a space-separated string, through oauth.SplitSpaceDelimited, the one splitter for the
+// space-delimited parameters, keeping each recognised level once in request order. The splitter
+// also trims each value with strings.TrimSpace, so a value padded with Unicode whitespace is
+// recognised; that can only raise the target, because computeTargetAcrLevel floors it at the
+// client's default (#436).
 func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []models.AcrLevel {
 	arr := []models.AcrLevel{}
-	for _, v := range oidc.SplitScope(ac.AcrValuesFromAuthorizeRequest) {
+	for _, v := range oauth.SplitSpaceDelimited(ac.AcrValuesFromAuthorizeRequest) {
 		acr, err := models.AcrLevelFromString(v)
 		if err == nil && !slices.Contains(arr, acr) {
 			arr = append(arr, acr)
@@ -461,13 +463,5 @@ func (ac *AuthContext) InState(accepted ...AuthState) bool {
 // HasPromptValue checks if a specific prompt value was requested.
 // The Prompt field contains normalized, space-delimited prompt values.
 func (ac *AuthContext) HasPromptValue(value string) bool {
-	if ac.Prompt == "" {
-		return false
-	}
-	for _, v := range strings.Fields(ac.Prompt) {
-		if v == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(oauth.SplitSpaceDelimited(ac.Prompt), value)
 }

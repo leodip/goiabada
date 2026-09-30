@@ -140,12 +140,23 @@ func TestDecideIssuance(t *testing.T) {
 			wantReads: []issuanceFact{registration, session, validity, user, scope},
 		},
 		{
-			// The token sequence, not ParseResponseType's collapsed booleans.
+			// IsCodeOnly: the parser reports the repeated token (#244). A ceremony stored before
+			// ValidateRequest refused "code code" can still hold it, and must not buy the port.
 			name: "a repeated code token buys no loopback port",
 			world: with(func(w *issuanceWorld) {
 				w.registered = []string{"http://127.0.0.1/callback"}
 				w.redirectURI = "http://127.0.0.1:5555/callback"
 				w.responseType = "code code"
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnregisteredRedirect},
+			wantReads: []issuanceFact{registration},
+		},
+		{
+			name: "an unrecognised token beside code buys no loopback port",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"http://127.0.0.1/callback"}
+				w.redirectURI = "http://127.0.0.1:5555/callback"
+				w.responseType = "code foo"
 			}),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnregisteredRedirect},
 			wantReads: []issuanceFact{registration},

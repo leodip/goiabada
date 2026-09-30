@@ -223,7 +223,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 		"client_secret": {clientSecret},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"invalid_code_verifier"}, // Using an invalid code verifier
+		"code_verifier": {testCodeVerifier + "-invalid"}, // Using an invalid code verifier
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -243,7 +243,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -274,7 +274,7 @@ func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -306,7 +306,7 @@ func TestToken_AuthCode_CodeReuse_RevokesRefreshToken(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -345,7 +345,7 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -402,7 +402,7 @@ func TestToken_Refresh_TabSeparatedDownScopeIsNormalized(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	})
 

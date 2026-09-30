@@ -47,7 +47,7 @@ func userTokenResponseWithScope(t *testing.T, scope string, beforeExchange func(
 		"client_secret": {clientSecret},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
 	return data, code, httpClient, clientSecret
