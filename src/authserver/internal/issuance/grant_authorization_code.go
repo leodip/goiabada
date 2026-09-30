@@ -63,10 +63,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 		return nil, err
 	}
 
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if code.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
-	}
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &code.Client)
 
 	var tokenResponse = oauth.TokenResponse{
 		TokenType: TokenTypeBearer.String(),

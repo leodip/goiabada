@@ -32,6 +32,8 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 		scope          string
 		expectedScopes []string
 		expectedAud    interface{}
+		// The lifetime the token must carry: the setting's 3600 unless the client overrides it.
+		expectedLifetime int
 	}{
 		{
 			name: "Single custom scope",
@@ -39,9 +41,10 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 				Id:               1,
 				ClientIdentifier: "test-client-1",
 			},
-			scope:          "resource1:read",
-			expectedScopes: []string{"resource1:read"},
-			expectedAud:    "resource1",
+			scope:            "resource1:read",
+			expectedScopes:   []string{"resource1:read"},
+			expectedAud:      "resource1",
+			expectedLifetime: 3600,
 		},
 		{
 			name: "Multiple custom scopes",
@@ -49,9 +52,10 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 				Id:               2,
 				ClientIdentifier: "test-client-2",
 			},
-			scope:          "resource1:read resource2:write",
-			expectedScopes: []string{"resource1:read", "resource2:write"},
-			expectedAud:    []interface{}{"resource1", "resource2"},
+			scope:            "resource1:read resource2:write",
+			expectedScopes:   []string{"resource1:read", "resource2:write"},
+			expectedAud:      []interface{}{"resource1", "resource2"},
+			expectedLifetime: 3600,
 		},
 		{
 			name: "Custom scopes with OIDC scopes (should be ignored)",
@@ -59,9 +63,24 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 				Id:               3,
 				ClientIdentifier: "test-client-3",
 			},
-			scope:          "resource1:read openid profile",
-			expectedScopes: []string{"resource1:read"},
-			expectedAud:    "resource1",
+			scope:            "resource1:read openid profile",
+			expectedScopes:   []string{"resource1:read"},
+			expectedAud:      "resource1",
+			expectedLifetime: 3600,
+		},
+		{
+			// The client's override wins over the setting for both expires_in and exp, as it does
+			// for every other grant (#437 decision 11).
+			name: "Client lifetime override",
+			client: &models.Client{
+				Id:                       5,
+				ClientIdentifier:         "test-client-5",
+				TokenExpirationInSeconds: 900,
+			},
+			scope:            "resource1:read",
+			expectedScopes:   []string{"resource1:read"},
+			expectedAud:      "resource1",
+			expectedLifetime: 900,
 		},
 	}
 
@@ -77,7 +96,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, response)
 			assert.Equal(t, "Bearer", response.TokenType)
-			assert.Equal(t, int64(3600), response.ExpiresIn)
+			assert.Equal(t, int64(tt.expectedLifetime), response.ExpiresIn)
 			assert.NotEmpty(t, response.AccessToken)
 			assert.Empty(t, response.IdToken)
 			assert.Empty(t, response.RefreshToken)
@@ -93,7 +112,8 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 
 			assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
 			assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-			assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
+			assertTimeClaimWithinRange(t, claims, "exp", time.Duration(tt.expectedLifetime)*time.Second,
+				"exp should be the expected lifetime from now")
 
 			_, err = uuidutil.Parse(claims["jti"].(string))
 			assert.NoError(t, err)

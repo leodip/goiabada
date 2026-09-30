@@ -40,10 +40,7 @@ type ImplicitGrantResponse struct {
 func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings,
 	input *ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*ImplicitGrantResponse, error) {
 
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
 	response := &ImplicitGrantResponse{
 		TokenType: TokenTypeBearer.String(),

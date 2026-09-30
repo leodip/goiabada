@@ -48,10 +48,7 @@ type ROPCGrantInput struct {
 func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.Settings,
 	input *ROPCGrantInput) (*oauth.TokenResponse, error) {
 
-	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
-	if input.Client.TokenExpirationInSeconds > 0 {
-		tokenExpirationInSeconds = input.Client.TokenExpirationInSeconds
-	}
+	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
 	response := &oauth.TokenResponse{
 		TokenType: TokenTypeBearer.String(),

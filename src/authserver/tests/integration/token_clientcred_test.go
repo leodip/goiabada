@@ -683,3 +683,71 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 		"Invalid scope format: 'emoji?scope'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.",
 		data["error_description"])
 }
+
+// TestToken_ClientCred_TokenLifetime proves the client credentials access token lives as long as
+// every other grant's: the client's own lifetime when it sets one, else the server's, in both
+// expires_in and the token's exp. It used to read the server's setting alone (#437 decision 11).
+// The rule's branches are owned by TestTokenLifetimeSeconds in internal/issuance; this shows one
+// of each on the wire.
+func TestToken_ClientCred_TokenLifetime(t *testing.T) {
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	assert.NoError(t, err)
+	serverLifetime := settings.TokenExpirationInSeconds
+
+	tests := []struct {
+		name             string
+		clientLifetime   int
+		expectedLifetime int
+	}{
+		// Differs from the server's by construction, so a token carrying the server's fails.
+		{name: "client override", clientLifetime: serverLifetime + 1234, expectedLifetime: serverLifetime + 1234},
+		{name: "no override inherits the server's", clientLifetime: 0, expectedLifetime: serverLifetime},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientSecret := fake.Password(32)
+			clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
+			assert.NoError(t, err)
+
+			resource := createResourceWithId(t, "lifetime-svc-"+fake.LetterN(8))
+			permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+
+			client := &models.Client{
+				ClientIdentifier:         "test-client-" + fake.LetterN(8),
+				Enabled:                  true,
+				ClientCredentialsEnabled: true,
+				DefaultAcrLevel:          models.AcrLevel2Optional,
+				IsPublic:                 false,
+				ClientSecretEncrypted:    clientSecretEncrypted,
+				TokenExpirationInSeconds: tt.clientLifetime,
+			}
+			err = database.CreateClient(context.Background(), nil, client)
+			assert.NoError(t, err)
+			err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
+				ClientId:     client.Id,
+				PermissionId: permission.Id,
+			})
+			assert.NoError(t, err)
+
+			httpClient := createHttpClient(t)
+			formData := url.Values{
+				"grant_type": {"client_credentials"},
+			}
+			data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, clientSecret)
+
+			assert.Equal(t, float64(tt.expectedLifetime), data["expires_in"])
+
+			accessToken, ok := data["access_token"].(string)
+			if !assert.True(t, ok, "access_token should be a string") {
+				return
+			}
+			claims := decodeJWTPayload(t, accessToken)
+			iat, _ := claims["iat"].(float64)
+			exp, _ := claims["exp"].(float64)
+			assert.Equal(t, float64(tt.expectedLifetime), exp-iat, "exp - iat should be the token's lifetime")
+		})
+	}
+}
