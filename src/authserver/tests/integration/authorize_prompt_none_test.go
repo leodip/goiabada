@@ -331,14 +331,14 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 // =============================================================================
 
 // walkDCRClientToConsentScreen registers a client through /connect/register, creates a user, and
-// drives the interactive flow until it stops. It returns the client, its redirect URI, the user,
-// and the http client holding the resulting session.
+// drives the interactive flow until it stops. It returns the http client holding the resulting
+// session, the client, its redirect URI, the user, and the URL of the consent screen it stopped at.
 //
 // Where the flow stops is itself the security property this issue exists for: a self-registered
 // client reaches /auth/consent, never /auth/issue. Seam 4 owns that as a claim about the rendered
 // page; here it is a precondition, asserted so a regression shows up as this helper failing
 // rather than as a confusing prompt=none result further down.
-func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
+func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client, *models.Client, *models.RedirectURI, *models.User, string) {
 	t.Helper()
 
 	client := registerDCRClient(t, clientName, "https://dcr-app.example.com/callback")
@@ -410,9 +410,9 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_ = assertRedirect(t, resp, "/auth/consent")
+	consentLocation := assertRedirect(t, resp, "/auth/consent")
 
-	return httpClient, client, redirectUri, user
+	return httpClient, client, redirectUri, user, consentLocation
 }
 
 // TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld is where the flip and decision 15 meet, and
@@ -431,7 +431,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 	enableDCR(t)
 
-	httpClient, client, redirectUri, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
+	httpClient, client, redirectUri, _, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
 	// The session exists and is valid; the only thing missing is a consent row.
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -459,7 +459,7 @@ func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	enableDCR(t)
 
-	httpClient, client, redirectUri, user := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
+	httpClient, client, redirectUri, user, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
 	consent := &models.UserConsent{
 		UserId:    user.Id,

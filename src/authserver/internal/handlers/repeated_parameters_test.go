@@ -232,7 +232,7 @@ func TestHandleAuthorizeGet_ADifferingRequestParameterIsInvalidRequest(t *testin
 
 		rr := e.get(t, validAuthorizeQuery+"&state=s1&state=s2")
 
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 		e.assertExpectations(t)
 	})
 

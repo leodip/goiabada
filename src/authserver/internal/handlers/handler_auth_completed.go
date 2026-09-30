@@ -48,7 +48,7 @@ func HandleAuthCompletedGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -121,7 +121,7 @@ func HandleAuthCompletedGet(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
+			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
 			return
 		case completionArmReuse:
 			boundSession, err = bindReusedSession(w, r, plan, ceremonyStore, userSessionManager, database,
@@ -200,7 +200,7 @@ func HandleAuthCompletedGet(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+"/auth/consent", http.StatusFound)
+			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/consent", authContext), http.StatusFound)
 		default:
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
@@ -208,7 +208,7 @@ func HandleAuthCompletedGet(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
+			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
 		}
 	}
 }

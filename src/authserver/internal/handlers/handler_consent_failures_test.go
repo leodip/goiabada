@@ -83,16 +83,18 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 			database := mocks_data.NewDatabase(t)
 
-			handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
+			handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-			req, _ := http.NewRequest("GET", "/auth/consent", nil)
+			req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-				AuthState: ceremony.AuthStateRequiresConsent,
-				UserId:    1,
-				ClientId:  "test-client",
-				Scope:     "openid",
+				CeremonyId: testCeremonyId,
+				AuthState:  ceremony.AuthStateRequiresConsent,
+				UserId:     1,
+				ClientId:   "test-client",
+				Scope:      "openid",
 			}, nil)
 			tc.stub(database, pageRenderer, ceremonyStore)
 			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {

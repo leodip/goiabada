@@ -129,7 +129,7 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func() { _ = resp.Body.Close() }()
 
-	assertRedirect(t, resp, "/auth/level1completed")
+	verifiedLocation := assertRedirect(t, resp, "/auth/level1completed")
 
 	verifiedId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
 	assert.NotEqual(t, plantedId, verifiedId,
@@ -145,7 +145,10 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 	require.NoError(t, err)
 	replay.Jar.SetCookies(baseURL, []*http.Cookie{plantedCookie})
 
-	resp = loadPage(t, replay, appConfig.AuthServer.BaseURL+"/auth/level1completed")
+	//
+	// It names the right ceremony, since the attacker copied the URL along with the cookie, so what
+	// sends it away is the missing auth context and not the id.
+	resp = loadPage(t, replay, verifiedLocation)
 	defer func() { _ = resp.Body.Close() }()
 
 	assertRedirect(t, resp, "/account/profile")

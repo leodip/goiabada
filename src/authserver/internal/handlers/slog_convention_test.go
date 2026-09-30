@@ -41,13 +41,14 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	// mock fails this test if the handler takes the other branch.
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, ceremony.ErrNoAuthContext)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/level2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil)
 	// The id the middleware will adopt. chi's RequestID takes X-Request-Id from the caller
 	// verbatim, which is also why the handler clips it (#159).
 	req.Header.Set("X-Request-Id", "req-level2-e2e")
 	rr := httptest.NewRecorder()
 
-	chimiddleware.RequestID(HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	chimiddleware.RequestID(HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 

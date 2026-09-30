@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -35,6 +36,25 @@ func refuseSelfRegistrationDisabled(pageRenderer PageRenderer, w http.ResponseWr
 	pageRenderer.NotFound(w, r)
 }
 
+// registrationCeremonyId is the sign-in the visitor came to this page from, when the password page's
+// "Register" link said so: the id that link carried, if it has the shape of one. The page puts it back
+// into its own "Sign in" link, so a visitor who registers nothing and goes back lands on the same
+// sign-in's password form, where without it the link would load a step that names no ceremony and get
+// the "no longer active" page (#246 decision 22).
+//
+// It is only ever echoed into a link, and never checked against a stored ceremony here, so a value
+// that is not an id is dropped and not repeated into the page, whatever the visitor put in the query:
+// a length and an alphabet that need no escaping and leave no room to smuggle a URL through. Empty
+// means the page was reached from anywhere else, an emailed link or a bookmark, and its "Sign in" link
+// stays bare.
+func registrationCeremonyId(r *http.Request) string {
+	id := r.URL.Query().Get(ceremony.QueryParameter)
+	if !ceremony.IsWellFormedId(id) {
+		return ""
+	}
+	return id
+}
+
 func HandleAccountRegisterGet(
 	pageRenderer PageRenderer,
 ) http.HandlerFunc {
@@ -51,7 +71,9 @@ func HandleAccountRegisterGet(
 			return
 		}
 
-		bind := map[string]interface{}{}
+		bind := map[string]interface{}{
+			"ceremonyId": registrationCeremonyId(r),
+		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
 		if err != nil {
@@ -106,9 +128,12 @@ func HandleAccountRegisterPost(
 		passwordConfirmation := r.PostFormValue("passwordConfirmation")
 
 		renderError := func(message string) {
+			// The form posts to action="", so the URL the visitor arrived at, ceremony parameter
+			// included, is the one this request has, and the re-render carries the id on.
 			bind := map[string]interface{}{
-				"email": email,
-				"error": message,
+				"email":      email,
+				"error":      message,
+				"ceremonyId": registrationCeremonyId(r),
 			}
 
 			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)

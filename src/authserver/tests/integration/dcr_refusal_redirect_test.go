@@ -63,9 +63,8 @@ func assertRedirectWasWithheld(t *testing.T, resp *http.Response, expectedDestin
 func TestDCR_Refusal_DeclinedConsentIsNotDeliveredByRedirect(t *testing.T) {
 	enableDCR(t)
 
-	httpClient, _, _, _ := walkDCRClientToConsentScreen(t, "Refusing Portal")
+	httpClient, _, _, _, consentURL := walkDCRClientToConsentScreen(t, "Refusing Portal")
 
-	consentURL := appConfig.AuthServer.BaseURL + "/auth/consent"
 	consentPage := loadPage(t, httpClient, consentURL)
 
 	// No consents selected sends btnCancel, which is the user declining.

@@ -36,16 +36,18 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 	database := mocks_data.NewDatabase(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/pwd", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
 	rr := httptest.NewRecorder()
 
 	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
-		AuthState: ceremony.AuthStateLevel1Password,
-		ClientId:  "test-client",
+		CeremonyId: testCeremonyId,
+		AuthState:  ceremony.AuthStateLevel1Password,
+		ClientId:   "test-client",
 	}, nil)
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	pageRenderer.AssertExpectations(t)
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)

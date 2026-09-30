@@ -26,7 +26,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/stringutil"
 )
 
 // validateIdTokenHint parses and validates the id_token_hint parameter.
@@ -139,10 +138,10 @@ func HandleAuthorizeGet(
 		}
 
 		// The ceremony id is minted here and nowhere else, because this is the only place an
-		// auth context is created. Every form this ceremony renders carries it and every POST
-		// checks it, so a page left open in another tab cannot act on the authorization
-		// request that replaced it (#79).
-		ceremonyId := stringutil.GenerateSecurityRandomString(ceremonyIdLength)
+		// auth context is created. Every form this ceremony renders carries it and every redirect
+		// between its steps names it, and loadAuthContext checks it on every step, so a page left
+		// open in another tab cannot act on the authorization request that replaced it (#79, #246).
+		ceremonyId := ceremony.NewId()
 
 		// The literal carries no AuthState, and nothing below saves it until an exit has assigned
 		// one. A request refused for its client, redirect URI or response mode therefore writes no
@@ -363,7 +362,7 @@ func HandleAuthorizeGet(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+path, http.StatusFound)
+			http.Redirect(w, r, ceremonyStepURL(baseURL, path, &authContext), http.StatusFound)
 		}
 
 		switch route {
@@ -897,7 +896,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 		return
 	}
 
-	http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
+	http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/issue", authContext), http.StatusFound)
 }
 
 // silentFact is a fact decideSilentAuthentication needs and has not been given. handlePromptNone

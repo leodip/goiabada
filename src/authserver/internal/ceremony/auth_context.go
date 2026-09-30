@@ -124,19 +124,23 @@ type AuthContext struct {
 	// shown a new QR code and scans it again, which is the safe direction: no code from the
 	// seed they can no longer prove they were shown is accepted.
 	OTPKeyURL string
-	// CeremonyId names this authorization ceremony, so a form this ceremony rendered can say
-	// which ceremony rendered it and be refused once the browser's single auth context slot
-	// holds another one.
+	// CeremonyId names this authorization ceremony, so a form this ceremony rendered, or a step
+	// it redirected to, can say which ceremony it belongs to and be refused once the browser's
+	// single auth context slot holds another one.
 	//
 	// A browser holds ONE auth context, so a second /auth/authorize replaces it while every
 	// form already on screen still posts to the same URL. No rule about WRITING the context
 	// can bind a page that is already rendered, which is why the page has to carry the id and
 	// the POST has to check it: without that, a consent screen naming client A resolves its
 	// checkbox indices against client B's scope list, and a password submitted at A's screen
-	// finishes B's authorization outright (#79, the shape #112 records for emailed links).
+	// finishes B's authorization outright (#79, the shape #112 records for emailed links). A
+	// page load is bound the same way: every redirect between steps carries the id in the URL
+	// (QueryParameter) and loadAuthContext compares it before anything else, so a tab of a
+	// replaced sign-in that reaches its next step gets the "no longer active" page instead of
+	// acting on the newer one (#246, #437).
 	//
-	// Generated only in HandleAuthorizeGet, the sole creation site, so no other path can mint
-	// one. Absent from a context written by an older binary it unmarshals as "", which
+	// Generated only in HandleAuthorizeGet, through NewId, the sole creation site, so no other
+	// path can mint one. Absent from a context written by an older binary it unmarshals as "", which
 	// ceremonyMatches refuses rather than matching against an empty submission: a user mid-flow
 	// across a deploy is refused once and restarts the authorization, bounded by the session
 	// cookie's life. That is the fail-closed direction.

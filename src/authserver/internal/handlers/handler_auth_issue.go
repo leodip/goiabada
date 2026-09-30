@@ -49,7 +49,7 @@ func HandleIssueGet(
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -692,7 +692,7 @@ func refuseIssuanceUnusableSession(
 		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
+	http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
 }
 
 // handleImplicitFlow handles the implicit grant flow token issuance.

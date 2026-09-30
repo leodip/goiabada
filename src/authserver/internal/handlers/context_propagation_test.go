@@ -124,6 +124,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
+		CeremonyId:   testCeremonyId,
 		AuthState:    ceremony.AuthStateReadyToIssueCode,
 		Scope:        "openid profile",
 		ClientId:     "test-client",
@@ -170,6 +171,7 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
+		CeremonyId:   testCeremonyId,
 		AuthState:    ceremony.AuthStateReadyToIssueCode,
 		Scope:        "openid profile",
 		ClientId:     "test-client",
@@ -190,6 +192,7 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 		userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
-	assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
+	assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+		"the restart names the ceremony it kept")
 	codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 }

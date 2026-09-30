@@ -117,7 +117,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 	// resource-permission template) must localize to the active locale, not
 	// render hardcoded English.
 	t.Run("Localizes descriptions in pt-BR", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+		req := httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil)
 		req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 		result := buildScopeInfoArray(req.Context(), "openid offline_access custom:read", nil)
@@ -134,9 +134,10 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{}
@@ -157,13 +158,15 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateReadyToIssueCode,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -180,14 +183,16 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresConsent,
-			UserId:    1,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresConsent,
+			UserId:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -209,15 +214,17 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresConsent,
-			UserId:    1,
-			ClientId:  "test-client",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresConsent,
+			UserId:     1,
+			ClientId:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -242,16 +249,18 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresConsent,
-			UserId:    1,
-			ClientId:  "test-client",
-			Scope:     "openid profile email",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresConsent,
+			UserId:     1,
+			ClientId:   "test-client",
+			Scope:      "openid profile email",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -299,16 +308,18 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresConsent,
-			UserId:    1,
-			ClientId:  "test-client",
-			Scope:     "openid profile",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresConsent,
+			UserId:     1,
+			ClientId:   "test-client",
+			Scope:      "openid profile",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -336,7 +347,7 @@ func TestHandleConsentGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -348,16 +359,18 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateRequiresConsent,
-			UserId:    1,
-			ClientId:  "test-client",
-			Scope:     "openid profile email",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateRequiresConsent,
+			UserId:     1,
+			ClientId:   "test-client",
+			Scope:      "openid profile email",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -407,9 +420,10 @@ func TestHandleConsentGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, testBaseURL, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/consent", nil)
+		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -877,7 +891,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -945,7 +959,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1017,7 +1031,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		if assert.NotNil(t, persisted) {
 			assert.Equal(t, "openid backend:read", persisted.Scope,
@@ -1875,7 +1889,7 @@ func TestHandleConsentPost(t *testing.T) {
 					handler.ServeHTTP(rr, req)
 
 					assert.Equal(t, http.StatusFound, rr.Code)
-					assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+					assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 					if assert.NotNil(t, persisted) {
 						assert.Equal(t, expectedScope, persisted.Scope)
@@ -1946,7 +1960,7 @@ func TestHandleConsentPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)

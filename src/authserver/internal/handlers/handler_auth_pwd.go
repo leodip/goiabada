@@ -35,12 +35,13 @@ func HandleAuthPwdGet(
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	database authPwdDatabase,
+	auditLogger AuditLogger,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -105,21 +106,14 @@ func HandleAuthPwdPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		// loadAuthContext refuses a submission naming another ceremony before the AuthState check, so
+		// a login form left open in another tab gets the 400 mismatch page rather than the 500 that
+		// a replaced context's state would produce, and before anything reads the credentials: a
+		// submission naming a ceremony that is no longer current is answered without ever looking up
+		// a user or verifying a password, so a stale form cannot authenticate anybody for anything
+		// (#79).
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
-			return
-		}
-
-		// Before the AuthState check, so a login form left open in another tab gets the 400
-		// mismatch page rather than the 500 that a replaced context's state would produce. And
-		// before anything reads the credentials: a submission naming a ceremony that is no longer
-		// current is answered without ever looking up a user or verifying a password, so a stale
-		// form cannot authenticate anybody for anything (#79).
-		//
-		// r.PostFormValue rather than r.FormValue: this form posts to action="", so r.Form would
-		// let /auth/pwd?ceremonyId=... supply the id, and only the submitted body is a submission.
-		if !ceremonyMatches(authContext.CeremonyId, r.PostFormValue(ceremonyIdField)) {
-			rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
 			return
 		}
 
@@ -293,6 +287,6 @@ func HandleAuthPwdPost(
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, baseURL+"/auth/level1completed", http.StatusFound)
+		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1completed", authContext), http.StatusFound)
 	}
 }

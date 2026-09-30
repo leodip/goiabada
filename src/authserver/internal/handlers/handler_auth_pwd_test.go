@@ -29,9 +29,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/pwd", nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		rr := httptest.NewRecorder()
@@ -54,15 +55,17 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/pwd", nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateReadyToIssueCode,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -83,9 +86,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/pwd", nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		rr := httptest.NewRecorder()
@@ -141,16 +145,18 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/pwd", nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateLevel1Password,
-			ClientId:  "another-app",
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateLevel1Password,
+			ClientId:   "another-app",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -195,9 +201,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
 
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
 
-		req, err := http.NewRequest("GET", "/auth/pwd", nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 
 		rr := httptest.NewRecorder()
@@ -814,7 +821,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the password was accepted")
 
 		pageRenderer.AssertExpectations(t)

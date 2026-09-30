@@ -138,7 +138,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1completed")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -200,7 +200,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -411,10 +411,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			})).Return(nil).Once()
 
 			handler.ServeHTTP(rr, req)
-			assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+			assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 			if assert.NotNil(t, saved) {
-				assert.Len(t, saved.CeremonyId, ceremonyIdLength,
+				assert.Len(t, saved.CeremonyId, ceremony.IdLength,
 					"the ceremony id must be generated at the full length, not left empty")
 				// A ceremony id shared between two authorization requests would bind neither:
 				// the second request's form would satisfy the first's check.
@@ -900,7 +900,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1completed")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -965,7 +965,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1093,7 +1093,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 		ceremonyStore.AssertExpectations(t)
 		authorizeValidator.AssertExpectations(t)
@@ -2206,7 +2206,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2396,7 +2396,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2786,7 +2786,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1completed")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2870,7 +2870,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1completed", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1completed")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2956,7 +2956,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3054,16 +3054,20 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		// The one save the silent path makes, just before code issuance. It carries the hint and
 		// the prompt, and it inherits the session's generation rather than the user's.
+		var savedCeremonyId string
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.IdTokenHintSub == userSubject && ac.Prompt == "none" &&
 				ac.UserId == 789 && ac.AuthStateGeneration == 7
-		})).Return(nil).Once()
+		})).Run(func(args mock.Arguments) {
+			savedCeremonyId = args.Get(2).(*ceremony.AuthContext).CeremonyId
+		}).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), testBaseURL+"/auth/issue")
+		assert.Equal(t, savedCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/issue"),
+			"the silent path's redirect names the ceremony it just saved")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3163,15 +3167,19 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
 		})).Return()
 
+		var savedCeremonyId string
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.Scope == requestedScope &&
 				ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
-		})).Return(nil).Once()
+		})).Run(func(args mock.Arguments) {
+			savedCeremonyId = args.Get(2).(*ceremony.AuthContext).CeremonyId
+		}).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Contains(t, rr.Header().Get("Location"), testBaseURL+"/auth/issue")
+		assert.Equal(t, savedCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/issue"),
+			"the silent path's redirect names the ceremony it just saved")
 		database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
@@ -3915,7 +3923,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 				assert.Contains(t, location, "error=invalid_scope", tc.why)
 			case deferToLogin:
 				assert.Equal(t, http.StatusFound, rr.Code, tc.why)
-				assert.Equal(t, testBaseURL+"/auth/level1", location, tc.why)
+				assertStepLocation(t, location, "/auth/level1", tc.why)
 			case blockedPage:
 				assert.Empty(t, location, "a withheld redirect must never become a Location: %s", tc.why)
 			}
@@ -4022,8 +4030,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 				assert.Contains(t, rr.Header().Get("Location"), "error=invalid_scope", tc.why)
 			case "level1":
 				assert.Equal(t, http.StatusFound, rr.Code, tc.why)
-				assert.Equal(t, testBaseURL+"/auth/level1",
-					rr.Header().Get("Location"), tc.why)
+				assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1", tc.why)
 			case "500":
 				assert.Empty(t, rr.Header().Get("Location"),
 					"a failed session lookup must not answer anybody: %s", tc.why)
@@ -4090,7 +4097,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, testBaseURL+"/auth/level1", rr.Header().Get("Location"))
+	assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 	assert.Equal(t, "Invalid scope format: '?'.", parked,
 		"the emoji is one ? and not four, and the cookie never carries a byte RFC 6749 forbids")
 

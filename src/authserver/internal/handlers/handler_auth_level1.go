@@ -15,12 +15,13 @@ import (
 func HandleAuthLevel1Get(
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
+	auditLogger AuditLogger,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -38,7 +39,7 @@ func HandleAuthLevel1Get(
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, baseURL+"/auth/pwd", http.StatusFound)
+		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/pwd", authContext), http.StatusFound)
 	}
 }
 
@@ -61,12 +62,13 @@ func HandleAuthLevel1CompletedGet(
 	userSessionManager UserSessionManager,
 	database authLevel1Database,
 	templateFS fs.FS,
+	auditLogger AuditLogger,
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, w, r, adminConsoleBaseURL)
+		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
 		if !ok {
 			return
 		}
@@ -161,7 +163,7 @@ func HandleAuthLevel1CompletedGet(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+"/auth/level2", http.StatusFound)
+			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level2", authContext), http.StatusFound)
 			return
 		} else {
 			// Auth is completed
@@ -171,7 +173,7 @@ func HandleAuthLevel1CompletedGet(
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+"/auth/completed", http.StatusFound)
+			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/completed", authContext), http.StatusFound)
 			return
 		}
 	}

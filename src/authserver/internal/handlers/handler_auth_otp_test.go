@@ -75,9 +75,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/otp", nil)
+		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		expectedError := &customerrors.ErrorDetail{}
@@ -99,13 +100,15 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/otp", nil)
+		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			AuthState: ceremony.AuthStateReadyToIssueCode,
+			CeremonyId: testCeremonyId,
+			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -123,9 +126,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/otp", nil)
+		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		// The stale pair is what this case is about as much as the render is: a ceremony that
@@ -208,9 +212,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/otp", nil)
+		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		settings := &models.Settings{
@@ -317,9 +322,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, testAdminConsoleBaseURL)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
 
-		req, _ := http.NewRequest("GET", "/auth/otp", nil)
+		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
 		settings := &models.Settings{
@@ -1016,7 +1022,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the code was accepted")
 
 		pageRenderer.AssertExpectations(t)
@@ -1133,7 +1139,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/completed", rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		assert.Equal(t, []string{"begin", "update", "increment", "clear", "commit", "rotate", "save"}, calls,
 			"the enable write, the counter advance and the pending-enrolment clear belong inside "+

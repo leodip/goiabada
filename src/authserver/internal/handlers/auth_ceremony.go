@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -18,14 +19,8 @@ import (
 // cases catch: they read the field out of the rendered page rather than building the form.
 const ceremonyIdField = "ceremonyId"
 
-// ceremonyIdLength matches the length of the continuation id emaillinks issues, and for the
-// same reason that package's own comment gives: over the 65-character alphabet
-// GenerateSecurityRandomString draws from, this is far more entropy than the value needs. Nobody outside the session ever sees it and it authorizes
-// nothing on its own.
-const ceremonyIdLength = 32
-
-// ceremonyMatches reports whether a submitted form belongs to the ceremony the session
-// currently holds.
+// ceremonyMatches reports whether a submitted form, or a step's page load, belongs to the ceremony
+// the session currently holds.
 //
 // An empty stored id is refused rather than matched against an empty submission. Only an auth
 // context written by a binary from before #79 can carry one, and treating "" as equal to ""
@@ -44,14 +39,14 @@ func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 	return subtle.ConstantTimeCompare([]byte(contextCeremonyId), []byte(submitted)) == 1
 }
 
-// rejectCeremonyMismatch answers a submission that names a ceremony the session no longer
-// holds: audit it, then render the error page at 400.
+// rejectCeremonyMismatch answers a request that names a ceremony the session no longer holds, or
+// none: audit it, then render the error page at 400.
 //
 // The auth context is deliberately NOT touched. The ceremony that is current is the one the
 // user is actually working on, in another tab, and clearing or advancing it here would let a
 // forgotten tab cancel a live authorization with nothing left to recover from. The stale form
-// is simply dead. The client is not told either, for the same reason: the client that would
-// receive an error is the current one, whose authorization the user still wants (#79
+// or page is simply dead. The client is not told either, for the same reason: the client that
+// would receive an error is the current one, whose authorization the user still wants (#79
 // decision 5).
 //
 // Mirrors accounthandlers' rejectResetPassword: audit, then render, at http.StatusBadRequest because a
@@ -93,15 +88,27 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 }
 
 // loadAuthContext reads the ceremony's auth context for a gated route, and answers the request
-// itself when there is none to read: a missing context redirects to the account page with a warn
-// line, since a visitor who reaches a step after the ceremony ended has nothing to resume and
-// somewhere better to be, and any other failure is a 500. It reports false when it answered, and the
-// caller then returns without writing anything.
+// itself when there is none to read or it is not the one the request names. It reports false when it
+// answered, and the caller then returns without writing anything.
 //
-// It stops at loading. The three form posts check the submitted ceremony id between this and
-// requireAuthState, which is why the two are separate helpers rather than one (#436 decision 5).
-func loadAuthContext(pageRenderer PageRenderer, ceremonyStore CeremonyStore, w http.ResponseWriter,
-	r *http.Request, adminConsoleBaseURL string) (*ceremony.AuthContext, bool) {
+//   - A missing context redirects to the account page with a warn line, since a visitor who reaches a
+//     step after the ceremony ended has nothing to resume and somewhere better to be. The load comes
+//     first for that reason: a request naming any ceremony, or none, still ends there when nothing is
+//     stored.
+//   - A request that does not name the stored ceremony is rejectCeremonyMismatch's 400, before
+//     requireAuthState and before anything else is read: a submission never reaches a credential check
+//     and a page load never reaches a step's loads (#79 for the forms, #246 and #437 for the pages).
+//   - Any other failure is a 500.
+//
+// Every step names its ceremony because a browser holds ONE auth context, so a second
+// /auth/authorize replaces it while every tab of the first is still open. A form carries the id in its
+// body and a page load in the URL every redirect between the steps builds (ceremonyStepURL). Without
+// the second half, a tab of the replaced sign-in that reached its next step acted on the newer
+// sign-in and could finish another application's authorization (#246 decision 22). Take the
+// comparison out and every step accepts any request while a context is stored, silently, since the
+// flows that follow their own redirects still pass.
+func loadAuthContext(pageRenderer PageRenderer, ceremonyStore CeremonyStore, auditLogger AuditLogger,
+	w http.ResponseWriter, r *http.Request, adminConsoleBaseURL string) (*ceremony.AuthContext, bool) {
 
 	authContext, err := ceremonyStore.GetAuthContext(r)
 	if err != nil {
@@ -114,7 +121,36 @@ func loadAuthContext(pageRenderer PageRenderer, ceremonyStore CeremonyStore, w h
 		}
 		return nil, false
 	}
+
+	if !ceremonyMatches(authContext.CeremonyId, submittedCeremonyId(r)) {
+		rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
+		return nil, false
+	}
 	return authContext, true
+}
+
+// submittedCeremonyId is the ceremony id a request to a step names: the form's field on a POST, and
+// the URL's parameter on anything else.
+//
+// A POST reads its body alone, with r.PostFormValue and not r.FormValue: these forms post to
+// action="", so r.Form would let /auth/pwd?ceremonyId=... supply the id, and only the submitted body
+// is a submission. The URL's parameter is named differently on purpose (ceremony.QueryParameter), so
+// even a query naming the field can never satisfy a POST, and on a POST the query is not read at all,
+// so the current id in the URL of a stale form's page cannot stand in for the one the form carries
+// (#79, #437).
+func submittedCeremonyId(r *http.Request) string {
+	if r.Method == http.MethodPost {
+		return r.PostFormValue(ceremonyIdField)
+	}
+	return r.URL.Query().Get(ceremony.QueryParameter)
+}
+
+// ceremonyStepURL is where a ceremony's next step is: the route under the base URL, naming the
+// ceremony the step belongs to. Every redirect between two ceremony routes is built here, and with
+// url.Values, so the parameter is written once and the id is encoded rather than trusted to need no
+// escaping.
+func ceremonyStepURL(baseURL string, path string, authContext *ceremony.AuthContext) string {
+	return baseURL + path + "?" + url.Values{ceremony.QueryParameter: {authContext.CeremonyId}}.Encode()
 }
 
 // requireAuthState is every gated route's check that the ceremony is on a step the route accepts.
