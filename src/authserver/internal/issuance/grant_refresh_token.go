@@ -74,15 +74,21 @@ var (
 
 // IssueRefreshTokenGrant redeems a validated refresh (RFC 6749 section 6). In order: it contains the
 // family of a token that was already revoked, refuses a token whose issuing flow is switched off,
-// then in ONE transaction claims the presented token, checks that the family is not recorded as
-// revoked, and mints the new token set and inserts its child, and finally bumps the browser session
-// a code-descended token is bound to.
+// then in ONE transaction takes the token's user row, claims the presented token, checks that the
+// family is not recorded as revoked, re-reads the presented token, and mints the new token set and
+// inserts its child, and finally bumps the browser session a code-descended token is bound to.
 //
 // The claim and the insert share a transaction so that a revocation of the family cannot fall
 // between them: it either commits before the check, which refuses the rotation and rolls the claim
 // back, or after the insert, when it finds the child and revokes it too, or in the window between,
 // where the child is born into a family that is already recorded and the validator refuses it (#132,
 // #259). The session bump opens a transaction of its own and stays after the commit.
+//
+// The user's row comes first, so a credential change that revokes the user's grants and this
+// rotation serialize on it: the change takes that row before it moves a generation or sweeps a
+// token, and a rotation that arrives second reads the token as the change left it, where before it
+// stamped the child from the copy the validator read and could insert one the next refresh refuses
+// (#131).
 //
 // A refusal is a *RefreshTokenReplayedError, ErrRefreshFlowDisabled, ErrRefreshTokenNotClaimed or
 // ErrRefreshFamilyRevoked, which the token handler answers; anything else is a fault.
@@ -161,15 +167,27 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *mode
 	// the strict rotation policy, chosen deliberately: the server cannot tell a delayed legitimate
 	// duplicate from a malicious replay from the token and the row alone.
 	//
-	// The claim is the first statement of the rotation's transaction, and every read and write after
-	// it runs on that transaction. A lost claim or a revoked family leaves the body as an error, so
-	// the helper rolls the transaction back: nothing is claimed and nothing is inserted.
+	// The user's row is the first statement of the rotation's transaction, the claim the second, and
+	// every read and write after them runs on that transaction. A lost claim or a revoked family
+	// leaves the body as an error, so the helper rolls the transaction back: nothing is claimed and
+	// nothing is inserted.
 	//
 	// The body is safe to rerun after a deadlock (#301): the presented token is only read, every
 	// token minted carries a fresh jti, and tokenResponse is whatever the attempt that committed
 	// minted.
 	var tokenResponse *oauth.TokenResponse
 	err := t.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		// The user's row, taken BEFORE anything else, as issuance takes the session row first (#139).
+		// revocation.RevokeUserAuthState begins by writing this row, both through the credential
+		// write that calls it and through the generation's increment, so whichever of the two reaches
+		// it second waits for the other to commit. A rotation that waited then reads its token as the
+		// change left it, promoted or revoked. One that went first inserts its child before the change
+		// starts, and the change's sweep finds it. Both take the user row first, so the pair cannot
+		// deadlock on each other (#131, #301). Only a lock on the user: updated_at is left alone.
+		if err := t.database.AcquireUserRow(ctx, tx, refreshOwnerUserId(input)); err != nil {
+			return err
+		}
+
 		claimed, err := t.database.MarkRefreshTokenAsRevoked(ctx, tx, refreshToken.Id)
 		if err != nil {
 			return err
@@ -197,10 +215,29 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *mode
 			return ErrRefreshFamilyRevoked
 		}
 
+		// The presented token's row as it is now, under the user's lock. The validator read it before
+		// this transaction began, and a credential change that preserved this token's session can
+		// have promoted its generation since: the change committed, this rotation waited for it, and
+		// the copy in hand still carries the old number. A child stamped from that copy is born a
+		// generation behind the user and the next refresh refuses it, a refresh that succeeded and
+		// handed out a token that cannot be redeemed (#131). The child is stamped, and its access
+		// token claims, from the row this read returns (#106 rule 5 still holds: the parent's
+		// generation, never the user's). A token the change revoked never gets here, because its
+		// claim above was lost.
+		current, err := t.database.GetRefreshTokenById(ctx, tx, refreshToken.Id)
+		if err != nil {
+			return err
+		}
+		if current == nil {
+			return errs.Errorf("the refresh token %d vanished while its rotation held it", refreshToken.Id)
+		}
+		parent := *refreshToken
+		parent.AuthStateGeneration = current.AuthStateGeneration
+
 		if input.IsROPC {
-			tokenResponse, err = t.mintROPCRefreshTokens(ctx, tx, settings, refreshToken, input.ScopeRequested)
+			tokenResponse, err = t.mintROPCRefreshTokens(ctx, tx, settings, &parent, input.ScopeRequested)
 		} else {
-			tokenResponse, err = t.mintCodeRefreshTokens(ctx, tx, settings, &refreshToken.Code, refreshToken, input.ScopeRequested)
+			tokenResponse, err = t.mintCodeRefreshTokens(ctx, tx, settings, &parent.Code, &parent, input.ScopeRequested)
 		}
 		return err
 	})
@@ -226,6 +263,16 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *mode
 		}
 	}
 	return tokenResponse, outcome, nil
+}
+
+// refreshOwnerUserId is the user a presented refresh token belongs to: the token's own for a
+// password grant's, which records none through a code, and the code's otherwise. The rotation takes
+// this user's row first (#131).
+func refreshOwnerUserId(input *RefreshTokenGrantInput) int64 {
+	if input.IsROPC {
+		return input.RefreshToken.UserId.Int64
+	}
+	return input.RefreshToken.Code.UserId
 }
 
 // containRefreshTokenFamily records a rotation family as revoked and revokes every live member, in

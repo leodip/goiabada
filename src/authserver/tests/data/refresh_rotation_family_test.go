@@ -69,13 +69,30 @@ func rotationSettings() *models.Settings {
 	return settings
 }
 
+// familyShape is which grant a rotation family descends from, and so which way a credential change
+// treats it: a session-bound code's tokens are kept alive when the change preserves their session, an
+// offline grant's are kept alive the same way because their code names the session they came from,
+// and a password grant's are revoked, having no session to preserve (#131).
+type familyShape int
+
+const (
+	sessionBoundFamily familyShape = iota
+	offlineFamily
+	passwordGrantFamily
+)
+
+func (s familyShape) String() string {
+	return [...]string{"session-bound family", "offline family", "password grant family"}[s]
+}
+
 // family is a rotation family of two members, an earlier one that is already revoked and the live
 // one a refresh would present, and the shape it is: code-descended, or a password grant's.
 type family struct {
-	ropc   bool
-	client *models.Client
-	user   *models.User
-	code   *models.Code
+	ropc    bool
+	offline bool
+	client  *models.Client
+	user    *models.User
+	code    *models.Code
 	// replayed is the earlier, revoked member: presenting it is a replay.
 	replayed *models.RefreshToken
 	// live is the member a refresh presents.
@@ -87,9 +104,19 @@ func (f *family) firstJti() string { return f.replayed.RefreshTokenJti }
 func newFamily(t *testing.T, db data.Database, ropc bool) *family {
 	t.Helper()
 
+	if ropc {
+		return newFamilyOfShape(t, db, passwordGrantFamily)
+	}
+	return newFamilyOfShape(t, db, sessionBoundFamily)
+}
+
+func newFamilyOfShape(t *testing.T, db data.Database, shape familyShape) *family {
+	t.Helper()
+
+	ropc := shape == passwordGrantFamily
 	client := createTestClientOn(t, db)
 	user := createTestUserOn(t, db)
-	f := &family{ropc: ropc, client: client, user: user}
+	f := &family{ropc: ropc, offline: shape == offlineFamily, client: client, user: user}
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	firstJti := fake.UUID()
@@ -111,6 +138,11 @@ func newFamily(t *testing.T, db data.Database, ropc bool) *family {
 			token.ClientId = sql.NullInt64{Int64: client.Id, Valid: true}
 			token.RefreshTokenType = "Offline"
 			token.AuthenticatedAt = sql.NullTime{Time: now.Add(-time.Hour), Valid: true}
+		} else if f.offline {
+			// An offline grant's token names no session of its own: the one it came from is on its code.
+			token.CodeId = sql.NullInt64{Int64: f.code.Id, Valid: true}
+			token.RefreshTokenType = "Offline"
+			token.Scope = "openid profile offline_access"
 		} else {
 			token.CodeId = sql.NullInt64{Int64: f.code.Id, Valid: true}
 			token.SessionIdentifier = f.code.SessionIdentifier
@@ -123,6 +155,10 @@ func newFamily(t *testing.T, db data.Database, ropc bool) *family {
 	if !ropc {
 		session := createTestUserSessionOn(t, db, user.Id)
 		f.code = createTestCodeInSessionOn(t, db, client.Id, user.Id, session.SessionIdentifier)
+		if f.offline {
+			f.code.Scope = "openid profile offline_access"
+			require.NoError(t, db.UpdateCode(context.Background(), nil, f.code))
+		}
 	}
 	f.replayed = row(firstJti, true)
 	f.live = row(fake.UUID(), false)

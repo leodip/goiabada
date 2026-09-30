@@ -615,6 +615,52 @@ func (d *CommonDatabase) DeleteUser(ctx context.Context, tx *sql.Tx, userId int6
 	})
 }
 
+// AcquireUserRow takes the user's row and holds it for the rest of the caller's transaction, the
+// way AcquireUserSessionRow and AcquireClientRow hold theirs: one unconditional UPDATE on the row,
+// which waits for any transaction writing it and makes the next writer wait for this one (#131).
+//
+// A refresh rotation takes this row first, and a credential change takes it first too, because
+// its credential write and IncrementUserAuthStateGeneration both update it. Whichever arrives
+// second waits, so a rotation's child is stamped from a token row no revocation can move before the
+// child commits, and a revocation's sweep sees every child a rotation committed. Without it the two
+// touch no common row until the child's insert, and a child can be inserted under a generation the
+// revocation has already left behind.
+//
+// It assigns auth_state_generation to itself and never touches updated_at, unlike its two
+// siblings: the admin console shows users.updated_at as "Last updated at", and a refresh is not an
+// edit of the account. Assigning a column to its own value is portable through sqlbuilder and locks
+// the row on every engine, which the data tier shows on each.
+//
+// A user that is not there affects no rows and is not reported here, as AcquireClientRow does not
+// report a missing client: there is nothing to hold, and the read that follows decides whether the
+// user exists. RowsAffected could not report it anyway, since MySQL counts a row whose columns did
+// not change as unaffected.
+//
+// tx is required: without one the statement autocommits and the row is released before the caller
+// can use it.
+func (d *CommonDatabase) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error {
+
+	if tx == nil {
+		return errs.New("acquiring a user row requires a transaction: an autocommitted statement releases the row before the caller can use it")
+	}
+
+	if userId == 0 {
+		return errs.New("can't acquire a user row with an id of 0")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set("auth_state_generation = auth_state_generation")
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	if _, err := d.ExecSql(ctx, tx, query, args...); err != nil {
+		return errs.Wrap(err, "unable to acquire user row")
+	}
+
+	return nil
+}
+
 // IncrementUserAuthStateGeneration advances the user's authentication generation and
 // returns the new value.
 //
