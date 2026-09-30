@@ -89,9 +89,10 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 			"Invalid resource owner credentials.", http.StatusBadRequest)
 	}
 
+	// Named plainly, unlike a disabled user's code or refresh token (#137): this caller has just
+	// proved the account's password, so the account's state is its own to know.
 	if !user.Enabled {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-			"The user account is disabled.", http.StatusBadRequest)
+		return nil, userDisabled("The user account is disabled.")
 	}
 
 	// Block ROPC for users with 2FA enabled

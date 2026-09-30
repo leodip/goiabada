@@ -348,9 +348,12 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			IsPublic:                 true,
 		}
 
+		// The right verifier, so the request proves it may redeem the code and reaches the
+		// user's state, which is read only below PKCE (#137).
 		codeEntity := &models.Code{
-			CodeHash:    "hash_of_valid_code",
-			RedirectURI: "https://example.com/callback",
+			CodeHash:      "hash_of_valid_code",
+			RedirectURI:   "https://example.com/callback",
+			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("code_verifier"), Valid: true},
 			Client: models.Client{
 				ClientIdentifier: "client1",
 			},
@@ -367,11 +370,14 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
-		assert.True(t, ok)
+		// The flat wording, never one naming the account (#137); the type is what the handler
+		// writes AuditUserDisabled from.
+		var disabled *UserDisabledError
+		require.ErrorAs(t, err, &disabled)
+		var customErr *customerrors.ErrorDetail
+		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "The user account is disabled.", customErr.GetDescription())
+		assert.Equal(t, "Code is invalid.", customErr.GetDescription())
 		assert.Equal(t, 400, customErr.GetHttpStatusCode())
 	})
 
@@ -400,9 +406,12 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			IsPublic:                 true,
 		}
 
+		// The right verifier, as in the disabled-user case above: the age is read only below
+		// PKCE (#137).
 		codeEntity := &models.Code{
-			CodeHash:    "hash_of_valid_code",
-			RedirectURI: "https://example.com/callback",
+			CodeHash:      "hash_of_valid_code",
+			RedirectURI:   "https://example.com/callback",
+			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge("code_verifier"), Valid: true},
 			Client: models.Client{
 				ClientIdentifier: "client1",
 			},
@@ -812,7 +821,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 				Enabled: true,
 			},
 			// Intentionally older than the 60s expiration window so we can
-			// verify the expiration check is GATED on !wasReused.
+			// verify the expiration check is read below the wasReused return.
 			CreatedAt: sql.NullTime{
 				Time:  time.Now().UTC().Add(-10 * time.Minute),
 				Valid: true,
@@ -926,7 +935,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		assert.Equal(t, codeEntity.Id, reused.Code.Id)
 	})
 
-	t.Run("Reuse with disabled user still returns sentinel (User.Enabled gated on !wasReused)", func(t *testing.T) {
+	t.Run("Reuse with a disabled, superseded user still returns sentinel (account state read below the reuse return)", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
@@ -953,7 +962,12 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		}
 
 		codeEntity := reusedCodeFixture(client, true)
-		codeEntity.User.Enabled = false // would normally trigger ErrUserDisabled
+		// Every account-state refusal applies to this code at once: the user is disabled, the
+		// generation moved, and the fixture is already past the 60 second life. #77's cascade
+		// still runs, because all three are read below the wasReused return (#137).
+		codeEntity.User.Enabled = false
+		codeEntity.AuthStateGeneration = 1
+		codeEntity.User.AuthStateGeneration = 2
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()

@@ -2,13 +2,13 @@ package protocolvalidation
 
 import "github.com/leodip/goiabada/core/customerrors"
 
-// The two comparison targets the token validator constructs at the point of failure. Only this
-// server issues or redeems a grant, so #385 moved them out of core/customerrors and beside the
-// validator that produces each; the admin console names none of them.
+// The comparison target the token validator constructs at the point of failure. Only this server
+// issues or redeems a grant, so #385 moved it out of core/customerrors and beside the validator
+// that produces it; the admin console never names it. ErrUserDisabled stood beside it until #437
+// answered a disabled user's code or refresh token with the grant's generic wording, which no
+// value can tell apart from the other refusals sharing it, and UserDisabledError replaced it.
 var (
-	ErrUserDisabled = customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
-		"The user account is disabled.", 400)
-	// ErrCodeRedirectURIDeregistered is a comparison target, like the one above: the token
+	// ErrCodeRedirectURIDeregistered is a comparison target: the token
 	// validator constructs this same value when redeeming an authorization code whose own
 	// redirect URI is no longer registered on the client, and errors.Is matches it by value
 	// through customerrors.ErrorDetail.Is.

@@ -468,11 +468,14 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
-		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
-		assert.True(t, ok)
+		// The wording that says nothing about why, never one naming the account (#137); the
+		// type is what the handler writes AuditUserDisabled from.
+		var disabled *UserDisabledError
+		require.ErrorAs(t, err, &disabled)
+		var customErr *customerrors.ErrorDetail
+		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "The user account is disabled.", customErr.GetDescription())
+		assert.Equal(t, invalidRefreshTokenMessage, customErr.GetDescription())
 		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
 	})
 
