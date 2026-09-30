@@ -14,6 +14,21 @@
         {{if .code}}
             <input type="hidden" name="code" value="{{.code}}" />
         {{end}}
+        {{if .access_token}}
+            <input type="hidden" name="access_token" value="{{.access_token}}" />
+        {{end}}
+        {{if .token_type}}
+            <input type="hidden" name="token_type" value="{{.token_type}}" />
+        {{end}}
+        {{if .expires_in}}
+            <input type="hidden" name="expires_in" value="{{.expires_in}}" />
+        {{end}}
+        {{if .id_token}}
+            <input type="hidden" name="id_token" value="{{.id_token}}" />
+        {{end}}
+        {{if .scope}}
+            <input type="hidden" name="scope" value="{{.scope}}" />
+        {{end}}
         {{if .error}}
             <input type="hidden" name="error" value="{{.error}}" />
         {{end}}

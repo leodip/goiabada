@@ -132,7 +132,7 @@ When both tokens are returned, the ID token includes an `at_hash` claim containi
 
 ### Success response
 
-Tokens are returned in the URL fragment:
+Tokens are returned in the URL fragment, or posted to the redirect URI in an auto-submitting HTML form when the request has `response_mode=form_post`:
 
 | Parameter | Description |
 |-----------|-------------|
@@ -145,7 +145,7 @@ Tokens are returned in the URL fragment:
 
 ### Error response
 
-Errors are also returned in the URL fragment:
+Errors are returned the same way:
 
 | Parameter | Description |
 |-----------|-------------|

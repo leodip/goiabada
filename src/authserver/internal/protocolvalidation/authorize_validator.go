@@ -423,11 +423,16 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 			http.StatusBadRequest)
 	}
 
-	// Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5: implicit grant tokens MUST be in fragment
-	// If response_mode is explicitly set for implicit flow, it must be fragment
-	if isImplicitFlow && len(input.ResponseMode) > 0 && input.ResponseMode != "fragment" {
+	// A response type that returns tokens may not be encoded in the query. OAuth 2.0 Multiple
+	// Response Type Encoding Practices section 3 says of id_token "the query encoding MUST NOT be
+	// used", section 5 says the same of id_token token, and RFC 6749 4.2.2 puts the implicit
+	// grant's token response in the fragment. The form_post encoding is a different matter: OAuth 2.0
+	// Form Post Response Mode section 4 says "it is safe to return Authorization Response parameters
+	// whose default Response Modes are the query encoding or the fragment encoding using the
+	// form_post Response Mode", so the request may name it, or the fragment, or nothing (#231).
+	if isImplicitFlow && input.ResponseMode == "query" {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-			"Implicit flow requires response_mode=fragment or no response_mode (fragment is the default for implicit flow).",
+			"Implicit flow does not support response_mode=query. Use response_mode=fragment (the default for implicit flow) or response_mode=form_post.",
 			http.StatusBadRequest)
 	}
 

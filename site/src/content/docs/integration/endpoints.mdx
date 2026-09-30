@@ -68,7 +68,7 @@ A POST is answered with a `303 See Other` to a GET that carries a one-time `requ
     <tr>
       <td style="white-space: nowrap;"><code>response_mode</code></td>
       <td>No</td>
-      <td>Supported values: <code>query</code> (default for code flow), <code>fragment</code> (default and required for implicit flow), or <code>form_post</code>. Any other value is answered with <code>400 Bad Request</code> on a page, with nothing returned to the client: understanding the mode is what tells the server how to encode a response, so an error cannot be sent in one it does not support.</td>
+      <td>Supported values: <code>query</code> (default for code flow), <code>fragment</code> (default for implicit flow), or <code>form_post</code>. The implicit flow does not accept <code>query</code>. Any other value is answered with <code>400 Bad Request</code> on a page, with nothing returned to the client: understanding the mode is what tells the server how to encode a response, so an error cannot be sent in one it does not support.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>state</code></td>

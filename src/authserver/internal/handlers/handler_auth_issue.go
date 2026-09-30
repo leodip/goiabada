@@ -209,7 +209,7 @@ func HandleIssueGet(
 			*scopeField = effectiveScope
 
 			if answer.outcome == issuanceIssueImplicit {
-				err := handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, facts.user, settings, ceremonyStore, implicitTokenIssuer, auditLogger)
+				err := handleImplicitFlow(w, r, templateFS, authContext, sessionIdentifier, issuingClient, facts.user, settings, ceremonyStore, implicitTokenIssuer, auditLogger)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)
 				}
@@ -696,7 +696,8 @@ func refuseIssuanceUnusableSession(
 }
 
 // handleImplicitFlow handles the implicit grant flow token issuance.
-// Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5, tokens are returned in fragment.
+// Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5, tokens are returned in the fragment, or posted in a
+// form when the request asked for response_mode=form_post (#231).
 // handleImplicitFlow takes the client and the user rather than loading them. HandleIssueGet
 // resolves both above the dispatch now, the client for the registration gate and the user for the
 // scope re-filter, and both gates refuse a nil, so re-reading them here would be two queries for
@@ -704,6 +705,7 @@ func refuseIssuanceUnusableSession(
 func handleImplicitFlow(
 	w http.ResponseWriter,
 	r *http.Request,
+	templateFS fs.FS,
 	authContext *ceremony.AuthContext,
 	sessionIdentifier string,
 	client *models.Client,
@@ -766,24 +768,29 @@ func handleImplicitFlow(
 		return err
 	}
 
-	// Issue tokens via fragment (implicit flow always uses fragment response mode)
-	return issueImplicitTokens(w, r, authContext.RedirectURI, authContext.State, tokenResponse)
+	return issueImplicitTokens(w, r, templateFS, authContext.ResponseMode, authContext.RedirectURI, authContext.State, tokenResponse)
 }
 
-// issueImplicitTokens redirects to the client with tokens in the fragment.
-// Per RFC 6749 4.2.2, implicit grant tokens MUST be delivered via fragment.
+// issueImplicitTokens answers the client with tokens: in the fragment of its redirect URI, which is
+// what RFC 6749 4.2.2 defines and the default, or in an auto-submitting form when the request asked
+// for response_mode=form_post. The mode is implicitResponseMode's, so the query is not reachable
+// from here whatever the ceremony holds (#231).
 func issueImplicitTokens(
 	w http.ResponseWriter,
 	r *http.Request,
+	templateFS fs.FS,
+	responseMode string,
 	redirectURI string,
 	state string,
 	tokenResponse *issuance.ImplicitGrantResponse,
 ) error {
-	// Gate 4, the last resort. This flow hands over access and ID tokens rather than a code, so a
-	// redirect URI that resolves to a host the operator never registered exfiltrates credentials
-	// directly rather than something still to be exchanged. Nothing can reach here with such a value
-	// once the authorization endpoint has refused it, and the check stays so that the property is
-	// enforced by a test rather than claimed by a comment (#122).
+	// Gate 4, the last resort, ABOVE the response-mode dispatch so that it covers the fragment and
+	// form_post alike, as issueAuthCode's does. This flow hands over access and ID tokens rather than
+	// a code, so a redirect URI that resolves to a host the operator never registered exfiltrates
+	// credentials directly rather than something still to be exchanged, and the form's action is the
+	// one place html/template's URL filter passes a scheme-relative value through untouched. Nothing
+	// can reach here with such a value once the authorization endpoint has refused it, and the check
+	// stays so that the property is enforced by a test rather than claimed by a comment (#122).
 	if err := checkRedirectURIEmittable(r.Context(), "issueImplicitTokens", redirectURI); err != nil {
 		return err
 	}
@@ -820,16 +827,18 @@ func issueImplicitTokens(
 		params = append(params, responseParam{"state", state})
 	}
 
-	// Appended rather than written through writeResponseParams, for the same reason the error
-	// emitter's fragment branch appends: the redirect URI cannot carry a fragment of its own for
-	// these fields to collide with, since RFC 6749 3.1.2 forbids one and checkRedirectURIEmittable
-	// refuses one just above. Its query, if it registered one, is left exactly as it stands.
+	// Written by writeAuthorizationResponse, whose fragment branch appends rather than going through
+	// writeResponseParams: the redirect URI cannot carry a fragment of its own for these fields to
+	// collide with, since RFC 6749 3.1.2 forbids one and checkRedirectURIEmittable refuses one just
+	// above. Its query, if it registered one, is left exactly as it stands. The form_post branch is
+	// the one the authorization code and the error emitter use: OAuth 2.0 Form Post Response Mode
+	// section 4 makes it safe for the parameters whose default is the fragment, and it sets
+	// Cache-Control: no-store and Pragma: no-cache once the page has rendered, which matters more
+	// here than on the code path since the page holds the tokens themselves.
 	//
-	// Field order is now declaration order rather than Encode's alphabetical sort. Nothing depends
-	// on it: RFC 6749 4.2.2 defines a set of parameters and not a sequence.
-	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 above
-	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
-	return nil
+	// Field order is declaration order rather than Encode's alphabetical sort. Nothing depends on
+	// it: RFC 6749 4.2.2 defines a set of parameters and not a sequence.
+	return writeAuthorizationResponse(w, r, templateFS, implicitResponseMode(responseMode), redirectURI, params)
 }
 
 func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code *models.Code, responseMode string) error {

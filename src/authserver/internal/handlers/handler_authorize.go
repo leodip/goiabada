@@ -533,9 +533,9 @@ func refuseUnaddressableAuthorizeRequest(w http.ResponseWriter, r *http.Request,
 	// decision 11).
 	//
 	// ValidateRequest's other response_mode rule is deliberately left where it is: an implicit
-	// request asking for query or form_post is asking for a mode this server understands and
-	// simply may not use for tokens, so that error can be, and is, delivered as a redirect the
-	// client can parse.
+	// request asking for the query is asking for a mode this server understands and simply may not
+	// use for tokens, so that error can be, and is, delivered as a redirect the client can parse,
+	// in the fragment (#231).
 	if !protocolvalidation.IsSupportedResponseMode(params.Get("response_mode")) {
 		renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), "auth_error.unsupported_response_mode.message"),
 			http.StatusBadRequest)
@@ -1322,15 +1322,13 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database aut
 	// text as the validator wrote it and only what actually leaves as a redirect is filtered.
 	description := customerrors.ConformErrorDescription(input.description)
 
-	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
-	// Determine if this is an implicit flow by checking response_type
+	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment,
+	// or in the form_post the request asked for; an explicit query is answered in the fragment too,
+	// which is what the refusal of that very request needs (#231).
 	rtInfo := protocolvalidation.ParseResponseType(input.responseType)
-	isImplicitFlow := rtInfo.IsImplicitFlow()
-
-	// For implicit flow, default to fragment response mode
 	effectiveResponseMode := input.responseMode
-	if isImplicitFlow && effectiveResponseMode == "" {
-		effectiveResponseMode = "fragment"
+	if rtInfo.IsImplicitFlow() {
+		effectiveResponseMode = implicitResponseMode(input.responseMode)
 	}
 
 	// The error response's parameters, in the order they reach the client, built once for all three

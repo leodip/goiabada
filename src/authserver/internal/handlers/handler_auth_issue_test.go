@@ -2027,7 +2027,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:       "openid",
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2051,7 +2051,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:   "openid",
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2078,7 +2078,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:       "openid profile",
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2102,7 +2102,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback", "", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "", tokenResponse)
 
 		assert.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -2130,7 +2130,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback", "   ", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "   ", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=+++",
@@ -2152,7 +2152,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback", "a b+c/d=e#f&g=h", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "a b+c/d=e#f&g=h", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
@@ -2174,7 +2174,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", tokenResponse)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=client-csrf-token",
@@ -2192,7 +2192,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		assert.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -2246,7 +2246,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 					Scope:       "openid",
 				}
 
-				err := issueImplicitTokens(w, r, tc.redirectURI, "test-state", tokenResponse)
+				err := issueImplicitTokens(w, r, nil, "", tc.redirectURI, "test-state", tokenResponse)
 
 				assert.Error(t, err, tc.why)
 				assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)

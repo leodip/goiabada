@@ -209,6 +209,26 @@ func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, template
 	}
 }
 
+// implicitResponseMode is the mode an implicit response is delivered in, its tokens or its error:
+// the form_post the client asked for, and the fragment for anything else.
+//
+// Never the query. OAuth 2.0 Multiple Response Type Encoding Practices section 3 says of id_token
+// that "the query encoding MUST NOT be used", section 5 says the same of id_token token, and
+// RFC 6749 4.2.2 puts the implicit grant's token response in the fragment; section 7 gives the
+// reason, that "Access Tokens and ID Tokens MUST NOT be encoded in the query string", since the
+// Referer header carries a query to third parties. ValidateRequest refuses a request that names the query for such a response type, and that
+// refusal is itself answered through here, in the fragment, because it answers a request whose mode
+// it cannot honour. The empty string is the fragment, the default for these response types.
+//
+// One rule for the success path and the error path: both used to decide it separately, the error
+// emitter letting an explicit "query" through to the query component (#231, #437).
+func implicitResponseMode(requested string) string {
+	if requested == "form_post" {
+		return "form_post"
+	}
+	return "fragment"
+}
+
 // writeFragmentRedirect redirects to redirectURI with params as its fragment.
 //
 // Appended rather than written through writeResponseParams: the redirect URI cannot carry a
