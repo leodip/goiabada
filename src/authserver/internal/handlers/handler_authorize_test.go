@@ -302,20 +302,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// an implicit request asking for it falls through to the ordinary validation and its refusal
 	// reaches the client as a redirect.
 	//
-	// This pins inherited behaviour rather than endorsed behaviour, and the distinction is worth
-	// stating because the refusal goes out in the query component. RFC 6749 section 4.2.2.1, the
+	// In the fragment, where an implicit client reads its responses. RFC 6749 section 4.2.2.1, the
 	// implicit grant's own error response, says the authorization server "informs the client by
 	// adding the following parameters to the fragment component of the redirection URI using the
 	// 'application/x-www-form-urlencoded' format", and OAuth 2.0 Multiple Response Type Encoding
 	// Practices section 3 says of id_token that "the default Response Mode for this Response Type
-	// is the fragment encoding and the query encoding MUST NOT be used". So emitting this refusal
-	// in query is a deviation.
-	//
-	// It predates #213 and #213 does not widen it: redirToClientWithError already defaults an
-	// implicit error carrying no response_mode to fragment, so only an explicitly supplied query
-	// reaches this branch. Correcting it changes what an implicit client receives and where it has
-	// to look for it, which belongs to its own change rather than to this gate.
-	t.Run("A supported response_mode the request may not use still reaches the client", func(t *testing.T) {
+	// is the fragment encoding and the query encoding MUST NOT be used". This case pinned the
+	// refusal arriving in the query component until #231 (decision 15) moved it: the emitter
+	// answers an implicit request in the fragment whatever mode was asked for, form_post apart.
+	t.Run("A supported response_mode the request may not use still reaches the client, in the fragment", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
@@ -352,15 +347,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(
 			customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
-				"Implicit flow requires response_mode=fragment or no response_mode (fragment is the default for implicit flow).",
+				"Implicit flow does not support response_mode=query. Use response_mode=fragment (the default for implicit flow) or response_mode=form_post.",
 				http.StatusBadRequest))
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		location := rr.Result().Header.Get("Location")
-		assert.Contains(t, location, "https://example.com?error=invalid_request")
-		assert.Contains(t, location, "Implicit+flow+requires+response_mode%3Dfragment")
+		assert.Contains(t, location, "https://example.com#error=invalid_request")
+		assert.Contains(t, location, "Implicit+flow+does+not+support+response_mode%3Dquery")
+		assert.NotContains(t, location, "?", "the refusal must not be written into the query component")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
