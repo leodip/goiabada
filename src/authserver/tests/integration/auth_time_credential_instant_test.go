@@ -124,7 +124,7 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 
 	t.Helper()
 
-	codeVerifier := "code-verifier-" + fake.LetterN(16)
+	codeVerifier := testCodeVerifier + "-" + fake.LetterN(16)
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
@@ -306,7 +306,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 	// /auth/authorize response and the verifier its challenge was made from.
 	silentAuthorize := func() (*http.Response, string) {
 		t.Helper()
-		codeVerifier := "code-verifier-" + fake.LetterN(16)
+		codeVerifier := testCodeVerifier + "-" + fake.LetterN(16)
 		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 			"&response_type=code" +
@@ -399,7 +399,7 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 
 	// The same browser signs in again under max_age=3600. The session its cookie names was
 	// authenticated two hours ago, so the request goes to the password page rather than reusing it.
-	const codeVerifier = "code-verifier-re-login"
+	const codeVerifier = testCodeVerifier + "-re-login"
 	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(grant.redirectURI) +

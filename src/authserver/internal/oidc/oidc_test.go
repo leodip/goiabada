@@ -82,6 +82,15 @@ func TestHasOfflineAccessScope(t *testing.T) {
 		{"uppercase", "openid OFFLINE_ACCESS", false},
 		{"no offline_access", "openid profile email", false},
 		{"empty", "", false},
+
+		// Read through SplitScope (#244), so it agrees with the splitter on every separator: a scope
+		// that reached it unnormalized is still read as the token endpoint and the authorization
+		// endpoint read it, where strings.Split(scope, " ") saw one value.
+		{"after a tab", "openid\toffline_access", true},
+		{"after a newline", "openid\noffline_access", true},
+		{"after a run of separators", "openid \t\r\n offline_access", true},
+		{"joined to a word by a no-break space", "openid offline_access", false},
+		{"padded by a no-break space", "openid offline_access ", true},
 	}
 
 	for _, tc := range testCases {

@@ -31,6 +31,23 @@ func TestSanitizeUILocales(t *testing.T) {
 		{"PT-br ZH-Hans-CN", []string{"PT-br", "ZH-Hans-CN"}}, // case preserved
 		{"!!!! garbage 😈 ", nil},
 		{"pt-BR garbage es", []string{"pt-BR", "es"}}, // garbage dropped, others kept
+
+		// ui_locales is split as every other space-delimited parameter is (#244): a tab, a newline,
+		// a form feed and a carriage return still separate two tags, and a no-break space, a
+		// next-line character and a vertical tab do not, so "pt-BR" joined to "es" by one is a
+		// single tag no locale has and is dropped whole. The escapes are spelled out so no editor
+		// can turn one into a plain space.
+		{"pt-BR\tes", []string{"pt-BR", "es"}},
+		{"pt-BR\nes", []string{"pt-BR", "es"}},
+		{"pt-BR\fes", []string{"pt-BR", "es"}},
+		{"pt-BR\res", []string{"pt-BR", "es"}},
+		{"pt-BR es", nil},
+		{"pt-BR\u0085es", nil},
+		{"pt-BR\ves", nil},
+		{"pt-BR es en", []string{"en"}}, // the joined tag is dropped, the next one kept
+		// The edge trim stays: a tag padded with one of them is still that tag.
+		{"pt-BR ", []string{"pt-BR"}},
+		{" pt-BR es", []string{"pt-BR", "es"}},
 	}
 	for _, c := range cases {
 		t.Run(c.in, func(t *testing.T) {
@@ -78,6 +95,33 @@ func TestMiddlewareLocale_QueryParamWins(t *testing.T) {
 		assert.True(t, hasExplicitIntent(r.Context()))
 	})).ServeHTTP(rr, req)
 	assert.Equal(t, "Entrar", seen)
+}
+
+// The middleware runs on every request of both processes before any handler, so it is where the
+// shared splitter reaches ui_locales first (#244): a query whose tags are separated by a tab is an
+// explicit preference, and one whose tags are joined by a no-break space carries no usable tag and
+// falls through to Accept-Language.
+func TestMiddlewareLocale_UILocalesUsesTheSharedSplitter(t *testing.T) {
+	mw := MiddlewareLocale(nil)
+
+	run := func(query string) (title string, explicit bool) {
+		req := httptest.NewRequest("GET", "/auth/authorize?ui_locales="+query, nil)
+		req.Header.Set("Accept-Language", "fr-FR")
+		rr := httptest.NewRecorder()
+		mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			title = T(r.Context(), "auth.pwd.title")
+			explicit = hasExplicitIntent(r.Context())
+		})).ServeHTTP(rr, req)
+		return title, explicit
+	}
+
+	title, explicit := run("pt-BR%09es")
+	assert.Equal(t, "Entrar", title)
+	assert.True(t, explicit, "a tab separates the two tags, so ui_locales is a stated preference")
+
+	title, explicit = run("pt-BR%C2%A0es")
+	assert.NotEqual(t, "Entrar", title, "a no-break space joins the tags into one that no locale has")
+	assert.False(t, explicit, "no usable tag, so ui_locales states no preference")
 }
 
 func TestMiddlewareLocale_UILocalesReaderWinsOverHeader(t *testing.T) {

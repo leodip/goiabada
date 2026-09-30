@@ -66,7 +66,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	requestState := fake.LetterN(8)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +

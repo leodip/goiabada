@@ -107,7 +107,7 @@ func TestToken_Refresh_PublicClient_PresentingASecret_IsRefused(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	})
 	require.Nil(t, data["error"], "unexpected refusal at redemption: %v", data["error_description"])
 	refreshToken := data["refresh_token"].(string)

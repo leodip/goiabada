@@ -39,8 +39,27 @@ func TestValidateScopes(t *testing.T) {
 			expectedError: "",
 		},
 		{
-			name:          "Valid offline_access scope",
+			// Reversed by #244: this row accepted "offline_access" alone, which was granted here and
+			// then answered 500 when the code was exchanged, having claimed the code. Keep the two
+			// rows below, which pin what is still accepted: offline_access is a fine scope beside
+			// another one, whichever side it sits on.
+			name:          "offline_access alone is refused",
 			scope:         "offline_access",
+			expectedError: "The 'scope' parameter holds only 'offline_access', which grants nothing by itself. Include at least one other scope, such as 'openid' or a resource:permission scope.",
+		},
+		{
+			name:          "offline_access repeated is still alone",
+			scope:         "offline_access offline_access",
+			expectedError: "The 'scope' parameter holds only 'offline_access', which grants nothing by itself. Include at least one other scope, such as 'openid' or a resource:permission scope.",
+		},
+		{
+			name:          "offline_access beside a claim scope",
+			scope:         "openid offline_access",
+			expectedError: "",
+		},
+		{
+			name:          "offline_access before a claim scope",
+			scope:         "offline_access profile",
 			expectedError: "",
 		},
 		{
@@ -367,9 +386,9 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			wantMessage:  notRegistered,
 		},
 		{
-			// "code foo" and "code code" are accepted as valid by ValidateRequest, which
-			// counts recognised flags and reaches 1. The token-sequence gate is the only
-			// thing standing between them and port flexibility.
+			// ValidateRequest refuses "code foo" and "code code" since #244, but it runs after
+			// this function, so IsCodeOnly is what stands between them and port flexibility
+			// here, and the rows keep asserting that and not the later refusal.
 			name:         "unrecognised token alongside code",
 			registered:   "http://127.0.0.1/cb",
 			requested:    "http://127.0.0.1:54321/cb",
@@ -1577,7 +1596,10 @@ func TestValidatePrompt_CaseSensitive_MixedCase(t *testing.T) {
 	assert.Equal(t, "", result)
 }
 
-func TestValidatePrompt_SelectAccountNotImplemented(t *testing.T) {
+// select_account is a value the specification defines and this server cannot honour, so it is
+// answered account_selection_required and not as an unknown value (#244). The combinations are in
+// authorize_request_syntax_test.go.
+func TestValidatePrompt_SelectAccountIsKnownButNotSupported(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1585,8 +1607,9 @@ func TestValidatePrompt_SelectAccountNotImplemented(t *testing.T) {
 
 	assert.Error(t, err)
 	customErr := err.(*customerrors.ErrorDetail)
-	assert.Equal(t, "invalid_request", customErr.GetCode())
-	assert.Equal(t, "Invalid prompt value: select_account", customErr.GetDescription())
+	assert.Equal(t, "account_selection_required", customErr.GetCode())
+	assert.Equal(t, "prompt=select_account is not supported: the authorization server cannot ask the end user to select an account.", customErr.GetDescription())
+	assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
 	assert.Equal(t, "", result)
 }
 

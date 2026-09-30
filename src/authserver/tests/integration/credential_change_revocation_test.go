@@ -127,7 +127,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 	// makes this a genuinely different device, which is what the case is about.
 	httpClient := createHttpClientWithUserAgent(t,
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1")
-	const codeVerifier = "code-verifier-second-device"
+	const codeVerifier = testCodeVerifier + "-second-device"
 	scope := "openid " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 
@@ -206,7 +206,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 
 	httpClient := createHttpClientWithUserAgent(t,
 		"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-	const codeVerifier = "code-verifier-second-offline"
+	const codeVerifier = testCodeVerifier + "-second-offline"
 	scope := "openid offline_access " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 
@@ -366,7 +366,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 
 	httpClient := createHttpClient(t)
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 
 	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -639,7 +639,7 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 		"the second login must create a DIFFERENT session, or this test proves nothing")
 
 	// The caller's own session-bound bearer, on the session the offline family came from.
-	const verifier = "code-verifier-session-bound"
+	const verifier = testCodeVerifier + "-session-bound"
 	sessionScope := "openid " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	exchanged := grant.exchange(t, grant.codeFromSameSession(t, sessionScope, verifier), verifier)
@@ -723,7 +723,7 @@ func TestCredentialChange_OutstandingAuthCodeIsRejected(t *testing.T) {
 	grant := createOfflineGrant(t)
 
 	// A second authorization on the live session, stopping at the code rather than exchanging it.
-	const verifier = "code-verifier-outstanding"
+	const verifier = testCodeVerifier + "-outstanding"
 	scope := "openid " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	code := grant.codeFromSameSession(t, scope, verifier)
@@ -838,7 +838,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 
 	// A session-bound bearer on the SAME session as the offline family: a second grant, without
 	// offline_access, obtained by SSO.
-	const verifier = "code-verifier-session-bound"
+	const verifier = testCodeVerifier + "-session-bound"
 	sessionScope := "openid " +
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	exchanged := grant.exchange(t, grant.codeFromSameSession(t, sessionScope, verifier), verifier)

@@ -367,7 +367,9 @@ func TestPrompt_CaseSensitivityMixed(t *testing.T) {
 	assert.Equal(t, requestState, state)
 }
 
-func TestPrompt_SelectAccountNotImplemented(t *testing.T) {
+// select_account is a value OIDC Core defines and this server cannot honour, so it is answered
+// account_selection_required and not as an unknown value (#244, decision 20).
+func TestPrompt_SelectAccountIsKnownButNotSupported(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createAuthenticatedHttpClient(t)
 
@@ -390,9 +392,10 @@ func TestPrompt_SelectAccountNotImplemented(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, description, state := getErrorFromUrl(t, resp)
 
-	assert.Equal(t, "invalid_request", errorCode)
+	assert.Equal(t, "account_selection_required", errorCode)
+	assert.Equal(t, "prompt=select_account is not supported: the authorization server cannot ask the end user to select an account.", description)
 	assert.Equal(t, requestState, state)
 }
 

@@ -163,7 +163,7 @@ func TestAuthorize_PublicClient_WithPKCE_CompletesAndIssuesTokens(t *testing.T) 
 			"client_id":     {code.Client.ClientIdentifier},
 			"code":          {code.Code},
 			"redirect_uri":  {code.RedirectURI},
-			"code_verifier": {"code-verifier"},
+			"code_verifier": {testCodeVerifier},
 		})
 
 	require.Nil(t, data["error"], "unexpected refusal: %v", data["error_description"])
@@ -185,5 +185,5 @@ func TestAuthorize_ConfidentialClient_PKCEOff_WithoutCodeChallenge_Succeeds(t *t
 		"the ceremony must have minted a code bound to no challenge, which is the point of the row")
 
 	// The challenge really is absent rather than merely unequal to a computed one.
-	assert.NotEqual(t, oauth.GeneratePKCECodeChallenge("code-verifier"), code.CodeChallenge.String)
+	assert.NotEqual(t, oauth.GeneratePKCECodeChallenge(testCodeVerifier), code.CodeChallenge.String)
 }

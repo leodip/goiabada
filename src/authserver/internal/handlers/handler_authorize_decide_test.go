@@ -694,6 +694,29 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantReads: []silentFact{session, validity, scope, consent},
 		},
+		{
+			// The scope is read through oidc.SplitScope like every other reader of one (#244): a
+			// no-break space is no separator, so this is one value, and the consent that names it
+			// covers it. Read with strings.Fields it was two, neither of which the consent holds.
+			name: "a value holding a no-break space is one scope, covered by the consent that names it",
+			world: with(func(w *silentWorld) {
+				w.consentRequired = true
+				w.effectiveScope = "openid res:read all"
+				w.consentScope = scopes("openid res:read all")
+			}),
+			wantReads: []silentFact{session, validity, scope, consent},
+		},
+		{
+			name: "a tab still separates two scopes of an effective scope",
+			world: with(func(w *silentWorld) {
+				w.consentRequired = true
+				w.effectiveScope = "openid\tprofile"
+				w.consentScope = scopes("openid")
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "Additional consent is required",
+			wantReads:       []silentFact{session, validity, scope, consent},
+		},
 	}
 
 	for _, tc := range testCases {

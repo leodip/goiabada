@@ -16,6 +16,8 @@ package oidc
 import (
 	"slices"
 	"strings"
+
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 const OfflineAccessScope = "offline_access"
@@ -39,35 +41,20 @@ func IsOfflineAccessScope(scope string) bool {
 }
 
 // HasOfflineAccessScope reports whether a whole scope string, space-delimited per RFC 6749
-// section 3.3, carries offline_access as one of its values. A resource scope that merely contains
-// the text, such as res:offline_access_read, is not offline access.
+// section 3.3, carries offline_access as one of its values, read through SplitScope like every
+// other reader of a scope's values. A resource scope that merely contains the text, such as
+// res:offline_access_read, is not offline access.
 func HasOfflineAccessScope(scope string) bool {
-	return slices.ContainsFunc(strings.Split(scope, " "), IsOfflineAccessScope)
+	return slices.ContainsFunc(SplitScope(scope), IsOfflineAccessScope)
 }
 
-// isScopeSeparator is RE2's \s: space, tab, newline, form feed, carriage return. It is the set the
-// `\s+` regexes SplitScope replaced matched, kept so that no scope value accepted before #116's
-// consolidation changes meaning. It is deliberately not unicode.IsSpace, which strings.Fields
-// uses: that would also split on vertical tab, U+0085 and U+00A0, a widening away from the
-// space-only delimiter #244 part 4 proposes for every space-delimited parameter. When #244 part 4
-// lands, this is the one place the scope delimiter changes.
-func isScopeSeparator(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\f' || r == '\r'
-}
-
-// SplitScope splits a scope string, space-delimited per RFC 6749 section 3.3, into its values: on
-// runs of isScopeSeparator, each value trimmed with strings.TrimSpace, empty values dropped.
-// Duplicates are kept; NormalizeScope drops them. Every site that reads a scope's values goes
-// through here or through NormalizeScope, where each used to carry its own copy of the rule and
-// three of them disagreed on the edges (#116).
+// SplitScope splits a scope string, space-delimited per RFC 6749 section 3.3, into its values,
+// through oauth.SplitSpaceDelimited, the one splitter every space-delimited parameter reads
+// through (#244). Duplicates are kept; NormalizeScope drops them. Every site that reads a scope's
+// values goes through here or through NormalizeScope, where each used to carry its own copy of the
+// rule and three of them disagreed on the edges (#116).
 func SplitScope(scope string) []string {
-	values := []string{}
-	for _, value := range strings.FieldsFunc(scope, isScopeSeparator) {
-		if value = strings.TrimSpace(value); value != "" {
-			values = append(values, value)
-		}
-	}
-	return values
+	return oauth.SplitSpaceDelimited(scope)
 }
 
 // NormalizeScope is SplitScope with duplicates dropped, keeping each value's first occurrence,

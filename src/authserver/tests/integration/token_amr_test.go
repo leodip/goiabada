@@ -25,7 +25,7 @@ func TestToken_AuthCode_AMR_IsArray(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -76,7 +76,7 @@ func TestToken_Refresh_AMR_IsArray(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 

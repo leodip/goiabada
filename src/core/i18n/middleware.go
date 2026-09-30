@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // UILocalesReader supplies locale preferences from an in-flight authorize
@@ -23,11 +25,12 @@ const (
 
 var bcp47ShapeRe = regexp.MustCompile(bcp47ShapePattern)
 
-// SanitizeUILocales filters and bounds an OIDC ui_locales value: trims each
-// tag, drops entries that don't match a permissive BCP 47 shape, caps at
-// 10 tags and 256 total bytes (preserving order, dropping the tail when
-// caps trip). Bounds prevent attacker-controlled input from bloating the
-// session cookie.
+// SanitizeUILocales filters and bounds an OIDC ui_locales value: splits it
+// as every other space-delimited parameter is split (oauth.SplitSpaceDelimited,
+// so a no-break space is no separator here either, #244), drops entries that
+// don't match a permissive BCP 47 shape, caps at 10 tags and 256 total bytes
+// (preserving order, dropping the tail when caps trip). Bounds prevent
+// attacker-controlled input from bloating the session cookie.
 //
 // Returning nil means "no usable ui_locales was supplied" — callers should
 // treat that as if the parameter was absent.
@@ -37,11 +40,7 @@ func SanitizeUILocales(raw string) []string {
 	}
 	var out []string
 	bytesUsed := 0
-	for _, tag := range strings.Fields(raw) {
-		tag = strings.TrimSpace(tag)
-		if tag == "" {
-			continue
-		}
+	for _, tag := range oauth.SplitSpaceDelimited(raw) {
 		if !bcp47ShapeRe.MatchString(tag) {
 			continue
 		}

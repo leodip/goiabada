@@ -82,7 +82,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Step 3: Get an ID token for User A (complete full auth flow)
 	// =========================================================================
 	httpClientA := createHttpClient(t)
-	codeVerifierA := "code-verifier-a"
+	codeVerifierA := testCodeVerifier + "-a"
 	requestCodeChallengeA := oauth.GeneratePKCECodeChallenge(codeVerifierA)
 	requestStateA := fake.LetterN(8)
 	requestNonceA := fake.LetterN(8)
@@ -159,7 +159,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Use a fresh HTTP client (no cookies, simulating fresh browser)
 	// =========================================================================
 	httpClientB := createHttpClient(t) // Fresh client, no session
-	codeVerifierB := "code-verifier-b"
+	codeVerifierB := testCodeVerifier + "-b"
 	requestCodeChallengeB := oauth.GeneratePKCECodeChallenge(codeVerifierB)
 	requestStateB := fake.LetterN(8)
 	requestNonceB := fake.LetterN(8)
@@ -291,7 +291,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// Step 3: Get an ID token for User A
 	// =========================================================================
 	httpClient1 := createHttpClient(t)
-	codeVerifier1 := "code-verifier-1"
+	codeVerifier1 := testCodeVerifier + "-1"
 	requestCodeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
@@ -360,7 +360,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// Step 4: Start NEW auth with same user using id_token_hint + prompt=login
 	// =========================================================================
 	httpClient2 := createHttpClient(t) // Fresh client
-	codeVerifier2 := "code-verifier-2"
+	codeVerifier2 := testCodeVerifier + "-2"
 	requestCodeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
@@ -490,7 +490,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	// Get ID token for User A (complete flow and token exchange)
 	httpClientA := createHttpClient(t)
-	codeVerifierA := "code-verifier-a"
+	codeVerifierA := testCodeVerifier + "-a"
 	requestCodeChallengeA := oauth.GeneratePKCECodeChallenge(codeVerifierA)
 	requestStateA := fake.LetterN(8)
 	requestNonceA := fake.LetterN(8)
@@ -550,7 +550,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	// Start new auth with User B using User A's id_token_hint (NO prompt parameter)
 	httpClientB := createHttpClient(t)
-	codeVerifierB := "code-verifier-b"
+	codeVerifierB := testCodeVerifier + "-b"
 	requestCodeChallengeB := oauth.GeneratePKCECodeChallenge(codeVerifierB)
 	requestStateB := fake.LetterN(8)
 	requestNonceB := fake.LetterN(8)

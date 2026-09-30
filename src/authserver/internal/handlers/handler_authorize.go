@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
@@ -167,9 +168,16 @@ func HandleAuthorizeGet(
 			UserAgent:                     r.UserAgent(),
 			IpAddress:                     authserver_middleware.GetClientIPFromRequest(r),
 		}
-		authContext.SetScope(params.Get("scope"))
+		// The scope the client asked for, normalized, is what the validator judges below; the scope
+		// stored is what the response type can honour of it. They differ only when offline_access is
+		// asked for a response type that returns no code, which OIDC Core 11 says to ignore, and
+		// validating the request rather than the stored value keeps a request for offline_access
+		// alone refused as that, on every response type (#244).
+		requestedScope := oidc.NormalizeScope(params.Get("scope"))
+		authContext.SetScope(protocolvalidation.ParseResponseType(authContext.ResponseType).ScopeHonoured(requestedScope))
 		// The scope as asked for, before any hop narrows Scope to what a user holds. A restart
-		// restores Scope from it, so it is written here and nowhere else (#436).
+		// restores Scope from it, so it is written here and nowhere else (#436). It is the honoured
+		// scope, so a restart cannot bring offline_access back onto an implicit ceremony.
 		authContext.RequestedScope = authContext.Scope
 
 		// Capture OIDC ui_locales (RFC §3.1.2.1) into AuthContext so the
@@ -302,7 +310,7 @@ func HandleAuthorizeGet(
 		// Every copy is read, not the first: a prompt sent twice with different values is refused
 		// below, and a copy asking for none still means nobody may be shown a login page before that
 		// refusal reaches the client. One copy, or identical copies, read as they always did (#228).
-		rawPrompt := strings.Fields(strings.Join(params["prompt"], " "))
+		rawPrompt := oauth.SplitSpaceDelimited(strings.Join(params["prompt"], " "))
 		facts := authorizeRouteFacts{
 			requestsSilence: slices.Contains(rawPrompt, "none"),
 			requestsLogin:   slices.Contains(rawPrompt, "login"),
@@ -352,7 +360,7 @@ func HandleAuthorizeGet(
 						ResponseMode:         authContext.ResponseMode,
 						PKCERequired:         client.IsPKCERequired(settings.PKCERequired),
 						ImplicitGrantEnabled: client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
-						Scope:                authContext.Scope,
+						Scope:                requestedScope,
 						Nonce:                authContext.Nonce,
 						State:                authContext.State,
 						MaxAge:               authContext.MaxAge,
@@ -984,7 +992,7 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 		if f.consent == nil {
 			return refuse(oidc.ErrorConsentRequired, "User consent is required")
 		}
-		for _, scope := range strings.Fields(*f.effectiveScope) {
+		for _, scope := range oidc.SplitScope(*f.effectiveScope) {
 			if !f.consent.HasScope(scope) {
 				return refuse(oidc.ErrorConsentRequired, "Additional consent is required")
 			}
@@ -1222,12 +1230,10 @@ func redirectWillBeEmitted(ctx context.Context, database authorizeDatabase, clie
 		registered = append(registered, uri.URI)
 	}
 
-	// Read off the token sequence rather than off ParseResponseType's booleans, for the reason
-	// stated at protocolvalidation.ValidateClientAndRedirectURI: the parser ignores unrecognised values
-	// and collapses duplicates, so "code code" and "code foo" are true for HasCode && !HasToken
-	// && !HasIdToken and must not buy an arbitrary loopback port.
-	responseTypes := strings.Fields(responseType)
-	allowLoopbackPortFlexibility := len(responseTypes) == 1 && responseTypes[0] == "code"
+	// IsCodeOnly, for the reason stated at protocolvalidation.ValidateClientAndRedirectURI: only the
+	// exact type "code" buys an arbitrary loopback port, and the parser reports "code code" and
+	// "code foo" as what they are (#244).
+	allowLoopbackPortFlexibility := protocolvalidation.ParseResponseType(responseType).IsCodeOnly()
 
 	if !urlutil.RedirectURIIsRegistered(registered, redirectURI, allowLoopbackPortFlexibility) {
 		slog.WarnContext(ctx, "the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",

@@ -33,7 +33,7 @@ func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
 		"grant_type":    {"authorization_code"},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}
 
 	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
@@ -66,7 +66,7 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 		"grant_type":    {"authorization_code"},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}
 
 	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
@@ -131,7 +131,7 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -167,7 +167,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -200,7 +200,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -329,7 +329,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -381,7 +381,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -482,7 +482,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + oauth.GeneratePKCECodeChallenge("code-verifier") +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
@@ -533,7 +533,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"code":          {codeVal},
 		"redirect_uri":  {redirectUri.URI},
 		"client_id":     {client.ClientIdentifier},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -613,7 +613,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + oauth.GeneratePKCECodeChallenge("code-verifier") +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
 		"&scope=" + url.QueryEscape(initialScope) +
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
@@ -660,7 +660,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"code":          {codeVal},
 		"redirect_uri":  {redirectUri.URI},
 		"client_id":     {client.ClientIdentifier},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -698,7 +698,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -776,7 +776,7 @@ func TestToken_Refresh_MissingRowIsInvalidGrant(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	refreshToken := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
-		code.Code, code.RedirectURI, "code-verifier")
+		code.Code, code.RedirectURI, testCodeVerifier)
 
 	row := refreshTokenRowByJti(t, refreshToken)
 	require.NoError(t, database.DeleteRefreshToken(context.Background(), nil, row.Id))

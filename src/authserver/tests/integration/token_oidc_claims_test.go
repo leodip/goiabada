@@ -37,7 +37,7 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -113,7 +113,7 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -167,7 +167,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -212,7 +212,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
@@ -315,7 +315,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		t.Fatal(err)
 	}
 
-	codeVerifier := "code-verifier"
+	codeVerifier := testCodeVerifier
 	requestCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)

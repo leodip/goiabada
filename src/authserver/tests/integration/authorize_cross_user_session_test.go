@@ -45,7 +45,7 @@ import (
 // redeemed. The shared fixtures in fixture_helpers_test.go send a random 43-character string as an S256
 // challenge, which no verifier matches, so their codes can never reach /auth/token and this file
 // needs the tokens.
-const crossUserCodeVerifier = "cross-user-session-code-verifier"
+const crossUserCodeVerifier = testCodeVerifier + "-cross-user-session"
 
 const crossUserScope = "openid profile email"
 

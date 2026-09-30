@@ -94,10 +94,10 @@ func TestToken_AuthCode_AccountStateReadAfterPKCE(t *testing.T) {
 			// A presenter without the verifier learns nothing about the account. The
 			// refusal comes before the code is claimed, so the code is still there for
 			// the request below.
-			status, body := postFormToTokenEndpoint(t, form("not-the-code-verifier"))
+			status, body := postFormToTokenEndpoint(t, form(testCodeVerifier+"-not-the-one"))
 			assertTokenRefusal(t, status, body, http.StatusBadRequest, "invalid_grant", "Invalid code_verifier (PKCE).")
 
-			status, body = postFormToTokenEndpoint(t, form("code-verifier"))
+			status, body = postFormToTokenEndpoint(t, form(testCodeVerifier))
 			if tc.wantDescription == "" {
 				assert.Equal(t, http.StatusOK, status, "the untouched account's code must redeem: %v", body)
 				assert.NotEmpty(t, body["access_token"])
@@ -134,7 +134,7 @@ func TestToken_Refresh_AccountStateReadAfterOwnership(t *testing.T) {
 			clientSecret := fake.Password(32)
 			httpClient, code := createAuthCode(t, clientSecret, "openid")
 			refreshToken := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
-				code.Code, code.RedirectURI, "code-verifier")
+				code.Code, code.RedirectURI, testCodeVerifier)
 			moveAccountState(t, code.UserId, tc.state)
 
 			status, body := postFormToTokenEndpoint(t, url.Values{

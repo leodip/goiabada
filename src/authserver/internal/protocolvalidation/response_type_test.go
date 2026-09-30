@@ -194,7 +194,9 @@ func TestParseResponseType(t *testing.T) {
 			wantIdToken:  false,
 		},
 
-		// Mixed valid and invalid
+		// Mixed valid and invalid. The recognised booleans are still set, and Unrecognised reports
+		// the rest (TestParseResponseType_ReportsWhatItDidNotUnderstand), which ValidateRequest
+		// refuses (#244).
 		{
 			name:         "valid with unknown type",
 			responseType: "token unknown",
@@ -210,7 +212,8 @@ func TestParseResponseType(t *testing.T) {
 			wantIdToken:  false,
 		},
 
-		// Duplicates (edge case - should still work)
+		// Duplicates: the boolean is set once, and Repeated reports the second copy, which
+		// ValidateRequest refuses (#244).
 		{
 			name:         "duplicate token",
 			responseType: "token token",

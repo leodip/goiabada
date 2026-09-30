@@ -68,7 +68,7 @@ func assertRefusal(t *testing.T, err error, want wantRefusal) {
 func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 	const (
 		clientSecret = "client_secret"
-		verifier     = "code_verifier"
+		verifier     = testCodeVerifier
 		redirectURI  = "https://example.com/callback"
 	)
 
@@ -83,7 +83,7 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 
 	proofs := []proof{
 		{
-			name: "wrong verifier", clientSecret: clientSecret, codeVerifier: "not_the_verifier",
+			name: "wrong verifier", clientSecret: clientSecret, codeVerifier: wrongCodeVerifier,
 			refusal: &wantRefusal{code: "invalid_grant", description: "Invalid code_verifier (PKCE).", status: http.StatusBadRequest},
 		},
 		{

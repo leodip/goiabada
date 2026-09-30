@@ -126,6 +126,15 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 				"Missing required code_verifier parameter.", http.StatusBadRequest)
 		}
 
+		// The verifier's grammar is RFC 7636 4.1's, checked here rather than left to the comparison:
+		// a value outside it was never a verifier, whatever it hashes to. It sits with the
+		// comparison, below client authentication and above the reuse return and every account
+		// check, so it answers about the verifier alone and reads nothing of the account (#137,
+		// #244).
+		if !isPKCEValue(input.CodeVerifier) {
+			return nil, codeVerifierMalformedRefusal()
+		}
+
 		codeChallenge := oauth.GeneratePKCECodeChallenge(input.CodeVerifier)
 		if codeEntity.CodeChallenge.String != codeChallenge {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",

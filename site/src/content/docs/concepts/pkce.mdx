@@ -77,9 +77,9 @@ Making PKCE optional reduces security. Only disable PKCE requirement when absolu
 When PKCE is optional but a client provides PKCE parameters, Goiabada validates them strictly:
 
 - `code_challenge_method` must be `S256` (plain is not supported)
-- `code_challenge` must be 43-128 characters
+- `code_challenge` must be 43-128 characters, using only `A-Z`, `a-z`, `0-9`, `-`, `.`, `_` and `~`
 - Both parameters must be provided together (partial PKCE is rejected)
-- At the token endpoint, `code_verifier` must be provided if PKCE was used during authorization
+- At the token endpoint, `code_verifier` must be provided if PKCE was used during authorization, and must follow the same character rule (a malformed one is refused with `invalid_grant`)
 - If PKCE was not used during authorization, providing `code_verifier` at the token endpoint is an error
 
 This ensures that clients using PKCE get full security benefits, even when PKCE is optional globally.

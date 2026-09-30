@@ -212,7 +212,7 @@ func TestToken_Refresh_StoredUppercaseOfflineAccess_AuthCode(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 	clientIdentifier := code.Client.ClientIdentifier
 	refreshToken := exchangeAuthCode(t, httpClient, clientIdentifier, clientSecret,
-		code.Code, code.RedirectURI, "code-verifier")
+		code.Code, code.RedirectURI, testCodeVerifier)
 
 	storedCode, err := database.GetCodeById(ctx, nil, code.Id)
 	require.NoError(t, err)

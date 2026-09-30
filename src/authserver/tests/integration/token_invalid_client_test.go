@@ -157,7 +157,7 @@ func TestToken_AuthCode_ClientSecretBasic_WrongSecretChallenge(t *testing.T) {
 		"grant_type":    {"authorization_code"},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
-		"code_verifier": {"code-verifier"},
+		"code_verifier": {testCodeVerifier},
 	}, true, code.Client.ClientIdentifier, "wrong_secret")
 
 	assert.Equal(t, http.StatusUnauthorized, got.status)
