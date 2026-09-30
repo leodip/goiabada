@@ -19,6 +19,8 @@ This endpoint shows the capabilities supported by Goiabada.
 
 The authorize endpoint is used to request authorization codes via the browser. This process normally involves authentication of the end-user and optionally obtaining consent.
 
+A POST is answered with a `303 See Other` to a GET that carries a one-time `request_handle` instead of the parameters, and the sign-in continues from that GET. The browser follows it on its own. The link works once and for five minutes.
+
 ### Parameters
 
 <table>

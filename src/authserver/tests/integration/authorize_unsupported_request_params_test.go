@@ -160,6 +160,11 @@ func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// The POST is parked and answered with a 303 to a GET, which refuses the request parameter
+	// (#246); the parked request keeps `request` so the GET sees it.
+	resp = followParkedAuthorizePost(t, httpClient, resp)
+	defer func() { _ = resp.Body.Close() }()
+
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
 	redirectLocation, err := url.Parse(resp.Header.Get("Location"))

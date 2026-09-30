@@ -52,6 +52,34 @@ func assertRedirect(t *testing.T, response *http.Response, location string) stri
 	return redirectLocation.String()
 }
 
+// followParkedAuthorizePost does what a browser does with the answer to a POST to
+// /auth/authorize (#246): the POST was parked and answered with a 303 to a GET carrying
+// ?request_handle=<handle>, and the browser navigates there with its own cookies. It returns the
+// GET's response and closes the POST's.
+func followParkedAuthorizePost(t *testing.T, browser *http.Client, postResponse *http.Response) *http.Response {
+	t.Helper()
+	handleURL := parkedAuthorizeLocation(t, postResponse)
+	_ = postResponse.Body.Close()
+	return loadPage(t, browser, handleURL)
+}
+
+// parkedAuthorizeLocation asserts a POST to /auth/authorize was answered with the 303 to a GET that
+// carries a handle and nothing else, and returns that URL.
+func parkedAuthorizeLocation(t *testing.T, postResponse *http.Response) string {
+	t.Helper()
+	if postResponse.StatusCode != http.StatusSeeOther {
+		t.Fatalf("Expected status code %d, got %d", http.StatusSeeOther, postResponse.StatusCode)
+	}
+	location, err := url.Parse(postResponse.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "/auth/authorize", location.Path)
+	assert.Len(t, location.Query(), 1, "the redirect carries the handle and nothing else")
+	assert.Len(t, location.Query().Get("request_handle"), 43, "a 256 bit handle, unpadded")
+	return location.String()
+}
+
 func loadPage(t *testing.T, client *http.Client, url string) *http.Response {
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {

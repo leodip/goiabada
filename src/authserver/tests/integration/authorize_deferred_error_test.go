@@ -265,8 +265,13 @@ func TestAuthorizePost_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://www.certification.openid.net")
 
-	resp, err := createHttpClient(t).Do(req)
+	httpClient := createHttpClient(t)
+	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	// The POST is parked and answered with a 303 to a GET, which runs the ceremony (#246).
+	resp = followParkedAuthorizePost(t, httpClient, resp)
 	defer func() { _ = resp.Body.Close() }()
 
 	location := assertRedirect(t, resp, "/auth/level1")
