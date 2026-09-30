@@ -74,6 +74,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 						"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
 					}}, nil)
 				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 				mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
 				mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 				if tc.wantDesc == "" {
@@ -132,6 +133,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", true).
 			Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the-jti", "typ": "Refresh", "sub": "user_subject"}}, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -20,10 +21,21 @@ import (
 )
 
 // Seam 3 for the refresh grant's redemption, in the order IssueRefreshTokenGrant owns it: the
-// containment of a replayed token's family (#128), the flow gate (#250), the claim on the presented
-// token (#128), the mint and the child's insert, and the session bump. These assertions were the
-// token handler's until the redemption moved into the issuer (#437); what the minted tokens carry is
+// containment of a replayed token's family (#128), the flow gate (#250), then one transaction that
+// claims the presented token (#128), checks the family's revocation record (#132, #259) and mints
+// and inserts the child, and the session bump after it commits. These assertions were the token
+// handler's until the redemption moved into the issuer (#437); what the minted tokens carry is
 // pinned by the TestMint*RefreshTokens cases.
+//
+// Every statement of the rotation is expected on rotationTx and never on mock.Anything. A wildcard
+// would match a read moved back to nil and the case would pass, and on sqlitedb's single connection
+// that read waits for the connection the transaction holds until the context expires (#139, #437).
+
+// rotationTx is the transaction the rotation runs in, and containmentTx the one containment does.
+var (
+	rotationTx    = &sql.Tx{}
+	containmentTx = &sql.Tx{}
+)
 
 // fakeSessions is the session port a refresh bumps through, recording each bump.
 type fakeSessions struct {
@@ -104,36 +116,54 @@ func ropcRefreshInput() *RefreshTokenGrantInput {
 	}
 }
 
-// armRefreshMint arms every read and write minting input's token set makes, noting "mint" at the
-// first of them and "insert" at the child's.
+// armRotation arms the rotation's transaction and the two statements that open it, in order: the
+// claim on the presented token, noted as "claim", and the read of the family's revocation record,
+// noted as "family", which answers familyRevoked. The transaction's own edges are noted as "begin"
+// and "commit" or "rollback".
+func armRotation(mockDB *mocks_data.Database, input *RefreshTokenGrantInput, claimed bool, familyRevoked bool,
+	note func(string)) *mocks_data.RunInTransactionStub {
+
+	stub := mocks_data.ExpectRunInTransaction(mockDB, rotationTx, note)
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).
+		Run(func(mock.Arguments) { note("claim") }).Return(claimed, nil).Once()
+	if claimed {
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, input.RefreshToken.FirstRefreshTokenJti).
+			Run(func(mock.Arguments) { note("family") }).Return(familyRevoked, nil).Once()
+	}
+	return stub
+}
+
+// armRefreshMint arms every read and write minting input's token set makes, all on rotationTx,
+// noting "mint" at the first of them and "insert" at the child's.
 func armRefreshMint(t *testing.T, mockDB *mocks_data.Database, input *RefreshTokenGrantInput, note func(string)) {
 	t.Helper()
 	parent := input.RefreshToken
-	mockDB.On("GetCurrentSigningKey", mock.Anything, (*sql.Tx)(nil)).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, rotationTx).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil).Once()
-	mockDB.On("CreateRefreshToken", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*models.RefreshToken")).
+	mockDB.On("CreateRefreshToken", mock.Anything, rotationTx, mock.AnythingOfType("*models.RefreshToken")).
 		Run(func(mock.Arguments) { note("insert") }).Return(nil).Once()
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, rotationTx, mock.Anything).Return(false, nil).Maybe()
 	if input.IsROPC {
-		mockDB.On("RefreshTokenLoadUser", mock.Anything, (*sql.Tx)(nil), parent).Run(func(mock.Arguments) { note("mint") }).Return(nil).Once()
-		mockDB.On("RefreshTokenLoadClient", mock.Anything, (*sql.Tx)(nil), parent).Return(nil).Once()
-		mockDB.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), &parent.User).Return(nil).Once()
-		mockDB.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), parent.User.Groups).Return(nil).Once()
-		mockDB.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), &parent.User).Return(nil).Once()
+		mockDB.On("RefreshTokenLoadUser", mock.Anything, rotationTx, parent).Run(func(mock.Arguments) { note("mint") }).Return(nil).Once()
+		mockDB.On("RefreshTokenLoadClient", mock.Anything, rotationTx, parent).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, rotationTx, &parent.User).Return(nil).Once()
+		mockDB.On("GroupsLoadAttributes", mock.Anything, rotationTx, parent.User.Groups).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, rotationTx, &parent.User).Return(nil).Once()
 		return
 	}
 	code := &parent.Code
 	now := time.Now().UTC()
-	mockDB.On("CodeLoadClient", mock.Anything, (*sql.Tx)(nil), code).Run(func(mock.Arguments) { note("mint") }).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, (*sql.Tx)(nil), code).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), &code.User).Return(nil).Once()
-	mockDB.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), code.User.Groups).Return(nil).Once()
-	mockDB.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), &code.User).Return(nil).Once()
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-1").Return(&models.UserSession{
+	mockDB.On("CodeLoadClient", mock.Anything, rotationTx, code).Run(func(mock.Arguments) { note("mint") }).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, rotationTx, code).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, rotationTx, &code.User).Return(nil).Once()
+	mockDB.On("GroupsLoadAttributes", mock.Anything, rotationTx, code.User.Groups).Return(nil).Once()
+	mockDB.On("UserLoadAttributes", mock.Anything, rotationTx, &code.User).Return(nil).Once()
+	// The max lifetime of a session-bound token is read off the session, on the transaction.
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, rotationTx, "sid-1").Return(&models.UserSession{
 		Id: 1, UserId: 5, Started: now.Add(-30 * time.Minute), LastAccessed: now.Add(-5 * time.Minute),
-	}, nil).Maybe()
+	}, nil).Once()
 }
 
 func refreshGrantSettings() *models.Settings {
@@ -148,8 +178,9 @@ func refreshGrantSettings() *models.Settings {
 	}
 }
 
-// The code-descended shape: claim, mint, insert the child, then bump the session the token is bound
-// to, with no step-up and no address, and hand the bumped session back for the audit (#243).
+// The code-descended shape: one transaction that claims, checks the family and mints and inserts
+// the child, then, after it commits, a bump of the session the token is bound to, with no step-up
+// and no address, handing the bumped session back for the audit (#243).
 func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	var order []string
@@ -159,16 +190,18 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 
 	input := codeRefreshInput()
 	input.ScopeRequested = "openid"
+	stub := armRotation(mockDB, input, true, false, note)
 	armRefreshMint(t, mockDB, input, note)
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).
-		Run(func(mock.Arguments) { note("claim") }).Return(true, nil).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
 	require.NoError(t, err)
 	assert.Equal(t, "openid", response.Scope, "the requested narrowing reaches the mint")
 	assert.NotEmpty(t, response.RefreshToken)
-	assert.Equal(t, []string{"claim", "mint", "insert", "bump"}, order)
+	// The claim, the family's record, the mint and the child's insert are inside the transaction; the
+	// bump opens a transaction of its own and so follows the commit.
+	assert.Equal(t, []string{"begin", "claim", "family", "mint", "insert", "commit", "bump"}, order)
+	assert.NoError(t, stub.BodyErr)
 	require.Len(t, sessions.bumps, 1)
 	bump := sessions.bumps[0]
 	assert.Equal(t, "sid-1", bump.sessionIdentifier)
@@ -189,8 +222,8 @@ func TestIssueRefreshTokenGrant_ATokenBoundToNoSessionBumpsNothing(t *testing.T)
 
 	input := codeRefreshInput()
 	input.RefreshToken.SessionIdentifier = ""
+	armRotation(mockDB, input, true, false, func(string) {})
 	armRefreshMint(t, mockDB, input, func(string) {})
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).Return(true, nil).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
@@ -213,22 +246,63 @@ func TestIssueRefreshTokenGrant_APasswordGrantsTokenBumpsNothing(t *testing.T) {
 	input := ropcRefreshInput()
 	input.RefreshToken.SessionIdentifier = "some-other-users-session"
 	input.ScopeRequested = "openid"
+	armRotation(mockDB, input, true, false, note)
 	armRefreshMint(t, mockDB, input, note)
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).
-		Run(func(mock.Arguments) { note("claim") }).Return(true, nil).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
 	require.NoError(t, err)
 	assert.Equal(t, "openid", response.Scope, "the requested narrowing reaches the mint")
-	assert.Equal(t, []string{"claim", "mint", "insert"}, order)
+	assert.Equal(t, []string{"begin", "claim", "family", "mint", "insert", "commit"}, order)
 	assert.Empty(t, sessions.bumps)
 	assert.Nil(t, outcome.BumpedSession)
 	mockDB.AssertExpectations(t)
 }
 
+// Every read the mint makes runs on the rotation's transaction, the claim mapper's picture lookup
+// included, for both shapes. On sqlitedb's single connection a read on nil waits for the connection
+// the transaction holds until the context expires, and the mapper swallows that failure, so the
+// token silently loses its picture claim (#437). The expectations on rotationTx are the assertion:
+// the picture read is required (no Maybe) and a read on nil matches none of them.
+func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		input  func() *RefreshTokenGrantInput
+		userId int64
+	}{
+		{"authorization code token", codeRefreshInput, 5},
+		{"ROPC token", ropcRefreshInput, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &models.UserSession{}})
+
+			input := tc.input()
+			input.ScopeRequested = "openid profile"
+			input.RefreshToken.Scope = "openid profile"
+			input.RefreshToken.Code.Scope = "openid profile"
+			settings := refreshGrantSettings()
+			settings.IncludeOpenIDConnectClaimsInAccessToken = true
+			settings.IncludeOpenIDConnectClaimsInIdToken = true
+
+			armRotation(mockDB, input, true, false, func(string) {})
+			armRefreshMint(t, mockDB, input, func(string) {})
+			mockDB.On("UserHasProfilePicture", mock.Anything, rotationTx, tc.userId).Return(true, nil)
+
+			response, _, err := issuer.IssueRefreshTokenGrant(context.Background(), settings, input)
+
+			require.NoError(t, err)
+			assert.NotEmpty(t, response.IdToken)
+			mockDB.AssertCalled(t, "UserHasProfilePicture", mock.Anything, rotationTx, tc.userId)
+			mockDB.AssertExpectations(t)
+		})
+	}
+}
+
 // A replayed token contains its family and goes no further: no gate, no claim, no mint, no bump.
-// The count comes back on the refusal, because whether the handler audits the replay depends on it.
+// Containment is one transaction that writes the family's record first and then revokes the live
+// members, so a family is never swept without a record (#132). Both answers come back on the
+// refusal, because whether the handler audits the replay depends on them.
 func TestIssueRefreshTokenGrant_AReplayContainsItsFamilyAndGoesNoFurther(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -238,52 +312,134 @@ func TestIssueRefreshTokenGrant_AReplayContainsItsFamilyAndGoesNoFurther(t *test
 		{"ROPC family", ropcRefreshInput()},
 	} {
 		for _, revokedCount := range []int64{0, 2} {
-			t.Run(fmt.Sprintf("%s, %d members revoked", tc.name, revokedCount), func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				sessions := &fakeSessions{}
-				issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+			for _, recorded := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s, %d members revoked, record written %v", tc.name, revokedCount, recorded), func(t *testing.T) {
+					mockDB := mocks_data.NewDatabase(t)
+					sessions := &fakeSessions{}
+					issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
 
-				input := *tc.input
-				replayed := *input.RefreshToken
-				replayed.Revoked = true
-				input.RefreshToken = &replayed
-				mockDB.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").
-					Return(revokedCount, nil).Once()
+					input := *tc.input
+					replayed := *input.RefreshToken
+					replayed.Revoked = true
+					input.RefreshToken = &replayed
+					var order []string
+					note := func(what string) { order = append(order, what) }
+					mocks_data.ExpectRunInTransaction(mockDB, containmentTx, note)
+					mockDB.On("RecordRefreshTokenFamilyRevoked", mock.Anything, containmentTx, "jti-family", RevokedFamilyReasonReplay).
+						Run(func(mock.Arguments) { note("record") }).Return(recorded, nil).Once()
+					mockDB.On("RevokeRefreshTokenFamily", mock.Anything, containmentTx, "jti-family").
+						Run(func(mock.Arguments) { note("revoke") }).Return(revokedCount, nil).Once()
 
-				response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), &input)
+					response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), &input)
 
-				var replayErr *RefreshTokenReplayedError
-				require.ErrorAs(t, err, &replayErr)
-				assert.Equal(t, revokedCount, replayErr.FamilyRevokedCount)
-				assert.Contains(t, err.Error(), fmt.Sprintf("containment revoked %d live family members", revokedCount))
-				assert.Nil(t, response)
-				assert.Nil(t, outcome)
-				assert.Empty(t, sessions.bumps)
-				mockDB.AssertExpectations(t)
-			})
+					var replayErr *RefreshTokenReplayedError
+					require.ErrorAs(t, err, &replayErr)
+					assert.Equal(t, revokedCount, replayErr.FamilyRevokedCount)
+					assert.Equal(t, recorded, replayErr.FamilyRecorded)
+					assert.Contains(t, err.Error(), fmt.Sprintf("containment revoked %d live family members", revokedCount))
+					assert.Equal(t, []string{"begin", "record", "revoke", "commit"}, order,
+						"the record is written before the sweep, in one transaction")
+					assert.Nil(t, response)
+					assert.Nil(t, outcome)
+					assert.Empty(t, sessions.bumps)
+					mockDB.AssertExpectations(t)
+				})
+			}
 		}
 	}
 }
 
 // Containment that failed revoked nothing, so it is a fault and never a replay refusal, which the
-// handler would audit as a containment.
+// handler would audit as a containment. Each of its two statements failing is one.
 func TestIssueRefreshTokenGrant_AFailedContainmentIsAFault(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
-
-	input := codeRefreshInput()
-	input.RefreshToken.Revoked = true
 	failure := errs.New("connection refused")
-	mockDB.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").Return(int64(0), failure).Once()
 
-	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
+	for _, tc := range []struct {
+		name string
+		arm  func(mockDB *mocks_data.Database)
+	}{
+		{"the record's write fails", func(mockDB *mocks_data.Database) {
+			mockDB.On("RecordRefreshTokenFamilyRevoked", mock.Anything, containmentTx, "jti-family", RevokedFamilyReasonReplay).
+				Return(false, failure).Once()
+		}},
+		{"the sweep fails", func(mockDB *mocks_data.Database) {
+			mockDB.On("RecordRefreshTokenFamilyRevoked", mock.Anything, containmentTx, "jti-family", RevokedFamilyReasonReplay).
+				Return(true, nil).Once()
+			mockDB.On("RevokeRefreshTokenFamily", mock.Anything, containmentTx, "jti-family").Return(int64(0), failure).Once()
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
 
-	assert.ErrorIs(t, err, failure)
-	var replayErr *RefreshTokenReplayedError
-	assert.False(t, errors.As(err, &replayErr))
-	assert.Nil(t, response)
-	assert.Nil(t, outcome)
-	mockDB.AssertExpectations(t)
+			input := codeRefreshInput()
+			input.RefreshToken.Revoked = true
+			stub := mocks_data.ExpectRunInTransaction(mockDB, containmentTx)
+			tc.arm(mockDB)
+
+			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
+
+			assert.ErrorIs(t, err, failure)
+			var replayErr *RefreshTokenReplayedError
+			assert.False(t, errors.As(err, &replayErr))
+			assert.ErrorIs(t, stub.BodyErr, failure, "the transaction rolled back")
+			assert.Nil(t, response)
+			assert.Nil(t, outcome)
+			mockDB.AssertExpectations(t)
+		})
+	}
+}
+
+// Two containments of one new family can both read the record absent, and the second insert then
+// loses on the key, which on PostgreSQL aborts its transaction. The containment runs once more, and
+// the second attempt finds the record the winner committed, so it is a replay refusal that wrote no
+// record (#132).
+func TestIssueRefreshTokenGrant_AContainmentThatLosesTheKeyRunsOnceMore(t *testing.T) {
+	lostTheKey := errs.Errorf("%w: another containment recorded the family first", data.ErrUniqueViolation)
+
+	t.Run("the second attempt finds the winner's record", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+
+		input := codeRefreshInput()
+		input.RefreshToken.Revoked = true
+		first := mocks_data.ExpectRunInTransaction(mockDB, containmentTx)
+		second := mocks_data.ExpectRunInTransaction(mockDB, containmentTx)
+		mockDB.On("RecordRefreshTokenFamilyRevoked", mock.Anything, containmentTx, "jti-family", RevokedFamilyReasonReplay).
+			Return(false, lostTheKey).Once()
+		mockDB.On("RecordRefreshTokenFamilyRevoked", mock.Anything, containmentTx, "jti-family", RevokedFamilyReasonReplay).
+			Return(false, nil).Once()
+		mockDB.On("RevokeRefreshTokenFamily", mock.Anything, containmentTx, "jti-family").Return(int64(0), nil).Once()
+
+		_, _, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
+
+		var replayErr *RefreshTokenReplayedError
+		require.ErrorAs(t, err, &replayErr)
+		assert.False(t, replayErr.FamilyRecorded, "the winner wrote the record, so this containment did not")
+		assert.Zero(t, replayErr.FamilyRevokedCount)
+		assert.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
+		assert.NoError(t, second.BodyErr)
+		mockDB.AssertExpectations(t)
+	})
+
+	t.Run("a second loss is a fault and is not retried again", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
+
+		input := codeRefreshInput()
+		input.RefreshToken.Revoked = true
+		mocks_data.ExpectRunInTransaction(mockDB, containmentTx)
+		mocks_data.ExpectRunInTransaction(mockDB, containmentTx)
+		mockDB.On("RecordRefreshTokenFamilyRevoked", mock.Anything, containmentTx, "jti-family", RevokedFamilyReasonReplay).
+			Return(false, lostTheKey).Twice()
+
+		_, _, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
+
+		assert.ErrorIs(t, err, data.ErrUniqueViolation)
+		var replayErr *RefreshTokenReplayedError
+		assert.False(t, errors.As(err, &replayErr))
+		mockDB.AssertExpectations(t)
+	})
 }
 
 // TestIssueRefreshTokenGrant_FlowGate owns the whole truth table for the rule that a refresh is
@@ -334,7 +490,7 @@ func TestIssueRefreshTokenGrant_FlowGate(t *testing.T) {
 			settings := refreshGrantSettings()
 			settings.ResourceOwnerPasswordCredentialsEnabled = tc.globalROPC
 			if !tc.refused {
-				mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).Return(false, nil).Once()
+				armRotation(mockDB, input, false, false, func(string) {})
 			}
 
 			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), settings, input)
@@ -346,7 +502,8 @@ func TestIssueRefreshTokenGrant_FlowGate(t *testing.T) {
 			} else {
 				assert.ErrorIs(t, err, ErrRefreshTokenNotClaimed, "an accepted row reaches the claim")
 			}
-			// The strict double: a refused row reaches neither containment nor the claim.
+			// The strict double: a refused row opens no transaction and reaches neither containment
+			// nor the claim.
 			mockDB.AssertExpectations(t)
 		})
 	}
@@ -374,7 +531,10 @@ func TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate(t *testing.T) {
 			input.RefreshToken.Revoked = true
 			settings := refreshGrantSettings()
 			settings.ResourceOwnerPasswordCredentialsEnabled = false
-			mockDB.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
+			mocks_data.ExpectRunInTransaction(mockDB, containmentTx)
+			mockDB.On("RecordRefreshTokenFamilyRevoked", mock.Anything, containmentTx, "jti-family", RevokedFamilyReasonReplay).
+				Return(true, nil).Once()
+			mockDB.On("RevokeRefreshTokenFamily", mock.Anything, containmentTx, "jti-family").Return(int64(2), nil).Once()
 
 			_, _, err := issuer.IssueRefreshTokenGrant(context.Background(), settings, input)
 
@@ -390,7 +550,8 @@ func TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate(t *testing.T) {
 // A refresh whose claim changed no row lost to a concurrent rotation, a concurrent revocation or a
 // deleted row, and cannot tell which. It is refused WITHOUT containment, since one of those is a
 // rotation whose freshly minted child a cascade would destroy, and it mints and bumps nothing
-// (#128). The strict double is the assertion that RevokeRefreshTokenFamily was not called.
+// (#128). The strict double is the assertion that neither containment nor the family's record was
+// touched, and the transaction rolled back.
 func TestIssueRefreshTokenGrant_ALostClaimContainsAndMintsNothing(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	sessions := &fakeSessions{}
@@ -398,11 +559,12 @@ func TestIssueRefreshTokenGrant_ALostClaimContainsAndMintsNothing(t *testing.T) 
 	logs := logtest.CaptureSlog(t)
 
 	input := codeRefreshInput()
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).Return(false, nil).Once()
+	stub := armRotation(mockDB, input, false, false, func(string) {})
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
 	assert.ErrorIs(t, err, ErrRefreshTokenNotClaimed)
+	assert.ErrorIs(t, stub.BodyErr, ErrRefreshTokenNotClaimed)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -421,7 +583,8 @@ func TestIssueRefreshTokenGrant_AClaimFailureIsAFault(t *testing.T) {
 
 	input := codeRefreshInput()
 	failure := errs.New("connection refused")
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).Return(false, failure).Once()
+	mocks_data.ExpectRunInTransaction(mockDB, rotationTx)
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(false, failure).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
@@ -432,8 +595,70 @@ func TestIssueRefreshTokenGrant_AClaimFailureIsAFault(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-// A mint that fails after the claim bumps nothing: the session is kept alive only by a refresh that
-// was answered with tokens.
+// The family's record is checked inside the rotation's transaction, below the claim. A family that
+// was recorded revoked after the validator read it, by a containment or by a client made public,
+// leaves the body as an error: the transaction rolls back, so the claim is undone and no child is
+// minted or inserted, and no session is bumped (#132, #259). Both shapes of token.
+func TestIssueRefreshTokenGrant_AFamilyRevokedInTheGapRollsTheRotationBack(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input *RefreshTokenGrantInput
+	}{
+		{"authorization code token", codeRefreshInput()},
+		{"ROPC token", ropcRefreshInput()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			sessions := &fakeSessions{}
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+			var order []string
+			note := func(what string) { order = append(order, what) }
+			logs := logtest.CaptureSlog(t)
+
+			// The strict double: nothing is minted, so no key is read and no child is inserted.
+			stub := armRotation(mockDB, tc.input, true, true, note)
+
+			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), tc.input)
+
+			assert.ErrorIs(t, err, ErrRefreshFamilyRevoked)
+			assert.False(t, errors.Is(err, ErrRefreshTokenNotClaimed), "it is its own refusal, not a lost claim")
+			assert.ErrorIs(t, stub.BodyErr, ErrRefreshFamilyRevoked, "the body asked for the rollback")
+			assert.Equal(t, []string{"begin", "claim", "family", "rollback"}, order)
+			assert.Nil(t, response)
+			assert.Nil(t, outcome)
+			assert.Empty(t, sessions.bumps)
+			assert.Empty(t, logs.Records())
+			mockDB.AssertExpectations(t)
+		})
+	}
+}
+
+// The record is read below the claim, so a claim that was lost never reads it, and a read that
+// fails is a fault that leaves the transaction rolled back with nothing minted.
+func TestIssueRefreshTokenGrant_AFailedFamilyReadIsAFault(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	sessions := &fakeSessions{}
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+
+	input := codeRefreshInput()
+	failure := errs.New("connection refused")
+	stub := mocks_data.ExpectRunInTransaction(mockDB, rotationTx)
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(true, nil).Once()
+	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, "jti-family").Return(false, failure).Once()
+
+	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
+
+	assert.ErrorIs(t, err, failure)
+	assert.False(t, errors.Is(err, ErrRefreshFamilyRevoked))
+	assert.ErrorIs(t, stub.BodyErr, failure)
+	assert.Nil(t, response)
+	assert.Nil(t, outcome)
+	assert.Empty(t, sessions.bumps)
+	mockDB.AssertExpectations(t)
+}
+
+// A mint that fails after the claim bumps nothing, and rolls the claim back with the transaction:
+// the session is kept alive only by a refresh that was answered with tokens.
 func TestIssueRefreshTokenGrant_AFailedMintBumpsNothing(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	sessions := &fakeSessions{}
@@ -441,12 +666,13 @@ func TestIssueRefreshTokenGrant_AFailedMintBumpsNothing(t *testing.T) {
 
 	input := codeRefreshInput()
 	failure := errs.New("connection refused")
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).Return(true, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, (*sql.Tx)(nil), &input.RefreshToken.Code).Return(failure).Once()
+	stub := armRotation(mockDB, input, true, false, func(string) {})
+	mockDB.On("CodeLoadClient", mock.Anything, rotationTx, &input.RefreshToken.Code).Return(failure).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
 	assert.ErrorIs(t, err, failure)
+	assert.ErrorIs(t, stub.BodyErr, failure, "the claim is rolled back with the failed mint")
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -461,12 +687,36 @@ func TestIssueRefreshTokenGrant_AFailedROPCMintIsAFault(t *testing.T) {
 
 	input := ropcRefreshInput()
 	failure := errs.New("connection refused")
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).Return(true, nil).Once()
-	mockDB.On("RefreshTokenLoadUser", mock.Anything, (*sql.Tx)(nil), input.RefreshToken).Return(failure).Once()
+	stub := armRotation(mockDB, input, true, false, func(string) {})
+	mockDB.On("RefreshTokenLoadUser", mock.Anything, rotationTx, input.RefreshToken).Return(failure).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
 	assert.ErrorIs(t, err, failure)
+	assert.ErrorIs(t, stub.BodyErr, failure)
+	assert.Nil(t, response)
+	assert.Nil(t, outcome)
+	assert.Empty(t, sessions.bumps)
+	mockDB.AssertExpectations(t)
+}
+
+// A commit the engine refuses after the body succeeded is a fault: the tokens minted inside are not
+// handed out, and no session is bumped for a refresh that did not commit.
+func TestIssueRefreshTokenGrant_ARefusedCommitHandsOutNothing(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+	sessions := &fakeSessions{}
+	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
+
+	input := codeRefreshInput()
+	commitFailure := errs.New("commit refused")
+	mocks_data.ExpectRunInTransactionThenFail(mockDB, rotationTx, commitFailure)
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(true, nil).Once()
+	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, "jti-family").Return(false, nil).Once()
+	armRefreshMint(t, mockDB, input, func(string) {})
+
+	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
+
+	assert.ErrorIs(t, err, commitFailure)
 	assert.Nil(t, response)
 	assert.Nil(t, outcome)
 	assert.Empty(t, sessions.bumps)
@@ -482,8 +732,8 @@ func TestIssueRefreshTokenGrant_AFailedBumpIsAFault(t *testing.T) {
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
 
 	input := codeRefreshInput()
+	armRotation(mockDB, input, true, false, func(string) {})
 	armRefreshMint(t, mockDB, input, func(string) {})
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), input.RefreshToken.Id).Return(true, nil).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 

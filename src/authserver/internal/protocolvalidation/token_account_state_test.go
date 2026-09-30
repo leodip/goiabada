@@ -272,6 +272,7 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 					mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
 						Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
 					mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
+					mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 					if ropc {
 						mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil).Maybe()
 						mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil).Maybe()

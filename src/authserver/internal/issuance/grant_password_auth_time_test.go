@@ -127,7 +127,7 @@ func TestMintROPCRefreshTokens_ATokenWithNoInstantIsRefused(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	response, err := issuer.mintROPCRefreshTokens(context.Background(), &models.Settings{},
+	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &models.Settings{},
 		&models.RefreshToken{
 			RefreshTokenJti: "pre-000051-jti",
 			UserId:          sql.NullInt64{Int64: 1, Valid: true},

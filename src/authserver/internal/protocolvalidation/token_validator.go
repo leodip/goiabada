@@ -39,6 +39,7 @@ type tokenValidatorDatabase interface {
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
 	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 	RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error

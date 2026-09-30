@@ -41,7 +41,7 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 	var replayed *issuance.RefreshTokenReplayedError
 	switch {
 	case errors.As(err, &replayed):
-		tr.auditRefreshTokenReplay(r.Context(), grant, replayed.FamilyRevokedCount)
+		tr.auditRefreshTokenReplay(r.Context(), grant, replayed.FamilyRevokedCount, replayed.FamilyRecorded)
 		tr.jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 			revokedRefreshTokenMessage, http.StatusBadRequest))
 		return
@@ -53,7 +53,10 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		tr.jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
 			description, http.StatusBadRequest))
 		return
-	case errors.Is(err, issuance.ErrRefreshTokenNotClaimed):
+	case errors.Is(err, issuance.ErrRefreshTokenNotClaimed), errors.Is(err, issuance.ErrRefreshFamilyRevoked):
+		// A family revoked between the validator's read and the rotation gets the lost claim's
+		// answer: the client can act on neither differently, and the record says nothing about
+		// why (#132, #259).
 		tr.jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 			revokedRefreshTokenMessage, http.StatusBadRequest))
 		return
@@ -88,19 +91,23 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 }
 
 // auditRefreshTokenReplay records a replay whose containment moved at least one family member from
-// live to revoked. A zero count means containment changed no state, which an already-swept family,
-// an earlier auth-code-reuse cascade and a repeated replay all produce. Suppressing the event there
-// avoids duplicate and misattributed audit rows and stops a client amplifying the log by replaying
-// the same token repeatedly.
+// live to revoked, or wrote the family's revocation record. A zero count and no record means
+// containment changed no state, which an already-swept family, an earlier auth-code-reuse cascade
+// and a repeated replay all produce. Suppressing the event there avoids duplicate and misattributed
+// audit rows and stops a client amplifying the log by replaying the same token repeatedly.
+//
+// The record counts on its own because a rotation in flight holds no live row to revoke: the
+// containment that arrives between its claim and its insert revokes nothing, yet it contained the
+// family, and the event is the only trace of the theft it answered (#132).
 //
 // It does NOT classify the presentation as benign. A repeated replay may well be malicious; it
 // simply caused no new containment, and the presentation that DID contain the family is the one
 // that recorded it.
 func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *protocolvalidation.RefreshTokenGrant,
-	revokedCount int64) {
+	revokedCount int64, recorded bool) {
 
 	refreshToken := grant.RefreshToken
-	if revokedCount == 0 {
+	if revokedCount == 0 && !recorded {
 		slog.DebugContext(ctx, "revoked refresh token presented, with no live family members to revoke",
 			"grant_type", oidc.GrantTypeRefreshToken.String(),
 			"refresh_token_id", refreshToken.Id)

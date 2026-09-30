@@ -321,6 +321,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 						"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
 					}}, nil)
 				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 				mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 				mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -399,6 +400,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 						"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
 					}}, nil)
 				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 				mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
 				mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 				if tc.wantAccepted {
@@ -780,6 +782,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", true).
 				Return(offlineClaims(), nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -810,6 +813,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", true).
 				Return(offlineClaims(), nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 			// #133's ownership check on the Offline arm looks the code's session up. It
@@ -848,6 +852,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", true).
 				Return(offlineClaims(), nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -901,6 +906,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 				"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
 			}}, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)

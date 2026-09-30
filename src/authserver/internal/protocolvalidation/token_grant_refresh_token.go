@@ -233,6 +233,37 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			http.StatusBadRequest)
 	}
 
+	// A live token whose rotation family is recorded as revoked is refused here. The record is
+	// written by replay containment and by a client made public, in the same transaction as the
+	// revocation, and it outlives every member of the family, which is what makes it more than the
+	// live-row sweep it accompanies: a rotation claims its parent and inserts its child in separate
+	// statements, so a sweep that ran between them found no child to revoke, the child then
+	// committed live, and this is the check that refuses it when it is presented. It is born
+	// refused, as #129 and #245 make a code's child (#132, #259).
+	//
+	// Below every refusal above it, so a token one of them already answers keeps its wording: the
+	// revoked code's marker (which refuses a flipped client's code-descended children first), the
+	// user's state, the generation and the authentication instant. Below the ownership check for the
+	// reason those are (#137): another client presenting a token must learn nothing about what
+	// became of it.
+	//
+	// Skipped for a token whose own row is revoked: that one is a replay, which the refresh
+	// redemption contains and audits, and its answer says the token was revoked. The record exists
+	// for the live token nothing else refuses.
+	//
+	// The same text as a disabled user's token and as an unknown jti, because the record says
+	// nothing a client can act on and naming it would confirm which families were contained.
+	if !refreshToken.Revoked {
+		familyRevoked, familyErr := val.database.IsRefreshTokenFamilyRevoked(ctx, nil, refreshToken.FirstRefreshTokenJti)
+		if familyErr != nil {
+			return nil, familyErr
+		}
+		if familyRevoked {
+			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				invalidRefreshTokenMessage, http.StatusBadRequest)
+		}
+	}
+
 	refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
 	switch refreshTokenType {
 	case issuance.TokenTypeRefresh.String():

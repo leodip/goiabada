@@ -101,7 +101,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
 
-	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, settings, code, refreshToken, "openid profile resource1:read")
+	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, refreshToken, "openid profile resource1:read")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -284,7 +284,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, settings, code, refreshToken, "resource1:write offline_access")
+	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, refreshToken, "resource1:write offline_access")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -438,7 +438,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 		Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
-	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, settings, refreshToken, "openid email resource:read")
+	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, nil, settings, refreshToken, "openid email resource:read")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -548,7 +548,7 @@ func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	// Request only a subset of the original scopes
-	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, settings, refreshToken, "resource:read")
+	response, err := tokenIssuer.mintROPCRefreshTokens(ctx, nil, settings, refreshToken, "resource:read")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)

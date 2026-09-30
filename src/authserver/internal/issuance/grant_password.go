@@ -87,7 +87,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.S
 
 	// Generate access token
 	// nil parent: initial password grant, so the validated User snapshot is the source.
-	accessTokenStr, err := t.generateROPCAccessToken(ctx, settings, input, input.Scope, now, privKey, keyIdentifier, nil)
+	accessTokenStr, err := t.generateROPCAccessToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.S
 	// Generate id_token if openid scope is present
 	scopes := strings.Split(input.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateROPCIdToken(ctx, settings, input, input.Scope, now, privKey, keyIdentifier)
+		idTokenStr, idTokenErr := t.generateROPCIdToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
@@ -105,7 +105,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.S
 	}
 
 	// Generate refresh token with direct UserId/ClientId (no Code entity needed)
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, settings, input, input.Scope, now, privKey, keyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -85,6 +85,7 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 	worker := NewWorker(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", theWorkersContext(), mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", theWorkersContext(), mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 	// The settings row is absent, which stops the task before the two session sweeps. That keeps

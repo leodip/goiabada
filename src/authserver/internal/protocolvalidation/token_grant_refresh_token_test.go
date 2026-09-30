@@ -90,6 +90,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 				"jti": "some_jti", "typ": "Refresh", "sub": "user_subject",
 			}}, nil).Once()
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "some_jti").Return(refreshToken, nil).Once()
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
@@ -400,6 +401,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "mismatched_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "mismatched_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -462,6 +464,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "disabled_user_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "disabled_user_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -534,6 +537,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "nil_session_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "nil_session_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "non_existent_session").Return(nil, nil)
@@ -611,6 +615,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_session_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_session_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "expired_session").Return(expiredSession, nil)
@@ -679,6 +684,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_offline_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "expired_offline_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -745,6 +751,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_offline_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_offline_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -806,6 +813,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_typ_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_typ_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -881,6 +889,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_scope_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_scope_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
@@ -962,6 +971,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
@@ -1038,6 +1048,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
@@ -1117,6 +1128,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "valid_refresh_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
@@ -1199,6 +1211,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_consent_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "revoked_consent_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
@@ -1289,6 +1302,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "partial_consent_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "partial_consent_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
@@ -1371,6 +1385,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_permission_refresh_token", true).Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "revoked_permission_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
@@ -1452,6 +1467,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 			"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
 		}}, nil)
 	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 	// Only the accepted row reaches these two.
@@ -1652,6 +1668,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "stored_grant_refresh_token", true).
 		Return(refreshTokenJwt, nil).Once()
 	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "stored_grant_jti").Return(refreshToken, nil).Once()
+	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	if reachesUser {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&user, nil).Once()
@@ -2113,6 +2130,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ownership_refresh_token", true).
 			Return(refreshTokenJwt, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ownership_jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session_of_interest").
@@ -2234,6 +2252,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", true).
 			Return(offlineClaims, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
@@ -2424,6 +2443,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", true).
 				Return(refreshTokenJwt, nil)
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+			mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 			mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
 			mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 
