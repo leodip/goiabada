@@ -10,15 +10,18 @@ import (
 
 // tokenIssuerDatabase is what the token issuer needs: the claim on the code or refresh token being
 // redeemed, the containment of a replayed refresh token's family and the record of it that a
-// rotation checks, the signing key, the claims
+// rotation checks, the user row a rotation takes first and the presented token's row it re-reads,
+// the signing key, the claims
 // that go into the tokens, and, for the implicit grant, the session row it takes and the
 // transaction it takes it in.
 type tokenIssuerDatabase interface {
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error
 	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error)
+	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
 	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []models.Group) error
 	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)

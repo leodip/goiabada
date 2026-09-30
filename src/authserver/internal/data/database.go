@@ -104,6 +104,20 @@ type Database interface {
 	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error)
 	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
 	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
+	// AcquireUserRow takes the user's row inside the caller's transaction and holds it until
+	// that transaction ends, the third of its kind beside AcquireUserSessionRow and
+	// AcquireClientRow. A refresh rotation takes it first, and a credential change takes the same
+	// row first through its write and IncrementUserAuthStateGeneration, so the two serialize and a
+	// child token is never stamped from a parent a revocation has already moved past (#131).
+	//
+	// It assigns auth_state_generation to itself and leaves updated_at alone, because the admin
+	// console shows that column as "Last updated at" and a refresh is not an edit of the account.
+	// A user that is not there is not an error: there is nothing to hold, and the read that follows
+	// decides whether the user exists.
+	//
+	// A transaction is required: without one the statement autocommits and the row is released
+	// before the caller can use it.
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	// IncrementUserAuthStateGeneration advances the user's authentication generation
 	// and returns the new value. Separate from UpdateUser because the column is tagged
 	// dont-update: every credential handler writes the whole user back, so an ordinary
