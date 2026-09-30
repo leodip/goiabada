@@ -19,4 +19,11 @@ type WellKnownConfig struct {
 	ClaimsSupported                   []string `json:"claims_supported"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
+	// Written false, never omitted: OIDC Discovery 1.0 section 3 reads an absent
+	// request_uri_parameter_supported as true, while the authorize endpoint refuses request_uri
+	// (request_uri_not_supported). request_parameter_supported defaults to false and is written
+	// beside it so the two refusals read alike. An omitempty tag here drops both, since the value
+	// is always false (#231, #437).
+	RequestParameterSupported    bool `json:"request_parameter_supported"`
+	RequestURIParameterSupported bool `json:"request_uri_parameter_supported"`
 }

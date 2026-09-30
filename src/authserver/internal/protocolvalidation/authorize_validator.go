@@ -238,6 +238,27 @@ func IsSupportedResponseMode(responseMode string) bool {
 	return responseMode == "" || slices.Contains(supportedResponseModes, responseMode)
 }
 
+// SupportedResponseModes is the discovery document's response_modes_supported: the set above, so
+// discovery can never advertise a mode ValidateRequest refuses or omit one it accepts (#437). It
+// returns a fresh slice, so a caller cannot reach the set.
+func SupportedResponseModes() []string {
+	return slices.Clone(supportedResponseModes)
+}
+
+// supportedResponseTypes are the response_type values ValidateRequest accepts, as discovery and
+// the unsupported_response_type description spell them. "token id_token" is accepted too, being the
+// same set of tokens (RFC 6749 section 3.1.1: order does not matter); this is the canonical
+// spelling of each.
+var supportedResponseTypes = []string{"code", "token", "id_token", "id_token token"}
+
+// SupportedResponseTypes is the discovery document's response_types_supported. It lists every
+// response type the server implements whatever the implicit switch says, as OIDC Discovery 1.0
+// section 3 defines the field ("values that this OP supports"); a client not allowed the implicit
+// grant is refused unauthorized_client (#437). It returns a fresh slice.
+func SupportedResponseTypes() []string {
+	return slices.Clone(supportedResponseTypes)
+}
+
 func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
 
 	// Check for empty/missing response_type first
@@ -275,7 +296,8 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	if !validResponseType {
 		return customerrors.NewErrorDetailWithHttpStatusCode("unsupported_response_type",
-			"The authorization server does not support this response_type. Supported values: code, token, id_token, id_token token.",
+			"The authorization server does not support this response_type. Supported values: "+
+				strings.Join(supportedResponseTypes, ", ")+".",
 			http.StatusBadRequest)
 	}
 

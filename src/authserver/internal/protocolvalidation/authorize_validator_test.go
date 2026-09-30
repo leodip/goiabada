@@ -675,6 +675,46 @@ func TestIsSupportedResponseMode(t *testing.T) {
 	}
 }
 
+// SupportedResponseModes is discovery's response_modes_supported. Pinned literally and in order,
+// and each value must be one IsSupportedResponseMode accepts, so the document cannot advertise a
+// mode the endpoint refuses (#437).
+func TestSupportedResponseModes(t *testing.T) {
+	modes := SupportedResponseModes()
+	assert.Equal(t, []string{"query", "fragment", "form_post"}, modes)
+	for _, mode := range modes {
+		assert.True(t, IsSupportedResponseMode(mode), "%q is advertised and must be accepted", mode)
+	}
+
+	// A caller overwriting the returned slice must not reach the set the validator reads.
+	modes[0] = "jwt"
+	assert.False(t, IsSupportedResponseMode("jwt"))
+	assert.True(t, IsSupportedResponseMode("query"))
+}
+
+// SupportedResponseTypes is discovery's response_types_supported. Every value is advertised
+// whatever the implicit switch says (#437); each must pass ValidateRequest for a client allowed
+// the implicit grant, and the description of unsupported_response_type lists the same values.
+func TestSupportedResponseTypes(t *testing.T) {
+	types := SupportedResponseTypes()
+	assert.Equal(t, []string{"code", "token", "id_token", "id_token token"}, types)
+
+	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	for _, responseType := range types {
+		input := ValidateRequestInput{
+			ResponseType:         responseType,
+			ImplicitGrantEnabled: true,
+			Scope:                "openid",
+			Nonce:                "test-nonce-123",
+			CodeChallengeMethod:  "S256",
+			CodeChallenge:        "a_valid_code_challenge_that_meets_length_requirements",
+		}
+		assert.NoError(t, validator.ValidateRequest(&input), "%q is advertised and must be accepted", responseType)
+	}
+
+	types[0] = "tampered"
+	assert.Equal(t, "code", SupportedResponseTypes()[0])
+}
+
 func TestValidateRequest_ValidInput(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
