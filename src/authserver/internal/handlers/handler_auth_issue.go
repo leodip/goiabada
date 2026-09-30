@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"html/template"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -821,10 +819,6 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		return err
 	}
 
-	if responseMode == "" {
-		responseMode = "query"
-	}
-
 	// The response's parameters, in the order they reach the client, built once for all three
 	// response modes because all three answer with the same two fields.
 	//
@@ -839,96 +833,7 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 		params = append(params, responseParam{"state", code.State})
 	}
 
-	if responseMode == "fragment" {
-		// Appended rather than written through writeResponseParams: a redirect URI cannot carry a
-		// fragment of its own for these fields to collide with, so there is no registered field
-		// list here to preserve or replace, and its query is left exactly as registered.
-		//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 above
-		http.Redirect(w, r, code.RedirectURI+"#"+encodeResponseParams(params), http.StatusFound)
-		return nil
-	}
-	if responseMode == "form_post" {
-		m := make(map[string]interface{})
-		m["redirectURI"] = code.RedirectURI
-		m["code"] = code.Code
-		// The same rule as the params slice above, restated because this branch answers through a
-		// bind map rather than a field list. What the client actually receives is then decided by
-		// form_post.html, whose {{if .state}} omits the input entirely.
-		//
-		// {{.state}} and {{if .state}} cannot tell an absent key from a key holding "", but a
-		// template that enumerates the map can: range yields the key only when it is present, and
-		// len counts it. form_post.html is operator supplied whenever GOIABADA_AUTHSERVER_TEMPLATEDIR
-		// is set, so that is a real reader, and it is what pins this guard in
-		// TestFormPostBindMapOmitsAnAbsentState (#146).
-		if code.State != "" {
-			m["state"] = code.State
-		}
-
-		t, err := template.ParseFS(templateFS, "form_post.html")
-		if err != nil {
-			return errs.Wrap(err, "unable to parse template")
-		}
-
-		// Render into a buffer, not straight to w, matching the error emitter's twin. Execute
-		// writes as it walks the template, so a template that parses and then fails part way
-		// through leaves a partial body and an implicit 200 already on the wire; the caller answers
-		// an error from here with pageRenderer.InternalServerError, and a WriteHeader after the
-		// response is committed changes nothing, so the client would be told 200 for a page that
-		// was never finished. Here that half-written page would be a form carrying an
-		// authorization code with no submit to deliver it. form_post.html is operator supplied
-		// whenever GOIABADA_AUTHSERVER_TEMPLATEDIR is set, so this is reachable in a real
-		// deployment rather than only in tests (#141, #146 decision 10).
-		var rendered bytes.Buffer
-		err = t.Execute(&rendered, m)
-		if err != nil {
-			return errs.Wrap(err, "unable to execute template")
-		}
-		// OAuth 2.0 Form Post Response Mode section 2: "Because the Authorization Response is
-		// intended to be used only once, the Authorization Server MUST instruct the User Agent (and
-		// any intermediaries) not to store or reuse the content of the response." This page carries
-		// an authorization code and the client's state, so a cached or reused copy is a replayable
-		// response sitting in an intermediary. This pair is what the rest of this codebase already
-		// writes for a no-store response (#146).
-		//
-		// Set here rather than before Execute deliberately: a render that fails must leave the
-		// response completely untouched, so the caller's last-resort InternalServerError owns every
-		// header as well as the status (#141).
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Pragma", "no-cache")
-
-		_, err = w.Write(rendered.Bytes())
-		if err != nil {
-			// The connection itself failed. Nothing can be recovered from here, including the
-			// caller's 500, but the error is still worth reporting rather than swallowing.
-			return errs.Wrap(err, "unable to write the form_post response")
-		}
-		return nil
-	}
-
-	// default to query
-	//
-	// writeResponseParams, not ParseRequestURI() then Query() then Encode(). That sequence seeded
-	// url.Values from the registered redirect URI's own query and Add'ed on top of it, so a client
-	// that had registered "?state=fixed" got back two state parameters and Go's own
-	// url.Values.Get answers with the first, which is the registered one. This is the redirect
-	// carrying the authorization code, so it is the response an RP's RFC 9700 2.1 CSRF check exists
-	// to guard, and unlike the error path it fired on every successful authorization rather than
-	// only on a refusal. Re-encoding also rewrote the registered query in five separate ways,
-	// against RFC 6749 3.1.2's "MUST be retained". Both are the shared helper's to prevent, and its
-	// comment carries the detail (#146).
-	//
-	// authorizationResponseParamNames, so a registered "error" is dropped from a success response as
-	// well: without it a client registering "?error=stale" completed an authorization and received
-	// "?error=stale&code=fresh&state=...", which an RP checking for "error" before reading "code"
-	// reads as a refusal of the authorization it just granted. It is also what drops a registered
-	// "?state=fixed" when the request carried no state of its own, so the client is never handed a
-	// state on this redirect that it did not send (#146).
-	location, err := writeResponseParams(code.RedirectURI, params, authorizationResponseParamNames)
-	if err != nil {
-		return errs.Wrap(err, "unable to build the authorization code redirect")
-	}
-
-	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 above
-	http.Redirect(w, r, location, http.StatusFound)
-	return nil
+	// An empty response mode is the query, the default for response_type=code (OAuth 2.0 Multiple
+	// Response Type Encoding Practices 2.1).
+	return writeAuthorizationResponse(w, r, templateFS, responseMode, code.RedirectURI, params)
 }

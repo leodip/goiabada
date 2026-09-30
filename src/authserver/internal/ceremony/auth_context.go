@@ -274,6 +274,20 @@ func (ac *AuthContext) RecordOTPVerified(now time.Time, enrolledGeneration *int6
 	ac.OTPKeyURL = ""
 }
 
+// AdoptSession records that this ceremony reuses userSession rather than authenticating: the user,
+// the level and methods the session reached, and its authentication generation. /auth/authorize's
+// SSO path and prompt=none both reuse one this way.
+//
+// The generation is inherited from the SESSION, never read from the user. Neither path reaches the
+// password handler, and reading the user's current generation here would launder an old session
+// into a newer one (#106 decision 11(d)).
+func (ac *AuthContext) AdoptSession(userSession *models.UserSession) {
+	ac.UserId = userSession.UserId
+	ac.AcrLevel = userSession.AcrLevel
+	ac.AuthMethods = userSession.AuthMethods
+	ac.AuthStateGeneration = userSession.AuthStateGeneration
+}
+
 // Restart sends the ceremony back to requires_level_1 keeping the request and discarding the
 // attempt. The request is what /auth/authorize accepted and is left untouched; everything an
 // authentication wrote is set to its zero value, and Scope is put back to RequestedScope. The

@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
@@ -122,6 +124,131 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "interaction_required", location.Query().Get("error"))
 			assert.Equal(t, tc.wantDescription, location.Query().Get("error_description"))
+		})
+	}
+}
+
+// Every read and write prompt=none makes, failing. Each answers 500 and nothing else: the client is
+// not answered, because a read that failed is no answer, and taking it for "no session" or "no
+// consent" would tell a signed-in user's client login_required or consent_required for a database
+// fault. Which reads a request makes is decideSilentAuthentication's table; this is that each load
+// stops on its fault (#437 seam 4).
+func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
+	fault := errors.New("the database is unavailable")
+
+	testCases := []struct {
+		name  string
+		fails string
+	}{
+		{"the session lookup", "GetUserSessionBySessionIdentifier"},
+		{"the session's user", "UserSessionLoadUser"},
+		{"the effective scope", "FilterOutScopesWhereUserIsNotAuthorized"},
+		{"the consent", "GetConsentByUserIdAndClientId"},
+		{"the session bump", "BumpUserSession"},
+		{"the save", "SaveAuthContext"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := mocks_handlers.NewPageRenderer(t)
+			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
+			database := mocks_data.NewDatabase(t)
+			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
+			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			tokenParser := mocks_handlers.NewTokenParser(t)
+
+			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
+				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+
+			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none", nil)
+			require.NoError(t, err)
+			ctx := reqctx.WithSettings(req.Context(), &models.Settings{Issuer: "https://test-issuer.com"})
+			ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
+			req = req.WithContext(ctx)
+			rr := httptest.NewRecorder()
+
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
+			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
+			authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
+			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+			// ConsentRequired, so the consent is read and every load is reached.
+			client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1, ConsentRequired: true}
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+
+			userSession := &models.UserSession{
+				Id:          1,
+				UserId:      7,
+				AcrLevel:    models.AcrLevel1,
+				AuthMethods: "pwd",
+				User:        models.User{Id: 7, Enabled: true},
+			}
+
+			// Each load answers until the one this row fails, and nothing after it is stubbed, so
+			// a load made past the fault fails the test on the mock.
+			steps := []struct {
+				method string
+				stub   func(fail bool)
+			}{
+				{"GetUserSessionBySessionIdentifier", func(fail bool) {
+					if fail {
+						database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(nil, fault)
+						return
+					}
+					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
+				}},
+				{"UserSessionLoadUser", func(fail bool) {
+					if fail {
+						database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(fault)
+						return
+					}
+					database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+					userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
+				}},
+				{"FilterOutScopesWhereUserIsNotAuthorized", func(fail bool) {
+					if fail {
+						permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", &userSession.User).Return("", fault)
+						return
+					}
+					permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", &userSession.User).Return("openid", nil)
+				}},
+				{"GetConsentByUserIdAndClientId", func(fail bool) {
+					if fail {
+						database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, fault)
+						return
+					}
+					database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(&models.UserConsent{Scope: "openid"}, nil)
+				}},
+				{"BumpUserSession", func(fail bool) {
+					if fail {
+						userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", models.AcrLevel1, mock.Anything).Return(nil, fault)
+						return
+					}
+					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", models.AcrLevel1, mock.Anything).Return(userSession, nil)
+					auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.Anything).Return()
+				}},
+				{"SaveAuthContext", func(fail bool) {
+					ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(fault)
+				}},
+			}
+			for _, step := range steps {
+				step.stub(step.method == tc.fails)
+				if step.method == tc.fails {
+					break
+				}
+			}
+
+			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+				return errors.Is(err, fault)
+			})).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Empty(t, rr.Header().Get("Location"), "a fault answers the client nothing")
+			ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 		})
 	}
 }

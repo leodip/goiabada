@@ -1,14 +1,13 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
-	"html/template"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -106,6 +105,7 @@ func HandleAuthorizeGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		requestId := middleware.GetReqID(r.Context())
+		params := authorizeParameters(r)
 
 		// The ceremony id is minted here and nowhere else, because this is the only place an
 		// auth context is created. Every form this ceremony renders carries it and every POST
@@ -118,20 +118,20 @@ func HandleAuthorizeGet(
 		// record, so a sign-in in progress in the same browser survives a malformed link (#436).
 		authContext := ceremony.AuthContext{
 			CeremonyId:                    ceremonyId,
-			ClientId:                      r.FormValue("client_id"),
-			RedirectURI:                   r.FormValue("redirect_uri"),
-			ResponseType:                  r.FormValue("response_type"),
-			CodeChallengeMethod:           r.FormValue("code_challenge_method"),
-			CodeChallenge:                 r.FormValue("code_challenge"),
-			ResponseMode:                  r.FormValue("response_mode"),
-			MaxAge:                        r.FormValue("max_age"),
-			AcrValuesFromAuthorizeRequest: r.FormValue("acr_values"),
-			State:                         r.FormValue("state"),
-			Nonce:                         r.FormValue("nonce"),
+			ClientId:                      params.Get("client_id"),
+			RedirectURI:                   params.Get("redirect_uri"),
+			ResponseType:                  params.Get("response_type"),
+			CodeChallengeMethod:           params.Get("code_challenge_method"),
+			CodeChallenge:                 params.Get("code_challenge"),
+			ResponseMode:                  params.Get("response_mode"),
+			MaxAge:                        params.Get("max_age"),
+			AcrValuesFromAuthorizeRequest: params.Get("acr_values"),
+			State:                         params.Get("state"),
+			Nonce:                         params.Get("nonce"),
 			UserAgent:                     r.UserAgent(),
 			IpAddress:                     authserver_middleware.GetClientIPFromRequest(r),
 		}
-		authContext.SetScope(r.FormValue("scope"))
+		authContext.SetScope(params.Get("scope"))
 		// The scope as asked for, before any hop narrows Scope to what a user holds. A restart
 		// restores Scope from it, so it is written here and nowhere else (#436).
 		authContext.RequestedScope = authContext.Scope
@@ -142,9 +142,9 @@ func HandleAuthorizeGet(
 		// /auth/issue). Sanitize first — BCP 47 shape filter, capped at
 		// 10 tags / 256 bytes — so we don't bloat the server-side session
 		// store this context lives in, which #266 moved out of the cookie,
-		// or accept attacker-controlled junk. r.FormValue covers both query
+		// or accept attacker-controlled junk. params covers both query
 		// (GET) and form body (POST).
-		if uiLocales := i18n.SanitizeUILocales(r.FormValue("ui_locales")); len(uiLocales) > 0 {
+		if uiLocales := i18n.SanitizeUILocales(params.Get("ui_locales")); len(uiLocales) > 0 {
 			authContext.UILocales = uiLocales
 			// The global locale middleware ran on this request but only sees
 			// the query string. If the value came from the form body
@@ -225,17 +225,14 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		// The client is loaded here rather than after the unsupported-parameter check below,
-		// because the closure declared next dispatches an error redirect and every error redirect
-		// now carries the client it is answering: RFC 9700 4.11.2 hands the trust decision to the
-		// server and names the source of the redirect URI as one of its inputs, so the redirect
-		// has to know which client asked for it. A closure declared above this load cannot
-		// reference the variable at all, which is why the load moved rather than the closure
-		// (#108).
+		// The client is loaded here, above every answer that can redirect, because every error
+		// redirect carries the client it is answering: RFC 9700 4.11.2 hands the trust decision to
+		// the server and names the source of the redirect URI as one of its inputs, so the redirect
+		// has to know which client asked for it (#108).
 		//
-		// Nothing is lost by the move: ValidateClientAndRedirectURI ran directly above and returns
-		// an error unless the client exists and is enabled, so the only way this finds nothing is a
-		// client deleted between the two lookups, which answered 500 before the move as well.
+		// ValidateClientAndRedirectURI ran directly above and returns an error unless the client
+		// exists and is enabled, so the only way this finds nothing is a client deleted between the
+		// two lookups, which is answered 500.
 		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
@@ -263,39 +260,6 @@ func HandleAuthorizeGet(
 		// log in for a request that will be refused anyway (#243).
 		requestedMaxAge, _ := oidc.ParseMaxAge(authContext.MaxAge)
 
-		// The session row behind this browser, loaded at most once and only if somebody asks. The
-		// predicate below asks, and so does the ordinary path at the bottom of the handler, and
-		// between them there must be exactly one query: this handler used to reach the lookup only
-		// after prompt=none and prompt=login had already returned, so an eager load here would add
-		// a query to every prompt=login request and a second one to every prompt=none request,
-		// which does its own lookup inside handlePromptNone.
-		//
-		// A lookup that fails records the error and answers false. False is not "no session" here,
-		// it is "no answer", so every caller checks sessionLoadErr and answers 500 rather than
-		// acting on it: treating an unreadable session as an absent one would turn a database
-		// fault into a login prompt for somebody who is already signed in (#213).
-		var (
-			userSession     *models.UserSession
-			sessionLookedUp bool
-			sessionIsValid  bool
-			sessionLoadErr  error
-		)
-		hasValidUserSession := func() bool {
-			if sessionLookedUp {
-				return sessionIsValid
-			}
-			sessionLookedUp = true
-
-			userSession, sessionLoadErr = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
-			if sessionLoadErr != nil {
-				return false
-			}
-
-			sessionIsValid = userSessionManager.HasValidUserSession(userSession,
-				settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
-			return sessionIsValid
-		}
-
 		// Silence and forced re-authentication are read from the RAW parameter rather than from
 		// authContext.Prompt, because a prompt the validator rejects is never assigned there, and
 		// OIDC Core 3.1.2.3 forbids interacting with a request that "contains the prompt parameter
@@ -304,321 +268,399 @@ func HandleAuthorizeGet(
 		// page. Case-sensitively, and on whitespace-separated tokens, because OIDC prompt values
 		// are case-sensitive: "NONE" and "Login" carry no recognised token and are interactive
 		// (#213 decision 5).
-		rawPrompt := strings.Fields(r.FormValue("prompt"))
-		requestsSilence := slices.Contains(rawPrompt, "none")
-		requestsLogin := slices.Contains(rawPrompt, "login")
+		rawPrompt := strings.Fields(params.Get("prompt"))
+		facts := authorizeRouteFacts{
+			requestsSilence: slices.Contains(rawPrompt, "none"),
+			requestsLogin:   slices.Contains(rawPrompt, "login"),
+		}
 
-		// Whether the five validations below answer the client straight away or park their error
-		// and send the visitor to log in first.
-		//
-		// RFC 9700 4.11.2: "The authorization server MUST always authenticate the user first and,
-		// with the exception of the silent authentication use case, prompt the user for credentials
-		// when needed, before redirecting the user." Without this, one link sent to a logged-out
-		// browser makes this server redirect it to a host the client chose, which is attack 1 in
-		// that section verbatim.
-		//
-		// The rule the three clauses come from: authentication is required before a REDIRECT, and
-		// only before a redirect. Where the answer is a page it is rendered at once.
-		//
-		//   - requestsSilence: OIDC Core 3.1.2.3 says the server "MUST NOT interact with the
-		//     End-User" when prompt=none, which is the exception RFC 9700 names.
-		//   - !redirectWillBeEmitted: no redirect leaves this server, so the requirement that
-		//     governs redirects has nothing to say and the visitor reaches the same refusal page
-		//     with or without a login (#108's and #122's guards, decision 8).
-		//   - !requestsLogin && hasValidUserSession(): a session holder has authenticated already,
-		//     unless the client asked not to be answered on the strength of one (decision 4).
-		//
-		// The two clauses that read nothing are evaluated first so the one that does is reached
-		// only when it decides something: || short-circuits, and what redirectWillBeEmitted does
-		// is read, so skipping it changes no state and the value is identical to the order §4
-		// wrote. Only the queries differ. It stopped being side-effect free when it gained the
-		// registration gate (#241 decision 11), and the ordering argument rests on the read being
-		// a read rather than on the predicate being pure.
-		//
-		// The answer is remembered, in the shape hasValidUserSession above already uses, because
-		// this request has a second reader: the emitter. Two live reads of a table an administrator
-		// can change mid-request are two answers that need not agree, and a no here is what makes
-		// answering the client at once safe, so it is carried to the emitter as a floor rather than
-		// recomputed there. redirectAlreadyWithheld is where it lands and why.
 		var (
-			emissionLookedUp bool
-			emissionAllowed  bool
+			userSession *models.UserSession
+			refusal     *customerrors.ErrorDetail
 		)
-		redirectWouldBeEmitted := func() bool {
-			if emissionLookedUp {
-				return emissionAllowed
-			}
-			emissionLookedUp = true
 
-			emissionAllowed = redirectWillBeEmitted(r.Context(), database, client, authContext.RedirectURI,
-				authContext.ResponseType, "authorize")
-			return emissionAllowed
-		}
+		// The loads. decideAuthorizeRoute names the next fact it needs, or the route once it needs
+		// none, and each fact is loaded here once and only when asked for. That is what keeps the
+		// reads what they were: a prompt=none request never reads the session here, because
+		// handlePromptNone does its own lookup; a prompt=login request never reads it at all; and a
+		// session read that fails answers 500 before any validation runs, rather than being taken
+		// for "no session" and turning a database fault into a login prompt for somebody already
+		// signed in (#213).
+		route, need := decideAuthorizeRoute(facts)
+		for need != authorizeFactNone {
+			switch need {
+			case authorizeFactRedirectEmission:
+				// Remembered on the facts, because this request has a second reader: the emitter.
+				// Two live reads of a table an administrator can change mid-request are two answers
+				// that need not agree, and a no here is what makes answering the client at once
+				// safe, so it is carried to the emitter as a floor rather than recomputed there.
+				// redirectAlreadyWithheld is where it lands and why.
+				emitted := redirectWillBeEmitted(r.Context(), database, client, authContext.RedirectURI,
+					authContext.ResponseType, "authorize")
+				facts.redirectEmitted = &emitted
 
-		answerClientNow := requestsSilence ||
-			!redirectWouldBeEmitted() ||
-			(!requestsLogin && hasValidUserSession())
-
-		if sessionLoadErr != nil {
-			pageRenderer.InternalServerError(w, r, sessionLoadErr)
-			return
-		}
-
-		// answerClientImmediately answers the client with an error now, whoever is at the browser.
-		//
-		// Read from the request rather than from authContext, because two of its call sites run
-		// before the context has been populated with the validated values. answerClientWithError then
-		// clears the context before answering, and derives its own server_error fallback
-		// from this same request-sourced input (#141).
-		answerClientImmediately := func(validationError *customerrors.ErrorDetail) {
-			input := redirectErrorFromRequest(r, client,
-				validationError.GetCode(), validationError.GetDescription())
-
-			// Carry a refusal this request has already been given, and only a refusal. The
-			// predicate may not have run at all, on a silent request, where the first clause of
-			// answerClientNow short-circuits it; that is "nothing has refused yet" and the emitter
-			// asks for itself.
-			input.redirectAlreadyWithheld = emissionLookedUp && !emissionAllowed
-
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, input)
-		}
-
-		// answerValidationError answers one of the five validations that run before this handler
-		// knows who is at the browser. It is separate from answerClientImmediately, rather than
-		// being the only closure with the disabled-account path folded into it, because that path
-		// must never defer: a disabled user sent to the login page cannot complete it, so the
-		// access_denied its client is owed would never be delivered at all.
-		//
-		// These five descriptions stay English and are deliberately NOT localized, unlike the
-		// seven above that render the refusal page. They become an error_description, which RFC
-		// 6749 4.1.2.1 confines to "%x20-21 / %x23-5B / %x5D-7E" and describes as "used to assist
-		// the client developer in understanding the error that occurred": the audience is the
-		// integrator reading a redirect, not the visitor, and the character set excludes pt-BR
-		// anyway. Translating one would not ship non-ASCII, because
-		// customerrors.ConformErrorDescription enforces that set at both the parking site below
-		// and the emitter, so an accented sentence would reach the client as a row of question
-		// marks instead. That is the failure a translation here buys (#213 decision 9).
-		answerValidationError := func(validationError *customerrors.ErrorDetail) {
-			if answerClientNow {
-				answerClientImmediately(validationError)
-				return
-			}
-
-			// Park the error and go and authenticate. It is carried on the auth context, which
-			// the session store seals with an AEAD, so it is not a value the visitor can choose,
-			// and it is delivered at /auth/level1completed once level 1 credentials are verified.
-			// ParkDeferredError conforms and bounds the description before it is stored.
-			authContext.ParkDeferredError(validationError.GetCode(), validationError.GetDescription())
-
-			saveAuthContextErr := ceremonyStore.SaveAuthContext(w, r, &authContext)
-			if saveAuthContextErr != nil {
-				pageRenderer.InternalServerError(w, r, saveAuthContextErr)
-				return
-			}
-			http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
-		}
-
-		err = authorizeValidator.ValidateUnsupportedRequestParameters(&protocolvalidation.ValidateUnsupportedRequestParametersInput{
-			HasRequest:    r.Form.Has("request"),
-			HasRequestURI: r.Form.Has("request_uri"),
-		})
-		if err != nil {
-			var valError *customerrors.ErrorDetail
-			if errors.As(err, &valError) {
-				answerValidationError(valError)
-				return
-			}
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-
-		// The client was loaded above the error-redirect closure, which needs it, and the settings
-		// above the session predicate.
-		pkceRequired := client.IsPKCERequired(settings.PKCERequired)
-		implicitGrantEnabled := client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled)
-
-		err = authorizeValidator.ValidateRequest(&protocolvalidation.ValidateRequestInput{
-			ResponseType:         authContext.ResponseType,
-			CodeChallengeMethod:  authContext.CodeChallengeMethod,
-			CodeChallenge:        authContext.CodeChallenge,
-			ResponseMode:         authContext.ResponseMode,
-			PKCERequired:         pkceRequired,
-			ImplicitGrantEnabled: implicitGrantEnabled,
-			Scope:                authContext.Scope,
-			Nonce:                authContext.Nonce,
-			MaxAge:               authContext.MaxAge,
-		})
-
-		if err != nil {
-			var valError *customerrors.ErrorDetail
-			if errors.As(err, &valError) {
-				answerValidationError(valError)
-				return
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-		}
-
-		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope)
-
-		if err != nil {
-			var valError *customerrors.ErrorDetail
-			if errors.As(err, &valError) {
-				answerValidationError(valError)
-				return
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-		}
-
-		// Validate and normalize the prompt parameter
-		normalizedPrompt, err := authorizeValidator.ValidatePrompt(r.FormValue("prompt"))
-		if err != nil {
-			var valError *customerrors.ErrorDetail
-			if errors.As(err, &valError) {
-				answerValidationError(valError)
-				return
-			} else {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-		}
-		authContext.Prompt = normalizedPrompt
-
-		// Validate id_token_hint if present (OIDC Core 1.0 Section 3.1.2.1/3.1.2.2)
-		idTokenHint := r.FormValue("id_token_hint")
-		hintSub, err := validateIdTokenHint(r.Context(), idTokenHint, tokenParser, settings)
-		if err != nil {
-			// id_token_hint validation errors are redirected to client
-			var valError *customerrors.ErrorDetail
-			if errors.As(err, &valError) {
-				answerValidationError(valError)
-				return
-			}
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-		authContext.IdTokenHintSub = hintSub
-
-		// The authentication level this ceremony must reach is fixed HERE, at the one point the
-		// request has been accepted and before any handler acts on it, and every later handler
-		// reads the snapshot instead of the client's row. /auth/level1completed, /auth/level2 and
-		// /auth/completed each reload the client and would otherwise recompute the target from
-		// whatever default_acr_level says by the time they run, so an administrator editing that
-		// row mid-ceremony would retroactively change what the ceremony was required to do:
-		// raising it after the step-up decision has been taken stamps an acr naming a second
-		// factor that was never performed, and lowering it takes /auth/level2's target outside
-		// its switch and answers 500. This is also the last point before handlePromptNone below
-		// reads the target (#240).
-		authContext.SetTargetAcrLevel(client.DefaultAcrLevel)
-
-		// Handle prompt=none: silent authentication without any UI
-		if authContext.HasPromptValue("none") {
-			handlePromptNone(w, r, pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
-			return
-		}
-
-		// Handle prompt=login: force re-authentication, skip session entirely
-		if authContext.HasPromptValue("login") {
-			authContext.AuthState = ceremony.AuthStateRequiresLevel1
-			err = ceremonyStore.SaveAuthContext(w, r, &authContext)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-			http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
-			return
-		}
-
-		// The same lookup the predicate at the top of the handler may already have performed, and
-		// the closure returns its cached answer when it did. It has not when a clause above the
-		// session clause carried the predicate on its own, which is why this is a call and not a
-		// read of a variable.
-		sessionIsValidForSSO := hasValidUserSession()
-		if sessionLoadErr != nil {
-			pageRenderer.InternalServerError(w, r, sessionLoadErr)
-			return
-		}
-
-		// The user behind the session is loaded here, and not inside the closure, because the
-		// predicate needs only the session's own timestamps and this is the first point anything
-		// reads userSession.User. UserSessionLoadUser answers nil for a nil session.
-		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-
-		if sessionIsValidForSSO {
-
-			// Check id_token_hint sub matching for SSO session reuse (OIDC Core 3.1.2.1)
-			// If hint identifies a different user, force re-authentication instead of SSO
-			if authContext.IdTokenHintSub != "" && userSession.User.Subject != authContext.IdTokenHintSub {
-				// Treat as no valid session — force re-authentication
-				authContext.AuthState = ceremony.AuthStateRequiresLevel1
-				err = ceremonyStore.SaveAuthContext(w, r, &authContext)
+			case authorizeFactSessionValidity:
+				userSession, err = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)
 					return
 				}
-				http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
-				return
+				valid := userSessionManager.HasValidUserSession(userSession,
+					settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
+				facts.sessionValid = &valid
+
+			case authorizeFactValidation:
+				validation, validationErr := validateAuthorizeRequest(r.Context(), authorizeValidator, tokenParser,
+					settings, params, &protocolvalidation.ValidateRequestInput{
+						ResponseType:         authContext.ResponseType,
+						CodeChallengeMethod:  authContext.CodeChallengeMethod,
+						CodeChallenge:        authContext.CodeChallenge,
+						ResponseMode:         authContext.ResponseMode,
+						PKCERequired:         client.IsPKCERequired(settings.PKCERequired),
+						ImplicitGrantEnabled: client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
+						Scope:                authContext.Scope,
+						Nonce:                authContext.Nonce,
+						MaxAge:               authContext.MaxAge,
+					})
+				if validationErr != nil {
+					pageRenderer.InternalServerError(w, r, validationErr)
+					return
+				}
+				refusal = validation.refusal
+				authContext.Prompt = validation.prompt
+				authContext.IdTokenHintSub = validation.hintSubject
+				if refusal == nil {
+					// The authentication level this ceremony must reach is fixed HERE, at the one
+					// point the request has been accepted and before any handler acts on it, and
+					// every later handler reads the snapshot instead of the client's row.
+					// /auth/level1completed, /auth/level2 and /auth/completed each reload the client
+					// and would otherwise recompute the target from whatever default_acr_level says
+					// by the time they run, so an administrator editing that row mid-ceremony would
+					// retroactively change what the ceremony was required to do: raising it after
+					// the step-up decision has been taken stamps an acr naming a second factor that
+					// was never performed, and lowering it takes /auth/level2's target outside its
+					// switch and answers 500. This is also the last point before handlePromptNone
+					// reads the target (#240).
+					authContext.SetTargetAcrLevel(client.DefaultAcrLevel)
+				}
+				facts.validated = true
+				facts.refused = refusal != nil
+				facts.promptNone = authContext.HasPromptValue("none")
+				facts.promptLogin = authContext.HasPromptValue("login")
+				facts.hintSubject = authContext.IdTokenHintSub
+
+			case authorizeFactSessionUser:
+				// Loaded only here, because the session predicate needs only the session's own
+				// timestamps and this is the first point anything reads userSession.User.
+				// UserSessionLoadUser answers nil for a nil session.
+				err = database.UserSessionLoadUser(r.Context(), nil, userSession)
+				if err != nil {
+					pageRenderer.InternalServerError(w, r, err)
+					return
+				}
+				facts.sessionUserLoaded = true
+				if userSession != nil {
+					facts.sessionUserSubject = userSession.User.Subject
+					facts.sessionUserEnabled = userSession.User.Enabled
+				}
 			}
+			route, need = decideAuthorizeRoute(facts)
+		}
 
-			// is the account still enabled?
+		// answerClientImmediately answers the client with an error now, whoever is at the browser.
+		// answerClientWithError clears the context before answering, and derives its own
+		// server_error fallback from this same input (#141).
+		answerClientImmediately := func(errorDetail *customerrors.ErrorDetail) {
+			input := redirectErrorFromAuthContext(&authContext, client,
+				errorDetail.GetCode(), errorDetail.GetDescription())
 
-			if !userSession.User.Enabled {
+			// Carry a refusal this request has already been given, and only a refusal. The
+			// predicate is not read at all on a silent request; that is "nothing has refused yet"
+			// and the emitter asks for itself.
+			input.redirectAlreadyWithheld = facts.redirectEmitted != nil && !*facts.redirectEmitted
 
-				// the user account has been disabled
-				// we should log this event and return an error to the client
-				auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
-					"userId": userSession.UserId,
-				})
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, input)
+		}
 
-				// Answered at once, never deferred: this path has a valid session, so somebody is
-				// already authenticated, and a disabled user sent to the login page could not
-				// complete it anyway (#213).
-				answerClientImmediately(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", "The user account is disabled.", http.StatusBadRequest))
-				return
-			}
-
-			// if the user has a valid session, that means they already completed level1 auth
-			// so we can send them to level1 completed handler, where further checks will be made
-
-			authContext.UserId = userSession.UserId
-			authContext.AcrLevel = userSession.AcrLevel
-			authContext.AuthMethods = userSession.AuthMethods
-			// Inherited from the SESSION, never read from the user. This path never reaches
-			// the password handler, and reading the user's current generation here would
-			// launder an old session into a newer generation (#106 decision 11(d)).
-			authContext.AuthStateGeneration = userSession.AuthStateGeneration
-			authContext.AuthState = ceremony.AuthStateLevel1ExistingSession
-			err = ceremonyStore.SaveAuthContext(w, r, &authContext)
+		saveAndRedirect := func(path string) {
+			err := ceremonyStore.SaveAuthContext(w, r, &authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-			http.Redirect(w, r, baseURL+"/auth/level1completed", http.StatusFound)
-			return
+			http.Redirect(w, r, baseURL+path, http.StatusFound)
 		}
 
-		// no valid session, requires level 1 auth
-		authContext.AuthState = ceremony.AuthStateRequiresLevel1
-		err = ceremonyStore.SaveAuthContext(w, r, &authContext)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
+		switch route {
+		case authorizeRouteAnswerNow:
+			answerClientImmediately(refusal)
+
+		case authorizeRoutePark:
+			// Park the error and go and authenticate. It is carried on the auth context, which the
+			// session store seals with an AEAD, so it is not a value the visitor can choose, and it
+			// is delivered at /auth/level1completed once level 1 credentials are verified.
+			// ParkDeferredError conforms and bounds the description before it is stored.
+			authContext.ParkDeferredError(refusal.GetCode(), refusal.GetDescription())
+			saveAndRedirect("/auth/level1")
+
+		case authorizeRoutePromptNone:
+			handlePromptNone(w, r, pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings, baseURL)
+
+		case authorizeRouteForceLogin, authorizeRouteLevel1:
+			authContext.AuthState = ceremony.AuthStateRequiresLevel1
+			saveAndRedirect("/auth/level1")
+
+		case authorizeRouteDisabledUser:
+			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+				"userId": userSession.UserId,
+			})
+
+			// Answered at once, never deferred: this path has a valid session, so somebody is
+			// already authenticated, and a disabled user sent to the login page could not complete
+			// it anyway (#213).
+			answerClientImmediately(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", "The user account is disabled.", http.StatusBadRequest))
+
+		case authorizeRouteSSO:
+			// The session already completed level 1, so the ceremony goes to /auth/level1completed,
+			// where the step-up checks are made.
+			authContext.AdoptSession(userSession)
+			authContext.AuthState = ceremony.AuthStateLevel1ExistingSession
+			saveAndRedirect("/auth/level1completed")
 		}
-		http.Redirect(w, r, baseURL+"/auth/level1", http.StatusFound)
 	}
 }
 
-// handlePromptNone handles the OIDC prompt=none flow for silent authentication.
-// It performs all necessary checks without displaying any UI and either:
-// - Returns an error to the client if silent auth is not possible
-// - Issues a code silently if all conditions are met
+// authorizeParameters answers the authorization request's parameters, the query and a form body
+// merged, as the one source HandleAuthorizeGet reads them from. It parses the request exactly as
+// r.FormValue does on its first call, ignoring a parse failure as that does, so reading one
+// url.Values rather than calling FormValue per parameter changes nothing a request receives.
+func authorizeParameters(r *http.Request) url.Values {
+	if r.Form == nil {
+		// net/http's defaultMaxMemory, the limit r.FormValue parses with.
+		//nolint:gosec // G120: bounded by the server's request-body table, as r.FormValue's own parse was; G120 flags every multipart parse
+		_ = r.ParseMultipartForm(32 << 20)
+	}
+	return r.Form
+}
+
+// authorizeValidation is what validateAuthorizeRequest found: the first refusal, or nil when the
+// request was accepted, and the two values the validations produce on the way.
+type authorizeValidation struct {
+	refusal *customerrors.ErrorDetail
+	// prompt is the normalized prompt once ValidatePrompt has accepted it, so a request refused
+	// later, for its id_token_hint, still carries it into the parked ceremony.
+	prompt string
+	// hintSubject is the id_token_hint's sub once the hint has been accepted, "" without a hint.
+	hintSubject string
+}
+
+// validateAuthorizeRequest runs the five validations that answer by redirect, in the order the
+// client is told about them: unsupported request parameters, the request itself, the scopes, the
+// prompt, the id_token_hint. The first refusal stops the rest. An error that is not an ErrorDetail
+// is a fault inside a validator and is returned for the 500.
+//
+// These five descriptions stay English and are deliberately NOT localized, unlike the refusal page
+// HandleAuthorizeGet renders. They become an error_description, which RFC 6749 4.1.2.1 confines to
+// "%x20-21 / %x23-5B / %x5D-7E" and describes as "used to assist the client developer in
+// understanding the error that occurred": the audience is the integrator reading a redirect, not
+// the visitor, and the character set excludes pt-BR anyway. Translating one would not ship
+// non-ASCII, because customerrors.ConformErrorDescription enforces that set at both the parking
+// site and the emitter, so an accented sentence would reach the client as a row of question marks
+// instead. That is the failure a translation here buys (#213 decision 9).
+func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeValidator, tokenParser TokenParser,
+	settings *models.Settings, params url.Values, request *protocolvalidation.ValidateRequestInput) (authorizeValidation, error) {
+
+	var validation authorizeValidation
+
+	// stop ends the validations on err: an ErrorDetail is the refusal, anything else a fault.
+	stop := func(err error) (authorizeValidation, error) {
+		var errorDetail *customerrors.ErrorDetail
+		if errors.As(err, &errorDetail) {
+			validation.refusal = errorDetail
+			return validation, nil
+		}
+		return authorizeValidation{}, err
+	}
+
+	err := authorizeValidator.ValidateUnsupportedRequestParameters(&protocolvalidation.ValidateUnsupportedRequestParametersInput{
+		HasRequest:    params.Has("request"),
+		HasRequestURI: params.Has("request_uri"),
+	})
+	if err != nil {
+		return stop(err)
+	}
+
+	err = authorizeValidator.ValidateRequest(request)
+	if err != nil {
+		return stop(err)
+	}
+
+	err = authorizeValidator.ValidateScopes(ctx, request.Scope)
+	if err != nil {
+		return stop(err)
+	}
+
+	normalizedPrompt, err := authorizeValidator.ValidatePrompt(params.Get("prompt"))
+	if err != nil {
+		return stop(err)
+	}
+	validation.prompt = normalizedPrompt
+
+	// OIDC Core 1.0 sections 3.1.2.1 and 3.1.2.2; a refused hint is answered to the client like the
+	// four above.
+	hintSubject, err := validateIdTokenHint(ctx, params.Get("id_token_hint"), tokenParser, settings)
+	if err != nil {
+		return stop(err)
+	}
+	validation.hintSubject = hintSubject
+
+	return validation, nil
+}
+
+// authorizeFact is a fact decideAuthorizeRoute needs and has not been given. HandleAuthorizeGet
+// loads it and asks again.
+type authorizeFact int
+
+const (
+	// authorizeFactNone means the route is decided.
+	authorizeFactNone authorizeFact = iota
+	// authorizeFactRedirectEmission is redirectWillBeEmitted's answer for this request.
+	authorizeFactRedirectEmission
+	// authorizeFactSessionValidity is whether the browser holds a valid session.
+	authorizeFactSessionValidity
+	// authorizeFactValidation is validateAuthorizeRequest's result.
+	authorizeFactValidation
+	// authorizeFactSessionUser is the subject and enabled flag of the session's user.
+	authorizeFactSessionUser
+)
+
+// authorizeRoute is where /auth/authorize sends an authorization request.
+type authorizeRoute int
+
+const (
+	// authorizeRouteUndecided is returned beside a fact still to load.
+	authorizeRouteUndecided authorizeRoute = iota
+	// authorizeRouteAnswerNow answers a refused request's client at once.
+	authorizeRouteAnswerNow
+	// authorizeRoutePark parks a refused request's error and sends the visitor to log in first.
+	authorizeRoutePark
+	// authorizeRoutePromptNone goes on to silent authentication.
+	authorizeRoutePromptNone
+	// authorizeRouteForceLogin sends the visitor to log in whatever session it holds: prompt=login,
+	// or an id_token_hint naming another user than the session's.
+	authorizeRouteForceLogin
+	// authorizeRouteDisabledUser answers access_denied for a valid session whose user is disabled.
+	authorizeRouteDisabledUser
+	// authorizeRouteSSO reuses the valid session.
+	authorizeRouteSSO
+	// authorizeRouteLevel1 sends a visitor with no valid session to log in.
+	authorizeRouteLevel1
+)
+
+// authorizeRouteFacts is what decideAuthorizeRoute decides from. The raw prompt tokens are known
+// from the start; every other fact is unknown until HandleAuthorizeGet has loaded it, a nil pointer
+// or a false loaded flag.
+type authorizeRouteFacts struct {
+	// requestsSilence and requestsLogin are the raw prompt parameter's none and login tokens.
+	requestsSilence bool
+	requestsLogin   bool
+
+	redirectEmitted *bool
+	sessionValid    *bool
+
+	// validated is set once validateAuthorizeRequest has run; the four after it are its result.
+	validated   bool
+	refused     bool
+	promptNone  bool
+	promptLogin bool
+	hintSubject string
+
+	// sessionUserLoaded is set once the session's user has been loaded; the two after it are ""
+	// and false when there is no session.
+	sessionUserLoaded  bool
+	sessionUserSubject string
+	sessionUserEnabled bool
+}
+
+// decideAuthorizeRoute decides where an authorization request goes, or names the next fact it needs
+// to decide that. It asks for each fact at the point the handler has always read it, and only when
+// the answer turns on it, so a path makes the reads it always made and no others.
+//
+// Whether a refused request is answered at once or parked behind a login is the first question,
+// asked before the validations run: RFC 9700 4.11.2, "The authorization server MUST always
+// authenticate the user first and, with the exception of the silent authentication use case, prompt
+// the user for credentials when needed, before redirecting the user." Without it, one link sent to
+// a logged-out browser makes this server redirect it to a host the client chose, which is attack 1
+// in that section verbatim. Authentication is required before a REDIRECT, and only before a
+// redirect, so a refusal is answered at once on any of three clauses:
+//
+//   - requestsSilence: OIDC Core 3.1.2.3 says the server "MUST NOT interact with the End-User" when
+//     prompt=none, which is the exception RFC 9700 names.
+//   - a withheld redirect: no redirect leaves this server, so the requirement that governs redirects
+//     has nothing to say and the visitor reaches the same refusal page with or without a login
+//     (#108's and #122's guards, #213 decision 8).
+//   - a valid session without login: a session holder has authenticated already, unless the client
+//     asked not to be answered on the strength of one (#213 decision 4).
+//
+// The clause that reads nothing is asked first, and the session only when the redirect would be
+// emitted, so each read is reached only when it decides something. The session read is also the
+// one the ordinary path below needs, so a request reads it at most once.
+func decideAuthorizeRoute(f authorizeRouteFacts) (authorizeRoute, authorizeFact) {
+	if !f.requestsSilence {
+		if f.redirectEmitted == nil {
+			return authorizeRouteUndecided, authorizeFactRedirectEmission
+		}
+		if *f.redirectEmitted && !f.requestsLogin && f.sessionValid == nil {
+			return authorizeRouteUndecided, authorizeFactSessionValidity
+		}
+	}
+
+	if !f.validated {
+		return authorizeRouteUndecided, authorizeFactValidation
+	}
+
+	if f.refused {
+		answerNow := f.requestsSilence || !*f.redirectEmitted || (!f.requestsLogin && *f.sessionValid)
+		if answerNow {
+			return authorizeRouteAnswerNow, authorizeFactNone
+		}
+		return authorizeRoutePark, authorizeFactNone
+	}
+
+	// The validated prompt from here, which for an accepted request holds the same tokens as the raw
+	// one.
+	if f.promptNone {
+		return authorizeRoutePromptNone, authorizeFactNone
+	}
+	// prompt=login skips the session entirely.
+	if f.promptLogin {
+		return authorizeRouteForceLogin, authorizeFactNone
+	}
+
+	if f.sessionValid == nil {
+		return authorizeRouteUndecided, authorizeFactSessionValidity
+	}
+	if !f.sessionUserLoaded {
+		return authorizeRouteUndecided, authorizeFactSessionUser
+	}
+
+	if !*f.sessionValid {
+		return authorizeRouteLevel1, authorizeFactNone
+	}
+	// OIDC Core 3.1.2.1: a hint naming a different user than the session's forces
+	// re-authentication rather than SSO.
+	if f.hintSubject != "" && f.sessionUserSubject != f.hintSubject {
+		return authorizeRouteForceLogin, authorizeFactNone
+	}
+	if !f.sessionUserEnabled {
+		return authorizeRouteDisabledUser, authorizeFactNone
+	}
+	return authorizeRouteSSO, authorizeFactNone
+}
+
+// handlePromptNone handles the OIDC prompt=none flow for silent authentication. It performs all
+// necessary checks without displaying any UI and either answers the client with an error when
+// silent authentication is not possible, or goes on to issue a code silently.
 func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings, baseURL string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
@@ -633,142 +675,79 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 			redirectErrorFromAuthContext(authContext, client, errorCode, errorDescription))
 	}
 
-	// 1. Check session exists
-	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
-	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
-		return
-	}
-
-	if userSession == nil {
-		redirectWithError(oidc.ErrorLoginRequired, "User authentication is required")
-		return
-	}
-
-	// Load user for the session
-	err = database.UserSessionLoadUser(r.Context(), nil, userSession)
-	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
-		return
-	}
-
-	// 2. Check session time-based validity (idle timeout, max lifetime, max_age)
 	idleTimeout, maxLifetime := settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds
 	requestedMaxAge := authContext.RequestedMaxAge()
-	hasValidSession := userSessionManager.HasValidUserSession(userSession, idleTimeout, maxLifetime, requestedMaxAge)
-	if !hasValidSession {
-		// Determine if it's max_age that caused the failure
-		if requestedMaxAge != nil {
-			// Check if session would be valid without max_age
-			if userSessionManager.HasValidUserSession(userSession, idleTimeout, maxLifetime, nil) {
-				redirectWithError(oidc.ErrorLoginRequired, "Session age exceeds max_age")
+	facts := silentAuthenticationFacts{
+		maxAgeRequested: requestedMaxAge != nil,
+		hintSubject:     authContext.IdTokenHintSub,
+		target:          authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
+		consentRequired: client.ConsentRequired,
+	}
+
+	// The loads, each made once and only when decideSilentAuthentication asks for it, so a refusal
+	// reads nothing past the check that refused.
+	answer, need := decideSilentAuthentication(facts)
+	for need != silentFactNone {
+		switch need {
+		case silentFactSession:
+			userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
-		}
-		redirectWithError(oidc.ErrorLoginRequired, "User session has expired")
-		return
-	}
+			if userSession != nil {
+				err = database.UserSessionLoadUser(r.Context(), nil, userSession)
+				if err != nil {
+					pageRenderer.InternalServerError(w, r, err)
+					return
+				}
+			}
+			facts.sessionLoaded = true
+			facts.session = userSession
 
-	// 3. Check user is enabled
-	if !userSession.User.Enabled {
-		auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
-			"userId": userSession.UserId,
-		})
-		redirectWithError("access_denied", "The user account is disabled")
-		return
-	}
+		case silentFactValidity:
+			valid := userSessionManager.HasValidUserSession(facts.session, idleTimeout, maxLifetime, requestedMaxAge)
+			facts.sessionValid = &valid
 
-	// 3a. Check id_token_hint sub matching (OIDC Core 3.1.2.1)
-	// "MUST NOT reply with an ID Token for a different user"
-	if authContext.IdTokenHintSub != "" {
-		if userSession.User.Subject != authContext.IdTokenHintSub {
-			redirectWithError(oidc.ErrorLoginRequired,
-				"The current session user does not match the id_token_hint")
-			return
-		}
-	}
+		case silentFactValidityWithoutMaxAge:
+			valid := userSessionManager.HasValidUserSession(facts.session, idleTimeout, maxLifetime, nil)
+			facts.sessionValidWithoutMaxAge = &valid
 
-	// 4. Check ACR requirements, through the step-up rule /auth/level1completed reads too. Steps 4
-	// and 6 are its two answers; step 5 sits between them so the order of the refusals is kept.
-	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-	stepUp, stepUpErr := ceremony.StepUpOwed(targetAcrLevel, userSession)
-
-	// An unknown session ACR is treated as insufficient. If the target ACR is higher than the
-	// session's, we need step-up (interaction required).
-	if stepUpErr != nil || stepUp == ceremony.StepUpLevel {
-		redirectWithError(oidc.ErrorInteractionRequired, "Higher authentication level required")
-		return
-	}
-
-	// 5. Check OTP requirements for level2
-	// For level2_mandatory: user MUST have OTP enabled
-	// For level2_optional: if user has OTP but session doesn't have OTP method, need step-up
-	if targetAcrLevel == models.AcrLevel2Mandatory {
-		if !userSession.User.OTPEnabled {
-			redirectWithError(oidc.ErrorInteractionRequired, "Additional authentication setup required")
-			return
-		}
-	}
-
-	// 6. The user's authenticator has changed since this session last answered the level 2
-	// question, and the target asks it. userSession.User is already loaded on this path, for
-	// Enabled and OTPEnabled above, so the comparison costs no query.
-	//
-	// A reader only: it refuses and promotes nothing, because no interaction happened. That
-	// is what makes an identical second prompt=none request get the identical answer, where
-	// the boolean this replaced would have been a one-shot signal had either reader cleared
-	// it here (#242 decision 1).
-	if stepUp == ceremony.StepUpOtpConfigChanged {
-		redirectWithError(oidc.ErrorInteractionRequired, "Authentication configuration has changed")
-		return
-	}
-
-	// 7. Compute effective scopes (filter by user permissions)
-	user := &userSession.User
-	effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), authContext.Scope, user)
-	if err != nil {
-		pageRenderer.InternalServerError(w, r, err)
-		return
-	}
-
-	if len(strings.TrimSpace(effectiveScope)) == 0 {
-		redirectWithError("access_denied", "The user is not authorized to access any of the requested scopes")
-		return
-	}
-
-	// 8. Check consent requirements
-	if client.ConsentRequired || oidc.HasOfflineAccessScope(effectiveScope) {
-		consent, getConsentErr := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
-		if getConsentErr != nil {
-			pageRenderer.InternalServerError(w, r, getConsentErr)
-			return
-		}
-
-		if consent == nil {
-			redirectWithError(oidc.ErrorConsentRequired, "User consent is required")
-			return
-		}
-
-		// Check if existing consent covers all effective scopes
-		effectiveScopes := strings.Fields(effectiveScope)
-		for _, scope := range effectiveScopes {
-			if !consent.HasScope(scope) {
-				redirectWithError(oidc.ErrorConsentRequired, "Additional consent is required")
+		case silentFactEffectiveScope:
+			effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(),
+				authContext.Scope, &facts.session.User)
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
+			facts.effectiveScope = &effectiveScope
+
+		case silentFactConsent:
+			consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, facts.session.User.Id, client.Id)
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+				return
+			}
+			facts.consentLoaded = true
+			facts.consent = consent
 		}
+		answer, need = decideSilentAuthentication(facts)
 	}
 
-	// All checks passed - proceed with silent code issuance
+	if answer.errorCode != "" {
+		if answer.userDisabled {
+			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+				"userId": facts.session.UserId,
+			})
+		}
+		redirectWithError(answer.errorCode, answer.errorDescription)
+		return
+	}
 
-	// Set auth context for code issuance
-	authContext.UserId = userSession.UserId
-	authContext.AuthMethods = userSession.AuthMethods
-	authContext.AcrLevel = userSession.AcrLevel
-	// Same rule as the interactive SSO path above: the generation comes from the session
-	// being reused, not from the user (#106 decision 11(d)).
-	authContext.AuthStateGeneration = userSession.AuthStateGeneration
-	authContext.SetScope(effectiveScope)
+	// All checks passed: the ceremony reuses the session and goes on to issue a code silently.
+	userSession := facts.session
+	authContext.AdoptSession(userSession)
+	authContext.SetScope(*facts.effectiveScope)
 
 	// Preserve the original session's auth_time for the token
 	if userSession.AuthTime.IsZero() {
@@ -779,7 +758,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	}
 
 	// Set ACR level (takes max of target and session ACR)
-	err = authContext.SetAcrLevel(targetAcrLevel, userSession)
+	err := authContext.SetAcrLevel(facts.target, userSession)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return
@@ -807,6 +786,150 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	}
 
 	http.Redirect(w, r, baseURL+"/auth/issue", http.StatusFound)
+}
+
+// silentFact is a fact decideSilentAuthentication needs and has not been given. handlePromptNone
+// loads it and asks again.
+type silentFact int
+
+const (
+	// silentFactNone means the answer is decided.
+	silentFactNone silentFact = iota
+	// silentFactSession is the browser's session with its user, or none.
+	silentFactSession
+	// silentFactValidity is whether the session is valid with the request's max_age applied.
+	silentFactValidity
+	// silentFactValidityWithoutMaxAge is whether it would be valid without max_age.
+	silentFactValidityWithoutMaxAge
+	// silentFactEffectiveScope is the requested scope narrowed to what the user holds.
+	silentFactEffectiveScope
+	// silentFactConsent is the user's consent to this client, or none.
+	silentFactConsent
+)
+
+// silentAuthenticationFacts is what decideSilentAuthentication decides from. The first four are
+// known from the ceremony and its client; every other fact is unknown until handlePromptNone has
+// loaded it, a nil pointer or a false loaded flag.
+type silentAuthenticationFacts struct {
+	maxAgeRequested bool
+	hintSubject     string
+	target          models.AcrLevel
+	// consentRequired is the client's ConsentRequired.
+	consentRequired bool
+
+	// sessionLoaded is set once the session has been looked up; session is nil when there is none,
+	// and otherwise carries its User.
+	sessionLoaded             bool
+	session                   *models.UserSession
+	sessionValid              *bool
+	sessionValidWithoutMaxAge *bool
+	effectiveScope            *string
+	// consentLoaded is set once the consent has been looked up; consent is nil when there is none.
+	consentLoaded bool
+	consent       *models.UserConsent
+}
+
+// silentAuthenticationAnswer is decideSilentAuthentication's answer: an error for the client, or
+// an empty errorCode to proceed.
+type silentAuthenticationAnswer struct {
+	errorCode        string
+	errorDescription string
+	// userDisabled says the refusal is for a disabled account, which is audited.
+	userDisabled bool
+}
+
+// decideSilentAuthentication decides whether a prompt=none request can be answered silently, or
+// names the next fact it needs to decide that. The checks run in a fixed order and the first that
+// fails is the answer, so each fact is asked for only once every check before it has passed:
+//
+//  1. a session exists;
+//  2. it is valid, and when it is not only because of max_age, the answer says so;
+//  3. its user is enabled;
+//  4. an id_token_hint names that user (OIDC Core 3.1.2.1: "MUST NOT reply with an ID Token for a
+//     different user");
+//  5. the step-up rule asks for no higher level (an unknown session ACR is insufficient);
+//  6. level2_mandatory has an authenticator to satisfy it;
+//  7. the user's authenticator has not changed since the session last answered the level 2
+//     question, when the target asks it. A reader only: it refuses and promotes nothing, because no
+//     interaction happened, which is what makes an identical second prompt=none request get the
+//     identical answer (#242 decision 1). Steps 5 and 7 are the step-up rule's two answers, and
+//     step 6 sits between them so the order of the refusals is kept;
+//  8. the user holds at least one requested scope;
+//  9. when the client requires consent or offline_access is asked for, a consent covers every
+//     scope.
+func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticationAnswer, silentFact) {
+	refuse := func(code, description string) (silentAuthenticationAnswer, silentFact) {
+		return silentAuthenticationAnswer{errorCode: code, errorDescription: description}, silentFactNone
+	}
+
+	if !f.sessionLoaded {
+		return silentAuthenticationAnswer{}, silentFactSession
+	}
+	if f.session == nil {
+		return refuse(oidc.ErrorLoginRequired, "User authentication is required")
+	}
+
+	if f.sessionValid == nil {
+		return silentAuthenticationAnswer{}, silentFactValidity
+	}
+	if !*f.sessionValid {
+		if f.maxAgeRequested {
+			if f.sessionValidWithoutMaxAge == nil {
+				return silentAuthenticationAnswer{}, silentFactValidityWithoutMaxAge
+			}
+			if *f.sessionValidWithoutMaxAge {
+				return refuse(oidc.ErrorLoginRequired, "Session age exceeds max_age")
+			}
+		}
+		return refuse(oidc.ErrorLoginRequired, "User session has expired")
+	}
+
+	user := &f.session.User
+	if !user.Enabled {
+		return silentAuthenticationAnswer{
+			errorCode:        "access_denied",
+			errorDescription: "The user account is disabled",
+			userDisabled:     true,
+		}, silentFactNone
+	}
+
+	if f.hintSubject != "" && user.Subject != f.hintSubject {
+		return refuse(oidc.ErrorLoginRequired, "The current session user does not match the id_token_hint")
+	}
+
+	stepUp, stepUpErr := ceremony.StepUpOwed(f.target, f.session)
+	if stepUpErr != nil || stepUp == ceremony.StepUpLevel {
+		return refuse(oidc.ErrorInteractionRequired, "Higher authentication level required")
+	}
+	if f.target == models.AcrLevel2Mandatory && !user.OTPEnabled {
+		return refuse(oidc.ErrorInteractionRequired, "Additional authentication setup required")
+	}
+	if stepUp == ceremony.StepUpOtpConfigChanged {
+		return refuse(oidc.ErrorInteractionRequired, "Authentication configuration has changed")
+	}
+
+	if f.effectiveScope == nil {
+		return silentAuthenticationAnswer{}, silentFactEffectiveScope
+	}
+	if len(strings.TrimSpace(*f.effectiveScope)) == 0 {
+		return refuse("access_denied", "The user is not authorized to access any of the requested scopes")
+	}
+
+	if f.consentRequired || oidc.HasOfflineAccessScope(*f.effectiveScope) {
+		if !f.consentLoaded {
+			return silentAuthenticationAnswer{}, silentFactConsent
+		}
+		if f.consent == nil {
+			return refuse(oidc.ErrorConsentRequired, "User consent is required")
+		}
+		for _, scope := range strings.Fields(*f.effectiveScope) {
+			if !f.consent.HasScope(scope) {
+				return refuse(oidc.ErrorConsentRequired, "Additional consent is required")
+			}
+		}
+	}
+
+	return silentAuthenticationAnswer{}, silentFactNone
 }
 
 // redirectErrorInput carries what an error response to a client is built from. It is a struct
@@ -850,9 +973,9 @@ type redirectErrorInput struct {
 }
 
 // redirectErrorFromAuthContext builds the input for an error redirect whose response parameters
-// come from the stored ceremony, which is where fourteen of the sixteen take them from. The two
-// inside HandleAuthorizeGet's own closure run before the context holds the validated values and
-// read the request instead.
+// come from the ceremony, which is where every error redirect takes them from. At /auth/authorize
+// that is the literal HandleAuthorizeGet has just built, which holds the four as the request sent
+// them before anything is validated, so an error arising there answers what the request carried.
 func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *models.Client,
 	code string, description string) redirectErrorInput {
 
@@ -864,24 +987,6 @@ func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *mod
 		redirectURI:  authContext.RedirectURI,
 		state:        authContext.State,
 		responseType: authContext.ResponseType,
-	}
-}
-
-// redirectErrorFromRequest builds the input for an error redirect whose response parameters come
-// from the HTTP request rather than from the stored ceremony. It is the twin of
-// redirectErrorFromAuthContext, and it exists because HandleAuthorizeGet answers errors that arise
-// before the context holds the validated values, so the request is the only source that has them.
-func redirectErrorFromRequest(r *http.Request, client *models.Client,
-	code string, description string) redirectErrorInput {
-
-	return redirectErrorInput{
-		client:       client,
-		code:         code,
-		description:  description,
-		responseMode: r.FormValue("response_mode"),
-		redirectURI:  r.FormValue("redirect_uri"),
-		state:        r.FormValue("state"),
-		responseType: r.FormValue("response_type"),
 	}
 }
 
@@ -1096,14 +1201,12 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database aut
 	}
 
 	// The description becomes an error_description on the wire from here down, so it is conformed to
-	// RFC 6749 Appendix A.8's NQSCHAR once, here, and every branch below reads the conformed value.
-	// Descriptions interpolate request text, so an emoji or a Cyrillic word in a rejected scope
-	// otherwise puts a byte the RFC forbids into a protocol parameter (#213).
+	// RFC 6749 Appendix A.8's NQSCHAR once, here, and every response mode reads the conformed value
+	// from the parameter list below. Descriptions interpolate request text, so an emoji or a Cyrillic
+	// word in a rejected scope otherwise puts a byte the RFC forbids into a protocol parameter (#213).
 	//
-	// This function rather than answerClientWithError, which wraps it: the three response modes below
-	// build the parameter in two different places, the params slice that query and fragment share and
-	// the form_post bind map, and a wrapper cannot cover a caller that reaches this emitter without
-	// going through it.
+	// This function rather than answerClientWithError, which wraps it: a wrapper cannot cover a caller
+	// that reaches this emitter without going through it.
 	//
 	// Below the redirect guard, deliberately. renderRedirectBlocked above puts the description on an
 	// HTML page, which is a user interface and not a protocol parameter, so the interstitial keeps the
@@ -1145,95 +1248,5 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database aut
 		params = append(params, responseParam{"state", input.state})
 	}
 
-	if effectiveResponseMode == "fragment" {
-		// A fragment is built by appending rather than through writeResponseParams: the redirect
-		// URI cannot carry a fragment of its own (RFC 6749 3.1.2 forbids it and
-		// checkRedirectURIEmittable refuses one above), so there is no registered field list here
-		// to preserve or replace. Its query, if it registered one, is left exactly as it stands.
-		http.Redirect(w, r, input.redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
-		return nil
-	}
-
-	if effectiveResponseMode == "form_post" {
-		m := make(map[string]interface{})
-		m["redirectURI"] = input.redirectURI
-		m["error"] = input.code
-		m["error_description"] = description
-		// The same rule as the params slice above, stated again because this branch answers through
-		// a bind map rather than through a field list, and all three branches should say what they
-		// emit in the same terms. What the client actually receives is then decided by
-		// form_post.html, whose {{if .state}} omits the input entirely.
-		//
-		// This guard was written as unobservable and is not. {{.state}} and {{if .state}} do answer
-		// identically for an absent key and a key holding "", which is as far as the first reading
-		// went, but a template that enumerates the map tells them apart: range yields the key only
-		// when it is present, and len counts it. form_post.html is operator supplied whenever
-		// GOIABADA_AUTHSERVER_TEMPLATEDIR is set, so that is a real reader rather than a contrived
-		// one, and TestFormPostBindMapOmitsAnAbsentState pins both emitters on it (#146).
-		if input.state != "" {
-			m["state"] = input.state
-		}
-
-		t, err := template.ParseFS(templateFS, "form_post.html")
-		if err != nil {
-			return errs.Wrap(err, "unable to parse template")
-		}
-
-		// Render into a buffer, not straight to w. Execute writes as it walks the template, so a
-		// template that parses and then fails part way through would leave a partial body and an
-		// implicit 200 already on the wire. Every caller answers an error from here with
-		// pageRenderer.InternalServerError as its last resort, and a WriteHeader after the response
-		// is committed changes nothing, so the client would be told 200 for a page that was never
-		// finished. form_post.html is operator supplied whenever GOIABADA_AUTHSERVER_TEMPLATEDIR
-		// is set, so this is reachable in a real deployment rather than only in tests. Buffering
-		// keeps the response uncommitted until there is a whole page to send (#141).
-		var rendered bytes.Buffer
-		err = t.Execute(&rendered, m)
-		if err != nil {
-			return errs.Wrap(err, "unable to execute template")
-		}
-		// OAuth 2.0 Form Post Response Mode section 2: "Because the Authorization Response is
-		// intended to be used only once, the Authorization Server MUST instruct the User Agent (and
-		// any intermediaries) not to store or reuse the content of the response." The page holds
-		// the client's state, and on the success path its twin holds an authorization code, so a
-		// cached or reused copy is a replayable response sitting in an intermediary. This pair is
-		// what the rest of this codebase already writes for a no-store response (#146).
-		//
-		// Set here rather than before Execute deliberately: a render that fails must leave the
-		// response completely untouched, so that the caller's last-resort InternalServerError owns
-		// every header as well as the status. Moving these two above the Execute would leave a 500
-		// carrying the headers of a form_post page that was never sent (#141).
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Pragma", "no-cache")
-
-		_, err = w.Write(rendered.Bytes())
-		if err != nil {
-			// The connection itself failed. Nothing can be recovered from here, including the
-			// caller's 500, but the error is still worth reporting rather than swallowing.
-			return errs.Wrap(err, "unable to write the form_post response")
-		}
-		return nil
-	}
-
-	// default to query
-	//
-	// writeResponseParams, not Query() then Encode(). Seeding url.Values from the registered URI's
-	// own query and calling Add on top is what emitted two state parameters to a client that had
-	// registered "?state=fixed", leaving its CSRF check to be made against a value it never
-	// generated, which is the defect this change exists to remove. Re-encoding also silently
-	// rewrote the registered query in five separate ways, against RFC 6749 3.1.2's "MUST be
-	// retained". Both are the shared helper's to prevent, and its comment carries the detail (#146).
-	//
-	// authorizationResponseParamNames, so a registered "code" is dropped from an error response as
-	// well: without it a client registering "?code=stale" was refused with
-	// "?code=stale&error=access_denied&...", a response carrying an authorization code and an error
-	// at once. The reserved set is filtered whether or not this response emits the name, which is
-	// what makes that true (#146).
-	location, err := writeResponseParams(input.redirectURI, params, authorizationResponseParamNames)
-	if err != nil {
-		return errs.Wrap(err, "unable to build the error redirect")
-	}
-
-	http.Redirect(w, r, location, http.StatusFound)
-	return nil
+	return writeAuthorizationResponse(w, r, templateFS, effectiveResponseMode, input.redirectURI, params)
 }

@@ -914,6 +914,37 @@ func TestRecordPasswordVerified(t *testing.T) {
 	}
 }
 
+// What reusing a session writes, for /auth/authorize's SSO path and prompt=none alike; each
+// handler's cases check only that its path adopts the session it read (#437 seam 1).
+func TestAdoptSession(t *testing.T) {
+	userSession := &models.UserSession{
+		UserId:              42,
+		AcrLevel:            models.AcrLevel2Optional,
+		AuthMethods:         "pwd otp",
+		AuthStateGeneration: 3,
+		User:                models.User{Id: 42, AuthStateGeneration: 9},
+	}
+	ac := &AuthContext{
+		AuthState:           AuthStateRequiresLevel1,
+		Scope:               "openid",
+		OtpConfigGeneration: func() *int64 { g := int64(7); return &g }(),
+	}
+
+	ac.AdoptSession(userSession)
+
+	assert.Equal(t, int64(42), ac.UserId)
+	assert.Equal(t, models.AcrLevel2Optional, ac.AcrLevel)
+	assert.Equal(t, "pwd otp", ac.AuthMethods)
+	assert.Equal(t, int64(3), ac.AuthStateGeneration,
+		"the session's generation and never the user's, or an old session is laundered into a newer one (#106)")
+	assert.Nil(t, ac.AuthenticatedAt, "adopting records no authentication performed here")
+	assert.False(t, ac.Level1AuthCompleted, "level 1 was not performed in this ceremony (#129)")
+	assert.Equal(t, AuthStateRequiresLevel1, ac.AuthState, "the caller decides the next state")
+	assert.Equal(t, "openid", ac.Scope, "adopting writes no request field")
+	require.NotNil(t, ac.OtpConfigGeneration)
+	assert.Equal(t, int64(7), *ac.OtpConfigGeneration, "the OTP snapshot is not the session's to write")
+}
+
 func TestRecordOTPVerified(t *testing.T) {
 	now := time.Date(2026, 9, 29, 12, 30, 0, 0, time.FixedZone("UTC+2", 2*60*60))
 	captured := int64(4)
