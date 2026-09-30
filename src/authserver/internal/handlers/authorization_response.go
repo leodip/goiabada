@@ -1,10 +1,15 @@
 package handlers
 
 import (
-	"github.com/leodip/goiabada/core/errs"
+	"bytes"
+	"html/template"
+	"io/fs"
+	"net/http"
 	"net/url"
 	"slices"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // responseParam is one parameter this server writes into a client's redirect URI: an
@@ -182,4 +187,118 @@ func isResponseParamName(name string, params []responseParam) bool {
 		}
 	}
 	return false
+}
+
+// writeAuthorizationResponse answers the client at redirectURI with params, in responseMode:
+// "fragment", "form_post", or the query for anything else. The authorization code and the error
+// emitter both answer through it, so the three encodings are written once each (#437).
+//
+// Deciding whether a response may be emitted at all is the caller's: each runs gate 4, and the
+// error emitter its provenance and registration gates, above this call.
+func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, templateFS fs.FS,
+	responseMode string, redirectURI string, params []responseParam) error {
+
+	switch responseMode {
+	case "fragment":
+		writeFragmentRedirect(w, r, redirectURI, params)
+		return nil
+	case "form_post":
+		return writeFormPost(w, templateFS, redirectURI, params)
+	default:
+		return writeQueryRedirect(w, r, redirectURI, params)
+	}
+}
+
+// writeFragmentRedirect redirects to redirectURI with params as its fragment.
+//
+// Appended rather than written through writeResponseParams: the redirect URI cannot carry a
+// fragment of its own (RFC 6749 3.1.2 forbids it and checkRedirectURIEmittable refuses one above
+// every caller), so there is no registered field list here to preserve or replace. Its query, if it
+// registered one, is left exactly as it stands.
+func writeFragmentRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) {
+	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
+	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
+}
+
+// writeQueryRedirect redirects to redirectURI with params in its query component.
+//
+// writeResponseParams, not Query() then Encode(). Seeding url.Values from the registered URI's own
+// query and calling Add on top emitted two state parameters to a client that had registered
+// "?state=fixed", and Go's own url.Values.Get answers with the first, which is the registered one:
+// on the code redirect that defeats the RP's RFC 9700 2.1 CSRF check, and on an error redirect it
+// leaves that check to be made against a value the client never generated. Re-encoding also rewrote
+// the registered query in five separate ways, against RFC 6749 3.1.2's "MUST be retained". Both are
+// the shared helper's to prevent, and its comment carries the detail (#146).
+//
+// authorizationResponseParamNames, so a registered "code" is dropped from an error response and a
+// registered "error" from a success response: without it a client registering "?code=stale" was
+// refused with a response carrying a code and an error at once, and one registering "?error=stale"
+// completed an authorization and read it as a refusal. It also drops a registered "?state=fixed"
+// when the request carried no state of its own, so the client is never handed a state it did not
+// send (#146).
+func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) error {
+	location, err := writeResponseParams(redirectURI, params, authorizationResponseParamNames)
+	if err != nil {
+		return errs.Wrap(err, "unable to build the authorization response redirect")
+	}
+
+	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
+	http.Redirect(w, r, location, http.StatusFound)
+	return nil
+}
+
+// writeFormPost answers with form_post.html, an auto-submitting form posting params to redirectURI.
+//
+// The bind map holds redirectURI and exactly the parameters in params, so a parameter the caller
+// left out, an empty state above all, is absent rather than present and empty. {{.state}} and
+// {{if .state}} cannot tell the two apart, but a template that enumerates the map can: range yields
+// the key only when it is present, and len counts it. form_post.html is operator supplied whenever
+// GOIABADA_AUTHSERVER_TEMPLATEDIR is set, so that is a real reader, and
+// TestFormPostBindMapOmitsAnAbsentState pins it through both emitters (#146).
+func writeFormPost(w http.ResponseWriter, templateFS fs.FS, redirectURI string, params []responseParam) error {
+	m := make(map[string]interface{}, 1+len(params))
+	m["redirectURI"] = redirectURI
+	for _, param := range params {
+		m[param.name] = param.value
+	}
+
+	t, err := template.ParseFS(templateFS, "form_post.html")
+	if err != nil {
+		return errs.Wrap(err, "unable to parse template")
+	}
+
+	// Render into a buffer, not straight to w. Execute writes as it walks the template, so a
+	// template that parses and then fails part way through would leave a partial body and an
+	// implicit 200 already on the wire. Every caller answers an error from here with
+	// pageRenderer.InternalServerError as its last resort, and a WriteHeader after the response is
+	// committed changes nothing, so the client would be told 200 for a page that was never
+	// finished: on the success path, a form carrying an authorization code with no submit to
+	// deliver it. Buffering keeps the response uncommitted until there is a whole page to send
+	// (#141, #146 decision 10).
+	var rendered bytes.Buffer
+	err = t.Execute(&rendered, m)
+	if err != nil {
+		return errs.Wrap(err, "unable to execute template")
+	}
+
+	// OAuth 2.0 Form Post Response Mode section 2: "Because the Authorization Response is intended to
+	// be used only once, the Authorization Server MUST instruct the User Agent (and any
+	// intermediaries) not to store or reuse the content of the response." The page holds the
+	// client's state, and on the success path an authorization code, so a cached or reused copy is a
+	// replayable response sitting in an intermediary. This pair is what the rest of this codebase
+	// writes for a no-store response (#146).
+	//
+	// Set here rather than before Execute deliberately: a render that fails must leave the response
+	// completely untouched, so that the caller's last-resort InternalServerError owns every header
+	// as well as the status (#141).
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+
+	_, err = w.Write(rendered.Bytes())
+	if err != nil {
+		// The connection itself failed. Nothing can be recovered from here, including the
+		// caller's 500, but the error is still worth reporting rather than swallowing.
+		return errs.Wrap(err, "unable to write the form_post response")
+	}
+	return nil
 }

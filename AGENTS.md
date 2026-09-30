@@ -153,7 +153,7 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 
 | State | Assigned by | When |
 |---|---|---|
-| `requires_level_1` | `HandleAuthorizeGet` | four sites: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
+| `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
 | | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted` (restart route 1, through `Restart()`) |
 | | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `HandleAuthLevel1Get` | unconditional |
