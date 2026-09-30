@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
@@ -198,6 +199,9 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 			return createUserSessionErr
 		}
 
+		// The associations belong to the session row created just above, whose id no other caller
+		// holds, so this insert cannot lose the (session, client) key to a concurrent one and needs
+		// no rerun on it. Only a bump, which writes to a session that already exists, can (#249).
 		for _, client := range userSession.Clients {
 			client.UserSessionId = userSession.Id
 			if createUserSessionClientErr := u.database.CreateUserSessionClient(r.Context(), tx, &client); createUserSessionClientErr != nil {
@@ -355,19 +359,33 @@ func (u *Manager) abandonUserSession(ctx context.Context, userSession *models.Us
 //   - ipAddress: The browser's address as the caller read it, which replaces the one recorded.
 //     Empty leaves the recorded address as it is, which is what the token endpoint passes: a
 //     refresh request comes from the client's server as often as from the user's browser.
+//
+// The session, its associations, the decision between inserting an association and updating it, and
+// every write are one transaction, and the transaction is rerun once when an insert lost the
+// (session, client) key to a concurrent bump (migration 000055, #249). Two bumps of one session for
+// one client that overlap both read the client as absent and both insert; the engine refuses the
+// second, and on PostgreSQL that refusal aborts the transaction, so the loser runs again and its
+// second attempt reads the association the winner committed and updates it. That only works if
+// nothing the attempt decided from was read before the transaction opened, which is why the session
+// and its associations are read in the body: a rerun that reused the first attempt's copy would
+// decide "absent" again and insert the same pair a second time. The body is otherwise safe to run
+// twice, since it builds every value it writes from what it has just read.
 func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
 	authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error) {
 
-	userSession, err := u.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if userSession != nil {
-
-		err = u.database.UserSessionLoadClients(ctx, nil, userSession)
+	var bumped *models.UserSession
+	err := data.RunInTransactionRetryingConflict(ctx, u.database, func(tx *sql.Tx) error {
+		userSession, err := u.database.GetUserSessionBySessionIdentifier(ctx, tx, sessionIdentifier)
 		if err != nil {
-			return nil, err
+			return err
+		}
+		if userSession == nil {
+			return errs.New("can't bump user session because user session is nil")
+		}
+
+		err = u.database.UserSessionLoadClients(ctx, tx, userSession)
+		if err != nil {
+			return err
 		}
 
 		utcNow := time.Now().UTC()
@@ -422,40 +440,37 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 			}
 		}
 
-		// The session update and its association write land in one transaction, opened through
-		// RunInTransaction so a deadlock reruns the body (#301). userSession was read before the
-		// transaction opened and the body only reads it: the insert-versus-update decision comes
-		// from client.Id on a copy, so an attempt that inserted leaves the slice as it found it
-		// and the rerun decides the same way.
-		err = u.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-			if updateUserSessionErr := u.database.UpdateUserSession(ctx, tx, userSession); updateUserSessionErr != nil {
-				return updateUserSessionErr
-			}
-
-			for _, client := range userSession.Clients {
-				if client.Id > 0 {
-					// update
-					if updateUserSessionClientErr := u.database.UpdateUserSessionClient(ctx, tx, &client); updateUserSessionClientErr != nil {
-						return updateUserSessionClientErr
-					}
-				} else {
-					// insert new
-					client.UserSessionId = userSession.Id
-					if createUserSessionClientErr := u.database.CreateUserSessionClient(ctx, tx, &client); createUserSessionClientErr != nil {
-						return createUserSessionClientErr
-					}
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
+		// The insert-versus-update decision comes from client.Id on a copy, so an attempt that
+		// inserted leaves the slice as it found it.
+		if updateUserSessionErr := u.database.UpdateUserSession(ctx, tx, userSession); updateUserSessionErr != nil {
+			return updateUserSessionErr
 		}
 
-		return userSession, nil
+		for _, client := range userSession.Clients {
+			if client.Id > 0 {
+				// update
+				if updateUserSessionClientErr := u.database.UpdateUserSessionClient(ctx, tx, &client); updateUserSessionClientErr != nil {
+					return updateUserSessionClientErr
+				}
+			} else {
+				// insert new
+				client.UserSessionId = userSession.Id
+				if createUserSessionClientErr := u.database.CreateUserSessionClient(ctx, tx, &client); createUserSessionClientErr != nil {
+					return createUserSessionClientErr
+				}
+			}
+		}
+
+		// Set by the attempt that wrote, so a rerun's session replaces a first attempt's and a
+		// failed commit returns nothing at all.
+		bumped = userSession
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, errs.New("can't bump user session because user session is nil")
+	return bumped, nil
 }
 
 // WillRaisePrivilege reports whether bumping a session with these values would raise its

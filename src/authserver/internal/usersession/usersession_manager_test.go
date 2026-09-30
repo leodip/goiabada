@@ -451,8 +451,10 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "non-existent-session").
-			Return(nil, nil)
+		// The read is on the transaction, since the decision it feeds is taken there (#249).
+		stub := mocks_data.ExpectRunInTransaction(database, txSentinel)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, "non-existent-session").
+			Return(nil, nil).Once()
 
 		result, err := manager.BumpUserSession(context.Background(), "non-existent-session", 456,
 			"pwd", models.AcrLevel1, "192.168.1.1")
@@ -460,8 +462,10 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "can't bump user session because user session is nil")
+		assert.Error(t, stub.BodyErr, "the transaction rolled back, and nothing was written")
 
 		database.AssertExpectations(t)
+		database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 

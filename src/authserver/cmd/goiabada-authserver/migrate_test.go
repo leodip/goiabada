@@ -140,11 +140,11 @@ func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	assert.Contains(t, out.String(), "target schema version: 000041")
 	// Highest first, these are the .down.sql files run from the top down, and the list is the
 	// versions THIS engine carries rather than a count: 000052 and 000049 are on the other three
-	// engines and 000042 is a MySQL migration, so SQLite steps from 000054 to 000053 and 000051, then
+	// engines and 000042 is a MySQL migration, so SQLite steps from 000055 to 000054, 000053 and 000051, then
 	// to 000050, straight from 000050 to 000048, and from 000043 to 000041. Spelled out rather than
 	// derived, because the CHAIN is what is under test here: a migration added on other engines
 	// alone must not appear in it.
-	assert.Contains(t, out.String(), "migrations to run, in order: 000054, 000053, 000051, 000050, 000048, 000047, 000046, 000045, 000044, 000043\n")
+	assert.Contains(t, out.String(), "migrations to run, in order: 000055, 000054, 000053, 000051, 000050, 000048, 000047, 000046, 000045, 000044, 000043\n")
 	assert.Contains(t, out.String(), "now at schema version 000041")
 
 	version, dirty, err := m.Version(context.Background())

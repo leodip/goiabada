@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -21,6 +22,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+// consentSaveTx is the transaction userconsent.Record runs the save in. The consent's read and its
+// write are matched on it rather than on mock.Anything, so a statement moved back outside the
+// transaction fails the case that names it (#249).
+var consentSaveTx = &sql.Tx{}
 
 // stubUserHoldsEveryScope makes the live permission re-check on the consent submission a
 // pass-through, for the cases whose subject is something other than the filter.
@@ -876,9 +882,10 @@ func TestHandleConsentPost(t *testing.T) {
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
+		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 
-		database.On("CreateUserConsent", mock.Anything, mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
@@ -944,9 +951,10 @@ func TestHandleConsentPost(t *testing.T) {
 			ClientId: 1,
 			Scope:    "openid",
 		}
-		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(existingConsent, nil)
+		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(existingConsent, nil)
 
-		database.On("UpdateUserConsent", mock.Anything, mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		database.On("UpdateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
@@ -1012,10 +1020,11 @@ func TestHandleConsentPost(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized",
 			mock.Anything, "openid backend:read backend:write", user).Return("openid backend:read", nil)
 
-		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
+		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 
 		var persisted *models.UserConsent
-		database.On("CreateUserConsent", mock.Anything, mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
 			persisted = consent
 			return true
 		})).Return(nil)
@@ -1870,10 +1879,11 @@ func TestHandleConsentPost(t *testing.T) {
 					client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 					database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
-					database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
+					mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+					database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 
 					var persisted *models.UserConsent
-					database.On("CreateUserConsent", mock.Anything, mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+					database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
 						persisted = consent
 						return true
 					})).Return(nil)
@@ -1944,10 +1954,11 @@ func TestHandleConsentPost(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
-		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
+		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).
 			Return(&models.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid profile"}, nil)
 
-		database.On("UpdateUserConsent", mock.Anything, mock.Anything, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		database.On("UpdateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
 			return consent.Scope == "email"
 		})).Return(nil)
 

@@ -160,7 +160,8 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 				stubUserHoldsEveryScope(permissionChecker)
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, boom)
+				mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+				database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, boom)
 			},
 			wantErr: "boom",
 		},
@@ -170,8 +171,9 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 				stubUserHoldsEveryScope(permissionChecker)
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
-				database.On("CreateUserConsent", mock.Anything, mock.Anything, mock.Anything).Return(boom)
+				mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+				database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
+				database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.Anything).Return(boom)
 			},
 			wantErr: "boom",
 		},
@@ -248,8 +250,9 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 		stubUserHoldsEveryScope(permissionChecker)
-		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
-		database.On("CreateUserConsent", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
+		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
+		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.Anything).Return(nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(boom)
 		pageRenderer.On("InternalServerError", rr, req, boom).Return().Once()
