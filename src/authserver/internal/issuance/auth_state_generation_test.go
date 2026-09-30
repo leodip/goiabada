@@ -256,7 +256,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			AuthStateGeneration: 7,
 		}
 		tokenInput := issuer.createTokenInputFromImplicit(input)
-		tokenStr, err := issuer.generateAccessTokenCore(context.Background(), settings, tokenInput, now, privKey, "test-kid")
+		tokenStr, err := issuer.generateAccessTokenCore(context.Background(), nil, settings, tokenInput, now, privKey, "test-kid")
 		require.NoError(t, err)
 
 		claims := parseAccessTokenClaims(t, tokenStr)

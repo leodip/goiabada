@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // authIssueDatabase is what /auth/issue reads before it issues: the client, its redirect URIs, the
@@ -64,6 +65,7 @@ func HandleIssueGet(
 			redirectURI:              authContext.RedirectURI,
 			responseType:             authContext.ResponseType,
 			hintSubject:              authContext.IdTokenHintSub,
+			authStateGeneration:      authContext.AuthStateGeneration,
 			sessionIdentifierPresent: sessionIdentifier != "",
 		}
 
@@ -76,6 +78,22 @@ func HandleIssueGet(
 			effectiveScope string
 		)
 
+		// The settings ride on the request's context, and two facts read them: the client's flow
+		// switches and the session's timeouts. Read once, and only when one of them is asked for,
+		// so a ceremony refused above both answers without them in its context.
+		loadSettings := func() bool {
+			if settings != nil {
+				return true
+			}
+			s, ok := reqctx.SettingsFrom(r.Context())
+			if !ok {
+				pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+				return false
+			}
+			settings = s
+			return true
+		}
+
 		// The loads, each made once and only when decideIssuance asks for it, so a refusal reads
 		// nothing past the check that refused.
 		answer, need := decideIssuance(facts)
@@ -83,7 +101,7 @@ func HandleIssueGet(
 			switch need {
 			case issuanceFactRegistration:
 				// The client loaded here is the one every act below answers or issues for, so
-				// neither the refusals nor handleImplicitFlow load it again.
+				// neither the refusals nor issueImplicitGrant load it again.
 				client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 				if err != nil {
 					pageRenderer.InternalServerError(w, r, err)
@@ -103,6 +121,18 @@ func HandleIssueGet(
 				issuingClient = client
 				facts.registrationLoaded = true
 				facts.registeredRedirectURIs = registered
+				facts.clientEnabled = client != nil && client.Enabled
+
+			case issuanceFactFlows:
+				// Only reached for a registered client, which the registration gate has already
+				// established is not nil.
+				if !loadSettings() {
+					return
+				}
+				facts.flows = &clientFlows{
+					implicit: issuingClient.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
+					code:     issuingClient.AuthorizationCodeEnabled,
+				}
 
 			case issuanceFactUser:
 				user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
@@ -132,19 +162,16 @@ func HandleIssueGet(
 				// session's AuthTime, so max_age=0 is violated a nanosecond after the credential
 				// was accepted and every such ceremony would restart at level 1, mint a fresh
 				// session and fail again (#241).
-				s, ok := reqctx.SettingsFrom(r.Context())
-				if !ok {
-					pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+				if !loadSettings() {
 					return
 				}
-				settings = s
 				valid := userSessionManager.HasValidUserSession(ambientSession,
 					settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
 				facts.sessionValid = &valid
 
 			case issuanceFactEffectiveScope:
 				// Whichever field the issuer will READ, and never the other one. IssueAuthCodeTx
-				// and handleImplicitFlow both prefer ConsentedScope and fall back to Scope when it
+				// and issueImplicitGrant both prefer ConsentedScope and fall back to Scope when it
 				// is empty, so writing an emptied ConsentedScope back would fall through to the
 				// full unfiltered request, which is why the empty result refuses instead of
 				// writing anything at all (#241 decision 2).
@@ -166,6 +193,26 @@ func HandleIssueGet(
 		switch answer.outcome {
 		case issuanceRefuseUnregisteredRedirect:
 			refuseIssuanceUnregisteredRedirect(w, r, authContext, issuingClient, pageRenderer, ceremonyStore, auditLogger)
+
+		case issuanceRefuseClientDisabled:
+			refuseIssuanceClientDisabled(w, r, authContext, pageRenderer, ceremonyStore)
+
+		case issuanceRefuseImplicitDisabled:
+			refuseIssuanceFlowDisabled(w, r, protocolvalidation.ImplicitNotAuthorizedErrorMsg, authContext, issuingClient,
+				database, pageRenderer, ceremonyStore, templateFS)
+
+		case issuanceRefuseCodeDisabled:
+			refuseIssuanceFlowDisabled(w, r, protocolvalidation.AuthorizationCodeNotSupportedErrorMsg, authContext, issuingClient,
+				database, pageRenderer, ceremonyStore, templateFS)
+
+		case issuanceRefuseUserDisabled:
+			// The same event and the same answer as /auth/completed gives the same condition, arriving
+			// later: the account was disabled while the ceremony sat on a step.
+			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+				"userId": facts.user.Id,
+			})
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+				redirectErrorFromAuthContext(authContext, issuingClient, "access_denied", userDisabledDescription))
 
 		case issuanceRefuseHintMismatch:
 			// An error redirect carries the client it is answering, so its provenance has to be
@@ -209,10 +256,8 @@ func HandleIssueGet(
 			*scopeField = effectiveScope
 
 			if answer.outcome == issuanceIssueImplicit {
-				err := handleImplicitFlow(w, r, templateFS, authContext, sessionIdentifier, issuingClient, facts.user, settings, ceremonyStore, implicitTokenIssuer, auditLogger)
-				if err != nil {
-					pageRenderer.InternalServerError(w, r, err)
-				}
+				issueImplicitGrant(w, r, authContext, sessionIdentifier, issuingClient, facts.user, settings, ambientSession,
+					pageRenderer, ceremonyStore, templateFS, implicitTokenIssuer, database, auditLogger, baseURL)
 				return
 			}
 
@@ -229,8 +274,11 @@ type issuanceFact int
 const (
 	// issuanceFactNone means the answer is decided.
 	issuanceFactNone issuanceFact = iota
-	// issuanceFactRegistration is the client's registered redirect URIs, none for a missing client.
+	// issuanceFactRegistration is the client's registered redirect URIs, none for a missing client, and
+	// whether it is enabled.
 	issuanceFactRegistration
+	// issuanceFactFlows is which authorization flows the client may use.
+	issuanceFactFlows
 	// issuanceFactUser is the ceremony's user, or none.
 	issuanceFactUser
 	// issuanceFactSession is the session the request's identifier names, or none.
@@ -250,12 +298,22 @@ const (
 	// issuanceRefuseUnregisteredRedirect renders the refusal page: the redirect URI is no longer
 	// registered on the client.
 	issuanceRefuseUnregisteredRedirect
+	// issuanceRefuseClientDisabled renders the refusal page /auth/authorize renders for a disabled client.
+	issuanceRefuseClientDisabled
+	// issuanceRefuseImplicitDisabled answers unauthorized_client: the ceremony is an implicit one and the
+	// client may no longer use the implicit grant.
+	issuanceRefuseImplicitDisabled
+	// issuanceRefuseCodeDisabled answers unauthorized_client: the ceremony is a code one and the client
+	// may no longer use the authorization code flow.
+	issuanceRefuseCodeDisabled
 	// issuanceRefuseHintMismatch answers login_required: the user is not the id_token_hint's.
 	issuanceRefuseHintMismatch
 	// issuanceRefuseUnusableSession is refuseIssuanceUnusableSession, for sessionShape.
 	issuanceRefuseUnusableSession
 	// issuanceUserMissing answers 500: the ceremony's user no longer exists.
 	issuanceUserMissing
+	// issuanceRefuseUserDisabled answers access_denied: the ceremony's user has been disabled.
+	issuanceRefuseUserDisabled
 	// issuanceRefuseScopeDenied answers access_denied: the user holds none of the scopes.
 	issuanceRefuseScopeDenied
 	// issuanceIssueImplicit issues tokens for an implicit response type.
@@ -271,18 +329,33 @@ type issuanceAnswer struct {
 	sessionShape sessionRefusalShape
 }
 
-// issuanceFacts is what decideIssuance decides from. The first four are known from the ceremony
+// clientFlows is which authorization flows a client may use, each as the token endpoint would read
+// it: the implicit grant through the client's override or else the global switch, the authorization
+// code flow through the client's own flag.
+type clientFlows struct {
+	implicit bool
+	code     bool
+}
+
+// issuanceFacts is what decideIssuance decides from. The first five are known from the ceremony
 // and the request; every other fact is unknown until HandleIssueGet has loaded it, a nil pointer or
 // a false loaded flag.
 type issuanceFacts struct {
 	redirectURI  string
 	responseType string
 	hintSubject  string
+	// authStateGeneration is the generation the ceremony authenticated at, as its context holds it.
+	authStateGeneration int64
 	// sessionIdentifierPresent says the request resolved a session identifier.
 	sessionIdentifierPresent bool
 
 	registrationLoaded     bool
 	registeredRedirectURIs []string
+	// clientEnabled is the client's enabled flag, false for a missing client, and is known with the
+	// registration.
+	clientEnabled bool
+	// flows is nil until the client's flows have been loaded.
+	flows *clientFlows
 	// userLoaded is set once the user has been looked up; user is nil when there is none.
 	userLoaded bool
 	user       *models.User
@@ -311,10 +384,19 @@ type issuanceFacts struct {
 //     validator.ValidateClientAndRedirectURI's own test applied to the stored response type:
 //     IsCodeOnly, true for the exact type "code", so "code code" and "code foo", which a ceremony
 //     stored before #244 can hold, do not buy an arbitrary loopback port.
-//  2. An id_token_hint names the ceremony's user. OIDC Core 3.1.2.2: "The Authorization Server MUST
+//  2. The client is still enabled, and still allowed the flow this ceremony is for. Both were
+//     checked at /auth/authorize, and the ceremony may have sat on a step for as long as the user
+//     left it, so an operator who disabled the client or switched the flow off in that time has an
+//     expectation these checks meet (#197). They sit right after the registration because they need
+//     neither the hint, the session nor the user, and so a refusal reads nothing more. A disabled
+//     client is the page /auth/authorize renders for one and never a redirect, because it is the
+//     client itself that is refused; a flow switched off is unauthorized_client by redirect, as the
+//     token endpoint answers it. The implicit grant is read through the client's override and else
+//     the global switch, as everywhere it is asked.
+//  3. An id_token_hint names the ceremony's user. OIDC Core 3.1.2.2: "The Authorization Server MUST
 //     NOT reply with an ID Token or Access Token for a different user, even if they have an active
 //     session with the Authorization Server." A user who no longer exists is not the hint's either.
-//  3. The ceremony may bind a grant to the browser's session: it exists, is the ceremony user's, and
+//  4. The ceremony may bind a grant to the browser's session: it exists, is the ceremony user's, and
 //     is valid. A ceremony must not bind a grant to a session that no longer exists (#129 decision
 //     6, second half): the session was alive at /auth/completed, and if it was ended while the user
 //     sat on the consent screen, the grant minted here is brand new and no marker written by the
@@ -328,14 +410,23 @@ type issuanceFacts struct {
 //     access by A's lifetimes. Validity is #241's: /auth/completed applied the timeouts once, and a
 //     session that timed out on the consent screen still resolves and is still owned, while the
 //     authorization_code grant checks ownership and not validity, so only the FIRST refresh would
-//     fail. The check sits ABOVE the response-type dispatch: handleImplicitFlow copies the
-//     identifier into the tokens it signs and never loads the session, and a third-party resource
-//     server validating an already-signed token has no way to compare the session's owner against
-//     its subject (#133). An implicit ceremony with no identifier at all is exempt, since there is
-//     nothing to cross-bind to and it issues no refresh token (#133); the exemption is applied
-//     after the conjunction, because validity answers false for no session.
-//  4. The user still exists (a 500 if not).
-//  5. The user holds at least one of the scopes to be issued, re-filtered against the LIVE
+//     fail. The check sits ABOVE the response-type dispatch, for both flows: a third-party
+//     resource server validating an already-signed token has no way to compare the session's owner
+//     against its subject (#133). An implicit ceremony with no identifier at all was exempt from it
+//     until #197, on the reasoning that it issues no refresh token and there was nothing to
+//     cross-bind to; but the tokens it signs name no session, so no termination could ever end
+//     them, and the code flow already refuses the same ceremony. It is the gone shape now, answered
+//     as the code flow answers it. The implicit flow's issuer takes the session row again inside its
+//     own transaction, which is what closes the gap between this read and the signing.
+//  5. The user still exists (a 500 if not), is still enabled, and the credential the ceremony
+//     authenticated with is still current. A disabled account is access_denied, and is audited as
+//     /auth/completed audits it. The credential is current when the ceremony's generation is the
+//     user's, the comparison the token endpoint makes at redemption: a password change or a
+//     revocation moves the user's on, and a ceremony at any other value would be issued a code that
+//     endpoint refuses, or tokens signed under a credential that is no longer current. It is
+//     restarted at level 1 instead, or told login_required when the request forbids UI, as a
+//     session that is gone is (#197, #106).
+//  6. The user holds at least one of the scopes to be issued, re-filtered against the LIVE
 //     permissions immediately before anything is minted. /auth/completed's filter is the only other
 //     live check, and nothing downstream catches a removal: the authorization_code grant never
 //     consults the permission checker, so without this a brand-new grant is the one thing minted
@@ -349,9 +440,24 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	if !f.registrationLoaded {
 		return issuanceAnswer{}, issuanceFactRegistration
 	}
-	allowLoopbackPortFlexibility := protocolvalidation.ParseResponseType(f.responseType).IsCodeOnly()
+	rtInfo := protocolvalidation.ParseResponseType(f.responseType)
+	allowLoopbackPortFlexibility := rtInfo.IsCodeOnly()
 	if !urlutil.RedirectURIIsRegistered(f.registeredRedirectURIs, f.redirectURI, allowLoopbackPortFlexibility) {
 		return decided(issuanceRefuseUnregisteredRedirect)
+	}
+
+	if !f.clientEnabled {
+		return decided(issuanceRefuseClientDisabled)
+	}
+	isImplicitFlow := rtInfo.IsImplicitFlow()
+	if f.flows == nil {
+		return issuanceAnswer{}, issuanceFactFlows
+	}
+	if isImplicitFlow && !f.flows.implicit {
+		return decided(issuanceRefuseImplicitDisabled)
+	}
+	if !isImplicitFlow && !f.flows.code {
+		return decided(issuanceRefuseCodeDisabled)
 	}
 
 	if f.hintSubject != "" {
@@ -369,11 +475,7 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	if f.sessionValid == nil {
 		return issuanceAnswer{}, issuanceFactSessionValidity
 	}
-	isImplicitFlow := protocolvalidation.ParseResponseType(f.responseType).IsImplicitFlow()
 	mayBind := f.sessionOwned && *f.sessionValid
-	if isImplicitFlow && !f.sessionIdentifierPresent {
-		mayBind = true
-	}
 	if !mayBind {
 		// The three shapes are mutually exclusive by construction: a row that is absent cannot be
 		// foreign, and a foreign one is refused on ownership before its clock is read.
@@ -392,6 +494,12 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	}
 	if f.user == nil {
 		return decided(issuanceUserMissing)
+	}
+	if !f.user.Enabled {
+		return decided(issuanceRefuseUserDisabled)
+	}
+	if f.user.AuthStateGeneration != f.authStateGeneration {
+		return issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionGenerationStale}, issuanceFactNone
 	}
 
 	if f.effectiveScope == nil {
@@ -460,6 +568,58 @@ func refuseIssuanceUnregisteredRedirect(
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}
+}
+
+// refuseIssuanceClientDisabled answers a ceremony whose client was disabled after it started:
+// nothing is issued and nothing is emitted, and the refusal page /auth/authorize renders for a
+// disabled client is rendered here, in the visitor's locale and with the status that page has
+// there. It is a page and never a redirect because it is the client that is refused, and answering
+// the client is what disabling it stops (#197).
+func refuseIssuanceClientDisabled(
+	w http.ResponseWriter,
+	r *http.Request,
+	authContext *ceremony.AuthContext,
+	pageRenderer PageRenderer,
+	ceremonyStore CeremonyStore,
+) {
+	slog.WarnContext(r.Context(), "the client this ceremony is issuing for has been disabled, so nothing is issued and nothing is emitted",
+		"client_identifier", authContext.ClientId)
+
+	// The clear goes FIRST, the order every refusal in this handler uses (#141). Its failure does not
+	// change the answer, for the reason refuseIssuanceUnregisteredRedirect gives: the page reaches no
+	// client, and a replay of the context that stays behind comes back to this gate and is refused
+	// again for as long as the client stays disabled.
+	err := ceremonyStore.ClearAuthContext(w, r)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to clear the auth context while refusing a disabled client, rendering the refusal anyway",
+			"error", err)
+	}
+
+	message := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientDisabled, nil).Localize(r.Context())
+	renderAuthorizeRefusal(pageRenderer, w, r, message, http.StatusOK)
+}
+
+// refuseIssuanceFlowDisabled answers a ceremony whose client was switched off for the flow the
+// ceremony is for: unauthorized_client, by redirect, through answerClientWithError. The description
+// is the one the authorize and token endpoints give for the same condition, so it reads alike
+// wherever it is found (#197).
+func refuseIssuanceFlowDisabled(
+	w http.ResponseWriter,
+	r *http.Request,
+	description string,
+	authContext *ceremony.AuthContext,
+	issuingClient *models.Client,
+	database authIssueDatabase,
+	pageRenderer PageRenderer,
+	ceremonyStore CeremonyStore,
+	templateFS fs.FS,
+) {
+	slog.WarnContext(r.Context(), "the client is no longer allowed the flow this ceremony is for, so nothing is issued",
+		"client_identifier", authContext.ClientId,
+		"response_type", authContext.ResponseType)
+
+	answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+		redirectErrorFromAuthContext(authContext, issuingClient, "unauthorized_client", description))
 }
 
 // issueAuthorizationCodeGrant is the authorization code branch: it issues the code, bound to the
@@ -569,10 +729,11 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 	}
 }
 
-// sessionRefusalShape names which of the three conditions on the session backing a ceremony
-// refuseIssuanceUnusableSession is answering. They are mutually exclusive by construction: a row
-// that is absent cannot be foreign, and a foreign one is refused on ownership before its clock is
-// read.
+// sessionRefusalShape names which of the four conditions refuseIssuanceUnusableSession is answering:
+// three on the session backing a ceremony and one on the credential it authenticated with. The
+// three session conditions are mutually exclusive by construction: a row that is absent cannot be
+// foreign, and a foreign one is refused on ownership before its clock is read. The fourth is
+// reached only after the session has passed all three.
 type sessionRefusalShape int
 
 const (
@@ -587,14 +748,20 @@ const (
 	// sessionExpired is a row that resolves, is owned, and is outside its idle timeout or its
 	// maximum lifetime (#241).
 	sessionExpired
+	// sessionGenerationStale is a session that is fine and a credential that is not: the user's
+	// authentication generation has moved on since the ceremony authenticated, by a password change
+	// or a revocation, so what this ceremony proved is no longer current. Answered like the other
+	// three, because whoever signs in next must prove it again (#197, #106).
+	sessionGenerationStale
 )
 
 // refuseIssuanceUnusableSession is /auth/issue's one answer to "this ceremony cannot bind a grant
-// to this session", and it exists as a function because the handler reaches that conclusion at two
-// different points: the liveness read above the response-type dispatch, and the acquisition that
-// orders the code insert against a session termination below it. Decision 3 of #139 is that one
-// condition gets one answer wherever it is learned, and a shared implementation is what makes that
-// checkable rather than a claim about two blocks that currently agree.
+// to this session", and it exists as a function because the handler reaches that conclusion at
+// several points: the liveness read above the response-type dispatch, the generation check beside
+// it, and below the dispatch the acquisition that orders the code insert, or the signing of the
+// implicit tokens, against a session termination. Decision 3 of #139 is that one condition gets one
+// answer wherever it is learned, and a shared implementation is what makes that checkable rather
+// than a claim about blocks that currently agree.
 //
 // Two outcomes, one predicate. An interactive ceremony is restarted at level 1, and a prompt=none
 // ceremony is answered login_required, because a request that forbids UI cannot be sent to a
@@ -649,6 +816,9 @@ func refuseIssuanceUnusableSession(
 			slog.WarnContext(r.Context(), "the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
 				"session_identifier", sessionIdentifier,
 				"session_user_id", ambientSession.UserId)
+		case sessionGenerationStale:
+			slog.WarnContext(r.Context(), "the user's authentication generation has moved on since this silent ceremony authenticated, returning login_required instead of issuing anything",
+				"ceremony_user_id", authContext.UserId)
 		default:
 			slog.WarnContext(r.Context(), "the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
 				"session_identifier", sessionIdentifier)
@@ -680,6 +850,9 @@ func refuseIssuanceUnusableSession(
 		slog.WarnContext(r.Context(), "the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier,
 			"session_user_id", ambientSession.UserId)
+	case sessionGenerationStale:
+		slog.WarnContext(r.Context(), "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of issuing anything",
+			"ceremony_user_id", authContext.UserId)
 	default:
 		slog.WarnContext(r.Context(), "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier)
@@ -695,26 +868,37 @@ func refuseIssuanceUnusableSession(
 	http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1", authContext), http.StatusFound)
 }
 
-// handleImplicitFlow handles the implicit grant flow token issuance.
-// Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5, tokens are returned in the fragment, or posted in a
-// form when the request asked for response_mode=form_post (#231).
-// handleImplicitFlow takes the client and the user rather than loading them. HandleIssueGet
-// resolves both above the dispatch now, the client for the registration gate and the user for the
-// scope re-filter, and both gates refuse a nil, so re-reading them here would be two queries for
-// values already in hand (#241).
-func handleImplicitFlow(
+// issueImplicitGrant is the implicit branch: it signs the tokens, bound to the session, and
+// delivers them to the client. Per RFC 6749 4.2.2 and OIDC Core 3.2.2.5, tokens are returned in the
+// fragment, or posted in a form when the request asked for response_mode=form_post (#231).
+//
+// It takes the client and the user rather than loading them. HandleIssueGet resolves both above the
+// dispatch, the client for the registration gate and the user for the scope re-filter, and both
+// gates refuse a nil, so re-reading them here would be two queries for values already in hand
+// (#241).
+//
+// The issuer signs inside a transaction that takes the session row first, as the code issuer does
+// (#197), so a session that was ended between the liveness read and the signing is answered
+// exactly as the read answers it, and only after the issuer has rolled back: the refusal writes the
+// session store on a nil transaction, and on SQLite that is the connection the transaction held
+// (#139). Like issueAuthorizationCodeGrant it answers for itself.
+func issueImplicitGrant(
 	w http.ResponseWriter,
 	r *http.Request,
-	templateFS fs.FS,
 	authContext *ceremony.AuthContext,
 	sessionIdentifier string,
 	client *models.Client,
 	user *models.User,
 	settings *models.Settings,
+	ambientSession *models.UserSession,
+	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
+	templateFS fs.FS,
 	implicitTokenIssuer ImplicitTokenIssuer,
+	database authIssueDatabase,
 	auditLogger AuditLogger,
-) error {
+	baseURL string,
+) {
 	// Determine what tokens to issue based on response_type
 	rtInfo := protocolvalidation.ParseResponseType(authContext.ResponseType)
 	issueAccessToken := rtInfo.HasToken
@@ -747,12 +931,21 @@ func handleImplicitFlow(
 		AuthStateGeneration: authContext.AuthStateGeneration,
 	}
 
-	tokenResponse, err := implicitTokenIssuer.GenerateTokenResponseForImplicit(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
+	tokenResponse, err := implicitTokenIssuer.IssueImplicitTx(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
+	if errors.Is(err, issuance.ErrIssuingSessionGone) {
+		// The gone shape, answered exactly as the liveness read answers it: the browser restarts at
+		// level 1 and a prompt=none ceremony is told login_required. Nothing was signed.
+		refuseIssuanceUnusableSession(w, r, sessionGone, authContext, client, ambientSession,
+			sessionIdentifier, pageRenderer, ceremonyStore, templateFS, database, auditLogger, baseURL)
+		return
+	}
 	if err != nil {
-		return err
+		pageRenderer.InternalServerError(w, r, err)
+		return
 	}
 
-	// Audit log
+	// Everything below this line attests to what was signed, so it waits for the issuer to return,
+	// which is after the commit.
 	auditLogger.Log(r.Context(), audit.AuditTokenIssuedImplicitResponse, map[string]interface{}{
 		"userId":           user.Id,
 		"clientId":         client.Id,
@@ -765,10 +958,14 @@ func handleImplicitFlow(
 	// Clear auth context
 	err = ceremonyStore.ClearAuthContext(w, r)
 	if err != nil {
-		return err
+		pageRenderer.InternalServerError(w, r, err)
+		return
 	}
 
-	return issueImplicitTokens(w, r, templateFS, authContext.ResponseMode, authContext.RedirectURI, authContext.State, tokenResponse)
+	err = issueImplicitTokens(w, r, templateFS, authContext.ResponseMode, authContext.RedirectURI, authContext.State, tokenResponse)
+	if err != nil {
+		pageRenderer.InternalServerError(w, r, err)
+	}
 }
 
 // issueImplicitTokens answers the client with tokens: in the fragment of its redirect URI, which is

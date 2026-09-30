@@ -209,6 +209,12 @@ The redirect is withheld because anyone can register a client and choose where i
 
 ## Stage 5: Code issuance
 
+The ceremony may have waited on the consent screen, so before anything is issued it is checked again, for implicit requests too. It stops if:
+
+- the client was disabled (an error page) or the flow was switched off for it (`unauthorized_client`);
+- the user was disabled (`access_denied`);
+- the user's credentials changed since they signed in (the sign-in starts again, or `login_required` for `prompt=none`).
+
 The authorization code is generated and delivered to the client using the response mode:
 
 | Response mode | Delivery |

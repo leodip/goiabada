@@ -188,7 +188,7 @@ func HandleAuthCompletedGet(
 				"userId": user.Id,
 			})
 			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
-				redirectErrorFromAuthContext(authContext, client, "access_denied", "The user account is disabled."))
+				redirectErrorFromAuthContext(authContext, client, "access_denied", userDisabledDescription))
 		case afterBindingNoScope:
 			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 				redirectErrorFromAuthContext(authContext, client,

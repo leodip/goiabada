@@ -979,7 +979,9 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
+		armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+		response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array
@@ -1147,7 +1149,9 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
+		armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+		response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -1174,7 +1178,9 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
+		armImplicitTransaction(mockDB, input.SessionIdentifier)
+
+		response, err := tokenIssuer.IssueImplicitTx(ctx, settings, input, true, true)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -1360,7 +1366,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		_, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		_, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid scope")
 	})
@@ -1382,7 +1388,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 		claims := verifyAndDecodeToken(t, token, getTestPublicKey(t))
@@ -1421,7 +1427,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 		AuthenticatedAt: now,
 	}
 
-	token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+	token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 	assert.NoError(t, err)
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1466,7 +1472,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 			SessionIdentifier: "test-session",
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1489,7 +1495,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 			Nonce:           "",
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1536,7 +1542,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 			AccessToken:     "fake-access-token-for-hash",
 		}
 
-		token, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1561,7 +1567,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 			AccessToken:     "",
 		}
 
-		token, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1615,7 +1621,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 		AuthenticatedAt: now,
 	}
 
-	token, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+	token, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 	assert.NoError(t, err)
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1708,7 +1714,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1732,7 +1738,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1779,7 +1785,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1808,7 +1814,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1839,7 +1845,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1869,7 +1875,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), nil, settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -1905,7 +1911,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
 		claims := jwt.MapClaims{}
-		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "profile"})
+		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, nil, claims, user, []string{"openid", "profile"})
 
 		assert.Equal(t, "https://auth.example.com/userinfo/picture/sub-42", claims["picture"])
 		assert.Equal(t, "https://auth.example.com/account/profile", claims["profile"])
@@ -1917,7 +1923,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
 		claims := jwt.MapClaims{}
-		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "email"})
+		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, nil, claims, user, []string{"openid", "email"})
 
 		assert.NotContains(t, claims, "picture")
 		mockDB.AssertNotCalled(t, "UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything)
@@ -2281,7 +2287,8 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	case "implicit token", "implicit id_token token", "implicit id_token":
 		issueAccessToken := flow != "implicit id_token"
 		issueIdToken := flow != "implicit token"
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, implicit, issueAccessToken, issueIdToken)
+		armImplicitTransaction(mockDB, implicit.SessionIdentifier)
+		response, err := tokenIssuer.IssueImplicitTx(ctx, settings, implicit, issueAccessToken, issueIdToken)
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken = response.Scope, response.AccessToken, response.IdToken
 	case "ROPC":

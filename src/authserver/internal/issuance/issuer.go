@@ -9,9 +9,11 @@ import (
 )
 
 // tokenIssuerDatabase is what the token issuer needs: the claim on the code or refresh token being
-// redeemed, the containment of a replayed refresh token's family, the signing key, and the claims
-// that go into the tokens.
+// redeemed, the containment of a replayed refresh token's family, the signing key, the claims
+// that go into the tokens, and, for the implicit grant, the session row it takes and the
+// transaction it takes it in.
 type tokenIssuerDatabase interface {
+	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error
 	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
@@ -23,6 +25,7 @@ type tokenIssuerDatabase interface {
 	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 	RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
 	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error

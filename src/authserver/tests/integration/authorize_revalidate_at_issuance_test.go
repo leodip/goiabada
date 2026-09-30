@@ -54,6 +54,16 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	codeVerifier string, grantScopes []string) *parkedCeremony {
 
 	t.Helper()
+	return parkCeremonyOnConsentScreen(t, "code", requestScope, clientSecret, codeVerifier, grantScopes)
+}
+
+// parkCeremonyOnConsentScreen is parkOnConsentScreen for any response type. An implicit one gets a
+// client the implicit grant is switched on for, and no code challenge, which only a code carries
+// (#197).
+func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope string, clientSecret string,
+	codeVerifier string, grantScopes []string) *parkedCeremony {
+
+	t.Helper()
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
@@ -67,6 +77,10 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 		ConsentRequired:       true,
 		DefaultAcrLevel:       models.AcrLevel1,
 		ClientSecretEncrypted: clientSecretEncrypted,
+	}
+	if responseType != "code" {
+		implicitOn := true
+		client.ImplicitGrantEnabled = &implicitOn
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
@@ -116,12 +130,14 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	state := fake.LetterN(8)
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
-		"&response_type=code" +
-		"&code_challenge_method=S256" +
-		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
+		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + state +
 		"&nonce=" + fake.LetterN(8)
+	if responseType == "code" {
+		destUrl += "&code_challenge_method=S256" +
+			"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier)
+	}
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)

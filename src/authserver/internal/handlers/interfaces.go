@@ -65,10 +65,11 @@ type TokenIssuer interface {
 	IssuePasswordGrant(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
 }
 
-// ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens
-// in the redirect fragment. The token endpoint issues the other four grants, through TokenIssuer.
+// ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens,
+// signed in a transaction that takes the session row first (#197). The token endpoint issues the other
+// four grants, through TokenIssuer.
 type ImplicitTokenIssuer interface {
-	GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
+	IssueImplicitTx(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
 }
 
 type AuthorizeValidator interface {

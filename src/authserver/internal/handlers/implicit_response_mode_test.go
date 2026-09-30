@@ -297,7 +297,7 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	handler := HandleIssueGet(pageRenderer, ceremonyStore, web.TemplateFS(), codeIssuer, implicitTokenIssuer, database,
 		auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
-	req := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
@@ -317,17 +317,18 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}, nil)
+		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 		Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
-	implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, true, true).
+	implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, true).
 		Return(implicitTokenResponse(), nil)
 	auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 
 	// The context is cleared, and only then does the response go out.
 	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
+	stubLiveSession(database, 123)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 	handler.ServeHTTP(rr, req)

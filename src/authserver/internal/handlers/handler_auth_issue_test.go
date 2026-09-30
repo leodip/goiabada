@@ -45,18 +45,23 @@ import (
 //
 // The filter returns its input unchanged, which is the "nothing was revoked" answer and the one
 // that leaves every existing assertion about scope reading as it did before this gate existed.
+// implicitAllowed is the client's implicit override the tests' clients carry. /auth/issue reads it,
+// with the client's other switches, before it issues anything: a client with no flow switched on is
+// refused unauthorized_client, and one that is disabled is refused on the page (#197).
+var implicitAllowed = true
+
 func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager,
 	permissionChecker *mocks_handlers.PermissionChecker, redirectURI string) {
 
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Maybe()
+		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil).Maybe()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			client := args.Get(2).(*models.Client)
 			client.RedirectURIs = []models.RedirectURI{{URI: redirectURI}}
 		}).Return(nil).Maybe()
 	database.On("GetUserById", mock.Anything, mock.Anything, mock.Anything).
-		Return(&models.User{Id: 1, Subject: fake.UUID()}, nil).Maybe()
+		Return(&models.User{Id: 1, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 	userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).
 		Return(true).Maybe()
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
@@ -957,7 +962,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 //
 // One case per issuance family, because one shared gate is only worth what its weakest branch
 // is: the code flow reaches IssueAuthCodeTx, and the three implicit response types reach
-// GenerateTokenResponseForImplicit through a dispatch that used to sit ABOVE this check and
+// IssueImplicitTx through a dispatch that used to sit ABOVE this check and
 // never loaded the session at all. An implicit token is signed and handed to a resource server
 // that cannot look the session up, so nothing downstream can catch it later.
 //
@@ -1042,7 +1047,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "access_token=")
 			assert.NotContains(t, location, "id_token=")
 			codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
-			implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+			implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			// The literal, not authContext.UserId: the restart has since discarded the user from
@@ -1128,7 +1133,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "access_token=")
 
 			codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
-			implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+			implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
@@ -1181,11 +1186,11 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		stubLiveSession(database, 123)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}, nil)
+			Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 			Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
-		implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.User.Id == int64(123) && input.SessionIdentifier == liveSessionIdentifier
 		}), true, false).Return(&issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -1282,7 +1287,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assert.NotNil(t, savedAuthContext)
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
-		implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+		implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		// No owner to name, so this takes #129's line rather than decision 7's.
 		assertWarnedSessionGone(t, logs)
@@ -1340,7 +1345,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assert.NotContains(t, location, "access_token=")
 		assert.NotContains(t, location, "id_token=")
 
-		implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+		implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assertWarnedSessionGone(t, logs)
@@ -1370,7 +1375,7 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 }
 
 // stubLiveSession makes the ownership check pass, which is the precondition for reaching
-// IssueAuthCodeTx or GenerateTokenResponseForImplicit at all. Liveness alone was enough after
+// IssueAuthCodeTx or IssueImplicitTx at all. Liveness alone was enough after
 // #129 stage 6; #133 added the owner comparison, so the caller has to say which user the row
 // belongs to and a subtest that wants the gate to pass has to name its own ceremony's user.
 func stubLiveSession(database *mocks_data.Database, ownerUserId int64) {
@@ -1533,6 +1538,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		requestSettings := &models.Settings{Issuer: "https://issuer.example",
 			UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds, UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds}
 		req = withSettings(req, requestSettings)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -1558,18 +1564,21 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		// Mock client lookup
 		mockClient := &models.Client{
-			Id:               1,
-			ClientIdentifier: "test-client",
-			Enabled:          true,
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			ImplicitGrantEnabled:     &implicitAllowed,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		// Mock user lookup
 		mockUser := &models.User{
-			Id:      123,
-			Subject: "11111111-1111-1111-1111-111111111111",
-			Email:   "test@example.com",
-			Enabled: true,
+			Id:                  123,
+			Subject:             "11111111-1111-1111-1111-111111111111",
+			Email:               "test@example.com",
+			Enabled:             true,
+			AuthStateGeneration: 7,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
@@ -1580,7 +1589,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ExpiresIn:   3600,
 			Scope:       "openid",
 		}
-		implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, theseSettings(requestSettings), mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, theseSettings(requestSettings), mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Scope == "openid" &&
 				input.AuthStateGeneration == 7
 		}), true, false).Return(tokenResponse, nil)
@@ -1593,6 +1602,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		// Mock clearing auth context
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
+		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -1628,6 +1638,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -1652,17 +1663,20 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{
-			Id:               1,
-			ClientIdentifier: "test-client",
-			Enabled:          true,
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			ImplicitGrantEnabled:     &implicitAllowed,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{
-			Id:      123,
-			Subject: "11111111-1111-1111-1111-111111111111",
-			Email:   "test@example.com",
-			Enabled: true,
+			Id:                  123,
+			Subject:             "11111111-1111-1111-1111-111111111111",
+			Email:               "test@example.com",
+			Enabled:             true,
+			AuthStateGeneration: 7,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
@@ -1670,7 +1684,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			IdToken: "id-token-123",
 			Scope:   "openid",
 		}
-		implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Nonce == "test-nonce"
 		}), false, true).Return(tokenResponse, nil)
 
@@ -1680,6 +1694,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
+		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -1714,6 +1729,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -1738,17 +1754,20 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{
-			Id:               1,
-			ClientIdentifier: "test-client",
-			Enabled:          true,
+			Id:                       1,
+			ClientIdentifier:         "test-client",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			ImplicitGrantEnabled:     &implicitAllowed,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{
-			Id:      123,
-			Subject: "11111111-1111-1111-1111-111111111111",
-			Email:   "test@example.com",
-			Enabled: true,
+			Id:                  123,
+			Subject:             "11111111-1111-1111-1111-111111111111",
+			Email:               "test@example.com",
+			Enabled:             true,
+			AuthStateGeneration: 7,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
@@ -1759,7 +1778,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			IdToken:     "id-token-123",
 			Scope:       "openid",
 		}
-		implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123)
 		}), true, true).Return(tokenResponse, nil)
 
@@ -1769,6 +1788,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
+		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -1805,6 +1825,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -1821,10 +1842,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
+		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
+		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -1833,13 +1854,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ExpiresIn:   3600,
 			Scope:       "openid profile",
 		}
-		implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Scope == "openid profile" // Should use consented scope
 		}), true, false).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
+		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -1852,7 +1874,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	// The client vanished between /auth/completed and /auth/issue. Before #241 this reached
-	// handleImplicitFlow, which loaded the client itself and answered a 500; now the registration
+	// issueImplicitGrant, which loaded the client itself and answered a 500; now the registration
 	// gate above the dispatch meets it first, and a client with no registrations at all cannot
 	// have the stored redirect URI among them. It is a refusal rather than a fault, so it renders
 	// the withheld page and never names a client on it.
@@ -1907,7 +1929,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a withheld redirect must never become a Location")
-		implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1931,6 +1953,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -1945,7 +1968,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
+		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(999)).Return(nil, nil)
@@ -1954,6 +1977,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return err != nil && strings.Contains(err.Error(), "user 999 not found")
 		})).Return()
 
+		stubLiveSession(database, 999)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -1978,6 +2002,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -1992,19 +2017,20 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
+		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
+		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenError := errs.New("token generation failed")
-		implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
+		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == tokenError
 		})).Return()
 
+		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -2320,6 +2346,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		assert.NoError(t, err)
 
 		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -2334,7 +2361,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
+		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		dbError := errs.New("user database error")
@@ -2344,6 +2371,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			return err == dbError
 		})).Return()
 
+		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -2368,6 +2396,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		assert.NoError(t, err)
 		req = withSessionSettings(req)
+		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
 
 		rr := httptest.NewRecorder()
 
@@ -2382,10 +2411,10 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
+		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
+		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2393,7 +2422,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 		}
-		implicitTokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, mock.Anything, true, false).Return(tokenResponse, nil)
+		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return()
 
@@ -2404,6 +2433,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			return err == clearError
 		})).Return()
 
+		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 		handler.ServeHTTP(rr, req)
@@ -3819,7 +3849,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
@@ -3865,7 +3895,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 				assert.Empty(t, location,
 					"a withheld redirect must never become a Location: %s", tc.why)
 				codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
-				implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+				implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			}
 
@@ -3921,7 +3951,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-	issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+	issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).Return(nil)
 
@@ -4000,7 +4030,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
@@ -4072,7 +4102,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 // while a REFRESH of an older grant does (#241).
 //
 // The two write-back rows are decision 2's answer and they are not interchangeable. The code issuer
-// and handleImplicitFlow both prefer ConsentedScope and fall back to Scope when it is empty, so the
+// and issueImplicitGrant both prefer ConsentedScope and fall back to Scope when it is empty, so the
 // filtered value has to land on whichever of the two the issuer will read and never on the other.
 func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 	for _, tc := range []struct {
@@ -4151,7 +4181,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
@@ -4301,7 +4331,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 
 			// Only reached on the second row, and only because its own arming got that far.
@@ -4377,7 +4407,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
@@ -4409,7 +4439,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a withheld redirect must never become a Location, least of all because the clear failed")
 		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
-		implicitTokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+		implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
@@ -4448,7 +4478,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
+		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
@@ -4517,7 +4547,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 		// The gate's own registration read, and separately the emitter's: the refusal below is an
 		// answer to the client, so it passes through redirectWillBeEmitted too (#241 decision 11).
-		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {

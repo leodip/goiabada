@@ -392,7 +392,7 @@ func HandleAuthorizeGet(
 			// Answered at once, never deferred: this path has a valid session, so somebody is
 			// already authenticated, and a disabled user sent to the login page could not complete
 			// it anyway (#213).
-			answerClientImmediately(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", "The user account is disabled.", http.StatusBadRequest))
+			answerClientImmediately(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", userDisabledDescription, http.StatusBadRequest))
 
 		case authorizeRouteSSO:
 			// The session already completed level 1, so the ceremony goes to /auth/level1completed,
@@ -1082,6 +1082,13 @@ type redirectErrorInput struct {
 	// no to yes.
 	redirectAlreadyWithheld bool
 }
+
+// userDisabledDescription is the error_description of the access_denied a ceremony is answered with
+// when its user turns out to be disabled. Three steps ask the question, each at the moment it is
+// cheapest to: the session shortcut here, /auth/completed once the credential is accepted, and
+// /auth/issue before anything is minted (#197). They have to say the same thing, so an application
+// reading the description sees one condition wherever it was found.
+const userDisabledDescription = "The user account is disabled."
 
 // redirectErrorFromAuthContext builds the input for an error redirect whose response parameters
 // come from the ceremony, which is where every error redirect takes them from. At /auth/authorize
