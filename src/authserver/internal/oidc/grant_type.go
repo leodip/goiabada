@@ -18,15 +18,6 @@ func (gt GrantType) String() string {
 	return string(gt)
 }
 
-// discoveryRule says when grant_types_supported lists a grant.
-type discoveryRule int
-
-const (
-	discoveryAlways discoveryRule = iota
-	discoveryWhenImplicitEnabled
-	discoveryNever
-)
-
 // grantTraits is what the server does with one grant type.
 type grantTraits struct {
 	grantType GrantType
@@ -39,7 +30,6 @@ type grantTraits struct {
 	readsScope bool
 	// registrable: a dynamically registered client may ask for it.
 	registrable bool
-	discovery   discoveryRule
 }
 
 // grantTable is the one list of grant types the server names. The validator's and the token
@@ -47,15 +37,19 @@ type grantTraits struct {
 // registration, discovery and the ROPC rate limiter all read it, where each used to carry its own
 // set of literals (#437). Its order is the order grant_types_supported publishes.
 //
+// Every row is advertised, whatever any setting says: grant_types_supported is the grant types
+// "this OP supports" (OIDC Discovery 1.0 section 3, RFC 8414 section 2), which is what the server
+// implements, not what a given client is allowed. A client not allowed a grant is refused
+// unauthorized_client. Gating a row on a switch again makes the document depend on settings and
+// hides password and implicit from a relying party that is allowed them (#437).
+//
 // Adding a grant is a row here plus its own units; no switch elsewhere learns the name.
 var grantTable = []grantTraits{
-	{GrantTypeAuthorizationCode, true, false, true, discoveryAlways},
-	{GrantTypeRefreshToken, true, true, true, discoveryAlways},
-	{GrantTypeClientCredentials, true, true, true, discoveryAlways},
-	// Never advertised: the list dates from fb9157a4 and the password grant's commits never
-	// touched it. Kept as it is until the discovery change of #437 lists every grant implemented.
-	{GrantTypePassword, true, true, false, discoveryNever},
-	{GrantTypeImplicit, false, false, false, discoveryWhenImplicitEnabled},
+	{GrantTypeAuthorizationCode, true, false, true},
+	{GrantTypeRefreshToken, true, true, true},
+	{GrantTypeClientCredentials, true, true, true},
+	{GrantTypePassword, true, true, false},
+	{GrantTypeImplicit, false, false, false},
 }
 
 func (gt GrantType) traits() (grantTraits, bool) {
@@ -87,20 +81,12 @@ func (gt GrantType) Registrable() bool {
 	return ok && row.registrable
 }
 
-// GrantTypesSupported is the discovery document's grant_types_supported, in table order. It
-// returns a fresh slice, so a caller appending to it cannot reach the table.
-func GrantTypesSupported(implicitFlowEnabled bool) []string {
-	supported := []string{}
+// GrantTypesSupported is the discovery document's grant_types_supported: every row, in table
+// order. It returns a fresh slice, so a caller appending to it cannot reach the table.
+func GrantTypesSupported() []string {
+	supported := make([]string, 0, len(grantTable))
 	for _, row := range grantTable {
-		switch row.discovery {
-		case discoveryAlways:
-			supported = append(supported, row.grantType.String())
-		case discoveryWhenImplicitEnabled:
-			if implicitFlowEnabled {
-				supported = append(supported, row.grantType.String())
-			}
-		case discoveryNever:
-		}
+		supported = append(supported, row.grantType.String())
 	}
 	return supported
 }

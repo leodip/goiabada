@@ -57,32 +57,21 @@ func TestGrantType_Traits(t *testing.T) {
 }
 
 // TestGrantTypesSupported pins the discovery list, in order, since the JSON array's order is
-// observable. password is absent on purpose: that is today's discovery document, which has never
-// listed it. Keep it absent until the discovery change of #437 (decision 7) lists every grant the
-// server implements, which reverses these rows.
+// observable. Every grant the server implements is listed, password and implicit included,
+// whatever a setting says: the list takes no setting at all (#437). A row missing here means a
+// relying party reading discovery is told the server cannot do something it does.
 func TestGrantTypesSupported(t *testing.T) {
-	testCases := []struct {
-		name            string
-		implicitEnabled bool
-		want            []string
-	}{
-		{"implicit off", false, []string{"authorization_code", "refresh_token", "client_credentials"}},
-		{"implicit on", true, []string{"authorization_code", "refresh_token", "client_credentials", "implicit"}},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, GrantTypesSupported(tc.implicitEnabled))
-		})
-	}
+	assert.Equal(t,
+		[]string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit"},
+		GrantTypesSupported())
 }
 
 // A caller that overwrites the returned slice must not reach the table the traits read.
 func TestGrantTypesSupported_ReturnsAFreshSlice(t *testing.T) {
-	first := GrantTypesSupported(true)
+	first := GrantTypesSupported()
 	first[0] = "tampered"
 
 	assert.True(t, GrantTypeAuthorizationCode.AcceptedAtTokenEndpoint())
 	assert.False(t, GrantType("tampered").AcceptedAtTokenEndpoint())
-	assert.Equal(t, "authorization_code", GrantTypesSupported(true)[0])
+	assert.Equal(t, "authorization_code", GrantTypesSupported()[0])
 }
