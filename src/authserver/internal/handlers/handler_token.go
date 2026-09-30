@@ -68,9 +68,17 @@ func HandleTokenPost(
 	}
 }
 
+// tokenRequestParameters are every form parameter the token endpoint reads, and so every one whose
+// copies must agree. TestTokenRequestParameters_EveryReadIsListed holds the list to the reads (#228).
+var tokenRequestParameters = []string{
+	"grant_type", "code", "redirect_uri", "code_verifier", "client_id", "client_secret",
+	"scope", "refresh_token", "username", "password",
+}
+
 // parseTokenRequest reads the token request's form into the validator's input, refusing what can be
-// refused before any client is known: a body that cannot be parsed, two client authentication
-// methods at once, and a scope that was provided but holds none.
+// refused before any client is known: a body that cannot be parsed, a parameter repeated with
+// differing values, two client authentication methods at once, and a scope that was provided but
+// holds none.
 func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenRequestInput, error) {
 	// A body that cannot be parsed is the client's malformed request, RFC 6749 section 5.2's
 	// invalid_request, and not a server fault: a url-encoding broken by the client, or a body cut
@@ -80,6 +88,14 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	if err := r.ParseForm(); err != nil {
 		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"The request body could not be parsed.", http.StatusBadRequest)
+	}
+
+	// RFC 6749 5.2 names a request that "repeats a parameter" or "includes multiple credentials"
+	// as invalid_request. Checked before anything is read, so a repeated grant_type cannot pick the
+	// grant and a repeated client_id or client_secret cannot pick the client. The body only, as every
+	// read below is; identical copies proceed (#228, #437 decision 18).
+	if err := protocolvalidation.ValidateNoConflictingParameters(r.PostForm, tokenRequestParameters); err != nil {
+		return nil, err
 	}
 
 	// Extract client credentials - supports both client_secret_basic and client_secret_post

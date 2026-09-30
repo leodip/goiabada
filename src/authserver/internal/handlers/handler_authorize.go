@@ -105,7 +105,43 @@ func HandleAuthorizeGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		requestId := middleware.GetReqID(r.Context())
-		params := authorizeParameters(r)
+
+		// The refusal page, which is how this handler answers anything it must not send to the
+		// client. The status is a parameter because the conditions that reach it differ on it: a bad
+		// client_id or redirect_uri has always answered 200, while an unsupported response_mode is
+		// answered 400 because OIDC Core 3.1.2.6 names that code (#213), and a request that cannot be
+		// parsed or repeats a delivery parameter is 400 as the malformed request it is (#228).
+		renderErrorUi := func(message string, httpStatus int) {
+			bind := map[string]interface{}{
+				"title":       i18n.T(r.Context(), "auth_error.unable_to_authorize.title"),
+				"error":       message,
+				"_httpStatus": httpStatus,
+			}
+
+			renderTemplateErr := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
+			if renderTemplateErr != nil {
+				pageRenderer.InternalServerError(w, r, renderTemplateErr)
+			}
+		}
+
+		// A request that does not parse is answered on the page and never by redirect: a malformed
+		// escape drops the field it sits in, so the client_id or redirect_uri the redirect would be
+		// built from may be one the client never sent. Before #228 the failure was ignored and the
+		// request went on without that field.
+		params, err := authorizeParameters(r)
+		if err != nil {
+			renderErrorUi(i18n.T(r.Context(), "auth_error.malformed_request.message"), http.StatusBadRequest)
+			return
+		}
+
+		// RFC 6749 4.1.2 returns state as "the exact value received from the client". Two differing
+		// copies leave no such value, so the ceremony carries none and the invalid_request that
+		// refuses the request below reaches the client without one, #146's rule that state is
+		// emitted only when there is exactly one value to emit (#228).
+		state := params.Get("state")
+		if protocolvalidation.ConflictingParameter(params, []string{"state"}) != "" {
+			state = ""
+		}
 
 		// The ceremony id is minted here and nowhere else, because this is the only place an
 		// auth context is created. Every form this ceremony renders carries it and every POST
@@ -126,7 +162,7 @@ func HandleAuthorizeGet(
 			ResponseMode:                  params.Get("response_mode"),
 			MaxAge:                        params.Get("max_age"),
 			AcrValuesFromAuthorizeRequest: params.Get("acr_values"),
-			State:                         params.Get("state"),
+			State:                         state,
 			Nonce:                         params.Get("nonce"),
 			UserAgent:                     r.UserAgent(),
 			IpAddress:                     authserver_middleware.GetClientIPFromRequest(r),
@@ -155,24 +191,18 @@ func HandleAuthorizeGet(
 			r = r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
 		}
 
-		// The refusal page, which is how this handler answers anything it must not send to the
-		// client. The status is a parameter because the two conditions that reach it differ on it:
-		// a bad client_id or redirect_uri has always answered 200, and an unsupported
-		// response_mode is answered 400 because OIDC Core 3.1.2.6 names that code (#213).
-		renderErrorUi := func(message string, httpStatus int) {
-			bind := map[string]interface{}{
-				"title":       i18n.T(r.Context(), "auth_error.unable_to_authorize.title"),
-				"error":       message,
-				"_httpStatus": httpStatus,
-			}
-
-			renderTemplateErr := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
-			if renderTemplateErr != nil {
-				pageRenderer.InternalServerError(w, r, renderTemplateErr)
-			}
+		// The parameters that decide where an answer goes and how it is encoded are checked for
+		// repeats first, above everything that could redirect: with two client_ids, redirect_uris,
+		// response_types or response_modes there is no single answer to "where does this response
+		// go, and in what form", so it goes nowhere and the page answers instead. RFC 6749 4.1.2.1
+		// already keeps a bad client_id or redirect_uri off the client for the same reason (#228).
+		if name := protocolvalidation.ConflictingParameter(params, authorizeDeliveryParameters); name != "" {
+			renderErrorUi(i18n.T(r.Context(), "auth_error.conflicting_parameter.message",
+				map[string]any{"parameter": name}), http.StatusBadRequest)
+			return
 		}
 
-		err := authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &protocolvalidation.ValidateClientAndRedirectURIInput{
+		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &protocolvalidation.ValidateClientAndRedirectURIInput{
 			RequestId:    requestId,
 			ClientId:     authContext.ClientId,
 			RedirectURI:  authContext.RedirectURI,
@@ -268,7 +298,11 @@ func HandleAuthorizeGet(
 		// page. Case-sensitively, and on whitespace-separated tokens, because OIDC prompt values
 		// are case-sensitive: "NONE" and "Login" carry no recognised token and are interactive
 		// (#213 decision 5).
-		rawPrompt := strings.Fields(params.Get("prompt"))
+		//
+		// Every copy is read, not the first: a prompt sent twice with different values is refused
+		// below, and a copy asking for none still means nobody may be shown a login page before that
+		// refusal reaches the client. One copy, or identical copies, read as they always did (#228).
+		rawPrompt := strings.Fields(strings.Join(params["prompt"], " "))
 		facts := authorizeRouteFacts{
 			requestsSilence: slices.Contains(rawPrompt, "none"),
 			requestsLogin:   slices.Contains(rawPrompt, "login"),
@@ -430,17 +464,35 @@ func HandleAuthorizeGet(
 	}
 }
 
+// authorizeDeliveryParameters are the parameters that decide where an authorization response goes
+// and how it is encoded. A repeat of one with differing values is answered on the refusal page,
+// never by redirect (#228).
+var authorizeDeliveryParameters = []string{"client_id", "redirect_uri", "response_type", "response_mode"}
+
+// authorizeRequestParameters are every parameter HandleAuthorizeGet reads a value of, and so every
+// one whose copies must agree. TestAuthorizeRequestParameters_EveryReadIsListed holds the list to
+// the reads, so a parameter read later cannot be left out of the check. request and request_uri
+// are absent because they are refused whatever their value (#228).
+var authorizeRequestParameters = []string{
+	"client_id", "redirect_uri", "response_type", "response_mode",
+	"code_challenge", "code_challenge_method", "max_age", "acr_values", "state", "nonce", "scope",
+	"ui_locales", "prompt", "id_token_hint",
+}
+
 // authorizeParameters answers the authorization request's parameters, the query and a form body
-// merged, as the one source HandleAuthorizeGet reads them from. It parses the request exactly as
-// r.FormValue does on its first call, ignoring a parse failure as that does, so reading one
-// url.Values rather than calling FormValue per parameter changes nothing a request receives.
-func authorizeParameters(r *http.Request) url.Values {
-	if r.Form == nil {
-		// net/http's defaultMaxMemory, the limit r.FormValue parses with.
-		//nolint:gosec // G120: bounded by the server's request-body table, as r.FormValue's own parse was; G120 flags every multipart parse
-		_ = r.ParseMultipartForm(32 << 20)
+// merged, as the one source HandleAuthorizeGet reads them from, or the error that stopped them
+// parsing. A multipart body is read as r.FormValue reads it, so a body that is simply not multipart
+// is no error.
+func authorizeParameters(r *http.Request) (url.Values, error) {
+	if err := r.ParseForm(); err != nil {
+		return nil, err
 	}
-	return r.Form
+	// net/http's defaultMaxMemory, the limit r.FormValue parses with.
+	//nolint:gosec // G120: bounded by the server's request-body table, as r.FormValue's own parse was; G120 flags every multipart parse
+	if err := r.ParseMultipartForm(32 << 20); err != nil && !errors.Is(err, http.ErrNotMultipart) {
+		return nil, err
+	}
+	return r.Form, nil
 }
 
 // authorizeValidation is what validateAuthorizeRequest found: the first refusal, or nil when the
@@ -454,9 +506,9 @@ type authorizeValidation struct {
 	hintSubject string
 }
 
-// validateAuthorizeRequest runs the five validations that answer by redirect, in the order the
-// client is told about them: unsupported request parameters, the request itself, the scopes, the
-// prompt, the id_token_hint. The first refusal stops the rest. An error that is not an ErrorDetail
+// validateAuthorizeRequest runs the validations that answer by redirect, in the order the client is
+// told about them: parameters repeated with differing values, unsupported request parameters, the
+// request itself, the scopes, the prompt, the id_token_hint. The first refusal stops the rest. An error that is not an ErrorDetail
 // is a fault inside a validator and is returned for the 500.
 //
 // These five descriptions stay English and are deliberately NOT localized, unlike the refusal page
@@ -482,7 +534,16 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 		return authorizeValidation{}, err
 	}
 
-	err := authorizeValidator.ValidateUnsupportedRequestParameters(&protocolvalidation.ValidateUnsupportedRequestParametersInput{
+	// First, because a parameter sent twice with differing values makes every later check read a
+	// copy the client may not have meant. The delivery parameters were checked above, before the
+	// client was loaded; the rest are refused here, so the refusal reaches the client through the
+	// deferral path like the four below (#228).
+	err := protocolvalidation.ValidateNoConflictingParameters(params, authorizeRequestParameters)
+	if err != nil {
+		return stop(err)
+	}
+
+	err = authorizeValidator.ValidateUnsupportedRequestParameters(&protocolvalidation.ValidateUnsupportedRequestParametersInput{
 		HasRequest:    params.Has("request"),
 		HasRequestURI: params.Has("request_uri"),
 	})

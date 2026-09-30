@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -240,7 +242,8 @@ func TestAuthorizeParameters(t *testing.T) {
 			strings.NewReader("redirect_uri="+url.QueryEscape("https://example.com/cb")+"&state=body-state"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		params := authorizeParameters(req)
+		params, err := authorizeParameters(req)
+		require.NoError(t, err)
 
 		assert.Equal(t, "from-query", params.Get("client_id"))
 		assert.Equal(t, "https://example.com/cb", params.Get("redirect_uri"))
@@ -252,18 +255,49 @@ func TestAuthorizeParameters(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/auth/authorize?client_id=from-query", nil)
 		req.Form = url.Values{"client_id": {"parsed-earlier"}}
 
-		assert.Equal(t, "parsed-earlier", authorizeParameters(req).Get("client_id"))
+		params, err := authorizeParameters(req)
+		require.NoError(t, err)
+		assert.Equal(t, "parsed-earlier", params.Get("client_id"))
 	})
 
-	t.Run("a body that does not parse leaves the query, as r.FormValue does", func(t *testing.T) {
+	t.Run("a multipart body is read, as r.FormValue reads it", func(t *testing.T) {
+		var body bytes.Buffer
+		form := multipart.NewWriter(&body)
+		require.NoError(t, form.WriteField("state", "multipart-state"))
+		require.NoError(t, form.Close())
+		req := httptest.NewRequest(http.MethodPost, "/auth/authorize?client_id=from-query", &body)
+		req.Header.Set("Content-Type", form.FormDataContentType())
+
+		params, err := authorizeParameters(req)
+		require.NoError(t, err)
+		assert.Equal(t, "from-query", params.Get("client_id"))
+		assert.Equal(t, "multipart-state", params.Get("state"))
+	})
+
+	// Until #228 a parse failure was ignored and the field holding it dropped, as r.FormValue does;
+	// now it is returned, and HandleAuthorizeGet answers it on the refusal page.
+	t.Run("a body that does not parse is an error", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/auth/authorize?client_id=from-query",
 			strings.NewReader("state=%zz"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		params := authorizeParameters(req)
+		_, err := authorizeParameters(req)
+		assert.Error(t, err)
+	})
 
-		assert.Equal(t, "from-query", params.Get("client_id"))
-		assert.Equal(t, "", params.Get("state"))
+	t.Run("a query that does not parse is an error", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/auth/authorize?client_id=from-query&state=%zz", nil)
+
+		_, err := authorizeParameters(req)
+		assert.Error(t, err)
+	})
+
+	t.Run("a multipart body that does not parse is an error", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/authorize", strings.NewReader("not a multipart body"))
+		req.Header.Set("Content-Type", "multipart/form-data; boundary=xyz")
+
+		_, err := authorizeParameters(req)
+		assert.Error(t, err)
 	})
 }
 
