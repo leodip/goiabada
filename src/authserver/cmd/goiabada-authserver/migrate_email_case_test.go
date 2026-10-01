@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	"github.com/leodip/goiabada/authserver/internal/datafactory"
 )
 
 // beforeLowercaseEmails is the version this command steps up FROM in these tests: the one below

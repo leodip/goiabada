@@ -2,10 +2,11 @@
 // configuration, selects the engine, opens it, refuses a schema the stored data cannot survive,
 // migrates it and runs the startup data tasks.
 //
-// It is its own package and not the data package's because selecting an engine means importing
-// all four of them, which made every importer of the Database interface compile every driver back
-// when that interface was core/data's. internal/data declares the interface and nothing that
-// chooses between implementations of it (#353, #359).
+// It sits under internal/data beside the four engines it chooses between, but in a package of its
+// own: selecting an engine means importing all four of them, and when that was the interface's own
+// package every importer of the Database interface compiled every driver. internal/data declares
+// the interface and imports none of its implementations; only this package and its importers link
+// the drivers (#353, #359, #438).
 //
 // It is one of the four places that still names the whole data.Database, and the one that produces
 // it: OpenDatabase and NewDatabase hand it out, and Migratable embeds it. The two functions here
