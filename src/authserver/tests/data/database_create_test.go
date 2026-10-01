@@ -3,11 +3,11 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -77,8 +77,8 @@ func TestNewDatabase_CreateFalse_StartsUnderALeastPrivilegeLogin(t *testing.T) {
 //
 // Decision 7 chose to let the engine's own error stand rather than detect the case, so what is
 // pinned here is that the error arrives AT THE CONSTRUCTOR carrying that text. Two of the three
-// engines needed a change for that to be true: sql.Open only parses a DSN, so NewMySQLDatabase
-// and NewPostgresDatabase used to return a usable-looking handle and a nil error, and the
+// engines needed a change for that to be true: sql.Open only parses a DSN, so mysqldb.New
+// and postgresdb.New used to return a usable-looking handle and a nil error, and the
 // failure surfaced later inside the migrator as somebody else's problem.
 func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing.T) {
 	if dbType() == data.SQLite {
@@ -92,20 +92,20 @@ func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing
 	var wantText string
 	switch dbType() {
 	case data.MySQL:
-		_, err = mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
-			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
+		_, err = mysqldb.New(context.Background(), &mysqldb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		wantText = "Unknown database"
 	case data.Postgres:
-		_, err = postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+		_, err = postgresdb.New(context.Background(), &postgresdb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		wantText = "does not exist"
 	case data.MSSQL:
-		_, err = mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+		_, err = mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		wantText = "Cannot open database"
@@ -123,7 +123,7 @@ func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing
 	require.False(t, serverDatabaseExists(t, name), "Create false must create nothing")
 }
 
-// TestNewMsSQLDatabase_CreateTrue_LeavesAPreCreatedDatabaseAlone keeps IF NOT EXISTS pinned.
+// TestMSSQLNew_CreateTrue_LeavesAPreCreatedDatabaseAlone keeps IF NOT EXISTS pinned.
 //
 // newPreCreatedMsSQLDB used to be what held it: it constructed over an operator's database and
 // asserted the collation survived. It now passes Create: false, so its assertion is trivially
@@ -135,7 +135,7 @@ func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing
 // ALTER DATABASE ... COLLATE blocks against a live connection pool, so no migration can repair
 // a database default, and every string column a future migration adds without spelling COLLATE
 // inherits it (#283 decision 4).
-func TestNewMsSQLDatabase_CreateTrue_LeavesAPreCreatedDatabaseAlone(t *testing.T) {
+func TestMSSQLNew_CreateTrue_LeavesAPreCreatedDatabaseAlone(t *testing.T) {
 	if dbType() != data.MSSQL {
 		t.Skipf("%s has no database default collation an operator's CREATE DATABASE could fix in place", dbType())
 	}
@@ -154,44 +154,30 @@ func TestNewMsSQLDatabase_CreateTrue_LeavesAPreCreatedDatabaseAlone(t *testing.T
 	mustExec(t, master, "CREATE DATABASE ["+name+"] COLLATE "+operatorCollation)
 	t.Cleanup(func() { dropMsSQL(t, cfg, name) })
 
-	db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-		Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+	db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+		Username: cfg.Username, Password: cfg.Password,
 		Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 	}, false)
-	require.NoError(t, err, "NewMsSQLDatabase on the creating arm over a database that is already there")
+	require.NoError(t, err, "mssqldb.New on the creating arm over a database that is already there")
 	t.Cleanup(func() { _ = db.DB.Close() })
 
 	require.Equal(t, operatorCollation, readDatabaseDefaultCollation(t, db.DB),
 		"the creating arm's CREATE DATABASE is IF NOT EXISTS, so an operator's database and its collation stand")
 }
 
-// TestSQLiteConfigHasNoCreateField is seam 2, and it is a test rather than a comment because
-// the compiler is otherwise the only witness and it would stop being one the moment somebody
-// added the field for symmetry.
-//
-// Decision 4: GOIABADA_DB_CREATE does not apply to SQLite. There is no create statement and no
-// maintenance connection, and what decides whether an absent file is created is the operator's
-// own DSN. Giving the config a field would promise a control that does nothing.
-func TestSQLiteConfigHasNoCreateField(t *testing.T) {
-	_, found := reflect.TypeOf(sqlitedb.DatabaseConfig{}).FieldByName("Create")
-	require.False(t, found,
-		"sqlitedb.DatabaseConfig must carry no Create field: SQLite has no create statement for it to govern, and mode=rw in the DSN is the equivalent (#293 decision 4)")
-}
-
-// TestNewSQLiteDatabase_ModeRWDoesNotCreateTheFile is the other half of decision 4: the thing
-// an operator who set GOIABADA_DB_CREATE=false globally actually wants on SQLite is in the DSN,
-// and it works. modernc.org/sqlite honours SQLite's own mode=rw, so an absent file is an error
-// rather than a new empty database.
+// TestSQLiteNew_ModeRWDoesNotCreateTheFile is #293 decision 4: GOIABADA_DB_CREATE does not apply
+// to SQLite, whose constructor takes the DSN alone and so has nowhere to receive it (#438
+// decision 4), and the thing an operator who set it to false globally actually wants on SQLite is
+// in the DSN, and it works. modernc.org/sqlite honours SQLite's own mode=rw, so an absent file is
+// an error rather than a new empty database.
 //
 // Not engine-specific: it constructs a SQLite database directly, so it is worth running in
 // every engine's job.
-func TestNewSQLiteDatabase_ModeRWDoesNotCreateTheFile(t *testing.T) {
+func TestSQLiteNew_ModeRWDoesNotCreateTheFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "absent.db")
 
-	_, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{
-		Type: "sqlite", DSN: "file:" + path + "?mode=rw",
-	}, false)
+	_, err := sqlitedb.New(context.Background(), "file:"+path+"?mode=rw", false)
 	require.Error(t, err, "mode=rw against an absent file must fail rather than create it")
 
 	_, statErr := os.Stat(path)
@@ -294,7 +280,7 @@ func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t 
 	}
 }
 
-// TestNewMsSQLDatabase_CreateTrue_CaseVariantNamesRaceToOneDatabase is why the SQL Server lock
+// TestMSSQLNew_CreateTrue_CaseVariantNamesRaceToOneDatabase is why the SQL Server lock
 // resource carries no database name.
 //
 // sp_getapplock compares its resource as binary. sys.databases.name is compared under master's
@@ -311,7 +297,7 @@ func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t 
 //
 // SQL Server only. PostgreSQL compares pg_database.datname byte-exact, so there is no fold for a
 // name-derived key to disagree with, which is exactly why it keeps one.
-func TestNewMsSQLDatabase_CreateTrue_CaseVariantNamesRaceToOneDatabase(t *testing.T) {
+func TestMSSQLNew_CreateTrue_CaseVariantNamesRaceToOneDatabase(t *testing.T) {
 	if dbType() != data.MSSQL {
 		t.Skipf("%s does not compare database names case-insensitively, so there are no case variants to collide", dbType())
 	}
@@ -388,8 +374,8 @@ func raceConstructors(t *testing.T, cfg *config.DatabaseConfig, names []string) 
 			<-start
 			switch dbType() {
 			case data.Postgres:
-				db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-					Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+				db, err := postgresdb.New(context.Background(), &postgresdb.DatabaseConfig{
+					Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 				}, false)
 				errs[i] = err
@@ -397,8 +383,8 @@ func raceConstructors(t *testing.T, cfg *config.DatabaseConfig, names []string) 
 					handles[i] = db.DB
 				}
 			case data.MSSQL:
-				db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-					Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+				db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+					Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 				}, false)
 				errs[i] = err
@@ -458,7 +444,7 @@ func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryResta
 	t.Cleanup(func() { dropServerDatabase(t, cfg, name) })
 
 	// Put the deployment in the state every start after the first is in: the database is there.
-	first, err := constructCreating(cfg, name)
+	first, err := constructCreating(context.Background(), cfg, name)
 	require.NoError(t, err, "the first construction is the one that creates the database")
 	if first != nil {
 		_ = first.Close()
@@ -475,7 +461,7 @@ func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryResta
 
 	done := make(chan error, 1)
 	go func() {
-		h, err := constructCreating(cfg, name)
+		h, err := constructCreating(context.Background(), cfg, name)
 		if h != nil {
 			_ = h.Close()
 		}
@@ -490,16 +476,81 @@ func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryResta
 	}
 }
 
+// TestNewDatabase_CreateTrue_AHeldCreationLockWaitEndsWithTheCallersContext is #438 decision 3:
+// a constructor waiting on the creation lock gives up when its caller's context ends.
+//
+// The lock has no timeout of its own, by #293 decision 5, so before the constructors took a
+// context the wait was on a root nobody could cancel: a start behind a stuck holder blocked until
+// that holder let go, whatever the caller wanted. The database is absent here, so the constructor
+// passes the catalog check and reaches for the lock another session holds, and the only thing
+// that can end the wait is the deadline on the context it was handed.
+//
+// The 10s bound is the regression's failure rather than a hang: a lock wait that ignores the
+// context never returns while the holder lives, which is until this test's cleanup.
+func TestNewDatabase_CreateTrue_AHeldCreationLockWaitEndsWithTheCallersContext(t *testing.T) {
+	switch dbType() {
+	case data.MySQL:
+		t.Skip("MySQL takes no database-creation lock: CREATE DATABASE IF NOT EXISTS is serialised by the engine itself (#293 decision 6)")
+	case data.SQLite:
+		t.Skip("SQLite has no maintenance database, so there is no shared lock space and no lock")
+	case data.Postgres, data.MSSQL:
+	default:
+		t.Fatalf("unsupported db type %q", dbType())
+	}
+
+	cfg := &appConfig.Database
+	name := isolatedDBName()
+	// Registered before the lock, so it runs after the lock's release: a constructor the
+	// regression left waiting creates the database once the holder lets go, and this drops it.
+	t.Cleanup(func() { dropServerDatabase(t, cfg, name) })
+	require.False(t, serverDatabaseExists(t, name), "the database must be absent, or the constructor never reaches for the lock")
+
+	holdCreationLock(t, cfg, name)
+
+	const deadline = 2 * time.Second
+	const bound = 10 * time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), deadline)
+	defer cancel()
+
+	type outcome struct {
+		err     error
+		elapsed time.Duration
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		start := time.Now()
+		h, err := constructCreating(ctx, cfg, name)
+		if h != nil {
+			_ = h.Close()
+		}
+		done <- outcome{err, time.Since(start)}
+	}()
+
+	select {
+	case got := <-done:
+		require.Errorf(t, got.err, "a constructor whose context ended while it waited on the creation lock must fail, not construct")
+		require.Truef(t, errors.Is(got.err, context.DeadlineExceeded),
+			"the wait must end because the caller's context did, and say so through errors.Is; got %v", got.err)
+		require.GreaterOrEqualf(t, got.elapsed, deadline-100*time.Millisecond,
+			"the constructor returned after %s, before the deadline: it failed for some other reason than the held lock", got.elapsed)
+	case <-time.After(bound):
+		t.Fatalf("the constructor was still waiting on the creation lock %s after its context's %s deadline: the wait does not run under the caller's context (#438 decision 3)", bound, deadline)
+	}
+
+	require.False(t, serverDatabaseExists(t, name), "a constructor that gave up on the lock created nothing")
+}
+
 // constructCreating builds one constructor on the configured engine with Create true, which is
-// the path an operator who sets nothing takes.
+// the path an operator who sets nothing takes, under ctx.
 //
 // Takes no *testing.T, deliberately: it is called from a goroutine that may be blocked when the
 // test fails, and t.Fatalf off the test goroutine is undefined.
-func constructCreating(cfg *config.DatabaseConfig, name string) (io.Closer, error) {
+func constructCreating(ctx context.Context, cfg *config.DatabaseConfig, name string) (io.Closer, error) {
 	switch dbType() {
 	case data.Postgres:
-		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+		db, err := postgresdb.New(ctx, &postgresdb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
 		if db == nil {
@@ -507,8 +558,8 @@ func constructCreating(cfg *config.DatabaseConfig, name string) (io.Closer, erro
 		}
 		return db.DB, err
 	case data.MSSQL:
-		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+		db, err := mssqldb.New(ctx, &mssqldb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
 		if db == nil {
@@ -633,7 +684,7 @@ func dropServerDatabase(t *testing.T, cfg *config.DatabaseConfig, name string) {
 // The constructor did NOT return an error for it, which is why the assertion has to go through
 // the handle. sql.Open only parses the URL, and the creating arm has no Ping (the create
 // statement is what forces first use there, and on this path the create succeeded, against the
-// wrong name). So NewPostgresDatabase returned a nil error and a handle that failed on its first
+// wrong name). So postgresdb.New returned a nil error and a handle that failed on its first
 // query with `database "Goiabada" does not exist (SQLSTATE 3D000)`, inside the migrator, as
 // somebody else's problem.
 //
@@ -671,27 +722,27 @@ func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing
 			var currentDatabase string
 			switch dbType() {
 			case data.MySQL:
-				db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
-					Type: "mysql", Username: cfg.Username, Password: cfg.Password,
+				db, err := mysqldb.New(context.Background(), &mysqldb.DatabaseConfig{
+					Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 				}, false)
-				require.NoErrorf(t, err, "NewMySQLDatabase at %s", name)
+				require.NoErrorf(t, err, "mysqldb.New at %s", name)
 				t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
 				sqlDB, currentDatabase = db.DB, "SELECT DATABASE()"
 			case data.Postgres:
-				db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-					Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+				db, err := postgresdb.New(context.Background(), &postgresdb.DatabaseConfig{
+					Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 				}, false)
-				require.NoErrorf(t, err, "NewPostgresDatabase at %s", name)
+				require.NoErrorf(t, err, "postgresdb.New at %s", name)
 				t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
 				sqlDB, currentDatabase = db.DB, "SELECT current_database()"
 			case data.MSSQL:
-				db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-					Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+				db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+					Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 				}, false)
-				require.NoErrorf(t, err, "NewMsSQLDatabase at %s", name)
+				require.NoErrorf(t, err, "mssqldb.New at %s", name)
 				t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
 				sqlDB, currentDatabase = db.DB, "SELECT DB_NAME()"
 			default:

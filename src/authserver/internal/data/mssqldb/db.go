@@ -1,3 +1,7 @@
+// Package mssqldb is the SQL Server adapter: the constructor that opens, and when asked creates,
+// the application database, the migration chain SQL Server runs, and the handful of Database
+// methods whose SQL differs from commondb's. Everything else is promoted from the embedded common
+// implementation.
 package mssqldb
 
 import (
@@ -11,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
@@ -20,39 +25,42 @@ import (
 //go:embed migrations/*.sql
 var mssqlMigrationsFs embed.FS
 
-// MsSQLDatabase declares only the methods SQL Server needs its own SQL for; the rest are promoted
+// Database declares only the methods SQL Server needs its own SQL for; the rest are promoted
 // from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
-type MsSQLDatabase struct {
+type Database struct {
 	*commondb.Database
 	dbConfig *DatabaseConfig
 }
 
+// The compiler holds the adapter to the whole interface here, in its own package, so an engine
+// missing a method fails where the method is missing rather than only where datafactory hands
+// the adapter out (#438).
+var _ data.Database = (*Database)(nil)
+
+// DatabaseConfig is what SQL Server reads to connect: the credentials, the address, the database
+// name, and whether it may create that database (#438 decision 3).
 type DatabaseConfig struct {
-	Type     string
 	Username string
 	Password string
 	Host     string
 	Port     int
 	Name     string
-	DSN      string
 	// Create decides whether the constructor may create the database when it is absent. It is
 	// positive-sense, so the zero value does not create: every literal has to set it (#293).
 	Create bool
 }
 
-func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, error) {
+// New opens the SQL Server database dbConfig names, creating it first when dbConfig.Create says
+// so. Every statement it issues runs under ctx, the caller's, the creation lock's wait included,
+// so a start held behind that lock ends when the caller stops waiting (#438 decision 3).
+func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database, error) {
 
 	// One record where five used to be, and no password: the connection string is assembled
 	// below from the same four values, so a startup problem is read off this line rather than
 	// off four consecutive ones that a collector had no way to join (#320 decision 6).
-	slog.Info("using database", "type", "mssql", "username", dbConfig.Username,
+	slog.InfoContext(ctx, "using database", "type", "mssql", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
-
-	// The constructor owns this root, because nothing is waiting on it: the process is starting
-	// and there is no request and no operator to cancel. It is here so the two pings below go
-	// through the *Context call like every other statement this package issues (#386, #424).
-	ctx := context.Background()
 
 	if dbConfig.Create {
 		// Connect to master database first
@@ -68,7 +76,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 			return nil, errs.Wrap(err, "unable to connect to master database")
 		}
 
-		if err := createDatabaseUnderAppLock(masterDB, dbConfig.Name); err != nil {
+		if err := createDatabaseUnderAppLock(ctx, masterDB, dbConfig.Name); err != nil {
 			return nil, err
 		}
 	} else {
@@ -76,7 +84,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		// never opened, let alone pinged. That matters more here than on the other two engines:
 		// an Azure SQL contained user cannot reach master at all, so the ping above would stop
 		// a start that has everything it needs inside the application database (#293).
-		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
+		slog.InfoContext(ctx, "database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 	}
 
 	// Connect to the actual database
@@ -100,7 +108,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	commonDb.InsertReturningIdSQL = insertReturningIdSQL
 	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
 
-	mssqlDb := MsSQLDatabase{
+	mssqlDb := Database{
 		Database: commonDb,
 		dbConfig: dbConfig,
 	}
@@ -127,9 +135,10 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 // is true only because createDatabaseUnderAppLock checks the catalog BEFORE reaching for the
 // lock. See the note there.
 //
-// Deliberately distinct from database.GenerateAdvisoryLockId, which ensureSchemaMigrationsTable
-// takes below: that guards the schema_migrations table INSIDE an existing database, a different
-// thing one layer down, and the two must not share a resource (#293).
+// Deliberately distinct from the migration lock, migrator.SQLServer's resource, which
+// ensureSchemaMigrationsTable takes below: that guards the schema_migrations table INSIDE an
+// existing database, a different thing one layer down, and the two must not share a resource
+// (#293).
 //
 // Exported because the resource is an inter-process contract rather than an implementation
 // detail: anything that has to interoperate with a starting Goiabada, a test holding the lock
@@ -157,7 +166,11 @@ const CreateDatabaseResource = "goiabada:create-database"
 // so they do share one lock space. That is the whole reason this works.
 //
 // LockTimeout = -1 blocks until the lock is free rather than failing, which is what the migration
-// lock already does: the holder is another process's create, and it is short.
+// lock already does: the holder is another process's create, and it is short. The wait is the
+// caller's, though: it runs under ctx, and go-mssqldb abandons it when ctx ends, leaving the pool
+// usable (#438 decision 3). The release below runs under the same ctx and may then fail, which
+// leaves nothing held: the lock belongs to a session of the master pool, and New closes that pool
+// on its way out.
 //
 // That is affordable only because the lock is reached ONLY when the database is absent. An
 // application lock taken in master is shared with every session on the instance, so ANY login
@@ -175,9 +188,7 @@ const CreateDatabaseResource = "goiabada:create-database"
 // trailing space, normalization form and width identically. Two instances configured `goiabada`
 // and `Goiabada` against an absent database therefore both find nothing here, both take the
 // constant resource, and the batch collapses them to one database exactly as before (#293).
-func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
-	ctx := context.Background()
-
+func createDatabaseUnderAppLock(ctx context.Context, masterDB *sql.DB, name string) error {
 	exists, err := databaseExists(ctx, masterDB, name)
 	if err != nil {
 		return err
@@ -330,7 +341,7 @@ const schemaMigrationsTableDDL = `IF OBJECT_ID(N'schema_migrations', N'U') IS NU
 // taken, used and released on a single connection pinned out of the pool. Issued against
 // the pooled *sql.DB, the release could land on a different session and leave the lock held
 // for the life of the process, blocking every later migrator.
-func (d *MsSQLDatabase) ensureSchemaMigrationsTable(ctx context.Context) (err error) {
+func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) (err error) {
 	eng := migrator.SQLServer(d.dbConfig.Name)
 
 	conn, err := d.DB.Conn(ctx)
@@ -375,7 +386,7 @@ func (d *MsSQLDatabase) ensureSchemaMigrationsTable(ctx context.Context) (err er
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *MsSQLDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+func (d *Database) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
 	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}

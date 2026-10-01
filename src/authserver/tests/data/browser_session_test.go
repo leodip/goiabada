@@ -53,13 +53,13 @@ func sha256Hex(s string) string {
 func rawSQLHandle(t *testing.T) *sql.DB {
 	t.Helper()
 	switch d := database.(type) {
-	case *sqlitedb.SQLiteDatabase:
+	case *sqlitedb.Database:
 		return d.DB
-	case *mysqldb.MySQLDatabase:
+	case *mysqldb.Database:
 		return d.DB
-	case *postgresdb.PostgresDatabase:
+	case *postgresdb.Database:
 		return d.DB
-	case *mssqldb.MsSQLDatabase:
+	case *mssqldb.Database:
 		return d.DB
 	}
 	t.Fatalf("no raw handle for database type %T", database)

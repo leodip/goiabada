@@ -174,7 +174,7 @@ func TestMigration000050_DeletesTheUserinfoPermissionAndItsGrants(t *testing.T) 
 
 // TestMigration000050_SQLiteWithForeignKeysOff holds the migration's own grant deletes, which the
 // case above cannot see. SQLite enforces a foreign key, and so runs its ON DELETE CASCADE, only on a
-// connection that has run PRAGMA foreign_keys = ON. NewSQLiteDatabase runs it on the one connection
+// connection that has run PRAGMA foreign_keys = ON. sqlitedb.New runs it on the one connection
 // it keeps open, but a connection opened any other way starts with foreign keys off, and then
 // deleting the permission leaves every grant of it behind, pointing at a row that no longer exists.
 // 000050 deletes the grants itself so its result does not depend on which connection runs it
@@ -193,7 +193,7 @@ func TestMigration000050_SQLiteWithForeignKeysOff(t *testing.T) {
 	ctx := context.Background()
 	f := seedUserinfoFixture000050(t, h)
 
-	// foreignKeys reads the pragma on the pool's one connection, which NewSQLiteDatabase caps the
+	// foreignKeys reads the pragma on the pool's one connection, which sqlitedb.New caps the
 	// pool at and keeps open, so it is the connection the migrator runs the file on.
 	foreignKeys := func() int {
 		t.Helper()

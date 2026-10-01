@@ -53,11 +53,11 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 		// issue the constructor's CREATE DATABASE for it and for nothing else.
 		mustExec(t, admin, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", name, username))
 
-		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
-			Type: "mysql", Username: username, Password: awkwardPassword,
+		db, err := mysqldb.New(context.Background(), &mysqldb.DatabaseConfig{
+			Username: username, Password: awkwardPassword,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
-		require.NoError(t, err, "NewMySQLDatabase with an awkward password and database name")
+		require.NoError(t, err, "mysqldb.New with an awkward password and database name")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
 		sqlDB = db.DB
 		currentUserQuery = "SELECT SUBSTRING_INDEX(CURRENT_USER(), '@', 1)"
@@ -71,11 +71,11 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 		mustExec(t, admin, fmt.Sprintf("CREATE ROLE %s LOGIN CREATEDB NOSUPERUSER PASSWORD '%s'", username, awkwardPassword))
 		t.Cleanup(func() { _, _ = admin.Exec("DROP ROLE IF EXISTS " + username) })
 
-		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-			Type: "postgres", Username: username, Password: awkwardPassword,
+		db, err := postgresdb.New(context.Background(), &postgresdb.DatabaseConfig{
+			Username: username, Password: awkwardPassword,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
-		require.NoError(t, err, "NewPostgresDatabase with an awkward password and database name")
+		require.NoError(t, err, "postgresdb.New with an awkward password and database name")
 		t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
 		sqlDB = db.DB
 		currentUserQuery = "SELECT current_user"
@@ -93,11 +93,11 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 		// dbcreator is the server role CREATE DATABASE needs; the login owns what it creates.
 		mustExec(t, admin, fmt.Sprintf("ALTER SERVER ROLE dbcreator ADD MEMBER [%s]", username))
 
-		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-			Type: "mssql", Username: username, Password: awkwardPassword,
+		db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+			Username: username, Password: awkwardPassword,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
-		require.NoError(t, err, "NewMsSQLDatabase with an awkward password and database name")
+		require.NoError(t, err, "mssqldb.New with an awkward password and database name")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
 		sqlDB = db.DB
 		currentUserQuery = "SELECT SUSER_SNAME()"

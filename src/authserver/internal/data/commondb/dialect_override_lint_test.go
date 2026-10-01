@@ -82,21 +82,24 @@ func TestDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	// that held a named field. Now every dialect declares only its overrides, so all four
 	// answer the same question and an override reaching one engine is as much a divergence as
 	// one reaching two.
-	for _, dialect := range []struct{ dir, recvType string }{
-		{filepath.Join(root, "authserver", "internal", "data", "sqlitedb"), "SQLiteDatabase"},
-		{filepath.Join(root, "authserver", "internal", "data", "mysqldb"), "MySQLDatabase"},
-		{filepath.Join(root, "authserver", "internal", "data", "postgresdb"), "PostgresDatabase"},
-		{filepath.Join(root, "authserver", "internal", "data", "mssqldb"), "MsSQLDatabase"},
+	// Every adapter's type is Database since #438, so the package names the engine in the
+	// offender message; the type name alone would say "Database and Database override it".
+	for _, dialect := range []struct{ pkg, recvType string }{
+		{"sqlitedb", "Database"},
+		{"mysqldb", "Database"},
+		{"postgresdb", "Database"},
+		{"mssqldb", "Database"},
 	} {
-		methods := divergentMethods(t, dialect.dir, dialect.recvType)
+		dir := filepath.Join(root, "authserver", "internal", "data", dialect.pkg)
+		methods := divergentMethods(t, dir, dialect.recvType)
 		// Per dialect and not only in total: every engine declares at least DeleteOldAuditLogs,
 		// so an empty answer means recvType no longer names the adapter, and that engine's
 		// overrides would drop out of the guard while the other three kept it passing (#438).
 		if len(methods) == 0 {
-			t.Fatalf("no method declared on *%s in %s; the adapter type was renamed and this table was not", dialect.recvType, dialect.dir)
+			t.Fatalf("no method declared on *%s in %s; the adapter type was renamed and this table was not", dialect.recvType, dir)
 		}
 		for name := range methods {
-			divergent[name] = append(divergent[name], dialect.recvType)
+			divergent[name] = append(divergent[name], dialect.pkg+"."+dialect.recvType)
 		}
 	}
 

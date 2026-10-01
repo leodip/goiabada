@@ -83,7 +83,7 @@ func runMainProcessWith(t *testing.T, decoy string, env []string, args ...string
 func migratedToHead(t *testing.T, path string) {
 	t.Helper()
 
-	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: "file:" + path}, false)
+	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
 	require.NoError(t, err)
 	defer func() { _ = db.DB.Close() }()
 
@@ -96,7 +96,7 @@ func migratedToHead(t *testing.T, path string) {
 func recordedVersion(t *testing.T, path string) int {
 	t.Helper()
 
-	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: "file:" + path}, false)
+	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
 	require.NoError(t, err)
 	defer func() { _ = db.DB.Close() }()
 

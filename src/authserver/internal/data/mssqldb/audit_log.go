@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *MsSQLDatabase) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
+func (d *Database) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
 	// MSSQL uses DELETE TOP(n) syntax
 	sqlStr := fmt.Sprintf("DELETE TOP (%d) FROM audit_logs WHERE created_at < @p1", maxDeletions)
 
@@ -45,11 +45,11 @@ func (d *MsSQLDatabase) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cuto
 // is the column's whole width: request_id is NVARCHAR(256), which stores UTF-16 even under the
 // UTF-8 collation, so 256 characters are 512 bytes and nothing that fits the column is clipped
 // by the cast.
-func requestIdIsByteExact(b interface{ Var(arg interface{}) string }, requestId string) string {
+func requestIdIsByteExact(b interface{ Var(arg any) string }, requestId string) string {
 	return "CAST(request_id AS VARBINARY(512)) = CAST(" + b.Var(requestId) + " AS VARBINARY(512))"
 }
 
-func (d *MsSQLDatabase) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
+func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
 	requestId string) ([]models.AuditLog, int, error) {
 	if page < 1 {
 		page = 1

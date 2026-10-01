@@ -26,7 +26,7 @@ func seedThrowawayDatabase(t *testing.T, name string, seed func(db data.Database
 	t.Helper()
 
 	dsn := filepath.Join(t.TempDir(), name)
-	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
+	db, err := sqlitedb.New(context.Background(), dsn, false)
 	require.NoError(t, err, "the seeding handle has to open before anything can be seeded")
 	m, err := db.NewMigrator(context.Background())
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing(t *testing.T) {
 
 	// Nothing was re-keyed: the PEM is the plaintext it was, and the client secret still reads
 	// under the previous key, because the refusal comes before ReencryptToKey opens its transaction.
-	reopened, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: cfg.DSN}, false)
+	reopened, err := sqlitedb.New(context.Background(), cfg.DSN, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = reopened.DB.Close() })
 
@@ -269,7 +269,7 @@ func TestNewDatabase_RefusesADirtyDatabase(t *testing.T) {
 	// because the dirty flag is a raw schema_migrations column and not anything data.Database
 	// exposes. The file is already at head, so the pre-flight reads the version, skips, and this
 	// arm is the first one with anything to refuse.
-	marker, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: cfg.DSN}, false)
+	marker, err := sqlitedb.New(context.Background(), cfg.DSN, false)
 	require.NoError(t, err, "the marker handle has to open before the fixture can be written")
 	res, err := marker.DB.Exec("UPDATE schema_migrations SET dirty = 1")
 	require.NoError(t, err, "the dirty marker is the whole fixture")

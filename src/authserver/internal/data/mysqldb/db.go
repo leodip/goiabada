@@ -1,3 +1,7 @@
+// Package mysqldb is the MySQL adapter: the constructor that opens, and when asked creates, the
+// application database, the migration chain MySQL runs, and the handful of Database methods whose
+// SQL differs from commondb's. Everything else is promoted from the embedded common
+// implementation.
 package mysqldb
 
 import (
@@ -11,6 +15,7 @@ import (
 
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
@@ -19,41 +24,42 @@ import (
 //go:embed migrations/*.sql
 var mysqlMigrationsFs embed.FS
 
-// MySQLDatabase declares only the methods MySQL needs its own SQL for; the rest are promoted
+// Database declares only the methods MySQL needs its own SQL for; the rest are promoted
 // from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
-type MySQLDatabase struct {
+type Database struct {
 	*commondb.Database
 	dbConfig *DatabaseConfig
 }
 
+// The compiler holds the adapter to the whole interface here, in its own package, so an engine
+// missing a method fails where the method is missing rather than only where datafactory hands
+// the adapter out (#438).
+var _ data.Database = (*Database)(nil)
+
+// DatabaseConfig is what MySQL reads to connect: the credentials, the address, the database name,
+// and whether it may create that database (#438 decision 3).
 type DatabaseConfig struct {
-	Type     string
 	Username string
 	Password string
 	Host     string
 	Port     int
 	Name     string
-	DSN      string
 	// Create decides whether the constructor may create the database when it is absent. It is
 	// positive-sense, so the zero value does not create: every literal has to set it (#293).
 	Create bool
 }
 
-func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, error) {
+// New opens the MySQL database dbConfig names, creating it first when dbConfig.Create says so.
+// Every statement it issues runs under ctx, the caller's, so a start that cannot reach the server
+// ends when the caller stops waiting (#438 decision 3).
+func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database, error) {
 
 	// One record where five used to be, and no password: the DSN is assembled below from the
 	// same four values, so a startup problem is read off this line rather than off four
 	// consecutive ones that a collector had no way to join (#320 decision 6).
-	slog.Info("using database", "type", "mysql", "username", dbConfig.Username,
+	slog.InfoContext(ctx, "using database", "type", "mysql", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
-
-	// The constructor owns this root, because nothing is waiting on it: the process is starting
-	// and there is no request and no operator to cancel. What the context buys here is that the
-	// CREATE DATABASE and the ping below go through the *Context calls like every other statement this
-	// package issues, so the shape has no exception to remember and no exemption to maintain
-	// (#386).
-	ctx := context.Background()
 
 	if dbConfig.Create {
 		tempDB, err := sql.Open("mysql", MaintenanceDSN(dbConfig))
@@ -89,7 +95,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		// maintenance connection above is never opened: a login with rights only inside the
 		// application schema is enough to start (#293). Logged because the operator who set
 		// this weeks ago needs the missing-database error below connected back to it.
-		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
+		slog.InfoContext(ctx, "database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 	}
 
 	db, err := sql.Open("mysql", DSN(dbConfig))
@@ -113,7 +119,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 
-	mysqlDb := MySQLDatabase{
+	mysqlDb := Database{
 		Database: commonDb,
 		dbConfig: dbConfig,
 	}
@@ -161,7 +167,7 @@ const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations "
 // ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
 // there yet. MySQL's CREATE TABLE IF NOT EXISTS takes a metadata lock, so two processes
 // starting against one empty database cannot both create it.
-func (d *MySQLDatabase) ensureSchemaMigrationsTable(ctx context.Context) error {
+func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) error {
 	if _, err := d.DB.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
@@ -174,7 +180,7 @@ func (d *MySQLDatabase) ensureSchemaMigrationsTable(ctx context.Context) error {
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *MySQLDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+func (d *Database) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
 	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}

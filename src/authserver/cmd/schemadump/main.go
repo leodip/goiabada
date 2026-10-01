@@ -94,21 +94,21 @@ func (t target) withOverrides() (target, error) {
 // drop: one mapping, so the constructor and the cleanup connect with the same credentials (#424).
 func (t target) mysqlConfig(name string) *mysqldb.DatabaseConfig {
 	return &mysqldb.DatabaseConfig{
-		Type: "mysql", Username: t.username, Password: t.password,
+		Username: t.username, Password: t.password,
 		Host: t.host, Port: t.port, Name: name, Create: true,
 	}
 }
 
 func (t target) postgresConfig(name string) *postgresdb.DatabaseConfig {
 	return &postgresdb.DatabaseConfig{
-		Type: "postgres", Username: t.username, Password: t.password,
+		Username: t.username, Password: t.password,
 		Host: t.host, Port: t.port, Name: name, Create: true,
 	}
 }
 
 func (t target) mssqlConfig(name string) *mssqldb.DatabaseConfig {
 	return &mssqldb.DatabaseConfig{
-		Type: "mssql", Username: t.username, Password: t.password,
+		Username: t.username, Password: t.password,
 		Host: t.host, Port: t.port, Name: name, Create: true,
 	}
 }
@@ -166,7 +166,7 @@ func dumpOne(t target) ([]byte, error) {
 
 	name := scratchName(t.dialect)
 
-	db, sqlDB, cleanup, err := open(t, name)
+	db, sqlDB, cleanup, err := open(ctx, t, name)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ type migratable interface {
 // open creates the scratch database and returns a handle to it plus the cleanup that closes
 // and drops it. Each constructor creates the database it is pointed at, which is the same
 // path the data tier's isolated databases take.
-func open(t target, name string) (migratable, *sql.DB, func(), error) {
+func open(ctx context.Context, t target, name string) (migratable, *sql.DB, func(), error) {
 	switch t.dialect {
 	case data.SQLite:
 		// A file rather than :memory:, because the SQLite driver requires WAL and an
@@ -212,9 +212,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 		if err != nil {
 			return nil, nil, nil, errs.Errorf("create a scratch directory: %w", err)
 		}
-		db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{
-			Type: "sqlite", DSN: filepath.Join(dir, "schemadump.db"),
-		}, false)
+		db, err := sqlitedb.New(ctx, filepath.Join(dir, "schemadump.db"), false)
 		if err != nil {
 			_ = os.RemoveAll(dir)
 			return nil, nil, nil, err
@@ -223,7 +221,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 
 	case data.MySQL:
 		cfg := t.mysqlConfig(name)
-		db, err := mysqldb.NewMySQLDatabase(cfg, false)
+		db, err := mysqldb.New(ctx, cfg, false)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -234,7 +232,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 
 	case data.Postgres:
 		cfg := t.postgresConfig(name)
-		db, err := postgresdb.NewPostgresDatabase(cfg, false)
+		db, err := postgresdb.New(ctx, cfg, false)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -245,7 +243,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 
 	case data.MSSQL:
 		cfg := t.mssqlConfig(name)
-		db, err := mssqldb.NewMsSQLDatabase(cfg, false)
+		db, err := mssqldb.New(ctx, cfg, false)
 		if err != nil {
 			return nil, nil, nil, err
 		}

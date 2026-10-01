@@ -68,39 +68,39 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		// A file-based DB in a temp dir: the sqlite driver requires WAL, which
 		// an in-memory database cannot provide.
 		dsn := filepath.Join(t.TempDir(), "migration_test.db")
-		db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
-		require.NoError(t, err, "NewSQLiteDatabase")
+		db, err := sqlitedb.New(context.Background(), dsn, false)
+		require.NoError(t, err, "sqlitedb.New")
 		t.Cleanup(func() { _ = db.DB.Close() }) // temp dir is removed by t.TempDir
 		return newIsolated(t, db, db.DB, "")
 
 	case data.MySQL:
 		name := isolatedDBName()
-		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
-			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
+		db, err := mysqldb.New(context.Background(), &mysqldb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
-		require.NoError(t, err, "NewMySQLDatabase")
+		require.NoError(t, err, "mysqldb.New")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
 		assertCreatedDatabaseCollation(t, db.DB)
 		return newIsolated(t, db, db.DB, name)
 
 	case data.Postgres:
 		name := isolatedDBName()
-		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+		db, err := postgresdb.New(context.Background(), &postgresdb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
-		require.NoError(t, err, "NewPostgresDatabase")
+		require.NoError(t, err, "postgresdb.New")
 		t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
 		return newIsolated(t, db, db.DB, name)
 
 	case data.MSSQL:
 		name := isolatedDBName()
-		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+		db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}, false)
-		require.NoError(t, err, "NewMsSQLDatabase")
+		require.NoError(t, err, "mssqldb.New")
 		t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
 		assertCreatedDatabaseCollation(t, db.DB)
 		return newIsolated(t, db, db.DB, name)
@@ -295,13 +295,13 @@ func dropPostgres(t *testing.T, cfg *config.DatabaseConfig, name string) {
 
 // newPreCreatedMsSQLDB is newIsolatedDB for the case an OPERATOR would produce: the
 // database already exists, at a collation somebody else chose, before Goiabada ever
-// connects. NewMsSQLDatabase creates IF NOT EXISTS, so its own CREATE DATABASE does not
+// connects. mssqldb.New creates IF NOT EXISTS, so its own CREATE DATABASE does not
 // fire and the collation stands.
 //
 // Two tests need it and they need different collations, which is why it takes one.
 // Migration 000040's own test needs a fixture at Latin1_General_100_CI_AI_SC_UTF8,
 // Goiabada's collation before #283, because newIsolatedDB would build the fixture through
-// NewMsSQLDatabase and that now creates at the TARGET collation: no migration before
+// mssqldb.New and that now creates at the TARGET collation: no migration before
 // 000040 declares a column collation, so all 92 columns would inherit the target from the
 // database default and satisfy the post-migration assertion before the migration existed.
 // The pre-created guard needs it at SQL_Latin1_General_CP1_CI_AS, a stock server default,
@@ -327,14 +327,14 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	_, err = master.Exec(fmt.Sprintf("CREATE DATABASE [%s] COLLATE %s", name, collation))
 	require.NoErrorf(t, err, "pre-create %s at %s", name, collation)
 
-	db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-		Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+	db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+		Username: cfg.Username, Password: cfg.Password,
 		Host: cfg.Host, Port: cfg.Port, Name: name,
 		// The operator created this one, so the constructor must not: that is what the
 		// collation assertion below is checking (#293).
 		Create: false,
 	}, false)
-	require.NoError(t, err, "NewMsSQLDatabase over a pre-created database")
+	require.NoError(t, err, "mssqldb.New over a pre-created database")
 	t.Cleanup(func() { _ = db.DB.Close(); dropMsSQL(t, cfg, name) })
 
 	// Asserted rather than assumed: with Create false nothing in the constructor may touch
@@ -346,7 +346,7 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	// to be what held it, and once it stopped issuing the statement it stopped being evidence
 	// about it (#293).
 	require.Equal(t, collation, readDatabaseDefaultCollation(t, db.DB),
-		"NewMsSQLDatabase with Create false must leave the operator's database exactly as it found it")
+		"mssqldb.New with Create false must leave the operator's database exactly as it found it")
 
 	return newIsolated(t, db, db.DB, name)
 }
@@ -408,7 +408,7 @@ func restrictedLoginName() string {
 }
 
 // mySQLServerDSN is a connection to the server with no database selected, which is both what
-// the fixture administers through and what NewMySQLDatabase's maintenance connection uses:
+// the fixture administers through and what mysqldb.New's maintenance connection uses:
 // mysqldb.MaintenanceDSN, as the credential given rather than the configured one.
 func mySQLServerDSN(username, password string, cfg *config.DatabaseConfig) string {
 	return mysqldb.MaintenanceDSN(&mysqldb.DatabaseConfig{
@@ -417,7 +417,7 @@ func mySQLServerDSN(username, password string, cfg *config.DatabaseConfig) strin
 }
 
 // postgresMaintenanceDSN is a connection to the postgres database, which is both what the
-// fixture administers through and what NewPostgresDatabase's maintenance connection uses:
+// fixture administers through and what postgresdb.New's maintenance connection uses:
 // postgresdb.MaintenanceDSN, as the credential given rather than the configured one.
 func postgresMaintenanceDSN(username, password string, cfg *config.DatabaseConfig) string {
 	return postgresdb.MaintenanceDSN(&postgresdb.DatabaseConfig{
@@ -538,29 +538,29 @@ func (r *restrictedLoginDB) constructRestricted(t *testing.T) (datafactory.Migra
 
 	switch dbType() {
 	case data.MySQL:
-		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
-			Type: "mysql", Username: r.username, Password: r.password,
+		db, err := mysqldb.New(context.Background(), &mysqldb.DatabaseConfig{
+			Username: r.username, Password: r.password,
 			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
 		}, false)
-		require.NoError(t, err, "NewMySQLDatabase as a login that cannot create a database")
+		require.NoError(t, err, "mysqldb.New as a login that cannot create a database")
 		t.Cleanup(func() { _ = db.DB.Close() })
 		return db, db.DB
 
 	case data.Postgres:
-		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-			Type: "postgres", Username: r.username, Password: r.password,
+		db, err := postgresdb.New(context.Background(), &postgresdb.DatabaseConfig{
+			Username: r.username, Password: r.password,
 			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
 		}, false)
-		require.NoError(t, err, "NewPostgresDatabase as a role holding no CREATEDB")
+		require.NoError(t, err, "postgresdb.New as a role holding no CREATEDB")
 		t.Cleanup(func() { _ = db.DB.Close() })
 		return db, db.DB
 
 	case data.MSSQL:
-		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-			Type: "mssql", Username: r.username, Password: r.password,
+		db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+			Username: r.username, Password: r.password,
 			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
 		}, false)
-		require.NoError(t, err, "NewMsSQLDatabase as a login that cannot create a database in master")
+		require.NoError(t, err, "mssqldb.New as a login that cannot create a database in master")
 		t.Cleanup(func() { _ = db.DB.Close() })
 		return db, db.DB
 

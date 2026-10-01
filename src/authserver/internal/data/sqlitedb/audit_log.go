@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func (d *SQLiteDatabase) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
+func (d *Database) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
 	// SQLite requires ORDER BY with LIMIT on DELETE
 	deleteSQL := `DELETE FROM audit_logs WHERE id IN (
 		SELECT id FROM audit_logs WHERE created_at < ? ORDER BY id LIMIT ?

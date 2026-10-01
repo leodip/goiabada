@@ -41,19 +41,19 @@ var disposableDatabases = map[string]bool{
 var dropByEngine = map[data.Dialect]func(ctx context.Context, cfg *config.DatabaseConfig) error{
 	data.MySQL: func(ctx context.Context, cfg *config.DatabaseConfig) error {
 		return mysqldb.DropDatabase(ctx, &mysqldb.DatabaseConfig{
-			Type: cfg.Type, Username: cfg.Username, Password: cfg.Password,
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: cfg.Name,
 		})
 	},
 	data.Postgres: func(ctx context.Context, cfg *config.DatabaseConfig) error {
 		return postgresdb.DropDatabase(ctx, &postgresdb.DatabaseConfig{
-			Type: cfg.Type, Username: cfg.Username, Password: cfg.Password,
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: cfg.Name,
 		})
 	},
 	data.MSSQL: func(ctx context.Context, cfg *config.DatabaseConfig) error {
 		return mssqldb.DropDatabase(ctx, &mssqldb.DatabaseConfig{
-			Type: cfg.Type, Username: cfg.Username, Password: cfg.Password,
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: cfg.Name,
 		})
 	},

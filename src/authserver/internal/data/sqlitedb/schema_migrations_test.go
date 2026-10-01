@@ -25,11 +25,11 @@ import (
 // driver's and is Goiabada's own statement since #268 decision 6, and it is the one part of the
 // table a fresh install could lose without any other test noticing.
 func TestNewMigrator_PinsTheSchemaMigrationsShape(t *testing.T) {
-	// A file rather than :memory:, because NewSQLiteDatabase requires WAL, which an
+	// A file rather than :memory:, because New requires WAL, which an
 	// in-memory database cannot provide, and because a shared-cache memory DSN is process
 	// wide and would be shared with any other test that opened one.
 	dsn := filepath.Join(t.TempDir(), "schema_migrations_test.db")
-	db, err := NewSQLiteDatabase(&DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
+	db, err := New(context.Background(), dsn, false)
 	require.NoError(t, err, "open the sqlite database")
 	t.Cleanup(func() { _ = db.DB.Close() })
 

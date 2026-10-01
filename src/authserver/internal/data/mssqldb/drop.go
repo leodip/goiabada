@@ -11,7 +11,7 @@ import (
 // SQL Server refuses to drop a database with a session attached, so the batch first takes it to
 // SINGLE_USER WITH ROLLBACK IMMEDIATE, which ends every other session.
 //
-// The server never calls it. It is the inverse of the CREATE DATABASE NewMsSQLDatabase issues,
+// The server never calls it. It is the inverse of the CREATE DATABASE New issues,
 // naming the database through the same quoteIdentifier and quoteLiteral, and it sits beside that
 // so the tools that discard a database spell the drop once: schemadump's scratch databases, the
 // data tier's fixtures, and droptestdb, which run-tests.sh runs before each tier so every local

@@ -48,7 +48,11 @@ type Migratable interface {
 // It is exported for the `migrate` subcommand, which needs an engine's migrator without the schema
 // being brought to head first, which is what NewDatabase does and what makes NewDatabase useless
 // for a rollback. Every other caller wants NewDatabase (#268).
-func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Migratable, error) {
+//
+// ctx is the caller's and reaches every statement the engine's constructor issues, so a start
+// waiting on an unreachable server or a held creation lock ends when the caller stops waiting
+// (#438 decision 3).
+func OpenDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, logSQL bool) (Migratable, error) {
 	// The parse comes before the record, so a refused type writes only its refusal and never an
 	// opening record naming an engine nothing opened (#438 decision 6).
 	dialect, err := data.ParseDialect(dbConfig.Type)
@@ -59,7 +63,7 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Migratable, err
 	// One record for the whole choice. This used to write "db type is x" here and "creating x
 	// database" in the arm, and each engine's constructor then wrote "using database x" a line
 	// later: three records saying the same thing, none of them structured (#320).
-	slog.Info("opening the database", "type", string(dialect))
+	slog.InfoContext(ctx, "opening the database", "type", string(dialect))
 
 	// Each arm takes the constructor's two results into a local pair and returns nil on the error
 	// path rather than returning the call directly: all four constructors answer a typed nil
@@ -67,25 +71,29 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Migratable, err
 	// Migratable over it, so an `if database == nil` at a caller would read false (#353).
 	switch dialect {
 	case data.MySQL:
-		database, err := mysqldb.NewMySQLDatabase(mysqlConfig(dbConfig), logSQL)
+		database, err := mysqldb.New(ctx, mysqlConfig(dbConfig), logSQL)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
 	case data.SQLite:
-		database, err := sqlitedb.NewSQLiteDatabase(sqliteConfig(dbConfig), logSQL)
+		// The DSN is all SQLite reads. GOIABADA_DB_CREATE has nowhere to go here: SQLite has no
+		// create statement and no maintenance connection to issue one over, so `mode=rw` in the
+		// operator's DSN is the equivalent (#293, #438 decision 4). A chosen leniency rather than
+		// an oversight, so TestOpenDatabase_Dispatch has a row for it.
+		database, err := sqlitedb.New(ctx, dbConfig.DSN, logSQL)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
 	case data.Postgres:
-		database, err := postgresdb.NewPostgresDatabase(postgresConfig(dbConfig), logSQL)
+		database, err := postgresdb.New(ctx, postgresConfig(dbConfig), logSQL)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
 	case data.MSSQL:
-		database, err := mssqldb.NewMsSQLDatabase(mssqlConfig(dbConfig), logSQL)
+		database, err := mssqldb.New(ctx, mssqlConfig(dbConfig), logSQL)
 		if err != nil {
 			return nil, err
 		}
@@ -98,36 +106,19 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Migratable, err
 }
 
 // mysqlConfig is the switch arm's struct literal and nothing else, extracted so that field
-// placement is a pure function a table can check. Eight fields copied by hand is eight chances to
+// placement is a pure function a table can check. Six fields copied by hand is six chances to
 // write one of them into the wrong place, and neither the engine's error nor the dispatch record
 // can see the difference: a swapped Host and Name still answers `dial tcp`, and Password appears
-// in no error at all (#353).
+// in no error at all (#353). Only what the engine reads is copied: the type has been dispatched
+// on by now, and the DSN is SQLite's (#438 decision 3).
 func mysqlConfig(c *config.DatabaseConfig) *mysqldb.DatabaseConfig {
 	return &mysqldb.DatabaseConfig{
-		Type:     c.Type,
 		Username: c.Username,
 		Password: c.Password,
 		Host:     c.Host,
 		Port:     c.Port,
 		Name:     c.Name,
-		DSN:      c.DSN,
 		Create:   c.Create,
-	}
-}
-
-// sqliteConfig copies seven fields and deliberately not Create, which sqlitedb.DatabaseConfig does
-// not declare: SQLite has no create statement and no maintenance connection to issue one over, so
-// `mode=rw` in the operator's DSN is the equivalent and GOIABADA_DB_CREATE does not apply (#293).
-// It is a chosen leniency rather than an oversight, so it has its own test case.
-func sqliteConfig(c *config.DatabaseConfig) *sqlitedb.DatabaseConfig {
-	return &sqlitedb.DatabaseConfig{
-		Type:     c.Type,
-		Username: c.Username,
-		Password: c.Password,
-		Host:     c.Host,
-		Port:     c.Port,
-		Name:     c.Name,
-		DSN:      c.DSN,
 	}
 }
 
@@ -135,13 +126,11 @@ func sqliteConfig(c *config.DatabaseConfig) *sqlitedb.DatabaseConfig {
 // mapping is extracted.
 func postgresConfig(c *config.DatabaseConfig) *postgresdb.DatabaseConfig {
 	return &postgresdb.DatabaseConfig{
-		Type:     c.Type,
 		Username: c.Username,
 		Password: c.Password,
 		Host:     c.Host,
 		Port:     c.Port,
 		Name:     c.Name,
-		DSN:      c.DSN,
 		Create:   c.Create,
 	}
 }
@@ -150,13 +139,11 @@ func postgresConfig(c *config.DatabaseConfig) *postgresdb.DatabaseConfig {
 // mapping is extracted.
 func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 	return &mssqldb.DatabaseConfig{
-		Type:     c.Type,
 		Username: c.Username,
 		Password: c.Password,
 		Host:     c.Host,
 		Port:     c.Port,
 		Name:     c.Name,
-		DSN:      c.DSN,
 		Create:   c.Create,
 	}
 }
@@ -173,7 +160,7 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // required and must be 32 bytes; previousAESKey is optional and is acted on only at that length,
 // by the env-to-env rotation inside runStartupDataTasks.
 func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []byte, previousAESKey []byte, logSQL bool) (data.Database, error) {
-	database, err := OpenDatabase(dbConfig, logSQL)
+	database, err := OpenDatabase(ctx, dbConfig, logSQL)
 	if err != nil {
 		return nil, err
 	}

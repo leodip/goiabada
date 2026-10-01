@@ -70,7 +70,7 @@ var renamedDefaults000040 = map[string]string{
 // and the runner refuses a target version its source does not carry.
 //
 // THE FIXTURE IS THE FIRST THING THIS TEST HAS TO GET RIGHT, and on SQL Server it is not
-// newIsolatedDB. That helper builds the database through NewMsSQLDatabase, which this change
+// newIsolatedDB. That helper builds the database through mssqldb.New, which this change
 // makes create at the TARGET collation; no mssql migration before 000040 declares a column
 // collation, so all 92 columns would inherit the target from the database default and satisfy
 // the post-migration assertion before 000040 existed. Deleting the migration file would leave
@@ -360,7 +360,7 @@ func priorVersion000040() int {
 // SQL Server's is pre-created at the OLD collation rather than left to newIsolatedDB.
 //
 // MySQL's needs the same treatment for the same reason, one statement instead of a helper.
-// NewMySQLDatabase now creates at the TARGET collation, so a fixture left as the constructor
+// mysqldb.New now creates at the TARGET collation, so a fixture left as the constructor
 // built it already holds the value 000040's opening ALTER DATABASE is there to write, and
 // deleting that statement outright would change nothing this test can see. Moved back to
 // utf8mb4_0900_ai_ci, where a database created before #283 stands, the statement is load
@@ -611,7 +611,7 @@ func splitQualified000040(key string) (table, column string) {
 }
 
 // TestMigration000040_PreCreatedDatabaseIsFullyCollated is decision 12's guard, and what it watches
-// is a deployment Goiabada did not build. NewMsSQLDatabase creates the database IF NOT EXISTS, so
+// is a deployment Goiabada did not build. mssqldb.New creates the database IF NOT EXISTS, so
 // an operator who creates it themselves keeps their own collation, and on SQL Server a migration
 // that omits COLLATE then lands the column at THAT collation rather than at ours. Measured before
 // #283, through the repository's own constructor and migrator against a database pre-created at the
@@ -646,7 +646,7 @@ func TestMigration000040_PreCreatedDatabaseIsFullyCollated(t *testing.T) {
 	// therefore cannot be mistaken for a column 000040 converted.
 	const operatorCollation = "SQL_Latin1_General_CP1_CI_AS"
 
-	// The helper asserts on its own that NewMsSQLDatabase left this collation alone; without
+	// The helper asserts on its own that mssqldb.New left this collation alone; without
 	// that, every assertion below would go on passing for the wrong reason if IF NOT EXISTS
 	// ever stopped being IF NOT EXISTS.
 	h := newPreCreatedMsSQLDB(t, operatorCollation)
