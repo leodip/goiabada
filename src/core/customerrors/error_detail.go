@@ -128,12 +128,12 @@ func (e *ErrorDetail) GetWWWAuthenticate() string {
 }
 
 // Is reports whether e carries the same details as target, which is what makes
-// errors.Is(err, protocolvalidation.ErrUserDisabled) match a copy the token validator rebuilt
-// rather than the sentinel value itself. That package's ErrUserDisabled and
-// ErrCodeRedirectURIDeregistered are never returned by identity: the validator constructs an equal
-// value at the point of failure, so without this method errors.Is would fall back to == and match
-// neither. ceremony.ErrNoAuthContext is returned by identity and would match
-// either way. All three are the auth server's since #385; core holds only the comparison.
+// errors.Is(err, protocolvalidation.ErrCodeRedirectURIDeregistered) match a copy the token
+// validator rebuilt rather than the sentinel value itself. That target is never returned by
+// identity: the validator constructs an equal value at the point of failure, so without this method
+// errors.Is would fall back to == and not match it. ceremony.ErrNoAuthContext is returned by
+// identity and would match either way. Both are the auth server's since #385; core holds only the
+// comparison.
 //
 // Every entry is compared, and the lengths first, so a detail key added later cannot quietly widen
 // an equality: two ErrorDetails agreeing on code and description but differing in httpStatusCode
