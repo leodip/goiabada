@@ -26,7 +26,7 @@ func TestIsDeadlock(t *testing.T) {
 		want bool
 	}{
 		{"the driver's deadlock, as pgx returns it", deadlock, true},
-		{"the same error wrapped once, as ExecSql returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
+		{"the same error wrapped once, as ExecSQL returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
 		{"the same error wrapped by the standard library", errors.Join(deadlock), true},
 		{"55P03 lock_not_available: a lock wait that ran out, not a broken cycle", &pgconn.PgError{Code: "55P03"}, false},
 		{"a syntax error from the same driver", &pgconn.PgError{Code: "42601", Message: "syntax error at or near"}, false},
@@ -43,7 +43,7 @@ func TestIsDeadlock(t *testing.T) {
 	}
 }
 
-// TestIsUniqueViolation is PostgreSQL's row of the unique-key classifier table WrapSQLError
+// TestIsUniqueViolation is PostgreSQL's row of the unique-key classifier table commondb's wrapSQLError
 // consults.
 //
 // One SQLSTATE covers every kind of key here: #279 recorded 23505 for a
@@ -64,7 +64,7 @@ func TestIsUniqueViolation(t *testing.T) {
 		want bool
 	}{
 		{"the driver's unique violation, as pgx returns it", duplicate, true},
-		{"the same error wrapped once, as WrapSQLError returns it", errs.Wrap(duplicate, "unable to execute SQL"), true},
+		{"the same error wrapped once, as commondb's wrapSQLError returns it", errs.Wrap(duplicate, "unable to execute SQL"), true},
 		{"the same error wrapped by the standard library", errors.Join(duplicate), true},
 		{"the same error at the depth a handler sees it", errs.Wrap(errs.Wrap(duplicate, "unable to execute SQL"), "unable to insert user"), true},
 		{"a primary-key collision, which this engine also spells 23505", &pgconn.PgError{Code: "23505", ConstraintName: "zzc_pkey"}, true},

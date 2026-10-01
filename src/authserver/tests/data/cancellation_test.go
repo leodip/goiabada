@@ -126,7 +126,7 @@ func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T)
 
 // The three cases above reach BeginTx. The three below reach the statements themselves, which is
 // the half of seam 2 that stage 5 adds: the 57 identity methods now carry the caller's context
-// down to QuerySql and ExecSql, and nothing but a real driver says whether it arrives.
+// down to QuerySQL and ExecSQL, and nothing but a real driver says whether it arrives.
 //
 // They run on all four engines. An already-cancelled context is the one cancellation every
 // driver answers identically, because database/sql refuses the call before the driver is reached
@@ -180,7 +180,7 @@ func TestUserLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // Stage 6 adds the session, token and code half. The three shapes above are repeated on the
 // methods this batch carries, because "the context reaches the driver" is a claim about each
 // method's own body: a batch that took the ctx into its signature and left a
-// context.Background() at its QuerySql would pass every other tier.
+// context.Background() at its QuerySQL would pass every other tier.
 
 // The read every request path makes. MiddlewareSessionIdentifier, /auth/authorize,
 // /auth/level1completed, /auth/completed, the token endpoint and the bearer-token middleware all
@@ -270,7 +270,7 @@ func TestAcquireUserSessionRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // Stage 7 adds the client, resource and permission half. The four shapes below repeat the ones
 // above on the methods this batch carries, for the reason stage 6's note gives: "the context
 // reaches the driver" is a claim about each method's own body, and a batch that took the ctx
-// into its signature and left a context.Background() at its QuerySql would pass every other tier.
+// into its signature and left a context.Background() at its QuerySQL would pass every other tier.
 
 // The read every ceremony hop makes. /auth/authorize, /auth/pwd, /auth/level1completed,
 // /auth/level2, /auth/otp, /auth/completed, /auth/consent, /auth/issue and the token endpoint all
@@ -372,8 +372,8 @@ func TestGetPermissionsByIds_RefusesAnAlreadyCancelledContext(t *testing.T) {
 
 // AcquireClientRow is this batch's row acquisition, the client-side twin of
 // AcquireUserSessionRow: updateClientNotOwningAuthenticationMode takes the client row before
-// re-reading the authentication mode it is about to write back (#245). It is an ExecSql rather than a
-// QuerySql, which is the other of the two SQL chokepoints, so it is the case that would fail if
+// re-reading the authentication mode it is about to write back (#245). It is an ExecSQL rather than a
+// QuerySQL, which is the other of the two SQL chokepoints, so it is the case that would fail if
 // only the query half of this batch carried the context through.
 func TestAcquireClientRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	client := createTestClient(t)

@@ -16,7 +16,7 @@ import (
 // session methods state: no row carries one, so it can only be a caller bug, and matching on it
 // would either return another request's row or sweep rows the caller never named.
 
-func (d *CommonDatabase) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest) error {
+func (d *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest) error {
 
 	if authorizeRequest.HandleHash == "" {
 		return errs.New("can't create an authorize request with an empty handle hash")
@@ -64,7 +64,7 @@ func (d *CommonDatabase) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx,
 // the browser can act on; an error means the lookup could not be performed. Every failure below
 // propagates instead of collapsing into nil, including rows.Err(), where a driver reports a fault
 // it deferred to the result set.
-func (d *CommonDatabase) GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string,
+func (d *Database) GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string,
 	now time.Time) (*models.AuthorizeRequest, error) {
 
 	if handleHash == "" {
@@ -81,7 +81,7 @@ func (d *CommonDatabase) GetAuthorizeRequestByHandleHash(ctx context.Context, tx
 	)
 
 	query, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -118,7 +118,7 @@ func (d *CommonDatabase) GetAuthorizeRequestByHandleHash(ctx context.Context, tx
 // The count is exact on all four engines: a DELETE reports the rows it removed, not the rows it
 // matched, so MySQL's changed-rows quirk does not reach it. Two overlapping claims of one row are
 // serialised by the engine's row lock on the DELETE, and the second finds no row to remove.
-func (d *CommonDatabase) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error) {
+func (d *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error) {
 
 	if authorizeRequestId == 0 {
 		return false, errs.New("can't claim the authorize request with id 0")
@@ -131,7 +131,7 @@ func (d *CommonDatabase) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, 
 	deleteBuilder.Where(deleteBuilder.Equal("id", authorizeRequestId))
 
 	query, args := deleteBuilder.Build()
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to claim authorize request")
 	}
@@ -147,7 +147,7 @@ func (d *CommonDatabase) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, 
 // DeleteExpiredAuthorizeRequests reaps on expires_at alone. Every row it removes was already
 // unusable, by the expires_at > now term the read carries; this is what stops the table growing
 // rather than what makes a request expire.
-func (d *CommonDatabase) DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error {
+func (d *Database) DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error {
 
 	authorizeRequestStruct := sqlbuilder.NewStruct(new(models.AuthorizeRequest)).
 		For(d.Flavor)
@@ -156,7 +156,7 @@ func (d *CommonDatabase) DeleteExpiredAuthorizeRequests(ctx context.Context, tx 
 	deleteBuilder.Where(deleteBuilder.LessThan("expires_at", now))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired authorize requests")
 	}

@@ -28,7 +28,7 @@ func TestIsDeadlock(t *testing.T) {
 	}{
 		{"the driver's deadlock, by value", deadlock, true},
 		{"the driver's deadlock, by pointer", &deadlock, true},
-		{"the value wrapped once, as ExecSql returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
+		{"the value wrapped once, as ExecSQL returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
 		{"the pointer wrapped once", errs.Wrap(&deadlock, "unable to execute SQL"), true},
 		{"the value wrapped by the standard library", errors.Join(deadlock), true},
 		{"1222 lock request time out period exceeded: a lock wait that ran out, not a broken cycle", mssql.Error{Number: 1222}, false},
@@ -48,7 +48,7 @@ func TestIsDeadlock(t *testing.T) {
 	}
 }
 
-// TestIsUniqueViolation is SQL Server's row of the unique-key classifier table WrapSQLError
+// TestIsUniqueViolation is SQL Server's row of the unique-key classifier table commondb's wrapSQLError
 // consults, and this engine is the one that needs two numbers.
 //
 // #279 recorded 2601, "Cannot insert duplicate key row ... with unique index",
@@ -76,7 +76,7 @@ func TestIsUniqueViolation(t *testing.T) {
 		{"2627 by pointer", &constraint, true},
 		{"2601 a unique index, by value", index, true},
 		{"2601 by pointer", &index, true},
-		{"2627 wrapped once, as WrapSQLError returns it", errs.Wrap(constraint, "unable to execute SQL"), true},
+		{"2627 wrapped once, as commondb's wrapSQLError returns it", errs.Wrap(constraint, "unable to execute SQL"), true},
 		{"2601 wrapped once", errs.Wrap(index, "unable to execute SQL"), true},
 		{"2627 wrapped by the standard library", errors.Join(constraint), true},
 		{"2601 at the depth a handler sees it", errs.Wrap(errs.Wrap(index, "unable to execute SQL"), "unable to insert user"), true},

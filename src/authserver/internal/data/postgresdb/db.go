@@ -26,10 +26,10 @@ import (
 var postgresMigrationsFs embed.FS
 
 // PostgresDatabase declares only the methods PostgreSQL needs its own SQL for; the rest are promoted
-// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
 type PostgresDatabase struct {
-	*commondb.CommonDatabase
+	*commondb.Database
 	dbConfig *DatabaseConfig
 }
 
@@ -103,15 +103,15 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		}
 	}
 
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.PostgreSQL, logSQL)
+	commonDb := commondb.New(db, sqlbuilder.PostgreSQL, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 	commonDb.InsertReturningIdSQL = insertReturningIdSQL
 	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
 
 	postgresDb := PostgresDatabase{
-		CommonDatabase: commonDb,
-		dbConfig:       dbConfig,
+		Database: commonDb,
+		dbConfig: dbConfig,
 	}
 	return &postgresDb, nil
 }
@@ -294,7 +294,7 @@ const (
 	pgDuplicateDatabase = "42P04"
 )
 
-// isUniqueViolation is PostgreSQL's row of the unique-key classifier table WrapSQLError consults.
+// isUniqueViolation is PostgreSQL's row of the unique-key classifier table commondb's wrapSQLError consults.
 //
 // pgconn.PgError has pointer receivers, so the pointer is the only form that is an error and the
 // only form the driver returns; there is no value form to check.

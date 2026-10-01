@@ -31,8 +31,8 @@ const (
 	emailTestAddress = "taken@example.com"
 )
 
-// uniqueViolationOnUpdate is the shape commondb hands back for a duplicate key: WrapSQLError's
-// sentinel join under ExecSql, wrapped again by UpdateUser.
+// uniqueViolationOnUpdate is the shape commondb hands back for a duplicate key: wrapSQLError's
+// sentinel join under ExecSQL, wrapped again by UpdateUser.
 var uniqueViolationOnUpdate = errs.Wrap(
 	errs.Errorf("%w: %w", data.ErrUniqueViolation, errs.New("duplicate key value violates unique constraint \"idx_email\"")),
 	"unable to update user")

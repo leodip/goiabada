@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error {
+func (d *Database) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error {
 
 	if redirectURI.ClientId == 0 {
 		return errs.New("client id must be greater than 0")
@@ -36,11 +36,11 @@ func (d *CommonDatabase) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redi
 	return nil
 }
 
-func (d *CommonDatabase) getRedirectURICommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getRedirectURICommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	redirectURIStruct *sqlbuilder.Struct) (*models.RedirectURI, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -62,7 +62,7 @@ func (d *CommonDatabase) getRedirectURICommon(ctx context.Context, tx *sql.Tx, s
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error) {
+func (d *Database) GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error) {
 
 	redirectURIStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).
 		For(d.Flavor)
@@ -78,7 +78,7 @@ func (d *CommonDatabase) GetRedirectURIById(ctx context.Context, tx *sql.Tx, red
 	return redirectURI, nil
 }
 
-func (d *CommonDatabase) GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.RedirectURI, error) {
+func (d *Database) GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.RedirectURI, error) {
 
 	redirectURIStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).
 		For(d.Flavor)
@@ -87,7 +87,7 @@ func (d *CommonDatabase) GetRedirectURIsByClientId(ctx context.Context, tx *sql.
 	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -111,7 +111,7 @@ func (d *CommonDatabase) GetRedirectURIsByClientId(ctx context.Context, tx *sql.
 	return redirectURIs, nil
 }
 
-func (d *CommonDatabase) DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error {
+func (d *Database) DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).
 		For(d.Flavor)
@@ -120,7 +120,7 @@ func (d *CommonDatabase) DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redi
 	deleteBuilder.Where(deleteBuilder.Equal("id", redirectURIId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete redirectURI")
 	}

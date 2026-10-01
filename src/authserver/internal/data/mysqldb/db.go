@@ -20,10 +20,10 @@ import (
 var mysqlMigrationsFs embed.FS
 
 // MySQLDatabase declares only the methods MySQL needs its own SQL for; the rest are promoted
-// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
 type MySQLDatabase struct {
-	*commondb.CommonDatabase
+	*commondb.Database
 	dbConfig *DatabaseConfig
 }
 
@@ -109,13 +109,13 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		}
 	}
 
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.MySQL, logSQL)
+	commonDb := commondb.New(db, sqlbuilder.MySQL, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 
 	mysqlDb := MySQLDatabase{
-		CommonDatabase: commonDb,
-		dbConfig:       dbConfig,
+		Database: commonDb,
+		dbConfig: dbConfig,
 	}
 	return &mysqlDb, nil
 }
@@ -134,7 +134,7 @@ func isDeadlock(err error) bool {
 // (23000): Duplicate entry 'a@b' for key 'zzprobe279.email'"` with Number 1062 (#279).
 const mysqlDuplicateEntry = 1062
 
-// isUniqueViolation is MySQL's row of the unique-key classifier table WrapSQLError consults.
+// isUniqueViolation is MySQL's row of the unique-key classifier table commondb's wrapSQLError consults.
 //
 // mysql.MySQLError has pointer receivers, so the pointer is the only form that is an error and the
 // only form the driver returns; there is no value form to check.

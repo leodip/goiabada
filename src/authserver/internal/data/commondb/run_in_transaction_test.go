@@ -34,36 +34,24 @@ var errDeadlock = errors.New("the engine chose this transaction as the deadlock 
 const retryWarning = "rerunning a transaction"
 
 // retryingDB is the scripted database with the sentinel installed as its deadlock.
-func retryingDB(t *testing.T, d *scriptedDriver) *CommonDatabase {
+func retryingDB(t *testing.T, d *scriptedDriver) *Database {
 	t.Helper()
 	db := scriptedDB(t, d)
 	db.IsDeadlock = func(err error) bool { return errors.Is(err, errDeadlock) }
 	return db
 }
 
-// recordBackoff swaps the helper's sleep for one that records what was asked of it, so the
+// recordBackoff replaces db's pause with one that records what was asked of it, so the
 // assertion is on the durations REQUESTED and never on the wall clock: a scheduler pause longer
 // than 75ms inside the first interval would otherwise reverse a comparison of two measured gaps
-// on a helper that is correct.
-func recordBackoff(t *testing.T) *[]time.Duration {
-	t.Helper()
+// on a helper that is correct. The replacement is db's alone, so no other test sees it.
+func recordBackoff(db *Database) *[]time.Duration {
 	requested := []time.Duration{}
-	swapSleep(t, func(_ context.Context, d time.Duration) error {
+	db.sleep = func(_ context.Context, d time.Duration) error {
 		requested = append(requested, d)
 		return nil
-	})
+	}
 	return &requested
-}
-
-// swapSleep installs a backoff for the duration of one test and puts the real one back. It is
-// separate from recordBackoff because the cancellation case needs the REAL wait, with a cancel
-// fired at it, so that the select on ctx.Done() is the thing under test rather than a stub
-// imitating its answer.
-func swapSleep(t *testing.T, replacement func(context.Context, time.Duration) error) {
-	t.Helper()
-	previous := sleep
-	sleep = replacement
-	t.Cleanup(func() { sleep = previous })
 }
 
 // retryWarnings counts the reruns the helper announced.
@@ -93,8 +81,8 @@ func warningsContaining(logs *logtest.SlogCapture, text string) int {
 
 // oneStatement is a body that issues one write on the transaction it was handed and returns
 // whatever the driver answered, which is how a scripted failure reaches the helper by the path a
-// real one takes: through ExecSql's wrapping, not as a bare sentinel.
-func oneStatement(db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
+// real one takes: through ExecSQL's wrapping, not as a bare sentinel.
+func oneStatement(db *Database, ran *int) func(tx *sql.Tx) error {
 	return oneStatementOn(context.Background(), db, ran)
 }
 
@@ -102,7 +90,7 @@ func oneStatement(db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
 // which is what the cancelled-inside-the-body case needs: the migration's end state is a body
 // whose statements run on the same context RunInTransaction was given, and the exit being pinned
 // is the one where the cancellation lands between the BEGIN and the statement.
-func oneStatementOn(ctx context.Context, db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
+func oneStatementOn(ctx context.Context, db *Database, ran *int) func(tx *sql.Tx) error {
 	return oneStatementCapturing(ctx, db, ran, new(error))
 }
 
@@ -112,10 +100,10 @@ func oneStatementOn(ctx context.Context, db *CommonDatabase, ran *int) func(tx *
 // a deadlock did -- are distinguishable from a lookalike only by comparing against the value
 // RunInTransaction was actually handed. On a rerun it holds the last attempt's, which is the one
 // the helper classified (#386 decision 13, final review round 3 findings 1 and 2).
-func oneStatementCapturing(ctx context.Context, db *CommonDatabase, ran *int, captured *error) func(tx *sql.Tx) error {
+func oneStatementCapturing(ctx context.Context, db *Database, ran *int, captured *error) func(tx *sql.Tx) error {
 	return func(tx *sql.Tx) error {
 		*ran++
-		_, err := db.ExecSql(ctx, tx, "UPDATE settings SET updated_at = updated_at")
+		_, err := db.ExecSQL(ctx, tx, "UPDATE settings SET updated_at = updated_at")
 		*captured = err
 		return err
 	}
@@ -123,9 +111,9 @@ func oneStatementCapturing(ctx context.Context, db *CommonDatabase, ran *int, ca
 
 func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	requested := recordBackoff(t)
 	d := &scriptedDriver{}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -142,10 +130,10 @@ func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
 
 func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	requested := recordBackoff(t)
 	boom := errors.New("connection reset by peer")
 	d := &scriptedDriver{}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
@@ -166,11 +154,11 @@ func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T)
 
 func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	requested := recordBackoff(t)
 	// The first attempt's statement is the engine's deadlock abort; the second is answered
 	// cleanly by running past the end of the script.
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -187,9 +175,9 @@ func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing
 
 func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	requested := recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}, {err: errDeadlock}}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -220,7 +208,7 @@ func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testi
 		rollbackErrs: []error{rolledBackAlready, rolledBackAlready, rolledBackAlready},
 	}
 	db := retryingDB(t, d)
-	recordBackoff(t)
+	recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -235,10 +223,10 @@ func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testi
 
 func TestRunInTransaction_ADeadlockAtCommitIsRerunAndTheRerunCommits(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	requested := recordBackoff(t)
 	// The body succeeds both times; it is the COMMIT that the engine aborts on the first.
 	d := &scriptedDriver{commitErrs: []error{errDeadlock}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -254,9 +242,9 @@ func TestRunInTransaction_ADeadlockAtCommitIsRerunAndTheRerunCommits(t *testing.
 }
 
 func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T) {
-	recordBackoff(t)
 	d := &scriptedDriver{commitErrs: []error{errDeadlock, errDeadlock, errDeadlock}}
 	db := retryingDB(t, d)
+	recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -273,10 +261,10 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 // client, and replaying the body would apply it twice.
 func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	requested := recordBackoff(t)
 	boom := errors.New("write: broken pipe")
 	d := &scriptedDriver{commitErrs: []error{boom}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -307,12 +295,12 @@ func TestRunInTransaction_APanicInTheBodyPropagatesAndLeavesNoOpenTransaction(t 
 }
 
 // TestRunInTransaction_WithNoClassifierNothingIsADeadlock is the default a handle gets when no
-// dialect installed a classifier, which is every CommonDatabase built directly in a test and
+// dialect installed a classifier, which is every Database built directly in a test and
 // any future embedder that forgets: today's behaviour, one attempt, the error as it was.
 func TestRunInTransaction_WithNoClassifierNothingIsADeadlock(t *testing.T) {
-	requested := recordBackoff(t)
 	d := &scriptedDriver{}
 	db := scriptedDB(t, d)
+	requested := recordBackoff(db)
 	require.Nil(t, db.IsDeadlock, "the fixture only says anything if no classifier is installed")
 	ran := 0
 
@@ -334,11 +322,10 @@ func TestRunInTransaction_WithNoClassifierNothingIsADeadlock(t *testing.T) {
 // covers the whole body and a callee that retried on its own would rerun a fragment of it
 // inside a transaction the engine has already rolled back.
 func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
-	recordBackoff(t)
-
 	t.Run("handed nil, it owns the transaction and retries", func(t *testing.T) {
 		d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}}}
 		db := retryingDB(t, d)
+		recordBackoff(db)
 		ran := 0
 
 		err := db.inTransaction(context.Background(), nil, oneStatement(db, &ran))
@@ -383,9 +370,9 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 // the context on the floor.
 
 func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *testing.T) {
-	requested := recordBackoff(t)
 	d := &scriptedDriver{}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	ran := 0
@@ -410,10 +397,10 @@ func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *tes
 // that classified a context error as retryable -- would spend three attempts and two backoffs on
 // a caller that has already gone.
 func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T) {
-	requested := recordBackoff(t)
 	// The statement takes longer than the deadline allows, interruptibly.
 	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	ran := 0
@@ -443,11 +430,11 @@ func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T)
 // error the body was handed is the error the caller gets (#386 decision 13, final review round 3
 // finding 1).
 func TestRunInTransaction_ACancellationWithNothingToJoinComesBackUntouched(t *testing.T) {
-	requested := recordBackoff(t)
 	// The same shape as the case above: one attempt, blocked inside its statement for longer
 	// than the deadline allows, so no deadlock ever reaches lastDeadlock.
 	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	ran := 0
@@ -473,9 +460,9 @@ func TestRunInTransaction_ACancellationWithNothingToJoinComesBackUntouched(t *te
 // transaction, which is an operator sent after a non-event (#386).
 func TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
 	db := retryingDB(t, d)
+	recordBackoff(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	ran := 0
@@ -496,13 +483,13 @@ func TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure(
 // error alone would have swallowed it (#386).
 func TestRunInTransaction_AnAlreadyDoneRollbackOnALiveContextIsStillRecorded(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	recordBackoff(t)
 	boom := errors.New("connection reset by peer")
 	d := &scriptedDriver{
 		execs:        []*scriptedExec{{err: boom}},
 		rollbackErrs: []error{sql.ErrTxDone},
 	}
 	db := retryingDB(t, d)
+	recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
@@ -523,13 +510,13 @@ func TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun(t *testing.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	realSleep := sleep
+	realSleep := db.sleep
 	requested := []time.Duration{}
-	swapSleep(t, func(ctx context.Context, delay time.Duration) error {
+	db.sleep = func(ctx context.Context, delay time.Duration) error {
 		requested = append(requested, delay)
 		cancel()
 		return realSleep(ctx, delay)
-	})
+	}
 	ran := 0
 
 	err := db.RunInTransaction(ctx, oneStatement(db, &ran))
@@ -551,16 +538,16 @@ func TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun(t *testing.
 // when the next iteration begins, so the helper stops before it even reaches the pause.
 func TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	requested := recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ran := 0
 
 	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		ran++
-		_, execErr := db.ExecSql(context.Background(), tx, "UPDATE settings SET updated_at = updated_at")
+		_, execErr := db.ExecSQL(context.Background(), tx, "UPDATE settings SET updated_at = updated_at")
 		// The caller goes away while the first attempt is being rolled back.
 		cancel()
 		return execErr
@@ -585,13 +572,13 @@ func TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop(t
 // joined abort, and the attempt error the join is built from (#386 decision 13, final review
 // round 2 finding 1 and round 3 finding 2).
 func TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor(t *testing.T) {
-	requested := recordBackoff(t)
 	// The first attempt is aborted as a victim; the second blocks inside its statement for far
 	// longer than the deadline allows, which is what puts the cancellation INSIDE the rerun
 	// rather than between the two attempts. The recorded backoff is instant, so the whole
 	// deadline is still unspent when the second attempt begins.
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {delay: 10 * time.Second}}}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
 	ran := 0
@@ -621,9 +608,9 @@ func TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor
 // nothing else: three real deadlocks on a live context still answer exactly as they did, with
 // the deadlock and the attempts-spent text and no context error anywhere in the tree.
 func TestRunInTransaction_AnExhaustedRunIsStillTheDeadlockAndNotAContextError(t *testing.T) {
-	recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}, {err: errDeadlock}}}
 	db := retryingDB(t, d)
+	recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))

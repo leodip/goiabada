@@ -19,7 +19,7 @@ import (
 // empty value can only be a caller bug, and matching on one would either return
 // somebody else's row or sweep rows the caller never named.
 
-func (d *CommonDatabase) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error {
+func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error {
 
 	if browserSession.Owner == "" {
 		return errs.New("can't create a browser session with an empty owner")
@@ -65,7 +65,7 @@ func (d *CommonDatabase) CreateBrowserSession(ctx context.Context, tx *sql.Tx, b
 // request. Every failure below therefore propagates instead of collapsing into a nil
 // session, including rows.Err(), which is where a driver reports a fault it deferred to
 // the result set rather than returning from the query.
-func (d *CommonDatabase) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string,
+func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string,
 	now time.Time) (*models.BrowserSession, error) {
 
 	if owner == "" {
@@ -87,7 +87,7 @@ func (d *CommonDatabase) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Co
 	)
 
 	query, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -130,7 +130,7 @@ func (d *CommonDatabase) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Co
 // resolution on every engine, and each save takes its own reading of the clock. Two
 // saves of one session inside the same microsecond would have to carry identical
 // contents as well, and would then report false and cost that browser a fresh session.
-func (d *CommonDatabase) UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string,
+func (d *Database) UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string,
 	now, expiresAt time.Time) (bool, error) {
 
 	if owner == "" {
@@ -156,7 +156,7 @@ func (d *CommonDatabase) UpdateBrowserSessionData(ctx context.Context, tx *sql.T
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update browser session data")
 	}
@@ -180,7 +180,7 @@ func (d *CommonDatabase) UpdateBrowserSessionData(ctx context.Context, tx *sql.T
 // UpdateBrowserSessionData above describes them. What RowsAffected counts is not: see
 // below, because the argument that discharges it for that statement is absent for this
 // one.
-func (d *CommonDatabase) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string,
+func (d *Database) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string,
 	now, expiresAt time.Time) (bool, error) {
 
 	if owner == "" {
@@ -205,7 +205,7 @@ func (d *CommonDatabase) TouchBrowserSession(ctx context.Context, tx *sql.Tx, ow
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to touch browser session")
 	}
@@ -245,7 +245,7 @@ func (d *CommonDatabase) TouchBrowserSession(ctx context.Context, tx *sql.Tx, ow
 // DeleteBrowserSession removes one session, which is what logging out and rotating an
 // identifier both do. It carries no expiry term: an expired row is already unusable, and
 // deleting it is the intended outcome either way.
-func (d *CommonDatabase) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error {
+func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error {
 
 	if owner == "" {
 		return errs.New("can't delete a browser session with an empty owner")
@@ -265,7 +265,7 @@ func (d *CommonDatabase) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, o
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete browser session")
 	}
@@ -277,7 +277,7 @@ func (d *CommonDatabase) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, o
 // it removes was already unusable, by the expires_at > now term the read and both
 // conditional updates carry; this is what stops the table growing rather than what makes
 // a session end.
-func (d *CommonDatabase) DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error {
+func (d *Database) DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error {
 
 	browserSessionStruct := sqlbuilder.NewStruct(new(models.BrowserSession)).
 		For(d.Flavor)
@@ -286,7 +286,7 @@ func (d *CommonDatabase) DeleteExpiredBrowserSessions(ctx context.Context, tx *s
 	deleteBuilder.Where(deleteBuilder.LessThan("expires_at", now))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired browser sessions")
 	}

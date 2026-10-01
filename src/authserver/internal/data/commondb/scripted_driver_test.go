@@ -400,12 +400,12 @@ func (r *scriptedRows) Next(dest []driver.Value) error {
 // scriptedDB wraps a script in the type BackfillLowercaseEmails is a method on. The flavor is
 // SQLite because the pass builds one statement for every engine and the flavor only decides the
 // placeholder, which this driver ignores.
-func scriptedDB(t *testing.T, d *scriptedDriver) *CommonDatabase {
+func scriptedDB(t *testing.T, d *scriptedDriver) *Database {
 	t.Helper()
 	db := sql.OpenDB(d)
 	t.Cleanup(func() { _ = db.Close() })
 	t.Cleanup(func() { assertNothingEscapedItsTransaction(t, d) })
-	return NewCommonDatabase(db, sqlbuilder.SQLite, false)
+	return New(db, sqlbuilder.SQLite, false)
 }
 
 // assertNothingEscapedItsTransaction holds every test in this file to the enlistment property,

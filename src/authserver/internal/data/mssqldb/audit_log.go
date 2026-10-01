@@ -16,7 +16,7 @@ func (d *MsSQLDatabase) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cuto
 	// MSSQL uses DELETE TOP(n) syntax
 	sqlStr := fmt.Sprintf("DELETE TOP (%d) FROM audit_logs WHERE created_at < @p1", maxDeletions)
 
-	result, err := d.ExecSql(ctx, tx, sqlStr, cutoff)
+	result, err := d.ExecSQL(ctx, tx, sqlStr, cutoff)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
@@ -81,7 +81,7 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, p
 	// MSSQL requires OFFSET...FETCH syntax for pagination
 	sqlStr = fmt.Sprintf("%s OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", sqlStr, offset, pageSize)
 
-	rows, err := d.QuerySql(ctx, tx, sqlStr, args...)
+	rows, err := d.QuerySQL(ctx, tx, sqlStr, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -110,7 +110,7 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, p
 	}
 
 	countSql, countArgs := countBuilder.Build()
-	countRows, err := d.QuerySql(ctx, tx, countSql, countArgs...)
+	countRows, err := d.QuerySQL(ctx, tx, countSql, countArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query count")
 	}

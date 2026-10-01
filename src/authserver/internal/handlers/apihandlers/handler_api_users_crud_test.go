@@ -396,7 +396,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 // matched none of the four engines' duplicate-key messages, so every lost race answered 500 and the
 // caller was told to report a bug rather than to pick another address.
 //
-// The error is wrapped twice on the way here, as it is in production -- ExecSql tags, CreateUser
+// The error is wrapped twice on the way here, as it is in production -- ExecSQL tags, CreateUser
 // wraps, the user creator wraps -- because a bare type assertion or a comparison against the
 // outermost error would pass on an untouched sentinel and fail on the real one.
 func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {

@@ -20,10 +20,10 @@ import (
 var sqliteMigrationsFs embed.FS
 
 // SQLiteDatabase declares only the methods SQLite needs its own SQL for; the rest are promoted
-// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
 type SQLiteDatabase struct {
-	*commondb.CommonDatabase
+	*commondb.Database
 }
 
 type DatabaseConfig struct {
@@ -125,11 +125,11 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	}
 
 	slog.Info("connected to sqlite database with required PRAGMA settings")
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLite, logSQL)
+	commonDb := commondb.New(db, sqlbuilder.SQLite, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 	sqliteDb := SQLiteDatabase{
-		CommonDatabase: commonDb,
+		Database: commonDb,
 	}
 
 	return &sqliteDb, nil
@@ -166,7 +166,7 @@ const (
 	sqliteConstraintRowid      = 2579
 )
 
-// isUniqueViolation is SQLite's row of the unique-key classifier table WrapSQLError consults.
+// isUniqueViolation is SQLite's row of the unique-key classifier table commondb's wrapSQLError consults.
 //
 // modernc.org/sqlite returns *sqlite.Error, with pointer receivers, so the pointer is the only form
 // that is an error. errors.As rather than a type assertion, because by the time a caller asks, the

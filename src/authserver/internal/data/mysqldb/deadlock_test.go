@@ -26,7 +26,7 @@ func TestIsDeadlock(t *testing.T) {
 		want bool
 	}{
 		{"the driver's deadlock, as go-sql-driver returns it", deadlock, true},
-		{"the same error wrapped once, as ExecSql returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
+		{"the same error wrapped once, as ExecSQL returns it", errs.Wrap(deadlock, "unable to execute SQL"), true},
 		{"the same error wrapped by the standard library", errors.Join(deadlock), true},
 		{"1205 ER_LOCK_WAIT_TIMEOUT: a lock wait that ran out, not a broken cycle", &mysqldriver.MySQLError{Number: 1205}, false},
 		{"a syntax error from the same driver", &mysqldriver.MySQLError{Number: 1064, Message: "You have an error in your SQL syntax"}, false},
@@ -43,7 +43,7 @@ func TestIsDeadlock(t *testing.T) {
 	}
 }
 
-// TestIsUniqueViolation is MySQL's row of the unique-key classifier table WrapSQLError consults.
+// TestIsUniqueViolation is MySQL's row of the unique-key classifier table commondb's wrapSQLError consults.
 //
 // One number covers every kind of key here: #279 recorded ER_DUP_ENTRY 1062
 // for a CREATE UNIQUE INDEX, for a UNIQUE column constraint and for a PRIMARY KEY alike, which is
@@ -62,7 +62,7 @@ func TestIsUniqueViolation(t *testing.T) {
 		want bool
 	}{
 		{"the driver's duplicate entry, as go-sql-driver returns it", duplicate, true},
-		{"the same error wrapped once, as WrapSQLError returns it", errs.Wrap(duplicate, "unable to execute SQL"), true},
+		{"the same error wrapped once, as commondb's wrapSQLError returns it", errs.Wrap(duplicate, "unable to execute SQL"), true},
 		{"the same error wrapped by the standard library", errors.Join(duplicate), true},
 		{"the same error at the depth a handler sees it", errs.Wrap(errs.Wrap(duplicate, "unable to execute SQL"), "unable to insert user"), true},
 		{"a primary-key collision, which this engine also numbers 1062", &mysqldriver.MySQLError{Number: 1062, Message: "Duplicate entry '1' for key 'zzc.PRIMARY'"}, true},

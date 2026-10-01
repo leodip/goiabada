@@ -3,8 +3,8 @@ package data
 // The one place the repository is held to "every database operation reachable from production
 // code takes a context and uses it".
 //
-// #386 gave all 215 Database methods a leading ctx and turned the two SQL chokepoints, ExecSql
-// and QuerySql, plus BeginTransaction, into their *Context forms. That is a state the tree was
+// #386 gave all 215 Database methods a leading ctx and turned the two SQL chokepoints, ExecSQL
+// and QuerySQL, plus BeginTransaction, into their *Context forms. That is a state the tree was
 // put into once; this guard is what stops it coming back. Two rules, both narrow:
 //
 //  1. No bare Query, QueryRow, Exec or Begin anywhere under authserver/internal/data in
@@ -53,7 +53,7 @@ const commondbRoot = "authserver/internal/data/commondb"
 
 // bareSQLSelectors are the four database/sql calls that cannot be cancelled. Their *Context
 // counterparts -- QueryContext, QueryRowContext, ExecContext, BeginTx -- are what the tree uses.
-// Matched as a selector name through the parser rather than as text, so QuerySql, ExecSql and
+// Matched as a selector name through the parser rather than as text, so QuerySQL, ExecSQL and
 // BeginTransaction, which are this package's own context-taking wrappers, are not caught by a
 // prefix.
 var bareSQLSelectors = map[string]string{
@@ -200,27 +200,27 @@ import (
 	"database/sql"
 )
 
-type CommonDatabase struct{ DB *sql.DB }
+type Database struct{ DB *sql.DB }
 
-func (d *CommonDatabase) ExecSql(ctx context.Context, tx *sql.Tx, s string) error {
+func (d *Database) ExecSQL(ctx context.Context, tx *sql.Tx, s string) error {
 	_, err := d.DB.ExecContext(ctx, s)
 	return err
 }
 
-func (d *CommonDatabase) QuerySql(ctx context.Context, tx *sql.Tx, s string) error {
+func (d *Database) QuerySQL(ctx context.Context, tx *sql.Tx, s string) error {
 	_, err := d.DB.QueryContext(ctx, s)
 	return err
 }
 
-func (d *CommonDatabase) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
+func (d *Database) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
 	return d.DB.BeginTx(ctx, nil)
 }
 
-func (d *CommonDatabase) both(ctx context.Context) error {
-	if err := d.ExecSql(ctx, nil, "x"); err != nil {
+func (d *Database) both(ctx context.Context) error {
+	if err := d.ExecSQL(ctx, nil, "x"); err != nil {
 		return err
 	}
-	return d.QuerySql(ctx, nil, "y")
+	return d.QuerySQL(ctx, nil, "y")
 }
 `)
 	writeLintFixture(t, root, "authserver/internal/data/sqlitedb/db.go", `package sqlitedb

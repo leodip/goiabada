@@ -19,10 +19,10 @@ type driverUniqueError struct{ msg string }
 
 func (e *driverUniqueError) Error() string { return e.msg }
 
-// classifyingDB is a CommonDatabase whose classifier answers for driverUniqueError and nothing
+// classifyingDB is a Database whose classifier answers for driverUniqueError and nothing
 // else, which is the shape every dialect wires in its constructor.
-func classifyingDB() *CommonDatabase {
-	d := NewCommonDatabase(nil, sqlbuilder.SQLite, false)
+func classifyingDB() *Database {
+	d := New(nil, sqlbuilder.SQLite, false)
 	d.IsUniqueViolation = func(err error) bool {
 		var target *driverUniqueError
 		return errors.As(err, &target)
@@ -30,13 +30,13 @@ func classifyingDB() *CommonDatabase {
 	return d
 }
 
-// TestWrapSQLError_TagsAClassifiedViolation is the translation WrapSQLError exists for: a driver
+// TestWrapSQLError_TagsAClassifiedViolation is the translation wrapSQLError exists for: a driver
 // failure the dialect recognised leaves the data layer carrying data.ErrUniqueViolation, so every
 // caller above it asks errors.Is and never a driver number or a driver sentence (#279).
 func TestWrapSQLError_TagsAClassifiedViolation(t *testing.T) {
 	driverErr := &driverUniqueError{msg: "UNIQUE constraint failed: users.email"}
 
-	err := classifyingDB().WrapSQLError(driverErr, "unable to execute SQL")
+	err := classifyingDB().wrapSQLError(driverErr, "unable to execute SQL")
 
 	if !errors.Is(err, data.ErrUniqueViolation) {
 		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false, want true; err = %v", err)
@@ -62,7 +62,7 @@ func TestWrapSQLError_TagsAClassifiedViolation(t *testing.T) {
 func TestWrapSQLError_LeavesAnUnclassifiedErrorExactlyAsItWas(t *testing.T) {
 	driverErr := errors.New("syntax error at or near \"slect\"")
 
-	err := classifyingDB().WrapSQLError(driverErr, "unable to execute SQL")
+	err := classifyingDB().wrapSQLError(driverErr, "unable to execute SQL")
 
 	if errors.Is(err, data.ErrUniqueViolation) {
 		t.Errorf("an unclassified failure must not carry the sentinel; err = %v", err)
@@ -73,13 +73,13 @@ func TestWrapSQLError_LeavesAnUnclassifiedErrorExactlyAsItWas(t *testing.T) {
 }
 
 // TestWrapSQLError_WithNoClassifierTagsNothing pins the default a handle built directly on
-// CommonDatabase gets. Nothing is a unique violation until a dialect says what one looks like, so
+// Database gets. Nothing is a unique violation until a dialect says what one looks like, so
 // a fifth engine added later without wiring IsUniqueViolation degrades to today's behaviour rather
 // than tagging by accident.
 func TestWrapSQLError_WithNoClassifierTagsNothing(t *testing.T) {
-	d := NewCommonDatabase(nil, sqlbuilder.SQLite, false)
+	d := New(nil, sqlbuilder.SQLite, false)
 
-	err := d.WrapSQLError(&driverUniqueError{msg: "UNIQUE constraint failed: users.email"},
+	err := d.wrapSQLError(&driverUniqueError{msg: "UNIQUE constraint failed: users.email"},
 		"unable to execute SQL")
 
 	if errors.Is(err, data.ErrUniqueViolation) {
@@ -88,11 +88,11 @@ func TestWrapSQLError_WithNoClassifierTagsNothing(t *testing.T) {
 }
 
 // TestWrapSQLError_NilInNilOut matches errs.Wrap, which every call site here relies on: the two
-// arms of ExecSql and QuerySql call this only inside `if err != nil`, but a caller that does not
+// arms of ExecSQL and QuerySQL call this only inside `if err != nil`, but a caller that does not
 // must not receive a non-nil error describing a success.
 func TestWrapSQLError_NilInNilOut(t *testing.T) {
-	if err := classifyingDB().WrapSQLError(nil, "unable to execute SQL"); err != nil {
-		t.Errorf("WrapSQLError(nil, ...) = %v, want nil", err)
+	if err := classifyingDB().wrapSQLError(nil, "unable to execute SQL"); err != nil {
+		t.Errorf("wrapSQLError(nil, ...) = %v, want nil", err)
 	}
 }
 
@@ -101,8 +101,8 @@ func TestWrapSQLError_NilInNilOut(t *testing.T) {
 // frames a duplicate-key failure would print two stacks in the log where every other failure prints
 // one -- which is the whole defect #279 exists to remove.
 func TestWrapSQLError_TaggingCostsNoSecondStack(t *testing.T) {
-	tagged := classifyingDB().WrapSQLError(&driverUniqueError{msg: "dup"}, "unable to execute SQL")
-	untagged := classifyingDB().WrapSQLError(errors.New("dup"), "unable to execute SQL")
+	tagged := classifyingDB().wrapSQLError(&driverUniqueError{msg: "dup"}, "unable to execute SQL")
+	untagged := classifyingDB().wrapSQLError(errors.New("dup"), "unable to execute SQL")
 
 	if got, want := countFrames(t, tagged), countFrames(t, untagged); got != want {
 		t.Errorf("the tagged branch printed %d frames under %%+v, the untagged one %d; "+
@@ -111,11 +111,11 @@ func TestWrapSQLError_TaggingCostsNoSecondStack(t *testing.T) {
 }
 
 // TestWrapSQLError_SurvivesTheDataLayersOwnWrapping is what makes the handler's errors.Is safe.
-// Nothing calls ExecSql directly: CreateUser wraps its result, the user creator wraps that, and the
+// Nothing calls ExecSQL directly: CreateUser wraps its result, the user creator wraps that, and the
 // handler sees the outermost. A sentinel that stopped being reachable one layer up would leave the
 // 409 unreachable while every test at this seam still passed.
 func TestWrapSQLError_SurvivesTheDataLayersOwnWrapping(t *testing.T) {
-	err := classifyingDB().WrapSQLError(&driverUniqueError{msg: "dup"}, "unable to execute SQL")
+	err := classifyingDB().wrapSQLError(&driverUniqueError{msg: "dup"}, "unable to execute SQL")
 	err = errs.Wrap(err, "unable to insert user")
 	err = errs.Wrap(err, "unable to create user")
 
@@ -136,9 +136,9 @@ func TestWrapSQLError_DoesNotTagUnrelatedFailures(t *testing.T) {
 		{"a connection failure", errors.New("driver: bad connection")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := classifyingDB().WrapSQLError(tc.err, "unable to execute SQL")
+			err := classifyingDB().wrapSQLError(tc.err, "unable to execute SQL")
 			if errors.Is(err, data.ErrUniqueViolation) {
-				t.Errorf("WrapSQLError tagged %v, which the classifier did not recognise", tc.err)
+				t.Errorf("wrapSQLError tagged %v, which the classifier did not recognise", tc.err)
 			}
 		})
 	}

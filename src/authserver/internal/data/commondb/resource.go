@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error {
+func (d *Database) CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error {
 
 	now := time.Now().UTC()
 
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreateResource(ctx context.Context, tx *sql.Tx, resourc
 	return nil
 }
 
-func (d *CommonDatabase) UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error {
+func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error {
 
 	if resource.Id == 0 {
 		return errs.New("can't update resource with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateResource(ctx context.Context, tx *sql.Tx, resourc
 	updateBuilder.Where(updateBuilder.Equal("id", resource.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		resource.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update resource")
@@ -60,11 +60,11 @@ func (d *CommonDatabase) UpdateResource(ctx context.Context, tx *sql.Tx, resourc
 	return nil
 }
 
-func (d *CommonDatabase) getResourceCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getResourceCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	resourceStruct *sqlbuilder.Struct) (*models.Resource, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -86,7 +86,7 @@ func (d *CommonDatabase) getResourceCommon(ctx context.Context, tx *sql.Tx, sele
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error) {
+func (d *Database) GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error) {
 
 	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
 		For(d.Flavor)
@@ -102,7 +102,7 @@ func (d *CommonDatabase) GetResourceById(ctx context.Context, tx *sql.Tx, resour
 	return resource, nil
 }
 
-func (d *CommonDatabase) GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error) {
+func (d *Database) GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error) {
 
 	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
 		For(d.Flavor)
@@ -124,7 +124,7 @@ func (d *CommonDatabase) GetResourceByResourceIdentifier(ctx context.Context, tx
 	return resource, nil
 }
 
-func (d *CommonDatabase) GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]models.Resource, error) {
+func (d *Database) GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]models.Resource, error) {
 
 	if len(resourceIds) == 0 {
 		return nil, nil
@@ -140,7 +140,7 @@ func (d *CommonDatabase) GetResourcesByIds(ctx context.Context, tx *sql.Tx, reso
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(ctx, tx, sql, args...)
+		rows, err := d.QuerySQL(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -169,14 +169,14 @@ func (d *CommonDatabase) GetResourcesByIds(ctx context.Context, tx *sql.Tx, reso
 	return resources, nil
 }
 
-func (d *CommonDatabase) GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Resource, error) {
+func (d *Database) GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Resource, error) {
 	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
 		For(d.Flavor)
 
 	selectBuilder := resourceStruct.SelectFrom("resources")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -200,7 +200,7 @@ func (d *CommonDatabase) GetAllResources(ctx context.Context, tx *sql.Tx) ([]mod
 	return resources, nil
 }
 
-func (d *CommonDatabase) DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error {
+func (d *Database) DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Resource)).
 		For(d.Flavor)
@@ -209,7 +209,7 @@ func (d *CommonDatabase) DeleteResource(ctx context.Context, tx *sql.Tx, resourc
 	deleteBuilder.Where(deleteBuilder.Equal("id", resourceId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete resource")
 	}

@@ -13,15 +13,15 @@ import (
 	"github.com/leodip/goiabada/core/testutil"
 )
 
-// TestCommonDatabase_NoSelfCallToAnOverriddenMethod is the structural half of the defect the
+// TestDatabase_NoSelfCallToAnOverriddenMethod is the structural half of the defect the
 // final review of #283 found: a method call this package makes on its own receiver can never
 // reach a dialect's override of that method, and on two of the four engines the override is the
 // only implementation that works.
 //
-// WHY THE CALL CANNOT REACH THE OVERRIDE. The four engine adapters embed *CommonDatabase and
+// WHY THE CALL CANNOT REACH THE OVERRIDE. The four engine adapters embed *Database and
 // declare only the methods their engine needs different SQL for; everything else is promoted
 // from this package (#416). Promotion is resolved at compile time and is not dispatch: Go
-// resolves d.X(...) inside this package against *CommonDatabase, so a self-call takes the
+// resolves d.X(...) inside this package against *Database, so a self-call takes the
 // common implementation whatever the caller's real dialect is. Embedding reads as though it
 // were inheritance and is not, which is why the trap survived the shape change that removed
 // the 801 hand-written delegations.
@@ -45,14 +45,14 @@ import (
 // assert on log output. A caller that actually used the returned id would get a hard error
 // rather than a false alarm.
 //
-// THAT PARTICULAR DIVERGENCE IS GONE, and the guard is not. #416 gave CommonDatabase an
+// THAT PARTICULAR DIVERGENCE IS GONE, and the guard is not. #416 gave Database an
 // InsertReturningIdSQL hook, so the id an INSERT reports comes back through one shared helper and
 // the fifty Create* overrides that carried the difference were deleted. A self-call to
 // CreateAuditLog is safe today. The next divergent method is what this reads for.
 //
 // THE BOUNDARY, stated because it decides what this file is worth. It compares method NAMES: a
 // name any dialect declares at all is treated as divergent, and this package may not take it on
-// a *CommonDatabase anywhere. Declaring one is the whole signal since #416, because embedding
+// a *Database anywhere. Declaring one is the whole signal since #416, because embedding
 // left a dialect no reason to write a method out except that the engine needs a different one.
 // That over-approximates, deliberately. A dialect method that diverges for a reason unrelated
 // to the caller is still a method whose behaviour depends on which engine is running, and a
@@ -61,12 +61,12 @@ import (
 //
 // WHAT COUNTS AS THE CALL is wider than d.M(...) on the receiver, and deliberately so. A guard
 // keyed to one spelling guards the spelling rather than the defect: x := d; x.M(...), a
-// package-level helper taking *CommonDatabase, a closure capturing either, and the method value
+// package-level helper taking *Database, a closure capturing either, and the method value
 // f := d.M all resolve statically to the same common implementation and cost the overriding
 // engines the same wrong SQL, while reading no more suspiciously than the shape that actually
-// shipped. So selfCalls tracks the names known to hold a *CommonDatabase rather than the
+// shipped. So selfCalls tracks the names known to hold a *Database rather than the
 // receiver's name, and states there what remains outside it.
-func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
+func TestDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	// The dialects are located from the source root rather than by counting "../" from
 	// here. #354 moved the four engine adapters to authserver/internal/data while commondb
 	// stayed in core, so they stopped being siblings, and they are siblings again once #359
@@ -88,19 +88,31 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 		{filepath.Join(root, "authserver", "internal", "data", "postgresdb"), "PostgresDatabase"},
 		{filepath.Join(root, "authserver", "internal", "data", "mssqldb"), "MsSQLDatabase"},
 	} {
-		for name := range divergentMethods(t, dialect.dir, dialect.recvType) {
+		methods := divergentMethods(t, dialect.dir, dialect.recvType)
+		// Per dialect and not only in total: every engine declares at least DeleteOldAuditLogs,
+		// so an empty answer means recvType no longer names the adapter, and that engine's
+		// overrides would drop out of the guard while the other three kept it passing (#438).
+		if len(methods) == 0 {
+			t.Fatalf("no method declared on *%s in %s; the adapter type was renamed and this table was not", dialect.recvType, dialect.dir)
+		}
+		for name := range methods {
 			divergent[name] = append(divergent[name], dialect.recvType)
 		}
 	}
-	if len(divergent) == 0 {
-		t.Fatal("no divergent dialect method was found at all, so this test could not fail and is not measuring anything; the parse or the adapters' shape has changed")
+
+	// Every method here reaches the database through d.ExecSQL or d.QuerySQL, so a walk that finds
+	// no selector on a *Database at all has stopped recognising the type, which is what renaming it
+	// without isDatabasePointer would do, and it would then pass on any tree (#438).
+	calls := selfCalls(t, ".")
+	if len(calls) == 0 {
+		t.Fatal("no selector taken on a *Database in commondb, so this test could not fail; isDatabasePointer no longer names the type")
 	}
 
 	offenders := []string{}
-	for _, call := range selfCalls(t, ".") {
+	for _, call := range calls {
 		if owners, ok := divergent[call.method]; ok {
 			sort.Strings(owners)
-			offenders = append(offenders, call.pos+": ."+call.method+" on a *CommonDatabase takes "+
+			offenders = append(offenders, call.pos+": ."+call.method+" on a *Database takes "+
 				"the common implementation always, but "+strings.Join(owners, " and ")+
 				" override it")
 		}
@@ -118,7 +130,7 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 }
 
 // divergentMethods returns every method one dialect declares on recvType. Since #416 the
-// adapters embed *CommonDatabase, so a method written out by hand is an override by
+// adapters embed *Database, so a method written out by hand is an override by
 // construction: there is nothing else it could be.
 func divergentMethods(t *testing.T, dir string, recvType string) map[string]bool {
 	t.Helper()
@@ -149,18 +161,18 @@ type selfCall struct {
 	pos    string
 }
 
-// selfCalls returns every method this package takes on a *CommonDatabase value, wherever the value
+// selfCalls returns every method this package takes on a *Database value, wherever the value
 // came from and whether or not the result is called on the spot.
 //
 // It tracks NAMES KNOWN TO HOLD ONE rather than the enclosing method's receiver: a receiver
-// declared *CommonDatabase, a parameter declared *CommonDatabase on a method, a plain function or
+// declared *Database, a parameter declared *Database on a method, a plain function or
 // a function literal, and any local aliased from one of those (x := d, var x = d, and a var
-// declared *CommonDatabase outright). A function literal inherits the names its enclosing function
+// declared *Database outright). A function literal inherits the names its enclosing function
 // had, because a closure over d is d. Every selector taken on such a name is reported, so the
 // method value f := d.M counts as much as the call d.M(...) does; the value is the dangerous part
 // and calling it later is a formality.
 //
-// WHAT IS STILL OUTSIDE IT, by construction rather than by oversight: a *CommonDatabase reached
+// WHAT IS STILL OUTSIDE IT, by construction rather than by oversight: a *Database reached
 // through a struct field, a map, a slice, or the return of a call, where no name in the function
 // says what the value is. Closing that class needs go/types over a loaded package instead of a
 // parse of one, which means golang.org/x/tools, a dependency this repository is deliberately
@@ -169,9 +181,9 @@ type selfCall struct {
 // not is the shapes where the value's type is already invisible to the reader too.
 //
 // The over-approximation also runs the other way, since a selector is matched by name alone: a
-// FIELD on CommonDatabase sharing a name with a divergent dialect method would be reported. There
-// are six fields (DB, Flavor, logSQL, IsDeadlock, IsUniqueViolation, InsertReturningIdSQL), none
-// of them a method name on any dialect, so the case
+// FIELD on Database sharing a name with a divergent dialect method would be reported. There
+// are eight fields (DB, Flavor, logSQL, IsDeadlock, IsUniqueViolation, InsertReturningIdSQL,
+// ExplicitIdInsertSQL, sleep), none of them a method name on any dialect, so the case
 // is theoretical today and a false report would name a line and be dismissed in a second.
 func selfCalls(t *testing.T, dir string) []selfCall {
 	t.Helper()
@@ -184,22 +196,22 @@ func selfCalls(t *testing.T, dir string) []selfCall {
 				continue
 			}
 			holders := map[string]bool{}
-			addCommonDatabaseNames(holders, fn.Recv)
-			addCommonDatabaseNames(holders, fn.Type.Params)
+			addDatabaseNames(holders, fn.Recv)
+			addDatabaseNames(holders, fn.Type.Params)
 			scanForSelfCalls(holders, fn.Body, &out)
 		}
 	}
 	return out
 }
 
-// addCommonDatabaseNames records every name in fields declared *CommonDatabase. An unnamed or
+// addDatabaseNames records every name in fields declared *Database. An unnamed or
 // blank one cannot be called through, so there is nothing to record.
-func addCommonDatabaseNames(holders map[string]bool, fields *ast.FieldList) {
+func addDatabaseNames(holders map[string]bool, fields *ast.FieldList) {
 	if fields == nil {
 		return
 	}
 	for _, field := range fields.List {
-		if !isCommonDatabasePointer(field.Type) {
+		if !isDatabasePointer(field.Type) {
 			continue
 		}
 		for _, name := range field.Names {
@@ -210,18 +222,18 @@ func addCommonDatabaseNames(holders map[string]bool, fields *ast.FieldList) {
 	}
 }
 
-// isCommonDatabasePointer reports whether expr is written *CommonDatabase. Inside this package the
+// isDatabasePointer reports whether expr is written *Database. Inside this package the
 // type is always spelled unqualified, so there is no selector form to accept.
-func isCommonDatabasePointer(expr ast.Expr) bool {
+func isDatabasePointer(expr ast.Expr) bool {
 	star, ok := expr.(*ast.StarExpr)
 	if !ok {
 		return false
 	}
 	ident, ok := star.X.(*ast.Ident)
-	return ok && ident.Name == "CommonDatabase"
+	return ok && ident.Name == "Database"
 }
 
-// scanForSelfCalls walks one function body carrying the names known to hold a *CommonDatabase,
+// scanForSelfCalls walks one function body carrying the names known to hold a *Database,
 // growing that set as aliases appear and reporting the selectors taken on any of them. The walk is
 // pre-order, which is the order Go requires anyway: an alias is declared before it can be used.
 //
@@ -236,7 +248,7 @@ func scanForSelfCalls(holders map[string]bool, body *ast.BlockStmt, out *[]selfC
 			for name := range holders {
 				inner[name] = true
 			}
-			addCommonDatabaseNames(inner, node.Type.Params)
+			addDatabaseNames(inner, node.Type.Params)
 			scanForSelfCalls(inner, node.Body, out)
 			return false
 
@@ -257,12 +269,12 @@ func scanForSelfCalls(holders map[string]bool, body *ast.BlockStmt, out *[]selfC
 			}
 
 		case *ast.ValueSpec:
-			// var x *CommonDatabase, whatever it is assigned, and var x = d.
+			// var x *Database, whatever it is assigned, and var x = d.
 			for i, name := range node.Names {
 				if name.Name == "_" {
 					continue
 				}
-				if isCommonDatabasePointer(node.Type) {
+				if isDatabasePointer(node.Type) {
 					holders[name.Name] = true
 					continue
 				}

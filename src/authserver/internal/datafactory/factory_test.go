@@ -365,7 +365,7 @@ func TestNewDatabase_WritesTheNoMigrationRecordOnlyWhenNothingRan(t *testing.T) 
 // TestOpenDatabase_PassesLogSQLToTheEngine covers the factory's other parameter, which every
 // caller in the tree passes false for and which nothing else observes.
 //
-// CommonDatabase gates every SQL record on the flag, so a transaction opened on the returned
+// commondb.Database gates every SQL record on the flag, so a transaction opened on the returned
 // handle writes "beginning transaction" when the flag arrived and nothing when it did not. The
 // capture is installed after the open, so what is read is the flag's effect rather than the
 // engine's own startup records.

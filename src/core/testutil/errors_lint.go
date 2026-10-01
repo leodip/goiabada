@@ -49,8 +49,8 @@ import (
 // a func assigned to a package variable is a function body that runs when it is called, not at
 // init, and its calls are reported like any other.
 //
-// Resolution is by import path, not by the name written at the call site:
-// authserver/internal/data/mssqldb/db.go imports stdlib errors as goerrors, and a check that
+// Resolution is by import path, not by the name written at the call site: a file may bind stdlib
+// errors to any name, goerrors say, and a check that
 // matched the literal text "errors." would walk straight past it while also catching every
 // unrelated package that happens to be called errors. Parentheses around a callee are stripped
 // for the same reason, since (errors.New)("x") constructs exactly what errors.New("x") constructs.
@@ -228,7 +228,7 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 	var uses []legacyErrorUse
 
 	// importPaths maps the name a file actually writes at a call site to the path it imports, so
-	// the goerrors alias in authserver/internal/data/mssqldb/db.go resolves like any other.
+	// an aliased import of a watched path resolves like any other.
 	importPaths := bindImports(file, errorsWatchedImports)
 
 	// The import declaration carries two findings of its own, neither of which depends on the name
