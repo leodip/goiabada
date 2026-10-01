@@ -68,7 +68,7 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	// branch was unreachable for that input. errors.As rather than a type assertion, and the
 	// driver's error kept in the chain with SQLite's own name for the code beside it, e.g.
 	// "Unable to open the database file (SQLITE_CANTOPEN)" (#438 decision 4).
-	if err := db.PingContext(ctx); err != nil {
+	if err = db.PingContext(ctx); err != nil {
 		_ = db.Close()
 		var sqliteErr *sqlitedriver.Error
 		if errors.As(err, &sqliteErr) {
