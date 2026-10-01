@@ -312,7 +312,7 @@ func dropPostgres(t *testing.T, cfg *config.DatabaseConfig, name string) {
 // database collation at all.
 func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 	t.Helper()
-	require.Equal(t, "mssql", dbType(), "newPreCreatedMsSQLDB is SQL Server only")
+	require.Equal(t, data.MSSQL, dbType(), "newPreCreatedMsSQLDB is SQL Server only")
 
 	cfg := &appConfig.Database
 	name := isolatedDBName()
@@ -579,7 +579,7 @@ func (r *restrictedLoginDB) constructRestricted(t *testing.T) (datafactory.Migra
 // still opened the maintenance DSN would make two.
 func (r *restrictedLoginDB) connectionCount(t *testing.T) int {
 	t.Helper()
-	require.Equal(t, "mysql", dbType(), "connectionCount reads MySQL's performance_schema")
+	require.Equal(t, data.MySQL, dbType(), "connectionCount reads MySQL's performance_schema")
 
 	var total sql.NullInt64
 	require.NoError(t, r.admin.QueryRow(
