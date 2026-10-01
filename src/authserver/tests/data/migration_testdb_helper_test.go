@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,11 +26,12 @@ import (
 // database (data_test.go) is always fully migrated, so it can't be used to
 // exercise a single migration against seeded pre-migration data.
 type isolatedDB struct {
-	// The whole interface, and one of the four places that still holds it: this tier exercises 215
-	// of the 216 methods on every engine, which is the broad capability #386 decision 8 names.
-	DB       data.Database      // concrete dialect DB (implements the interface)
-	SQL      *sql.DB            // raw handle for seeding / asserting
-	Migrator *migrator.Migrator // bound to DB, starts at version 0
+	// The whole interface, and one of the four places that still holds it: this tier exercises all
+	// 223 methods on every engine, which is the broad capability #386 decision 8 names. Migratable
+	// adds the engine's NewMigrator, which every migration case here steps through.
+	DB       datafactory.Migratable // concrete dialect DB (implements the interface)
+	SQL      *sql.DB                // raw handle for seeding / asserting
+	Migrator *migrator.Migrator     // bound to DB, starts at version 0
 	// Name is the database on the server, which is what the migration lock's resource name
 	// is computed over. SQLite has no server-side name and leaves it empty; nothing there
 	// contends, since that engine has no session-scoped lock statement (#268).
@@ -171,19 +173,12 @@ func readDatabaseDefaultCollation(t *testing.T, sqlDB *sql.DB) string {
 	return got
 }
 
-// migratable is satisfied by every concrete dialect DB (they all expose
-// NewMigrator via the seam added in chunk 3).
-type migratable interface {
-	data.Database
-	NewMigrator(ctx context.Context) (*migrator.Migrator, error)
-}
-
 // newIsolated binds a migrator to the database and registers no cleanup for it. There is
 // nothing to release: the runner takes a connection out of the pool for one operation and
 // gives it back before returning, where golang-migrate's drivers pinned one for the life of
 // the instance and had to be closed (#268 decision 8). The per-dialect close and drop are
 // still registered by the caller, and they are now the whole of it.
-func newIsolated(t *testing.T, db migratable, sqlDB *sql.DB, name string) *isolatedDB {
+func newIsolated(t *testing.T, db datafactory.Migratable, sqlDB *sql.DB, name string) *isolatedDB {
 	t.Helper()
 	m, err := db.NewMigrator(context.Background())
 	require.NoError(t, err, "NewMigrator")
@@ -537,7 +532,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 // Deliberately stops short of building a migrator, unlike newIsolatedDB: the MySQL case has to
 // read the server's connection counter at the exact instant the constructor returned, and
 // anything that opened a connection in between would make the number unreadable.
-func (r *restrictedLoginDB) constructRestricted(t *testing.T) (migratable, *sql.DB) {
+func (r *restrictedLoginDB) constructRestricted(t *testing.T) (datafactory.Migratable, *sql.DB) {
 	t.Helper()
 	cfg := &appConfig.Database
 

@@ -42,7 +42,7 @@ func seedEmail(t *testing.T, sqlDB *sql.DB, id int64, email string) {
 // opens through OpenDatabase deliberately, so that a downward step is possible. Without the
 // pre-flight here, this command on a colliding database would trip the UNIQUE idx_email half way
 // up the chain. That is the expensive outcome, not merely a failed command: the migrator writes a
-// dirty marker before each file runs, a dirty database refuses to start with ErrDirty, and this
+// dirty marker before each file runs, a dirty database refuses to start with DirtyError, and this
 // command has no force verb, so recovery means hand-editing schema_migrations in SQL.
 //
 // So the assertions are the three halves of "left alone" rather than just the exit code: the

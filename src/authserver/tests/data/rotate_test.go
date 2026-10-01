@@ -30,8 +30,12 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteDatabase: %v", err)
 	}
-	if migrateErr := db.Migrate(context.Background()); migrateErr != nil {
-		t.Fatalf("Migrate: %v", migrateErr)
+	m, err := db.NewMigrator(context.Background())
+	if err != nil {
+		t.Fatalf("NewMigrator: %v", err)
+	}
+	if upErr := m.Up(context.Background()); upErr != nil {
+		t.Fatalf("Up: %v", upErr)
 	}
 
 	keyA := []byte("0123456789abcdef0123456789abcdef")
@@ -218,8 +222,12 @@ func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteDatabase: %v", err)
 	}
-	if migrateErr := db.Migrate(context.Background()); migrateErr != nil {
-		t.Fatalf("Migrate: %v", migrateErr)
+	m, err := db.NewMigrator(context.Background())
+	if err != nil {
+		t.Fatalf("NewMigrator: %v", err)
+	}
+	if upErr := m.Up(context.Background()); upErr != nil {
+		t.Fatalf("Up: %v", upErr)
 	}
 
 	keyA := []byte("0123456789abcdef0123456789abcdef")

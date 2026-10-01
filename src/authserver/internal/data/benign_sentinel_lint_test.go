@@ -12,9 +12,10 @@ package data
 // other migrator on that database then waits on: indefinitely on PostgreSQL and SQL Server.
 //
 // migrator.IsNoChange and migrator.IsNilVersion are identity tests, which the joined error fails
-// and the bare sentinel passes. There are six production sites today, four engine wrappers and
-// two in the authserver migrate command, and the fifth engine somebody adds later is exactly the
-// one a comment would not reach. This test makes it a compile-time-adjacent fact instead (#268).
+// and the bare sentinel passes. There are seven production sites today: the migrator's own
+// UpToHead, which every startup goes through, the datafactory pre-flight's version read, and five
+// in the authserver migrate command. The next caller somebody writes is exactly the one a comment
+// would not reach. This test makes it a compile-time-adjacent fact instead (#268, #438).
 //
 // It reads and parses files and nothing else: no database, no git, no network, so it runs in the
 // authserver internal tier on every CI job rather than only the four database ones.
@@ -57,9 +58,9 @@ type errorsIsOnBenignSentinel struct {
 // whose second argument names one of the sentinels above.
 //
 // The receiver is resolved through the file's own imports rather than matched against the
-// spelling "errors", because the spelling is not the package. mssqldb/db.go already imports the
-// standard package as goerrors, so a checker keyed on the identifier walks straight past
-// goerrors.Is(err, migrator.ErrNoChange) in the one file most likely to grow it, and reports
+// spelling "errors", because the spelling is not the package. A file may bind the standard
+// package to any name, so a checker keyed on the identifier walks straight past
+// goerrors.Is(err, migrator.ErrNoChange) in a file that imports it as goerrors, and reports
 // nothing at all (#268).
 //
 // Test files are not walked. A test asserting the sentinel is reachable inside a wrapped error is

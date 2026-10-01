@@ -291,7 +291,7 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 				// a typed nil pointer as nil: all four constructors answer one beside their
 				// error, so an arm returning the call directly would put a non-nil data.Database
 				// over it and this is the one assertion that can tell the difference (#353).
-				var noDatabase data.Database
+				var noDatabase Migratable
 				assert.Equalf(t, noDatabase, database,
 					"a failed open returns no database at all, not a typed nil behind a non-nil interface: %s", tc.why)
 
@@ -322,6 +322,44 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 				"the record carries the dialect it dispatched on")
 		})
 	}
+}
+
+// TestNewDatabase_WritesTheNoMigrationRecordOnlyWhenNothingRan is the startup record's two rows.
+// The four engines each wrote "no need to migrate the database" until #438 moved the step to head
+// into the migrator's UpToHead and the record here, beside the caller that knows a process is
+// starting. A first start migrates and writes nothing of the kind; a restart on the same file
+// finds the schema at head and says so once, at Info, which is lifecycle.
+//
+// A real SQLite file rather than a double: the migrator is a concrete type, and the file is the
+// one thing that can be at head on the second open and not on the first.
+func TestNewDatabase_WritesTheNoMigrationRecordOnlyWhenNothingRan(t *testing.T) {
+	const record = "no need to migrate the database"
+	cfg := &config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "startup.db")}
+	aesKey := []byte("0123456789abcdef0123456789abcdef")
+
+	start := func(t *testing.T) []logtest.CapturedRecord {
+		t.Helper()
+		capture := logtest.CaptureSlog(t)
+		database, err := NewDatabase(context.Background(), cfg, aesKey, nil, false)
+		require.NoError(t, err)
+		concrete, ok := database.(*sqlitedb.SQLiteDatabase)
+		require.True(t, ok, "a sqlite type opens the sqlite engine")
+		require.NoError(t, concrete.DB.Close(), "released so the next start is a fresh open")
+
+		var found []logtest.CapturedRecord
+		for _, r := range capture.Records() {
+			if r.Message == record {
+				found = append(found, r)
+			}
+		}
+		return found
+	}
+
+	assert.Empty(t, start(t), "the first start ran the whole chain, so nothing was left unmigrated to report")
+
+	second := start(t)
+	require.Len(t, second, 1, "a restart at head says so exactly once")
+	assert.Equal(t, slog.LevelInfo, second[0].Level, "a start finding nothing to migrate is lifecycle, which is Info")
 }
 
 // TestOpenDatabase_PassesLogSQLToTheEngine covers the factory's other parameter, which every

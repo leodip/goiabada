@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -175,7 +174,7 @@ func TestCheckEmailCaseBeforeMigrating_PassesAnEmptyTable(t *testing.T) {
 
 // TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal pins the fail-closed direction. A read
 // that failed says nothing about the data, so treating it as "no hazard found" would migrate the
-// database this check exists to stop, and the operator would meet ErrDirty instead of a message.
+// database this check exists to stop, and the operator would meet DirtyError instead of a message.
 func TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal(t *testing.T) {
 	boom := errors.New("storage is unavailable")
 	db := mocks_data.NewDatabase(t)
@@ -187,25 +186,4 @@ func TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal(t *testing.T) {
 	assert.Contains(t, err.Error(), "unable to read stored email addresses",
 		"the message must name what failed: this is the only thing the operator is told")
 	assert.ErrorIs(t, err, boom, "the cause must survive, or the storage failure is invisible under a message about email")
-}
-
-// TestPreflightEmailCase_PassesADatabaseWithNoMigrator covers preflightEmailCase's one leniency:
-// a handle that cannot produce a migrator is passed rather than refused.
-//
-// It is deliberate and therefore earns a case. The recorded version is what decides whether the
-// check runs at all, and a database that cannot say what version it is at cannot be judged; every
-// production handle is one of the four engines and does implement MigratorProvider, so the arm is
-// reached only by a substitute, which is exactly what a generated mock of data.Database is. If
-// someone puts NewMigrator on the Database interface, this case goes red and says so rather than
-// quietly starting to exercise the other arms against a mock.
-func TestPreflightEmailCase_PassesADatabaseWithNoMigrator(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
-
-	var _ data.Database = db
-	_, isProvider := any(db).(MigratorProvider)
-	require.False(t, isProvider,
-		"the mock must not implement MigratorProvider, or this test exercises the migrator arm while claiming to cover the leniency")
-
-	assert.NoError(t, preflightEmailCase(context.Background(), db),
-		"a database that cannot produce a migrator is passed, because the recorded version is what decides whether the check applies")
 }

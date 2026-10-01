@@ -193,7 +193,7 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 // differ only by case, 000047's UPDATE really does fail.
 //
 // That failure is the expensive one. The migrator writes a dirty marker before each file runs and
-// clears it after; a dirty database refuses to start with ErrDirty; and `migrate` has no force
+// clears it after; a dirty database refuses to start with DirtyError; and `migrate` has no force
 // verb, so recovery means hand-editing schema_migrations in SQL. So this test asserts both halves
 // in the order that matters: the pre-flight refuses first, and the migration would indeed have
 // failed had it not.

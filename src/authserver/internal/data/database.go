@@ -17,7 +17,7 @@ import (
 //   - datafactory, which builds one and returns it, and the `migrate` subcommand that feeds
 //     datafactory's pre-flight the handle it built;
 //   - server.Server, which holds it and hands it to every constructor, each of which narrows it;
-//   - tests/data, which exercises 215 of these 216 methods on every engine, and is the tier that
+//   - tests/data, which exercises all 223 of these methods on every engine, and is the tier that
 //     proves each one works there;
 //   - this declaration itself, which is the compiler's check that the four engine adapters still
 //     implement a complete set -- worth more since #416 replaced their explicit delegations with
@@ -43,7 +43,6 @@ type Database interface {
 	// context.DeadlineExceeded, with the deadlock that caused the retry joined to it where
 	// there was one (#386 decision 13).
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	Migrate(ctx context.Context) error
 	// ScanEmailCase reads every users row as its id, its stored address and that address as
 	// THIS engine's own LOWER() reduces it, which is the read behind the startup pre-flight
 	// (the auth server's datafactory.CheckEmailCaseBeforeMigrating). It compares nothing: the

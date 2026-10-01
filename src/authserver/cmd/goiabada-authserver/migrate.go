@@ -81,14 +81,7 @@ func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io
 		return migrateExitError
 	}
 
-	provider, ok := database.(datafactory.MigratorProvider)
-	if !ok {
-		// Every engine type implements NewMigrator, so this is a new engine that forgot to.
-		outf(stderr, "this database engine cannot be migrated by hand: %T has no NewMigrator\n", database)
-		return migrateExitError
-	}
-
-	m, err := provider.NewMigrator(ctx)
+	m, err := database.NewMigrator(ctx)
 	if err != nil {
 		outf(stderr, "unable to prepare the migration runner: %+v\n", err)
 		return migrateExitError
@@ -183,8 +176,8 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 //
 // The database is the whole data.Database rather than a port, which is what every other consumer
 // now takes (#386). This command calls no method on it: it hands it to
-// datafactory.CheckEmailCaseBeforeMigrating, which is composition and keeps the wide interface,
-// and type-asserts it to datafactory.MigratorProvider. A port would have nothing in it.
+// datafactory.CheckEmailCaseBeforeMigrating, which is composition and keeps the wide interface.
+// A port would have nothing in it.
 //
 // The database is here for the pre-flight migrateTo runs before an upward step (#351). The
 // migrator alone cannot answer it: the check reads the users table through the engine's own SQL,
@@ -270,7 +263,7 @@ func migrateVersion(ctx context.Context, m *migrator.Migrator, out io.Writer) in
 // the head, which the runner reports as an unknown version without saying that being above the
 // head is what makes it unknown, and the stored email addresses migration 000047 cannot resolve,
 // which is a fact about the data rather than about the schema (#351). Everything else is printed
-// as the runner phrased it, because ErrDirty and ErrUnknownVersion already carry the facts an
+// as the runner phrased it, because DirtyError and UnknownVersionError already carry the facts an
 // operator needs (decision 7 of #268).
 func migrateTo(ctx context.Context, database data.Database, m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	if target < floor {

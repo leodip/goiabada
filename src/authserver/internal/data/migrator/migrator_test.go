@@ -330,7 +330,7 @@ func TestVersion_RefusesMoreThanOneRow(t *testing.T) {
 	// Every entry point refuses, because every one of them starts by reading this table and none
 	// of them can tell which row the schema matches.
 	_, _, err = m.Version(context.Background())
-	var multi ErrMultipleVersions
+	var multi MultipleVersionsError
 	require.ErrorAs(t, err, &multi)
 	assert.Contains(t, err.Error(), "000002")
 	assert.Contains(t, err.Error(), "000005")
@@ -456,7 +456,7 @@ func TestMigrate_RefusesADirtyDatabase(t *testing.T) {
 	require.NoError(t, err)
 	m := newTestMigrator(t, db, threeVersions())
 
-	var dirty ErrDirty
+	var dirty DirtyError
 	require.ErrorAs(t, m.Up(context.Background()), &dirty)
 	assert.Equal(t, 2, dirty.Version)
 	assert.ErrorAs(t, m.Migrate(context.Background(), 1), &dirty)
@@ -474,7 +474,7 @@ func TestMigrate_RefusesAVersionThisBinaryDoesNotCarry(t *testing.T) {
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		var unknown ErrUnknownVersion
+		var unknown UnknownVersionError
 		require.ErrorAs(t, m.Up(context.Background()), &unknown)
 		assert.Equal(t, 9, unknown.Version)
 		assert.Equal(t, "sqlite", unknown.Engine)
@@ -491,7 +491,7 @@ func TestMigrate_RefusesAVersionThisBinaryDoesNotCarry(t *testing.T) {
 		m := newTestMigrator(t, db, threeVersions())
 		require.NoError(t, m.Migrate(context.Background(), 1))
 
-		var unknown ErrUnknownVersion
+		var unknown UnknownVersionError
 		require.ErrorAs(t, m.Migrate(context.Background(), 3), &unknown)
 		assert.Equal(t, 3, unknown.Version)
 		assert.Equal(t, 2, unknown.Below)
@@ -539,7 +539,7 @@ func TestErrDirty_DoesNotNameAPredecessorForAVersionThisBinaryDoesNotCarry(t *te
 		"000002_two.up.sql": "CREATE TABLE two (id INTEGER);",
 	}))
 
-	var dirty ErrDirty
+	var dirty DirtyError
 	require.ErrorAs(t, older.Up(context.Background()), &dirty, "a dirty database is refused whatever the version")
 	assert.Equal(t, 5, dirty.Version)
 	assert.False(t, dirty.Carried, "this binary has no file numbered 000005")
@@ -569,7 +569,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 
 		err := m.Up(context.Background())
 		require.Error(t, err)
-		var dirty ErrDirty
+		var dirty DirtyError
 		require.ErrorAs(t, err, &dirty)
 		assert.Equal(t, 2, dirty.Version, "the marker is the version being applied")
 		assert.Equal(t, 2, dirty.Applied)
@@ -591,7 +591,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 
 		err := m.Migrate(context.Background(), 1)
 		require.Error(t, err)
-		var dirty ErrDirty
+		var dirty DirtyError
 		require.ErrorAs(t, err, &dirty)
 		assert.Equal(t, 1, dirty.Version, "the marker is the version being returned to")
 		assert.Equal(t, 2, dirty.Applied, "the file that ran is 000002's down")
@@ -605,7 +605,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 	t.Run("read back from the table, where the direction is not recorded", func(t *testing.T) {
 		// schema_migrations records the version reached and nothing else, so a marker read back
 		// is consistent with two interrupted steps. The message names both rather than guessing.
-		e := ErrDirty{Version: 2, Applied: AppliedUnknown, Below: 1, Above: 5, Carried: true}
+		e := DirtyError{Version: 2, Applied: AppliedUnknown, Below: 1, Above: 5, Carried: true}
 		assert.Contains(t, e.Error(), "000001")
 		assert.Contains(t, e.Error(), "000002")
 		assert.Contains(t, e.Error(), "000005")
@@ -628,7 +628,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, files)
 
-		var dirty ErrDirty
+		var dirty DirtyError
 		require.ErrorAs(t, m.Up(context.Background()), &dirty)
 		assert.Equal(t, 5, dirty.Version)
 		assert.Equal(t, 5, dirty.Applied)
@@ -648,7 +648,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, files)
 
-		var dirty ErrDirty
+		var dirty DirtyError
 		require.ErrorAs(t, m.Up(context.Background()), &dirty)
 		assert.Equal(t, 1, dirty.Version)
 		assert.Equal(t, NilVersion, dirty.Below, "there is nothing below the first migration")
@@ -664,7 +664,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		var dirty ErrDirty
+		var dirty DirtyError
 		require.ErrorAs(t, m.Up(context.Background()), &dirty)
 		assert.Equal(t, AppliedUnknown, dirty.Applied, "the row records no direction")
 		assert.Equal(t, 2, dirty.Below)
@@ -689,7 +689,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		require.Error(t, m.Migrate(context.Background(), NilVersion), "000001's down does not run")
 		require.Equal(t, []RecordedVersion{{Version: NilVersion, Dirty: true}}, recorded(t, db))
 
-		var dirty ErrDirty
+		var dirty DirtyError
 		require.ErrorAs(t, m.Up(context.Background()), &dirty, "and the restarted process refuses that row")
 		assert.Equal(t, NilVersion, dirty.Version)
 		assert.Equal(t, AppliedUnknown, dirty.Applied)

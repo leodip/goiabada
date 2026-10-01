@@ -28,8 +28,8 @@ const LowercaseEmailsVersion = 47
 // cannot sign in because both have compared byte-wise all along. So the machinery only ever acted
 // on rows that were already broken, and the honest answer is to stop and say which ones.
 //
-// WHY BEFORE Migrate() RATHER THAN LETTING 000047 FAIL. The migrator writes a dirty marker before
-// each file runs and clears it after, and a dirty database refuses to start with ErrDirty. The
+// WHY BEFORE MIGRATING RATHER THAN LETTING 000047 FAIL. The migrator writes a dirty marker before
+// each file runs and clears it after, and a dirty database refuses to start with DirtyError. The
 // migrate subcommand has no force verb, so recovery would mean hand-editing schema_migrations in
 // SQL. Checking before anything is written means that state never occurs.
 //
@@ -163,26 +163,12 @@ func describeEmailCaseHazards(collisions [][]models.EmailCaseRow, unreachable []
 	return b.String()
 }
 
-// preflightEmailCase reads where this database stands and hands the answer to
-// CheckEmailCaseBeforeMigrating, which is where the policy and every test live. It is the
-// startup half of that check; the `migrate to` subcommand has the other, because it reaches
-// OpenDatabase directly and never comes through here (#351).
-//
-// A database that cannot produce a migrator is passed rather than refused. Every engine type
-// implements NewMigrator, so the only way to land here is a new engine that did not, which
-// database.Migrate() is about to fail on anyway with a message about migrating rather than about
-// email addresses.
-func preflightEmailCase(ctx context.Context, database data.Database) error {
-	provider, ok := database.(MigratorProvider)
-	if !ok {
-		return nil
-	}
-
-	m, err := provider.NewMigrator(ctx)
-	if err != nil {
-		return errs.Wrap(err, "unable to prepare the migration runner for the email case pre-flight")
-	}
-
+// preflightEmailCase reads where this database stands, through the migrator NewDatabase is about
+// to bring it to head with, and hands the answer to CheckEmailCaseBeforeMigrating, which is where
+// the policy and every test live. It is the startup half of that check; the `migrate to`
+// subcommand has the other, because it reaches OpenDatabase directly and never comes through here
+// (#351).
+func preflightEmailCase(ctx context.Context, database data.Database, m *migrator.Migrator) error {
 	recorded, _, err := m.Version(ctx)
 	if migrator.IsNilVersion(err) {
 		recorded = migrator.NilVersion

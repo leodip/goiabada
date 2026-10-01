@@ -49,13 +49,13 @@ var ErrLocked = errors.New("another migration is already running on this databas
 // off the first migration, interrupted), so the two releases read each other's rows (#268).
 const NilVersion = -1
 
-// AppliedUnknown is ErrDirty.Applied when the direction of the interrupted step is not known.
+// AppliedUnknown is DirtyError.Applied when the direction of the interrupted step is not known.
 // schema_migrations records the version reached and nothing about direction, so a marker read
 // back from the table could have been left by either an up or a down step; only the step that
 // fails in this process knows which it was.
 const AppliedUnknown = math.MinInt
 
-// ErrDirty says a migration was interrupted between its two bookkeeping writes, so the schema
+// DirtyError says a migration was interrupted between its two bookkeeping writes, so the schema
 // sits between two versions and no automatic recovery is safe.
 //
 // Version is the marker in schema_migrations. Applied is the version whose file was running,
@@ -65,7 +65,7 @@ const AppliedUnknown = math.MinInt
 // those sits above the marker depends on the direction. Deriving them from the marker alone sends
 // an operator recovering a failed down to a version the schema was never at, and deriving the
 // lower one by subtracting sends them to a version no engine's set carries (#268).
-type ErrDirty struct {
+type DirtyError struct {
 	// Version is the version recorded in schema_migrations, dirty.
 	Version int
 	// Applied is the version whose file the interrupted step was running, or AppliedUnknown.
@@ -95,7 +95,7 @@ type ErrDirty struct {
 	Carried bool
 }
 
-func (e ErrDirty) Error() string {
+func (e DirtyError) Error() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "the database records version %s and is marked dirty, so a migration did not finish. ",
 		formatVersion(e.Version))
@@ -154,7 +154,7 @@ func (e ErrDirty) Error() string {
 	return b.String()
 }
 
-// ErrUnknownVersion says a version is not among the migration files this binary carries for this
+// UnknownVersionError says a version is not among the migration files this binary carries for this
 // engine. It arises two ways, and they need different sentences: the DATABASE records a version
 // the binary does not know, which means a newer release migrated it, or an operator asked to step
 // to one.
@@ -162,7 +162,7 @@ func (e ErrDirty) Error() string {
 // The type carries the facts and no wording. The "a newer release migrated this database"
 // sentence also needs the Goiabada version, which lives in core/constants, and is composed by the
 // caller that has it (decision 7).
-type ErrUnknownVersion struct {
+type UnknownVersionError struct {
 	// Version is the version that is not in the source.
 	Version int
 	// Engine names the engine whose migration set was searched, since the four sets differ: three
@@ -177,7 +177,7 @@ type ErrUnknownVersion struct {
 	Above int
 }
 
-func (e ErrUnknownVersion) Error() string {
+func (e UnknownVersionError) Error() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "this binary carries no %s migration numbered %s", e.Engine, formatVersion(e.Version))
 	switch {
@@ -198,15 +198,15 @@ type RecordedVersion struct {
 	Dirty   bool
 }
 
-// ErrMultipleVersions says schema_migrations holds more than one row. The runner's own writes
+// MultipleVersionsError says schema_migrations holds more than one row. The runner's own writes
 // cannot produce that, since every write deletes the table and inserts one row in a single
 // transaction, so a second row is a hand edit or corruption. Reading one of them and carrying on
 // is how a database gets migrated from a version it is not at (decision 5).
-type ErrMultipleVersions struct {
+type MultipleVersionsError struct {
 	Rows []RecordedVersion
 }
 
-func (e ErrMultipleVersions) Error() string {
+func (e MultipleVersionsError) Error() string {
 	parts := make([]string, 0, len(e.Rows))
 	for _, r := range e.Rows {
 		parts = append(parts, fmt.Sprintf("(version %s, dirty %t)", formatVersion(r.Version), r.Dirty))

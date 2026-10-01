@@ -24,28 +24,31 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// MigratorProvider is the one thing a caller needs beyond data.Database to step a schema by hand:
-// a migrator built over this engine's embedded migration set. All four concrete engine types have
-// the method already, and it stays off the data.Database interface deliberately, so the generated
-// mock and every application path keep seeing a database that migrates itself on open.
+// Migratable is an opened engine: the data.Database every consumer narrows, and a migrator over
+// that engine's embedded migration set. All four engine types implement it, and OpenDatabase
+// returns it, so reaching the migrator is a method call rather than a type assertion with a
+// fallback for an engine that forgot.
 //
-// The authserver's `migrate` subcommand is the only user: it opens through OpenDatabase and
-// type-asserts to this, because it must be able to step DOWN, and anything that went through
-// NewDatabase would have migrated up before it got the chance (#268).
-type MigratorProvider interface {
+// NewMigrator stays off data.Database deliberately. That interface is what the generated mock
+// doubles and what every handler test is written against, and nothing above the data layer steps
+// a schema; the two callers that do, NewDatabase and the `migrate` subcommand, take this (#268,
+// #438).
+type Migratable interface {
+	data.Database
 	NewMigrator(ctx context.Context) (*migrator.Migrator, error)
 }
 
 // OpenDatabase constructs the concrete database for the configured engine and returns it having
 // migrated nothing and run no startup task. It is NewDatabase's engine switch and nothing else.
 //
-// It exists so that the `migrate` subcommand can reach an engine's migrator without the schema
+// It is exported for the `migrate` subcommand, which needs an engine's migrator without the schema
 // being brought to head first, which is what NewDatabase does and what makes NewDatabase useless
 // for a rollback. Every other caller wants NewDatabase (#268).
-func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (data.Database, error) {
+func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Migratable, error) {
 	// The parse comes before the record, so a refused type writes only its refusal and never an
 	// opening record naming an engine nothing opened (#438 decision 6).
 	dialect, err := data.ParseDialect(dbConfig.Type)
@@ -61,7 +64,7 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (data.Database, 
 	// Each arm takes the constructor's two results into a local pair and returns nil on the error
 	// path rather than returning the call directly: all four constructors answer a typed nil
 	// pointer beside their error, and returning that straight out would put a non-nil
-	// data.Database over it, so an `if database == nil` at a caller would read false (#353).
+	// Migratable over it, so an `if database == nil` at a caller would read false (#353).
 	switch dialect {
 	case data.MySQL:
 		database, err := mysqldb.NewMySQLDatabase(mysqlConfig(dbConfig), logSQL)
@@ -161,6 +164,10 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // NewDatabase opens the configured database, refuses it if the stored email addresses cannot
 // survive migration 000047, brings the schema to head and then runs the startup data tasks.
 //
+// One migrator serves both the pre-flight's version read and the step to head, and the startup
+// record saying nothing needed migrating is written here, by the process starting, rather than by
+// the runner or by each engine (#438).
+//
 // The two data-encryption keys are parameters rather than reads of a configuration singleton, so
 // that the refusal below is one call away from a test rather than unreachable (#351). aesKey is
 // required and must be 32 bytes; previousAESKey is optional and is acted on only at that length,
@@ -171,13 +178,21 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, err
 	}
 
-	if preflightEmailCaseErr := preflightEmailCase(ctx, database); preflightEmailCaseErr != nil {
+	m, err := database.NewMigrator(ctx)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to prepare the migration runner")
+	}
+
+	if preflightEmailCaseErr := preflightEmailCase(ctx, database, m); preflightEmailCaseErr != nil {
 		return nil, preflightEmailCaseErr
 	}
 
-	err = database.Migrate(ctx)
+	migrated, err := m.UpToHead(ctx, constants.Version)
 	if err != nil {
 		return nil, err
+	}
+	if !migrated {
+		slog.InfoContext(ctx, "no need to migrate the database")
 	}
 
 	// The data-encryption key is supplied from the environment (issue #83), never
