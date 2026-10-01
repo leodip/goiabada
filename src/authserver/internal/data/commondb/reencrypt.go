@@ -34,7 +34,7 @@ var aesProtectedColumns = []struct{ table, column string }{
 // above the data layer where a mock can drive every branch of it, and this method is the write it
 // ends in (#438 decision 8). It does not blank settings.aes_encryption_key, which was the 1.5.x
 // conversion's own bookkeeping, deleted by #359 (#262).
-func (d *CommonDatabase) ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error {
+func (d *Database) ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error {
 	if len(oldKey) != 32 || len(newKey) != 32 {
 		return errs.New("re-encryption requires 32-byte old and new keys")
 	}
@@ -46,7 +46,7 @@ func (d *CommonDatabase) ReencryptToKey(ctx context.Context, oldKey, newKey []by
 	})
 }
 
-func (d *CommonDatabase) reencryptAll(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
+func (d *Database) reencryptAll(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
 	for _, c := range aesProtectedColumns {
 		if err := d.reencryptStringColumn(ctx, tx, c.table, c.column, oldKey, newKey); err != nil {
 			return errs.Wrapf(err, "re-encrypting %s.%s", c.table, c.column)
@@ -65,12 +65,12 @@ func (d *CommonDatabase) reencryptAll(ctx context.Context, tx *sql.Tx, oldKey, n
 // reencryptStringColumn re-encrypts one string-secret column across a table. It
 // reads each row fully before writing (SQLite runs on a single connection), and
 // skips rows whose ciphertext is empty/NULL.
-func (d *CommonDatabase) reencryptStringColumn(ctx context.Context, tx *sql.Tx, table, column string, oldKey, newKey []byte) error {
+func (d *Database) reencryptStringColumn(ctx context.Context, tx *sql.Tx, table, column string, oldKey, newKey []byte) error {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", column).From(table)
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (d *CommonDatabase) reencryptStringColumn(ctx context.Context, tx *sql.Tx, 
 		ub.Set(ub.Assign(column, newCt))
 		ub.Where(ub.Equal("id", it.id))
 		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSql(ctx, tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSQL(ctx, tx, uq, uargs...); err != nil {
 			return err
 		}
 	}
@@ -127,12 +127,12 @@ func (d *CommonDatabase) reencryptStringColumn(ctx context.Context, tx *sql.Tx, 
 // canary and refuses before calling ReencryptToKey when it decrypts under neither key (#438
 // decision 8). So a plaintext PEM fails closed at the canary, never reaching this branch. It is kept because deleting it would
 // change a crypto path for no observable gain.
-func (d *CommonDatabase) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
+func (d *Database) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", "private_key_pem").From("key_pairs")
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func (d *CommonDatabase) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, o
 		ub.Set(ub.Assign("private_key_pem", enc))
 		ub.Where(ub.Equal("id", it.id))
 		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSql(ctx, tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSQL(ctx, tx, uq, uargs...); err != nil {
 			return err
 		}
 	}

@@ -38,8 +38,8 @@ func TestGetGroupById_RefusesAnAlreadyCancelledContext(t *testing.T) {
 }
 
 // TestCreateGroup_RefusesAnAlreadyCancelledContextAndWritesNothing covers the insert, which on
-// PostgreSQL and SQL Server goes through insertReturningId's QuerySql and on SQLite and MySQL
-// through ExecSql's LastInsertId. The second half is the one that matters: a refusal that still
+// PostgreSQL and SQL Server goes through insertReturningId's QuerySQL and on SQLite and MySQL
+// through ExecSQL's LastInsertId. The second half is the one that matters: a refusal that still
 // wrote the row would be worse than no refusal at all, because the caller is gone and nobody is
 // left to undo it.
 func TestCreateGroup_RefusesAnAlreadyCancelledContextAndWritesNothing(t *testing.T) {
@@ -76,7 +76,7 @@ func TestGroupLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 }
 
 // TestGetGroupMembersPaginated_RefusesAnAlreadyCancelledContext is the two-statement shape: a
-// page query and a count query, each its own QuerySql. It is what the admin console's group
+// page query and a count query, each its own QuerySQL. It is what the admin console's group
 // members page reads, and the zero total is the assertion that says the count statement did not
 // run either.
 func TestGetGroupMembersPaginated_RefusesAnAlreadyCancelledContext(t *testing.T) {
@@ -171,7 +171,7 @@ func TestDeleteOldAuditLogs_RefusesAnAlreadyCancelledContext(t *testing.T) {
 
 // TestGetAuditLogsPaginated_RefusesAnAlreadyCancelledContext is the other half of that: promoted
 // from commondb on three engines and overridden on SQL Server, where the byte-exact request_id
-// predicate and OFFSET/FETCH pagination need their own statement. Both bodies are two QuerySql
+// predicate and OFFSET/FETCH pagination need their own statement. Both bodies are two QuerySQL
 // calls, and whichever engine the tier is running is the one covered here.
 func TestGetAuditLogsPaginated_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	require.NoError(t, database.CreateAuditLog(context.Background(), nil,

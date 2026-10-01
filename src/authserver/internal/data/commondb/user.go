@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
 
 	now := time.Now().UTC()
 
@@ -37,7 +37,7 @@ func (d *CommonDatabase) CreateUser(ctx context.Context, tx *sql.Tx, user *model
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
 
 	if user.Id == 0 {
 		return errs.New("can't update user with id 0")
@@ -53,7 +53,7 @@ func (d *CommonDatabase) UpdateUser(ctx context.Context, tx *sql.Tx, user *model
 	updateBuilder.Where(updateBuilder.Equal("id", user.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		user.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update user")
@@ -62,11 +62,11 @@ func (d *CommonDatabase) UpdateUser(ctx context.Context, tx *sql.Tx, user *model
 	return nil
 }
 
-func (d *CommonDatabase) getUserCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getUserCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	userStruct *sqlbuilder.Struct) (*models.User, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -88,7 +88,7 @@ func (d *CommonDatabase) getUserCommon(ctx context.Context, tx *sql.Tx, selectBu
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
+func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
 
 	if len(userIds) == 0 {
 		return nil, nil
@@ -104,7 +104,7 @@ func (d *CommonDatabase) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds 
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(ctx, tx, sql, args...)
+		rows, err := d.QuerySQL(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -133,7 +133,7 @@ func (d *CommonDatabase) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds 
 	return users, nil
 }
 
-func (d *CommonDatabase) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error) {
+func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error) {
 
 	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
@@ -149,7 +149,7 @@ func (d *CommonDatabase) GetUserById(ctx context.Context, tx *sql.Tx, userId int
 	return user, nil
 }
 
-func (d *CommonDatabase) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error {
+func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error {
 
 	if users == nil {
 		return nil
@@ -195,7 +195,7 @@ func (d *CommonDatabase) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, u
 	return nil
 }
 
-func (d *CommonDatabase) UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error {
 
 	if user == nil {
 		return nil
@@ -211,7 +211,7 @@ func (d *CommonDatabase) UserLoadAttributes(ctx context.Context, tx *sql.Tx, use
 	return nil
 }
 
-func (d *CommonDatabase) UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error {
 
 	if user == nil {
 		return nil
@@ -238,7 +238,7 @@ func (d *CommonDatabase) UserLoadPermissions(ctx context.Context, tx *sql.Tx, us
 
 }
 
-func (d *CommonDatabase) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []models.User) error {
+func (d *Database) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []models.User) error {
 
 	if users == nil {
 		return nil
@@ -283,7 +283,7 @@ func (d *CommonDatabase) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users 
 	return nil
 }
 
-func (d *CommonDatabase) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error {
 
 	if user == nil {
 		return nil
@@ -309,7 +309,7 @@ func (d *CommonDatabase) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *m
 	return nil
 }
 
-func (d *CommonDatabase) GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*models.User, error) {
+func (d *Database) GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*models.User, error) {
 
 	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
@@ -325,7 +325,7 @@ func (d *CommonDatabase) GetUserByUsername(ctx context.Context, tx *sql.Tx, user
 	return user, nil
 }
 
-func (d *CommonDatabase) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error) {
+func (d *Database) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error) {
 
 	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
@@ -351,7 +351,7 @@ func (d *CommonDatabase) GetUserBySubject(ctx context.Context, tx *sql.Tx, subje
 	return user, nil
 }
 
-func (d *CommonDatabase) GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error) {
+func (d *Database) GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error) {
 
 	userStruct := sqlbuilder.NewStruct(new(models.User)).
 		For(d.Flavor)
@@ -383,7 +383,7 @@ func (d *CommonDatabase) GetUserByEmail(ctx context.Context, tx *sql.Tx, email s
 // Locating the row is not authenticating it. The caller still compares the submitted
 // code against the encrypted column in constant time and checks the code's expiry; this
 // only says which row to compare against.
-func (d *CommonDatabase) GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error) {
+func (d *Database) GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error) {
 
 	// The dormant value is '' on every user with no code outstanding, so an empty
 	// codeHash reaching the query would match one of them and hand the caller somebody
@@ -474,7 +474,7 @@ func searchUserLikeClauses(sb *sqlbuilder.SelectBuilder, query string) []string 
 	return clauses
 }
 
-func (d *CommonDatabase) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error) {
+func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error) {
 
 	if page < 1 {
 		page = 1
@@ -506,7 +506,7 @@ func (d *CommonDatabase) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, q
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -534,7 +534,7 @@ func (d *CommonDatabase) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, q
 	}
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(ctx, tx, sql, args...)
+	rows2, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -575,7 +575,7 @@ func (d *CommonDatabase) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, q
 // credential change for the same user, which writes the users row first, is the one pair this
 // shape can still deadlock with; that pair is answered by RunInTransaction rerunning the
 // victim rather than by an ordering here.
-func (d *CommonDatabase) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error {
 
 	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
 		sessions, err := d.GetUserSessionsByUserId(ctx, tx, userId)
@@ -606,7 +606,7 @@ func (d *CommonDatabase) DeleteUser(ctx context.Context, tx *sql.Tx, userId int6
 		deleteBuilder.Where(deleteBuilder.Equal("id", userId))
 
 		sql, args := deleteBuilder.Build()
-		_, err = d.ExecSql(ctx, tx, sql, args...)
+		_, err = d.ExecSQL(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete user")
 		}
@@ -638,7 +638,7 @@ func (d *CommonDatabase) DeleteUser(ctx context.Context, tx *sql.Tx, userId int6
 //
 // tx is required: without one the statement autocommits and the row is released before the caller
 // can use it.
-func (d *CommonDatabase) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error {
 
 	if tx == nil {
 		return errs.New("acquiring a user row requires a transaction: an autocommitted statement releases the row before the caller can use it")
@@ -654,7 +654,7 @@ func (d *CommonDatabase) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId 
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSql(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
 		return errs.Wrap(err, "unable to acquire user row")
 	}
 
@@ -680,7 +680,7 @@ func (d *CommonDatabase) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId 
 // because every credential handler loads the whole user and writes it back, so leaving
 // it in the ordinary update set would let a request holding a stale model silently
 // regress the boundary.
-func (d *CommonDatabase) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error) {
+func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error) {
 
 	if userId == 0 {
 		return 0, errs.New("can't increment the auth state generation of user with id 0")
@@ -698,7 +698,7 @@ func (d *CommonDatabase) IncrementUserAuthStateGeneration(ctx context.Context, t
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user auth state generation")
 	}
@@ -719,7 +719,7 @@ func (d *CommonDatabase) IncrementUserAuthStateGeneration(ctx context.Context, t
 	query, args = sb.BuildWithFlavor(d.Flavor)
 
 	var generation int64
-	rows, err := d.QuerySql(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user auth state generation")
 	}
@@ -748,7 +748,7 @@ func (d *CommonDatabase) IncrementUserAuthStateGeneration(ctx context.Context, t
 // otp_config_generation is tagged dont-update precisely so a handler that loaded the
 // user before a concurrent change cannot write the old counter back and discharge every
 // session's obligation at once (#106, #242).
-func (d *CommonDatabase) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error) {
+func (d *Database) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error) {
 
 	if userId == 0 {
 		return 0, errs.New("can't increment the otp config generation of user with id 0")
@@ -766,7 +766,7 @@ func (d *CommonDatabase) IncrementUserOtpConfigGeneration(ctx context.Context, t
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user otp config generation")
 	}
@@ -789,7 +789,7 @@ func (d *CommonDatabase) IncrementUserOtpConfigGeneration(ctx context.Context, t
 	query, args = sb.BuildWithFlavor(d.Flavor)
 
 	var generation int64
-	rows, err := d.QuerySql(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user otp config generation")
 	}
@@ -811,7 +811,7 @@ func (d *CommonDatabase) IncrementUserOtpConfigGeneration(ctx context.Context, t
 // Narrow rather than going through UpdateUser, which writes every non-tagged column:
 // a credential handler that loaded the user before a concurrent admin disable would
 // otherwise write Enabled back as it was and silently re-enable the account. (#106)
-func (d *CommonDatabase) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
+func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
 
 	if userId == 0 {
 		return errs.New("can't set the password hash of user with id 0")
@@ -840,7 +840,7 @@ func (d *CommonDatabase) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, us
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to set user password hash")
 	}
@@ -880,7 +880,7 @@ func (d *CommonDatabase) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, us
 // Separate from SetUserPasswordHash rather than a fourth parameter on it: its other two
 // callers, the admin user-create path and the account password-change API, hold no
 // outstanding code and would have to pass a meaningless predicate.
-func (d *CommonDatabase) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string,
+func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string,
 	passwordHash string) (bool, error) {
 
 	if userId == 0 {
@@ -911,7 +911,7 @@ func (d *CommonDatabase) TryConsumeForgotPasswordCode(ctx context.Context, tx *s
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to consume forgot password code")
 	}
@@ -941,7 +941,7 @@ func (d *CommonDatabase) TryConsumeForgotPasswordCode(ctx context.Context, tx *s
 // Covers both directions on purpose. The endpoint behind it serves enable as well as
 // disable, and leaving enable on the full-row UpdateUser would keep the clobbering
 // problem alive in half of it. (#106)
-func (d *CommonDatabase) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
+func (d *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
 
 	if userId == 0 {
 		return false, errs.New("can't set enabled on user with id 0")
@@ -959,7 +959,7 @@ func (d *CommonDatabase) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, user
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to set user enabled")
 	}
@@ -1005,7 +1005,7 @@ func (d *CommonDatabase) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, user
 // Deliberately not part of UpdateUser. last_otp_step is tagged dont-update because
 // the OTP enrollment handler claims a step and then writes the whole user back, so an
 // ordinary update would write the pre-claim value over the claim.
-func (d *CommonDatabase) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
 	requireOTPEnabled bool) (bool, error) {
 
 	if userId == 0 {
@@ -1037,7 +1037,7 @@ func (d *CommonDatabase) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, 
 	ub.Where(predicates...)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to consume user OTP step")
 	}
@@ -1068,7 +1068,7 @@ func (d *CommonDatabase) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, 
 // Resetting an already-reset user is not a failure, so this reports only an error
 // rather than whether anything changed. Nothing gates on the transition, unlike
 // TrySetUserEnabled's disable direction.
-func (d *CommonDatabase) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error {
 
 	if userId == 0 {
 		return errs.New("can't reset the OTP step of user with id 0")
@@ -1083,7 +1083,7 @@ func (d *CommonDatabase) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userI
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to reset user OTP step")
 	}
@@ -1123,7 +1123,7 @@ func (d *CommonDatabase) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userI
 //
 // Deliberately not part of UpdateUser: both columns are tagged dont-update, because the full-row
 // write is what would let one enrolment request erase another's issuance. See models.User.
-func (d *CommonDatabase) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64,
+func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64,
 	secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
 
 	if userId == 0 {
@@ -1167,7 +1167,7 @@ func (d *CommonDatabase) TryInstallPendingOTPEnrollment(ctx context.Context, tx 
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to install pending OTP enrollment")
 	}
@@ -1193,7 +1193,7 @@ func (d *CommonDatabase) TryInstallPendingOTPEnrollment(ctx context.Context, tx 
 // sqlbuilder sends an untyped Go nil as a parameter and the SQL Server driver types it nvarchar,
 // which it then refuses to convert implicitly to varbinary(max). A literal NULL has no parameter
 // type to get wrong and is portable across all four engines (#247).
-func (d *CommonDatabase) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error {
 
 	if userId == 0 {
 		return errs.New("can't clear the pending OTP enrollment of user with id 0")
@@ -1209,7 +1209,7 @@ func (d *CommonDatabase) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to clear pending OTP enrollment")
 	}

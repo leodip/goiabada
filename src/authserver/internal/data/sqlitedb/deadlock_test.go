@@ -39,7 +39,7 @@ func TestIsDeadlock(t *testing.T) {
 	}
 }
 
-// TestIsUniqueViolation is SQLite's row of the unique-key classifier table WrapSQLError consults.
+// TestIsUniqueViolation is SQLite's row of the unique-key classifier table commondb's wrapSQLError consults.
 //
 // Unlike TestIsDeadlock above, this row has true entries: SQLite has one connection and so cannot
 // deadlock, but it refuses a duplicate key exactly as the other three engines do.
@@ -66,7 +66,7 @@ func TestIsUniqueViolation(t *testing.T) {
 		want bool
 	}{
 		{"the driver's unique violation, as modernc.org/sqlite returns it", unique, true},
-		{"the same error wrapped once, as WrapSQLError returns it", errs.Wrap(unique, "unable to execute SQL"), true},
+		{"the same error wrapped once, as commondb's wrapSQLError returns it", errs.Wrap(unique, "unable to execute SQL"), true},
 		{"the same error wrapped by the standard library", errors.Join(unique), true},
 		{"the same error at the depth a handler sees it", errs.Wrap(errs.Wrap(unique, "unable to execute SQL"), "unable to insert user"), true},
 		{"SQLITE_CONSTRAINT_PRIMARYKEY: an integer primary key", realSQLiteError(t,

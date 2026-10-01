@@ -41,7 +41,7 @@ func appendReturningId(insertSQL string) (string, error) {
 }
 
 // TestInsertReturningId_LastInsertIdArm is the SQLite and MySQL path: no hook wired, the
-// statement goes through ExecSql, and the id is whatever the driver reports.
+// statement goes through ExecSQL, and the id is whatever the driver reports.
 func TestInsertReturningId_LastInsertIdArm(t *testing.T) {
 	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: 77}}}
 	d := scriptedDB(t, script)
@@ -144,7 +144,7 @@ func TestInsertReturningId_ReturningArm(t *testing.T) {
 }
 
 // TestInsertReturningId_ReturningArmSurfacesADeferredViolation is the one behaviour a careless
-// collapse loses, and the reason WrapSQLError is reachable from here.
+// collapse loses, and the reason wrapSQLError is reachable from here.
 //
 // pgx and go-mssqldb can report a constraint violation through the result set rather than from
 // the query call, and then Next() simply reports no row. Without the rows.Err() check the insert

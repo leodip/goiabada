@@ -21,10 +21,10 @@ import (
 var mssqlMigrationsFs embed.FS
 
 // MsSQLDatabase declares only the methods SQL Server needs its own SQL for; the rest are promoted
-// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
 type MsSQLDatabase struct {
-	*commondb.CommonDatabase
+	*commondb.Database
 	dbConfig *DatabaseConfig
 }
 
@@ -94,15 +94,15 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		return nil, errs.Wrap(err, "unable to connect to database")
 	}
 
-	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer, logSQL)
+	commonDb := commondb.New(db, sqlbuilder.SQLServer, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 	commonDb.InsertReturningIdSQL = insertReturningIdSQL
 	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
 
 	mssqlDb := MsSQLDatabase{
-		CommonDatabase: commonDb,
-		dbConfig:       dbConfig,
+		Database: commonDb,
+		dbConfig: dbConfig,
 	}
 	return &mssqlDb, nil
 }
@@ -278,7 +278,7 @@ const (
 	mssqlUniqueIndex      = 2601
 )
 
-// isUniqueViolation is SQL Server's row of the unique-key classifier table WrapSQLError consults.
+// isUniqueViolation is SQL Server's row of the unique-key classifier table commondb's wrapSQLError consults.
 //
 // mssql.Error has VALUE receivers, so both the value and the pointer are errors and the driver
 // hands out one shape from one path and the other from another; errors.As matches only the shape it

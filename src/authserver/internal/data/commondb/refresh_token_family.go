@@ -31,7 +31,7 @@ import (
 // read absent, and the second insert then loses on the key: that is reported as
 // data.ErrUniqueViolation, and a caller reruns its transaction once, because on PostgreSQL the
 // refused insert aborts the transaction it ran in.
-func (d *CommonDatabase) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string,
+func (d *Database) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string,
 	reason string) (bool, error) {
 
 	if firstRefreshTokenJti == "" {
@@ -59,7 +59,7 @@ func (d *CommonDatabase) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx
 		InsertInto("refresh_token_family_revocations", revocation)
 
 	query, args := insertBuilder.Build()
-	_, err = d.ExecSql(ctx, tx, query, args...)
+	_, err = d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to record revoked refresh token family")
 	}
@@ -76,7 +76,7 @@ func (d *CommonDatabase) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx
 // An error and false are different answers: false means the family is not recorded, which lets the
 // token proceed, and an error means the lookup could not be performed, which refuses it. Every
 // failure below propagates, rows.Err() included.
-func (d *CommonDatabase) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error) {
+func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error) {
 
 	if firstRefreshTokenJti == "" {
 		return false, errs.New("can't look up a refresh token family with an empty first refresh token jti")
@@ -87,7 +87,7 @@ func (d *CommonDatabase) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sq
 	selectBuilder.Where(selectBuilder.Equal("first_refresh_token_jti", firstRefreshTokenJti))
 
 	query, args := selectBuilder.BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySql(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}
@@ -112,7 +112,7 @@ func (d *CommonDatabase) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sq
 // record with no member has nothing to refuse: a token needs a parent row to be rotated from, and
 // the last member is gone. A family with any member, live or revoked, keeps its record, so the
 // sweep can never remove the record of a family a rotation in flight still holds the parent of.
-func (d *CommonDatabase) DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error {
+func (d *Database) DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error {
 
 	members := d.Flavor.NewSelectBuilder()
 	members.Select("1").From("refresh_tokens")
@@ -123,7 +123,7 @@ func (d *CommonDatabase) DeleteOrphanedRefreshTokenFamilyRevocations(ctx context
 	deleteBuilder.Where(deleteBuilder.NotExists(members))
 
 	query, args := deleteBuilder.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete orphaned refresh token family revocations")
 	}

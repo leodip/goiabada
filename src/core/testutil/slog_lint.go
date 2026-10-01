@@ -260,7 +260,7 @@ var slogSpreadSites = []slogSpreadSite{
 // core/auditlog, which held the console record's one writer, into it.
 //
 // authserver/internal/data/commondb was the other, and is now listed: #386 gave all 215 Database
-// methods a leading context and carried it into RunInTransaction, ExecSql and QuerySql, so the
+// methods a leading context and carried it into RunInTransaction, ExecSQL and QuerySQL, so the
 // transaction and statement records finally have one to take request_id from. commondb rather
 // than the whole of authserver/internal/data, because the match below is a path prefix and the
 // wider name would also reach the seeder's startup records and the four adapters' connection

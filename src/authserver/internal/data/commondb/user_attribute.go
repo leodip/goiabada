@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error {
+func (d *Database) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error {
 
 	if userAttribute.UserId == 0 {
 		return errs.New("can't create userAttribute with user_id 0")
@@ -39,7 +39,7 @@ func (d *CommonDatabase) CreateUserAttribute(ctx context.Context, tx *sql.Tx, us
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error {
+func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error {
 
 	if userAttribute.Id == 0 {
 		return errs.New("can't update userAttribute with id 0")
@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, us
 	updateBuilder.Where(updateBuilder.Equal("id", userAttribute.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		userAttribute.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userAttribute")
@@ -64,11 +64,11 @@ func (d *CommonDatabase) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, us
 	return nil
 }
 
-func (d *CommonDatabase) getUserAttributeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getUserAttributeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	userAttributeStruct *sqlbuilder.Struct) (*models.UserAttribute, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -90,7 +90,7 @@ func (d *CommonDatabase) getUserAttributeCommon(ctx context.Context, tx *sql.Tx,
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error) {
+func (d *Database) GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error) {
 
 	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
 		For(d.Flavor)
@@ -106,7 +106,7 @@ func (d *CommonDatabase) GetUserAttributeById(ctx context.Context, tx *sql.Tx, u
 	return userAttribute, nil
 }
 
-func (d *CommonDatabase) GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserAttribute, error) {
+func (d *Database) GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserAttribute, error) {
 
 	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
 		For(d.Flavor)
@@ -115,7 +115,7 @@ func (d *CommonDatabase) GetUserAttributesByUserId(ctx context.Context, tx *sql.
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -139,7 +139,7 @@ func (d *CommonDatabase) GetUserAttributesByUserId(ctx context.Context, tx *sql.
 	return userAttributes, nil
 }
 
-func (d *CommonDatabase) DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error {
+func (d *Database) DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
 		For(d.Flavor)
@@ -148,7 +148,7 @@ func (d *CommonDatabase) DeleteUserAttribute(ctx context.Context, tx *sql.Tx, us
 	deleteBuilder.Where(deleteBuilder.Equal("id", userAttributeId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userAttribute")
 	}

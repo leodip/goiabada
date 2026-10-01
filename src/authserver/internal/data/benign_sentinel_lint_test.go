@@ -195,7 +195,7 @@ func assertNoErrorsIsOnBenignSentinels(r testutil.Reporter, root string) {
 		"Use migrator.IsNoChange or migrator.IsNilVersion instead. The runner JOINS a failed "+
 		"unlock, or a failed connection close, onto whatever the operation returned, so the "+
 		"sentinel arrives inside an error that also carries a real failure. errors.Is finds it "+
-		"there and reports the operation as successful, which on the four engine wrappers means "+
+		"there and reports the operation as successful, which at startup means "+
 		"starting the server with the migration lock still held against every other process on "+
 		"the database (#268).",
 		len(found), strings.Join(lines, "\n\t"))
@@ -275,9 +275,8 @@ import "errors"
 
 func isNothingToDo(err error) bool { return errors.Is(err, ErrNoChange) }
 `)
-	// goerrors is not a hypothetical spelling: mssqldb/db.go imports the standard package under
-	// exactly this name today, so a checker keyed on the identifier "errors" misses the one file
-	// where the mistake is nearest to hand. The migrator import is aliased too, because the target
+	// A file may bind the standard package to any name, so a checker keyed on the identifier
+	// "errors" misses every file that does. The migrator import is aliased too, because the target
 	// is read by selector name and must not depend on the package's spelling either.
 	write("authserver/internal/data/mssqldb/db.go", `package mssqldb
 

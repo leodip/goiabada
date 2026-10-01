@@ -21,9 +21,9 @@ import (
 // was written for.
 //
 // It also covers the two insert paths, which are not the same path. SQLite and MySQL insert through
-// ExecSql; PostgreSQL and SQL Server insert through QuerySql, because they need
+// ExecSQL; PostgreSQL and SQL Server insert through QuerySQL, because they need
 // INSERT ... RETURNING / OUTPUT INSERTED for the generated id, and then re-check rows.Err() because
-// the driver may defer a constraint violation to the result set. A translation wired into ExecSql
+// the driver may defer a constraint violation to the result set. A translation wired into ExecSQL
 // alone passes on two engines and fails on the other two, and only this tier can tell.
 func TestCreateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	first := createTestUser(t)
@@ -52,8 +52,8 @@ func TestCreateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 // is what both email PUTs stand on: each answers a lost race 409 only if the engine's refusal of an
 // UPDATE arrives tagged the same way (#414 item 1, #425).
 //
-// It is not the insert path again. UpdateUser writes through ExecSql on all four engines, where
-// PostgreSQL and SQL Server insert through QuerySql, so on those two this is the first case that
+// It is not the insert path again. UpdateUser writes through ExecSQL on all four engines, where
+// PostgreSQL and SQL Server insert through QuerySQL, so on those two this is the first case that
 // takes a real unique violation through the other writer.
 func TestUpdateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	first := createTestUser(t)
@@ -151,7 +151,7 @@ func TestInsert_AnUnrelatedConstraintIsNotErrUniqueViolation(t *testing.T) {
 }
 
 // TestCreateUser_DuplicateEmailInsideATransactionIsErrUniqueViolation covers the other arm of the
-// two writers. ExecSql and QuerySql each branch on whether they were handed a transaction, and the
+// two writers. ExecSQL and QuerySQL each branch on whether they were handed a transaction, and the
 // case above passes nil, so it exercises only the arm that opens its own connection. Most of
 // Goiabada's writes are not like that: every issuance, revocation and credential change runs inside
 // RunInTransaction, so the arm this covers is the one production actually uses.

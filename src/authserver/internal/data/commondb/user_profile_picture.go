@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
+func (d *Database) CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
 
 	if profilePicture.UserId == 0 {
 		return errs.New("can't create profile picture with user_id 0")
@@ -39,7 +39,7 @@ func (d *CommonDatabase) CreateUserProfilePicture(ctx context.Context, tx *sql.T
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
+func (d *Database) UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
 
 	if profilePicture.Id == 0 {
 		return errs.New("can't update profile picture with id 0")
@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdateUserProfilePicture(ctx context.Context, tx *sql.T
 	updateBuilder.Where(updateBuilder.Equal("id", profilePicture.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		profilePicture.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update profile picture")
@@ -64,7 +64,7 @@ func (d *CommonDatabase) UpdateUserProfilePicture(ctx context.Context, tx *sql.T
 	return nil
 }
 
-func (d *CommonDatabase) GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error) {
+func (d *Database) GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error) {
 
 	profilePictureStruct := sqlbuilder.NewStruct(new(models.UserProfilePicture)).
 		For(d.Flavor)
@@ -73,7 +73,7 @@ func (d *CommonDatabase) GetUserProfilePictureByUserId(ctx context.Context, tx *
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -95,7 +95,7 @@ func (d *CommonDatabase) GetUserProfilePictureByUserId(ctx context.Context, tx *
 	return nil, nil
 }
 
-func (d *CommonDatabase) DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error {
 
 	profilePictureStruct := sqlbuilder.NewStruct(new(models.UserProfilePicture)).
 		For(d.Flavor)
@@ -104,7 +104,7 @@ func (d *CommonDatabase) DeleteUserProfilePicture(ctx context.Context, tx *sql.T
 	deleteBuilder.Where(deleteBuilder.Equal("user_id", userId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete profile picture")
 	}
@@ -112,7 +112,7 @@ func (d *CommonDatabase) DeleteUserProfilePicture(ctx context.Context, tx *sql.T
 	return nil
 }
 
-func (d *CommonDatabase) UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error) {
+func (d *Database) UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error) {
 
 	selectBuilder := d.Flavor.NewSelectBuilder()
 	selectBuilder.Select("1").From("user_profile_pictures")
@@ -120,7 +120,7 @@ func (d *CommonDatabase) UserHasProfilePicture(ctx context.Context, tx *sql.Tx, 
 	selectBuilder.Limit(1)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}

@@ -30,7 +30,7 @@ import (
 
 // runInTransactionOwners are the files allowed to call BeginTransaction. One, now: the helper's
 // own body. The four dialect wrappers that used to forward to it are gone, because #416 made the
-// adapters embed *CommonDatabase and promotion needs no wrapper. Relative to the source root,
+// adapters embed *commondb.Database and promotion needs no wrapper. Relative to the source root,
 // forward slashes. Nothing else is exempt, and the list is not the place to put a new owner: an
 // owner that cannot be written as a closure is a design question, not an exemption.
 var runInTransactionOwners = map[string]bool{
@@ -185,11 +185,11 @@ func ok() string { return message }
 
 import "database/sql"
 
-type CommonDatabase struct{ DB *sql.DB }
+type Database struct{ DB *sql.DB }
 
-func (d *CommonDatabase) BeginTransaction() (*sql.Tx, error) { return d.DB.Begin() }
+func (d *Database) BeginTransaction() (*sql.Tx, error) { return d.DB.Begin() }
 
-func (d *CommonDatabase) runTransactionOnce() error { _, err := d.BeginTransaction(); return err }
+func (d *Database) runTransactionOnce() error { _, err := d.BeginTransaction(); return err }
 `)
 	// Accepted: a test file, which interleaves transactions by hand.
 	write("authserver/tests/data/interleave_test.go", `package data

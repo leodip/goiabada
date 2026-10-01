@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error {
+func (d *Database) CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error {
 
 	if userGroup.UserId == 0 {
 		return errs.New("can't create userGroup with user_id 0")
@@ -43,7 +43,7 @@ func (d *CommonDatabase) CreateUserGroup(ctx context.Context, tx *sql.Tx, userGr
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error {
+func (d *Database) UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error {
 
 	if userGroup.Id == 0 {
 		return errs.New("can't update userGroup with id 0")
@@ -59,7 +59,7 @@ func (d *CommonDatabase) UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGr
 	updateBuilder.Where(updateBuilder.Equal("id", userGroup.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		userGroup.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userGroup")
@@ -68,11 +68,11 @@ func (d *CommonDatabase) UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGr
 	return nil
 }
 
-func (d *CommonDatabase) getUserGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getUserGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	userGroupStruct *sqlbuilder.Struct) (*models.UserGroup, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -94,7 +94,7 @@ func (d *CommonDatabase) getUserGroupCommon(ctx context.Context, tx *sql.Tx, sel
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUserGroupById(ctx context.Context, tx *sql.Tx, userGroupId int64) (*models.UserGroup, error) {
+func (d *Database) GetUserGroupById(ctx context.Context, tx *sql.Tx, userGroupId int64) (*models.UserGroup, error) {
 
 	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
@@ -110,7 +110,7 @@ func (d *CommonDatabase) GetUserGroupById(ctx context.Context, tx *sql.Tx, userG
 	return userGroup, nil
 }
 
-func (d *CommonDatabase) GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]models.UserGroup, error) {
+func (d *Database) GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]models.UserGroup, error) {
 
 	if len(userIds) == 0 {
 		return nil, nil
@@ -126,7 +126,7 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx,
 		selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(ctx, tx, sql, args...)
+		rows, err := d.QuerySQL(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -155,7 +155,7 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx,
 	return userGroups, nil
 }
 
-func (d *CommonDatabase) GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserGroup, error) {
+func (d *Database) GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserGroup, error) {
 
 	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
@@ -164,7 +164,7 @@ func (d *CommonDatabase) GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, 
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -188,7 +188,7 @@ func (d *CommonDatabase) GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, 
 	return userGroups, nil
 }
 
-func (d *CommonDatabase) GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error) {
+func (d *Database) GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error) {
 
 	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
@@ -205,7 +205,7 @@ func (d *CommonDatabase) GetUserGroupByUserIdAndGroupId(ctx context.Context, tx 
 	return userGroup, nil
 }
 
-func (d *CommonDatabase) DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error {
+func (d *Database) DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
 		For(d.Flavor)
@@ -214,7 +214,7 @@ func (d *CommonDatabase) DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGr
 	deleteBuilder.Where(deleteBuilder.Equal("id", userGroupId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userGroup")
 	}

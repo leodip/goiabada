@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
 
 	now := time.Now().UTC()
 
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreateRefreshToken(ctx context.Context, tx *sql.Tx, ref
 	return nil
 }
 
-func (d *CommonDatabase) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
 
 	if refreshToken.Id == 0 {
 		return errs.New("can't update refreshToken with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, ref
 	updateBuilder.Where(updateBuilder.Equal("id", refreshToken.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		refreshToken.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update refreshToken")
@@ -76,7 +76,7 @@ func (d *CommonDatabase) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, ref
 // UpdateRefreshToken: the full-row writer already excludes the column through its
 // dont-update struct tag (#106). Stating it in the statement itself means the boundary
 // does not rest on a tag a future writer might not honour.
-func (d *CommonDatabase) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error) {
+func (d *Database) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error) {
 
 	if refreshTokenId == 0 {
 		return false, errs.New("can't mark refresh token with id 0 as revoked")
@@ -94,7 +94,7 @@ func (d *CommonDatabase) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark refresh token as revoked")
 	}
@@ -128,7 +128,7 @@ func (d *CommonDatabase) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.
 // and absorbing it goes wrong in two different directions depending on the data: with
 // no matching rows it hides the bug as a zero-count no-op, and with malformed
 // empty-family rows present it mutates them.
-func (d *CommonDatabase) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+func (d *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
 
 	if firstRefreshTokenJti == "" {
 		return 0, errs.New("can't revoke a refresh token family with an empty first refresh token jti")
@@ -146,7 +146,7 @@ func (d *CommonDatabase) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.T
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke refresh token family")
 	}
@@ -159,11 +159,11 @@ func (d *CommonDatabase) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.T
 	return rowsAffected, nil
 }
 
-func (d *CommonDatabase) getRefreshTokenCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getRefreshTokenCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -185,7 +185,7 @@ func (d *CommonDatabase) getRefreshTokenCommon(ctx context.Context, tx *sql.Tx, 
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
 
 	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
@@ -201,7 +201,7 @@ func (d *CommonDatabase) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, re
 	return refreshToken, nil
 }
 
-func (d *CommonDatabase) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
@@ -226,7 +226,7 @@ func (d *CommonDatabase) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, r
 
 // RefreshTokenLoadUser loads the User entity for ROPC flow refresh tokens.
 // For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
-func (d *CommonDatabase) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
@@ -250,7 +250,7 @@ func (d *CommonDatabase) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, r
 
 // RefreshTokenLoadClient loads the Client entity for ROPC flow refresh tokens.
 // For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
-func (d *CommonDatabase) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
@@ -272,7 +272,7 @@ func (d *CommonDatabase) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx,
 	return nil
 }
 
-func (d *CommonDatabase) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error) {
 
 	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
@@ -288,7 +288,7 @@ func (d *CommonDatabase) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, j
 	return refreshToken, nil
 }
 
-func (d *CommonDatabase) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
 
 	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
@@ -297,7 +297,7 @@ func (d *CommonDatabase) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.T
 	selectBuilder.Where(selectBuilder.Equal("code_id", codeId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -328,7 +328,7 @@ func (d *CommonDatabase) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.T
 // linked code does). An empty sessionIdentifier returns an empty slice with
 // no error: the join would otherwise match every code with an empty
 // session_identifier and over-revoke.
-func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
 
 	if sessionIdentifier == "" {
 		return nil, nil
@@ -342,7 +342,7 @@ func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(ctx context.Context
 	selectBuilder.Where(selectBuilder.Equal("codes.session_identifier", sessionIdentifier))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -366,7 +366,7 @@ func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(ctx context.Context
 	return refreshTokens, nil
 }
 
-func (d *CommonDatabase) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {
+func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
 		For(d.Flavor)
@@ -375,7 +375,7 @@ func (d *CommonDatabase) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, ref
 	deleteBuilder.Where(deleteBuilder.Equal("id", refreshTokenId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete refreshToken")
 	}
@@ -404,13 +404,13 @@ func (d *CommonDatabase) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, ref
 // This runs on every engine rather than only on SQL Server. The other three would
 // have cascaded these rows anyway, so the result is identical, and one code path
 // that all four exercise is worth more than the statement it saves.
-func (d *CommonDatabase) deleteRefreshTokensByColumn(ctx context.Context, tx *sql.Tx, column string, value int64) error {
+func (d *Database) deleteRefreshTokensByColumn(ctx context.Context, tx *sql.Tx, column string, value int64) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("refresh_tokens")
 	deleteBuilder.Where(deleteBuilder.Equal(column, value))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrapf(err, "unable to delete refresh tokens by %v", column)
 	}
@@ -442,7 +442,7 @@ func (d *CommonDatabase) deleteRefreshTokensByColumn(ctx context.Context, tx *sq
 //
 // The storage cost is accepted: with the default 30-day offline idle timeout, a grant
 // rotated every five minutes retains roughly 8,640 detection-relevant revoked rows.
-func (d *CommonDatabase) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error {
+func (d *Database) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("refresh_tokens")
 
@@ -455,7 +455,7 @@ func (d *CommonDatabase) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired refresh tokens")
 	}
@@ -475,7 +475,7 @@ func (d *CommonDatabase) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql
 // Built as two UNION ALL branches rather than one join with an OR across the two
 // tables. The shapes are mutually exclusive, so the union cannot produce duplicates,
 // and each branch can use its own index where the OR would defeat both. (#106)
-func (d *CommonDatabase) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
 
 	if userId == 0 {
 		return nil, nil
@@ -494,7 +494,7 @@ func (d *CommonDatabase) GetRefreshTokensByUserId(ctx context.Context, tx *sql.T
 	direct.Where(direct.Equal("refresh_tokens.user_id", userId))
 
 	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -533,7 +533,7 @@ func (d *CommonDatabase) GetRefreshTokensByUserId(ctx context.Context, tx *sql.T
 // Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: each
 // branch can use its own index where an OR across the two tables would defeat both.
 // (#245)
-func (d *CommonDatabase) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
 
 	if clientId == 0 {
 		return nil, nil
@@ -552,7 +552,7 @@ func (d *CommonDatabase) GetRefreshTokensByClientId(ctx context.Context, tx *sql
 	direct.Where(direct.Equal("refresh_tokens.client_id", clientId))
 
 	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -589,7 +589,7 @@ func (d *CommonDatabase) GetRefreshTokensByClientId(ctx context.Context, tx *sql
 // An empty id list is a no-op. That is not a formality: an empty IN () is a syntax
 // error on some engines and matches everything on others, so it is handled here rather
 // than left to the builder.
-func (d *CommonDatabase) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
+func (d *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
 
 	if len(refreshTokenIds) == 0 {
 		return nil
@@ -620,7 +620,7 @@ func (d *CommonDatabase) PromoteRefreshTokenGenerations(ctx context.Context, tx 
 		)
 
 		sql, args := ub.BuildWithFlavor(d.Flavor)
-		_, err := d.ExecSql(ctx, tx, sql, args...)
+		_, err := d.ExecSQL(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to promote refresh token generations")
 		}

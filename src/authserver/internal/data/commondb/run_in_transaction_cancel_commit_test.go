@@ -34,16 +34,16 @@ import (
 // arm: the body waits for the rollback goroutine to have finished before it returns, so Commit is
 // guaranteed to find the transaction already done and answer sql.ErrTxDone.
 func TestRunInTransaction_ACancellationAfterASuccessfulBodyReturnsTheContextError(t *testing.T) {
-	requested := recordBackoff(t)
 	d := &scriptedDriver{}
 	db := retryingDB(t, d)
+	requested := recordBackoff(db)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ran := 0
 
 	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		ran++
-		if _, execErr := db.ExecSql(ctx, tx, "UPDATE settings SET updated_at = updated_at"); execErr != nil {
+		if _, execErr := db.ExecSQL(ctx, tx, "UPDATE settings SET updated_at = updated_at"); execErr != nil {
 			return execErr
 		}
 		cancel()
@@ -73,16 +73,16 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyReturnsTheContextErro
 // past it: decision 13 keeps the engine's abort reachable beside the context error, and a run
 // cancelled at the commit of its second attempt has one to keep.
 func TestRunInTransaction_ACancellationAfterASuccessfulBodyJoinsTheDeadlockItWasRerunFor(t *testing.T) {
-	recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}}}
 	db := retryingDB(t, d)
+	recordBackoff(db)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ran := 0
 
 	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		ran++
-		_, execErr := db.ExecSql(ctx, tx, "UPDATE settings SET updated_at = updated_at")
+		_, execErr := db.ExecSQL(ctx, tx, "UPDATE settings SET updated_at = updated_at")
 		if execErr != nil {
 			return execErr
 		}
@@ -106,9 +106,9 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyJoinsTheDeadlockItWas
 // finished by something other than this helper, which is a defect and not a cancellation, so it
 // surfaces exactly as it did -- the same shape as the rollback suppression's own negative.
 func TestRunInTransaction_ACommitThatFindsTheTransactionDoneOnALiveContextIsStillTheSentinel(t *testing.T) {
-	recordBackoff(t)
 	d := &scriptedDriver{commitErrs: []error{sql.ErrTxDone}}
 	db := retryingDB(t, d)
+	recordBackoff(db)
 	ran := 0
 
 	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))

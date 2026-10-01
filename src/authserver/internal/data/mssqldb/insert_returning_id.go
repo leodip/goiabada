@@ -10,7 +10,7 @@ import (
 // go-mssqldb does not implement LastInsertId -- it returns an error -- so the id has to come back
 // as a row, and OUTPUT INSERTED.id is how SQL Server says that.
 //
-// It is wired onto commondb.CommonDatabase in the constructor, beside IsDeadlock and
+// It is wired onto commondb.Database in the constructor, beside IsDeadlock and
 // IsUniqueViolation, and commondb.insertReturningId owns everything around it: the query, the
 // scan, and the rows.Err() check that catches a constraint violation the driver deferred to the
 // result set. This function is only the grammar (#416).

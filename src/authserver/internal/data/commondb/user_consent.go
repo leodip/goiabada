@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error {
+func (d *Database) CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error {
 
 	if userConsent.ClientId == 0 {
 		return errs.New("client id must be greater than 0")
@@ -43,7 +43,7 @@ func (d *CommonDatabase) CreateUserConsent(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error {
+func (d *Database) UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error {
 
 	if userConsent.Id == 0 {
 		return errs.New("can't update userConsent with id 0")
@@ -59,7 +59,7 @@ func (d *CommonDatabase) UpdateUserConsent(ctx context.Context, tx *sql.Tx, user
 	updateBuilder.Where(updateBuilder.Equal("id", userConsent.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		userConsent.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userConsent")
@@ -68,11 +68,11 @@ func (d *CommonDatabase) UpdateUserConsent(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-func (d *CommonDatabase) getUserConsentCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getUserConsentCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	userConsentStruct *sqlbuilder.Struct) (*models.UserConsent, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -94,7 +94,7 @@ func (d *CommonDatabase) getUserConsentCommon(ctx context.Context, tx *sql.Tx, s
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*models.UserConsent, error) {
+func (d *Database) GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*models.UserConsent, error) {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).
 		For(d.Flavor)
@@ -110,7 +110,7 @@ func (d *CommonDatabase) GetUserConsentById(ctx context.Context, tx *sql.Tx, use
 	return userConsent, nil
 }
 
-func (d *CommonDatabase) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error) {
+func (d *Database) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error) {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).
 		For(d.Flavor)
@@ -127,7 +127,7 @@ func (d *CommonDatabase) GetConsentByUserIdAndClientId(ctx context.Context, tx *
 	return userConsent, nil
 }
 
-func (d *CommonDatabase) UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []models.UserConsent) error {
+func (d *Database) UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []models.UserConsent) error {
 
 	if userConsents == nil {
 		return nil
@@ -159,7 +159,7 @@ func (d *CommonDatabase) UserConsentsLoadClients(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (d *CommonDatabase) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserConsent, error) {
+func (d *Database) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserConsent, error) {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).
 		For(d.Flavor)
@@ -168,7 +168,7 @@ func (d *CommonDatabase) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, us
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -192,7 +192,7 @@ func (d *CommonDatabase) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, us
 	return userConsents, nil
 }
 
-func (d *CommonDatabase) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error {
+func (d *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).
 		For(d.Flavor)
@@ -201,7 +201,7 @@ func (d *CommonDatabase) DeleteUserConsent(ctx context.Context, tx *sql.Tx, user
 	deleteBuilder.Where(deleteBuilder.Equal("id", userConsentId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userConsent")
 	}
@@ -209,14 +209,14 @@ func (d *CommonDatabase) DeleteUserConsent(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-func (d *CommonDatabase) DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error {
+func (d *Database) DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error {
 	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).
 		For(d.Flavor)
 
 	deleteBuilder := userConsentStruct.DeleteFrom("user_consents")
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userConsent")
 	}

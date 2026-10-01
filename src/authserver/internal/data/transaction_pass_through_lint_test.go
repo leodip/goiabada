@@ -47,7 +47,7 @@ type escapedTransactionCall struct {
 //
 // The transaction position is read from the callee's declaration rather than assumed to be
 // argument zero. That is what makes this rule survive the context migration unedited: once a
-// method takes a context first, the transaction is argument 1, and d.QuerySql(ctx, nil, sql) is
+// method takes a context first, the transaction is argument 1, and d.QuerySQL(ctx, nil, sql) is
 // the same defect written one position along. A hardcoded index would pass it in silence.
 //
 // It returns the findings and the count of files parsed, because a walk that reached nothing
@@ -141,7 +141,7 @@ func findEscapedTransactions(root string) ([]escapedTransactionCall, int, error)
 				if !ok {
 					return true
 				}
-				// Rooted at the receiver, so d.QuerySql(...) counts and so would any
+				// Rooted at the receiver, so d.QuerySQL(...) counts and so would any
 				// selector chain starting there.
 				if leftmostIdent(sel.X) != receiver {
 					return true
@@ -271,7 +271,7 @@ func assertNoEscapedTransactions(r testutil.Reporter, root string) {
 // TestNoEscapedTransactions_TheGuardFailsOnADroppedTransaction is the must-fail half, over both
 // shapes the rule has to catch: today's, where the transaction is argument zero, and the one the
 // context migration leaves behind, where it is argument one. The second is in a tree of its own
-// because the two declarations of QuerySql would otherwise be a single name with two positions,
+// because the two declarations of QuerySQL would otherwise be a single name with two positions,
 // which is a different property and is not what this case is measuring.
 func TestNoEscapedTransactions_TheGuardFailsOnADroppedTransaction(t *testing.T) {
 	// Today's shape: the transaction is argument zero, and the rule is not special-cased to the
@@ -281,13 +281,13 @@ func TestNoEscapedTransactions_TheGuardFailsOnADroppedTransaction(t *testing.T) 
 
 import "database/sql"
 
-type CommonDatabase struct{}
+type Database struct{}
 
-func (d *CommonDatabase) QuerySql(tx *sql.Tx, query string, args ...any) (*sql.Rows, error) {
+func (d *Database) QuerySQL(tx *sql.Tx, query string, args ...any) (*sql.Rows, error) {
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, ids []int64) ([]int64, error) {
+func (d *Database) GetPermissionsByIds(tx *sql.Tx, ids []int64) ([]int64, error) {
 	return nil, nil
 }
 `)
@@ -295,12 +295,12 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, ids []int64) ([]int64, 
 
 import "database/sql"
 
-func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string) error {
-	_, err := d.QuerySql(nil, query)
+func (d *Database) SearchUsersPaginated(tx *sql.Tx, query string) error {
+	_, err := d.QuerySQL(nil, query)
 	return err
 }
 
-func (d *CommonDatabase) ClientLoadPermissions(tx *sql.Tx, ids []int64) error {
+func (d *Database) ClientLoadPermissions(tx *sql.Tx, ids []int64) error {
 	_, err := d.GetPermissionsByIds(nil, ids)
 	return err
 }
@@ -316,7 +316,7 @@ type PostgresDatabase struct{ CommonDB *anything }
 type anything struct{}
 
 func (d *PostgresDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, query string) error {
-	_, err := d.CommonDB.QuerySql(nil, query)
+	_, err := d.CommonDB.QuerySQL(nil, query)
 	return err
 }
 `)
@@ -325,9 +325,9 @@ func (d *PostgresDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, query str
 	require.NoError(t, err)
 	assert.Equal(t, 3, files, "every non-test file under the data package is parsed")
 	assert.Equal(t, []escapedTransactionCall{
-		{file: "authserver/internal/data/commondb/user.go", line: 6, callee: "QuerySql"},
+		{file: "authserver/internal/data/commondb/user.go", line: 6, callee: "QuerySQL"},
 		{file: "authserver/internal/data/commondb/user.go", line: 11, callee: "GetPermissionsByIds"},
-		{file: "authserver/internal/data/postgresdb/user.go", line: 10, callee: "QuerySql"},
+		{file: "authserver/internal/data/postgresdb/user.go", line: 10, callee: "QuerySQL"},
 	}, findings)
 
 	report := testutil.RunGuard(func(r testutil.Reporter) {
@@ -350,14 +350,14 @@ import (
 	"database/sql"
 )
 
-type CommonDatabase struct{}
+type Database struct{}
 
-func (d *CommonDatabase) QuerySql(ctx context.Context, tx *sql.Tx, query string) (*sql.Rows, error) {
+func (d *Database) QuerySQL(ctx context.Context, tx *sql.Tx, query string) (*sql.Rows, error) {
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, query string) error {
-	_, err := d.QuerySql(ctx, nil, query)
+func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, query string) error {
+	_, err := d.QuerySQL(ctx, nil, query)
 	return err
 }
 `)
@@ -366,7 +366,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(ctx context.Context, tx *sql.T
 	require.NoError(t, err)
 	assert.Equal(t, 1, afterFiles)
 	assert.Equal(t, []escapedTransactionCall{
-		{file: "authserver/internal/data/commondb/db.go", line: 15, callee: "QuerySql"},
+		{file: "authserver/internal/data/commondb/db.go", line: 15, callee: "QuerySQL"},
 	}, afterFindings)
 }
 
@@ -379,29 +379,29 @@ func TestNoEscapedTransactions_TheGuardPassesTheShapesItMustAdmit(t *testing.T) 
 
 import "database/sql"
 
-type CommonDatabase struct{}
+type Database struct{}
 
-func (d *CommonDatabase) QuerySql(tx *sql.Tx, query string, args ...any) (*sql.Rows, error) {
+func (d *Database) QuerySQL(tx *sql.Tx, query string, args ...any) (*sql.Rows, error) {
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, ids []int64) ([]int64, error) {
+func (d *Database) GetPermissionsByIds(tx *sql.Tx, ids []int64) ([]int64, error) {
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetSettingsById(tx *sql.Tx, id int64) (any, error) {
+func (d *Database) GetSettingsById(tx *sql.Tx, id int64) (any, error) {
 	return nil, nil
 }
 
 // IsEmpty holds no transaction, so its nil is the pool's next connection and not a dropped one.
-func (d *CommonDatabase) IsEmpty() (bool, error) {
+func (d *Database) IsEmpty() (bool, error) {
 	_, err := d.GetSettingsById(context.Background(), nil, 1)
 	return false, err
 }
 
 // ScanEmailCase is the same shape at the other chokepoint.
-func (d *CommonDatabase) ScanEmailCase() error {
-	_, err := d.QuerySql(nil, "select 1")
+func (d *Database) ScanEmailCase() error {
+	_, err := d.QuerySQL(nil, "select 1")
 	return err
 }
 `)
@@ -409,8 +409,8 @@ func (d *CommonDatabase) ScanEmailCase() error {
 
 import "database/sql"
 
-func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string) error {
-	_, err := d.QuerySql(tx, query)
+func (d *Database) SearchUsersPaginated(tx *sql.Tx, query string) error {
+	_, err := d.QuerySQL(tx, query)
 	if err != nil {
 		return err
 	}

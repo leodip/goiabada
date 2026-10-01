@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
+func (d *Database) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
 
 	now := time.Now().UTC()
 
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreateUserSessionClient(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
+func (d *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
 
 	if userSessionClient.Id == 0 {
 		return errs.New("can't update userSessionClient with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx
 	updateBuilder.Where(updateBuilder.Equal("id", userSessionClient.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		userSessionClient.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userSessionClient")
@@ -60,11 +60,11 @@ func (d *CommonDatabase) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (d *CommonDatabase) getUserSessionClientCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *Database) getUserSessionClientCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -86,7 +86,7 @@ func (d *CommonDatabase) getUserSessionClientCommon(ctx context.Context, tx *sql
 	return nil, nil
 }
 
-func (d *CommonDatabase) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
+func (d *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
 
 	if userSessionClients == nil {
 		return nil
@@ -118,7 +118,7 @@ func (d *CommonDatabase) UserSessionClientsLoadClients(ctx context.Context, tx *
 	return nil
 }
 
-func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
+func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
 
 	if len(userSessionIds) == 0 {
 		return nil, nil
@@ -134,7 +134,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(ctx context.Conte
 		selectBuilder.Where(selectBuilder.In("user_session_id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(ctx, tx, sql, args...)
+		rows, err := d.QuerySQL(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -163,7 +163,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(ctx context.Conte
 	return userSessionClients, nil
 }
 
-func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
+func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
 
 	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
@@ -172,7 +172,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(ctx context.Contex
 	selectBuilder.Where(selectBuilder.Equal("user_session_id", userSessionId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -196,7 +196,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(ctx context.Contex
 	return userSessionClients, nil
 }
 
-func (d *CommonDatabase) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
+func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
 
 	if len(userSessionClientIds) == 0 {
 		return nil, nil
@@ -212,7 +212,7 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(ctx context.Context, tx *sql
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(ctx, tx, sql, args...)
+		rows, err := d.QuerySQL(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -241,7 +241,7 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(ctx context.Context, tx *sql
 	return userSessionClients, nil
 }
 
-func (d *CommonDatabase) GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
+func (d *Database) GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
 
 	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
@@ -257,7 +257,7 @@ func (d *CommonDatabase) GetUserSessionClientById(ctx context.Context, tx *sql.T
 	return userSessionClient, nil
 }
 
-func (d *CommonDatabase) DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error {
+func (d *Database) DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
 		For(d.Flavor)
@@ -266,7 +266,7 @@ func (d *CommonDatabase) DeleteUserSessionClient(ctx context.Context, tx *sql.Tx
 	deleteBuilder.Where(deleteBuilder.Equal("id", userSessionClientId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userSessionClient")
 	}

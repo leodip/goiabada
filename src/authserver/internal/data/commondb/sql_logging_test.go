@@ -20,22 +20,22 @@ import (
 // Decision 8 took the bound arguments out: this used to write a second record listing every
 // value bound to the statement, and nothing at this layer can tell a password hash, a TOTP seed
 // or an encrypted client secret from a page size. Every value the product writes to the database
-// passes through ExecSql or QuerySql, so the negative case below is the one that matters, and it
+// passes through ExecSQL or QuerySQL, so the negative case below is the one that matters, and it
 // binds a sentinel rather than asserting on the shape of the record alone.
 //
 // A real in-memory SQLite database rather than the scripted driver this package's other tests
 // use: what is under test is what reaches the log for a statement that really ran with really
 // bound arguments, and a driver that discards its arguments could not fail this.
 
-// loggingDB opens an in-memory SQLite database behind a CommonDatabase with logSQL set as given.
-func loggingDB(t *testing.T, logSQL bool) *CommonDatabase {
+// loggingDB opens an in-memory SQLite database behind a Database with logSQL set as given.
+func loggingDB(t *testing.T, logSQL bool) *Database {
 	t.Helper()
 
 	db, err := sql.Open("sqlite", ":memory:")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	database := NewCommonDatabase(db, sqlbuilder.SQLite, logSQL)
+	database := New(db, sqlbuilder.SQLite, logSQL)
 	_, err = database.DB.Exec(`CREATE TABLE secrets (id INTEGER PRIMARY KEY, value TEXT)`)
 	require.NoError(t, err, "the table is created behind the logger's back, so nothing it writes is under test yet")
 	return database
@@ -43,11 +43,11 @@ func loggingDB(t *testing.T, logSQL bool) *CommonDatabase {
 
 const boundSentinel = "SENTINEL-bound-credential"
 
-func TestCommonDatabaseLog_ExecSqlWritesOneRecordAndNoBoundValue(t *testing.T) {
+func TestDatabaseLog_ExecSQLWritesOneRecordAndNoBoundValue(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)
 
-	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
+	_, err := database.ExecSQL(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
 	require.NoError(t, err)
 
 	records := logs.Records()
@@ -60,11 +60,11 @@ func TestCommonDatabaseLog_ExecSqlWritesOneRecordAndNoBoundValue(t *testing.T) {
 		"a value bound to the statement must not reach the log: nothing here can tell a credential from a page size")
 }
 
-func TestCommonDatabaseLog_QuerySqlWritesOneRecordAndNoBoundValue(t *testing.T) {
+func TestDatabaseLog_QuerySQLWritesOneRecordAndNoBoundValue(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)
 
-	rows, err := database.QuerySql(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
+	rows, err := database.QuerySQL(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
 	require.NoError(t, err)
 	require.NoError(t, rows.Close())
 
@@ -77,13 +77,13 @@ func TestCommonDatabaseLog_QuerySqlWritesOneRecordAndNoBoundValue(t *testing.T) 
 
 // The off case, which is what makes the on case attributable: without it, a logger that wrote
 // nothing at all would satisfy every assertion above about what is absent.
-func TestCommonDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
+func TestDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, false)
 
-	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
+	_, err := database.ExecSQL(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
 	require.NoError(t, err)
-	rows, err := database.QuerySql(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
+	rows, err := database.QuerySQL(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
 	require.NoError(t, err)
 	require.NoError(t, rows.Close())
 
@@ -94,11 +94,11 @@ func TestCommonDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
 // It is logged, and deliberately: the flag exists to show which queries run, the statements this
 // tree builds come from sqlbuilder with placeholders rather than interpolation, and a caller that
 // concatenated a credential into a statement has a defect this logger is not the place to fix.
-func TestCommonDatabaseLog_LogsTheStatementTextAsWritten(t *testing.T) {
+func TestDatabaseLog_LogsTheStatementTextAsWritten(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)
 
-	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES ('literal')`)
+	_, err := database.ExecSQL(context.Background(), nil, `INSERT INTO secrets (value) VALUES ('literal')`)
 	require.NoError(t, err)
 
 	require.Len(t, logs.Records(), 1)

@@ -1,3 +1,7 @@
+// Package commondb is the SQL every engine shares: the one implementation of data.Database, which
+// each of the four engine packages embeds and overrides only where its own dialect needs a
+// different statement. It also owns the two chokepoints every statement passes through, ExecSQL
+// and QuerySQL, and RunInTransaction, the one way a transaction is opened.
 package commondb
 
 import (
@@ -12,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// CommonDatabase is the one implementation of the Database interface, and the four engine
+// Database is the one implementation of the data.Database interface, and the four engine
 // adapters embed it rather than delegating to it method by method. Each adapter declares only
 // the methods its engine needs different SQL for; every other method is promoted from here, so
 // a query is written once and a signature changes once (#416).
@@ -21,13 +25,13 @@ import (
 // dispatch. A call this package makes on its own receiver resolves to the implementation below
 // at compile time, whatever engine is running, so it never reaches the adapter's override even
 // when the override is the only version that works on that engine.
-// TestCommonDatabase_NoSelfCallToAnOverriddenMethod refuses that call, and #283 is the one that
+// TestDatabase_NoSelfCallToAnOverriddenMethod refuses that call, and #283 is the one that
 // shipped: an audit insert that ended at LastInsertId, which two of the four drivers refuse.
 //
 // The compiler still holds each adapter to the whole interface, so an engine cannot lose a
 // method by omission; what it cannot check is that a method promoted from here is right for
 // that engine.
-type CommonDatabase struct {
+type Database struct {
 	DB     *sql.DB
 	Flavor sqlbuilder.Flavor
 	logSQL bool
@@ -47,7 +51,7 @@ type CommonDatabase struct {
 	// nil, nothing is a unique violation and every failure surfaces untagged, which is what a
 	// handle built directly on this type gets by default rather than by remembering to opt out.
 	//
-	// WrapSQLError is the only consumer: a classified failure leaves the data layer carrying
+	// wrapSQLError is the only consumer: a classified failure leaves the data layer carrying
 	// data.ErrUniqueViolation, so no caller above it ever sees a driver number or a driver sentence
 	// (#279).
 	IsUniqueViolation func(error) bool
@@ -55,7 +59,7 @@ type CommonDatabase struct {
 	// InsertReturningIdSQL rewrites a built INSERT so that the engine reports the new row's id
 	// in a result set. Each dialect sets it in its constructor, because only the engine's own
 	// grammar says how: PostgreSQL appends RETURNING id, SQL Server splices OUTPUT INSERTED.id
-	// in front of VALUES. Left nil, the insert goes through ExecSql and the id is read from
+	// in front of VALUES. Left nil, the insert goes through ExecSQL and the id is read from
 	// LastInsertId, which is what SQLite and MySQL do, and which is what a handle built
 	// directly on this type gets by default rather than by remembering to opt out.
 	//
@@ -72,17 +76,27 @@ type CommonDatabase struct {
 	// MySQL do, since both advance their counters past an explicit id. CreateInitialSettings is
 	// the only consumer (#424 decision 14).
 	ExplicitIdInsertSQL func(table string) (before []string, after []string)
+
+	// sleep is the pause between attempts, set by New to waitOrCancel. It is a field rather than
+	// a call so a test can record the durations REQUESTED rather than time the wall clock, where a
+	// scheduler stall longer than the gap between the two values reverses the comparison on a
+	// correct helper. A field and not a package variable, so that replacing it changes one value
+	// and leaves every other test free to run in parallel with the one that did (#438).
+	sleep func(ctx context.Context, d time.Duration) error
 }
 
-func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *CommonDatabase {
-	return &CommonDatabase{
+// New builds the shared implementation over db, writing SQL for flavor. The engine packages call
+// it and then install their classifiers and hooks on the result.
+func New(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *Database {
+	return &Database{
 		DB:     db,
 		Flavor: flavor,
 		logSQL: logSQL,
+		sleep:  waitOrCancel,
 	}
 }
 
-func (d *CommonDatabase) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
+func (d *Database) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
 	if d.logSQL {
 		slog.InfoContext(ctx, "beginning transaction")
 	}
@@ -98,7 +112,7 @@ func (d *CommonDatabase) BeginTransaction(ctx context.Context) (*sql.Tx, error) 
 	return tx, nil
 }
 
-func (d *CommonDatabase) CommitTransaction(ctx context.Context, tx *sql.Tx) error {
+func (d *Database) CommitTransaction(ctx context.Context, tx *sql.Tx) error {
 	if d.logSQL {
 		slog.InfoContext(ctx, "committing transaction")
 	}
@@ -110,7 +124,7 @@ func (d *CommonDatabase) CommitTransaction(ctx context.Context, tx *sql.Tx) erro
 	return nil
 }
 
-func (d *CommonDatabase) RollbackTransaction(ctx context.Context, tx *sql.Tx) error {
+func (d *Database) RollbackTransaction(ctx context.Context, tx *sql.Tx) error {
 	if d.logSQL {
 		slog.InfoContext(ctx, "rolling back transaction")
 	}
@@ -127,15 +141,13 @@ func (d *CommonDatabase) RollbackTransaction(ctx context.Context, tx *sql.Tx) er
 // and the survivor is already past the rows it wanted; the pause only lets the survivor commit.
 var runInTransactionBackoff = [...]time.Duration{25 * time.Millisecond, 100 * time.Millisecond}
 
-// sleep is the pause between attempts, a seam so a test can record the durations REQUESTED
-// rather than time the wall clock, where a scheduler stall longer than the gap between the two
-// values reverses the comparison on a correct helper.
+// waitOrCancel is the real pause between attempts, the one New installs as Database.sleep.
 //
 // It takes the context and returns its error because the pause has to be interruptible: a caller
 // that is already gone should not be held for another 100ms and then handed a fresh transaction.
-// time.Sleep cannot be interrupted, so the wait is a select on ctx.Done(); the seam is still this
-// variable, and a test that wants the real wait keeps it.
-var sleep = func(ctx context.Context, d time.Duration) error {
+// time.Sleep cannot be interrupted, so the wait is a select on ctx.Done(); the seam is still the
+// field, and a test that wants the real wait keeps it.
+func waitOrCancel(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {
@@ -176,7 +188,7 @@ var sleep = func(ctx context.Context, d time.Duration) error {
 // Rollback failures on the error path are logged and never returned: MySQL has already rolled a
 // deadlock victim back server-side and says so, and returning that would replace the error the
 // caller needs with a bookkeeping one.
-func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (d *Database) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	const attempts = 3
 
 	var lastDeadlock error
@@ -186,7 +198,7 @@ func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.T
 		}
 
 		if attempt > 1 {
-			if err := sleep(ctx, runInTransactionBackoff[attempt-2]); err != nil {
+			if err := d.sleep(ctx, runInTransactionBackoff[attempt-2]); err != nil {
 				return abandoned(err, lastDeadlock)
 			}
 			slog.WarnContext(ctx, "rerunning a transaction the engine aborted as a deadlock victim",
@@ -270,7 +282,7 @@ func abandoned(cancelled error, lastDeadlock error) error {
 // runTransactionOnce is one attempt. Its own function so the rollback is deferred, which is
 // what makes a panicking fn leave no open transaction behind: the connection goes back to the
 // pool clean instead of holding its locks until the pool closes it.
-func (d *CommonDatabase) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (d *Database) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	tx, err := d.BeginTransaction(ctx)
 	if err != nil {
 		return err
@@ -309,17 +321,17 @@ func (d *CommonDatabase) runTransactionOnce(ctx context.Context, fn func(tx *sql
 }
 
 // deadlock consults the dialect's classifier, treating none as "nothing is a deadlock".
-func (d *CommonDatabase) deadlock(err error) bool {
+func (d *Database) deadlock(err error) bool {
 	return d.IsDeadlock != nil && d.IsDeadlock(err)
 }
 
 // uniqueViolation consults the dialect's classifier, treating none as "nothing is a unique
 // violation".
-func (d *CommonDatabase) uniqueViolation(err error) bool {
+func (d *Database) uniqueViolation(err error) bool {
 	return d.IsUniqueViolation != nil && d.IsUniqueViolation(err)
 }
 
-// WrapSQLError wraps a failure the driver reported with msg, tagging a unique-key violation with
+// wrapSQLError wraps a failure the driver reported with msg, tagging a unique-key violation with
 // the data.ErrUniqueViolation sentinel first. Nil in, nil out.
 //
 // It is the one place a driver's dialect-specific refusal becomes something the rest of the tree
@@ -331,13 +343,7 @@ func (d *CommonDatabase) uniqueViolation(err error) bool {
 // prefix is the only change to what this layer has always printed. errs.Errorf carries both %w
 // verbs, so the sentinel and the driver error are both unwrappable and the tree still holds exactly
 // one stack, the origin's, since neither operand brought one.
-//
-// Exported because two engine packages need it: PostgreSQL and SQL Server insert through
-// INSERT ... RETURNING / OUTPUT INSERTED and then re-check rows.Err(), because those drivers can
-// defer a constraint violation to the result set rather than returning it from the query. That arm
-// lives in their own packages and would otherwise be the one path on which the sentinel never
-// appears (#279).
-func (d *CommonDatabase) WrapSQLError(err error, msg string) error {
+func (d *Database) wrapSQLError(err error, msg string) error {
 	if err == nil {
 		return nil
 	}
@@ -356,7 +362,7 @@ func (d *CommonDatabase) WrapSQLError(err error, msg string) error {
 // through RunInTransaction, so a deadlock reruns fn; handed one, it is a nested callee
 // and returns the error to the owner, whose rerun covers the whole body rather than
 // this piece of it.
-func (d *CommonDatabase) inTransaction(ctx context.Context, tx *sql.Tx, fn func(tx *sql.Tx) error) error {
+func (d *Database) inTransaction(ctx context.Context, tx *sql.Tx, fn func(tx *sql.Tx) error) error {
 	if tx != nil {
 		return fn(tx)
 	}
@@ -364,7 +370,7 @@ func (d *CommonDatabase) inTransaction(ctx context.Context, tx *sql.Tx, fn func(
 	return d.RunInTransaction(ctx, fn)
 }
 
-// Log writes one record per statement when GOIABADA_AUTHSERVER_LOG_SQL is on.
+// log writes one record per statement when GOIABADA_AUTHSERVER_LOG_SQL is on.
 //
 // It takes no arguments beyond the statement, and that is the point rather than a
 // simplification. It used to write a second record listing every bound value, and
@@ -374,32 +380,32 @@ func (d *CommonDatabase) inTransaction(ctx context.Context, tx *sql.Tx, fn func(
 // what it writes (#145, #159), and a flag an operator turns on to see which
 // queries run should not be the one path that publishes what they ran with.
 // Restore the arguments and the log carries credentials in the clear (#320).
-func (d *CommonDatabase) Log(ctx context.Context, sql string) {
+func (d *Database) log(ctx context.Context, sql string) {
 	if d.logSQL {
 		slog.InfoContext(ctx, "sql", "statement", sql)
 	}
 }
 
-func (d *CommonDatabase) ExecSql(ctx context.Context, tx *sql.Tx, sql string, args ...any) (sql.Result, error) {
+func (d *Database) ExecSQL(ctx context.Context, tx *sql.Tx, sql string, args ...any) (sql.Result, error) {
 
-	d.Log(ctx, sql)
+	d.log(ctx, sql)
 
 	if tx != nil {
 		result, err := tx.ExecContext(ctx, sql, args...)
 		if err != nil {
-			return nil, d.WrapSQLError(err, "unable to execute SQL")
+			return nil, d.wrapSQLError(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
 	result, err := d.DB.ExecContext(ctx, sql, args...)
 	if err != nil {
-		return nil, d.WrapSQLError(err, "unable to execute SQL")
+		return nil, d.wrapSQLError(err, "unable to execute SQL")
 	}
 	return result, nil
 }
 
-// QuerySql runs a query and returns its rows.
+// QuerySQL runs a query and returns its rows.
 //
 // Callers must check rows.Err() once iteration stops, not only the error returned
 // here. A driver is free to report a failure through the result set rather than
@@ -409,20 +415,20 @@ func (d *CommonDatabase) ExecSql(ctx context.Context, tx *sql.Tx, sql string, ar
 // without the check a failed read is indistinguishable from a legitimate absence.
 // For the getters behind permission and session lookups, that is the wrong
 // direction to fail in.
-func (d *CommonDatabase) QuerySql(ctx context.Context, tx *sql.Tx, sql string, args ...any) (*sql.Rows, error) {
-	d.Log(ctx, sql)
+func (d *Database) QuerySQL(ctx context.Context, tx *sql.Tx, sql string, args ...any) (*sql.Rows, error) {
+	d.log(ctx, sql)
 
 	if tx != nil {
 		result, err := tx.QueryContext(ctx, sql, args...)
 		if err != nil {
-			return nil, d.WrapSQLError(err, "unable to execute SQL")
+			return nil, d.wrapSQLError(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
 	rows, err := d.DB.QueryContext(ctx, sql, args...)
 	if err != nil {
-		return nil, d.WrapSQLError(err, "unable to execute SQL")
+		return nil, d.wrapSQLError(err, "unable to execute SQL")
 	}
 	return rows, nil
 }
@@ -443,15 +449,15 @@ func (d *CommonDatabase) QuerySql(ctx context.Context, tx *sql.Tx, sql string, a
 // then Next() simply reports no row. Without the rows.Err() check the insert would read as a
 // success with id 0, and data.ErrUniqueViolation -- which the handler above needs to answer 409
 // rather than 500 -- would be unreachable on exactly the two engines that take this arm. It goes
-// through WrapSQLError rather than errs.Wrap for that reason; the failure QuerySql itself returns
-// has already been through WrapSQLError (#279).
-func (d *CommonDatabase) insertReturningId(ctx context.Context, tx *sql.Tx,
+// through wrapSQLError rather than errs.Wrap for that reason; the failure QuerySQL itself returns
+// has already been through wrapSQLError (#279).
+func (d *Database) insertReturningId(ctx context.Context, tx *sql.Tx,
 	insertBuilder *sqlbuilder.InsertBuilder, noun string) (int64, error) {
 
 	statement, args := insertBuilder.Build()
 
 	if d.InsertReturningIdSQL == nil {
-		result, err := d.ExecSql(ctx, tx, statement, args...)
+		result, err := d.ExecSQL(ctx, tx, statement, args...)
 		if err != nil {
 			return 0, errs.Wrap(err, "unable to insert "+noun)
 		}
@@ -468,7 +474,7 @@ func (d *CommonDatabase) insertReturningId(ctx context.Context, tx *sql.Tx,
 		return 0, err
 	}
 
-	rows, err := d.QuerySql(ctx, tx, statement, args...)
+	rows, err := d.QuerySQL(ctx, tx, statement, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to insert "+noun)
 	}
@@ -482,13 +488,13 @@ func (d *CommonDatabase) insertReturningId(ctx context.Context, tx *sql.Tx,
 	}
 
 	if err := rows.Err(); err != nil {
-		return 0, d.WrapSQLError(err, "unable to insert "+noun)
+		return 0, d.wrapSQLError(err, "unable to insert "+noun)
 	}
 
 	return id, nil
 }
 
-func (d *CommonDatabase) IsEmpty(ctx context.Context) (bool, error) {
+func (d *Database) IsEmpty(ctx context.Context) (bool, error) {
 	settings, err := d.GetSettingsById(ctx, nil, initialSettingsId)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to check if database is empty")

@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error {
+func (d *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error {
 
 	if clientLogo.ClientId == 0 {
 		return errs.New("can't create client logo with client_id 0")
@@ -39,7 +39,7 @@ func (d *CommonDatabase) CreateClientLogo(ctx context.Context, tx *sql.Tx, clien
 	return nil
 }
 
-func (d *CommonDatabase) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error {
+func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error {
 
 	if clientLogo.Id == 0 {
 		return errs.New("can't update client logo with id 0")
@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clien
 	updateBuilder.Where(updateBuilder.Equal("id", clientLogo.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		clientLogo.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update client logo")
@@ -64,7 +64,7 @@ func (d *CommonDatabase) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clien
 	return nil
 }
 
-func (d *CommonDatabase) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error) {
+func (d *Database) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error) {
 
 	clientLogoStruct := sqlbuilder.NewStruct(new(models.ClientLogo)).
 		For(d.Flavor)
@@ -73,7 +73,7 @@ func (d *CommonDatabase) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx
 	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -95,7 +95,7 @@ func (d *CommonDatabase) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx
 	return nil, nil
 }
 
-func (d *CommonDatabase) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error {
+func (d *Database) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error {
 
 	clientLogoStruct := sqlbuilder.NewStruct(new(models.ClientLogo)).
 		For(d.Flavor)
@@ -104,7 +104,7 @@ func (d *CommonDatabase) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clien
 	deleteBuilder.Where(deleteBuilder.Equal("client_id", clientId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete client logo")
 	}
@@ -112,7 +112,7 @@ func (d *CommonDatabase) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clien
 	return nil
 }
 
-func (d *CommonDatabase) ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
+func (d *Database) ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
 
 	selectBuilder := d.Flavor.NewSelectBuilder()
 	selectBuilder.Select("1").From("client_logos")
@@ -120,7 +120,7 @@ func (d *CommonDatabase) ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId
 	selectBuilder.Limit(1)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}

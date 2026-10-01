@@ -4,7 +4,7 @@ package postgresdb
 // pgx's database/sql wrapper does not implement LastInsertId at all -- it returns an error -- so
 // the id has to come back as a row, and RETURNING is how PostgreSQL says that.
 //
-// It is wired onto commondb.CommonDatabase in the constructor, beside IsDeadlock and
+// It is wired onto commondb.Database in the constructor, beside IsDeadlock and
 // IsUniqueViolation, and commondb.insertReturningId owns everything around it: the query, the
 // scan, and the rows.Err() check that catches a constraint violation the driver deferred to the
 // result set. This function is only the grammar (#416).
