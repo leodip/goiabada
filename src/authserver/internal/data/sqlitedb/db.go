@@ -77,7 +77,28 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 		return nil, errs.Wrap(err, "unable to connect to database")
 	}
 
-	// Execute PRAGMA statements directly
+	// Closed on a refused PRAGMA as on a refused ping, because the caller is handed no database to
+	// close: a read-only file in DELETE journal mode connects, refuses WAL, and its pool used to
+	// keep the file's descriptor for the life of the process (#438).
+	if err = applyPragmas(ctx, db, dsn); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "connected to sqlite database with required PRAGMA settings")
+	commonDb := commondb.New(db, sqlbuilder.SQLite, logSQL)
+	commonDb.IsDeadlock = isDeadlock
+	commonDb.IsUniqueViolation = isUniqueViolation
+	sqliteDb := Database{
+		Database: commonDb,
+	}
+
+	return &sqliteDb, nil
+}
+
+// applyPragmas sets the PRAGMAs Goiabada requires on db and reads each back, refusing a value
+// that did not take. WAL is skipped for an in-memory database, which has no journal file.
+func applyPragmas(ctx context.Context, db *sql.DB, dsn string) error {
 	pragmaStatements := []string{
 		"PRAGMA foreign_keys = ON;",
 		"PRAGMA busy_timeout = 5000;",
@@ -90,9 +111,8 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	}
 
 	for _, stmt := range pragmaStatements {
-		_, err = db.ExecContext(ctx, stmt)
-		if err != nil {
-			return nil, errs.Wrapf(err, "failed to execute %s", stmt)
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			return errs.Wrapf(err, "failed to execute %s", stmt)
 		}
 	}
 
@@ -117,24 +137,14 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 
 	for _, check := range pragmaChecks {
 		var value any
-		err = db.QueryRowContext(ctx, check.query).Scan(&value)
-		if err != nil {
-			return nil, errs.Wrapf(err, "unable to check %s status", check.name)
+		if err := db.QueryRowContext(ctx, check.query).Scan(&value); err != nil {
+			return errs.Wrapf(err, "unable to check %s status", check.name)
 		}
 		if fmt.Sprintf("%v", value) != fmt.Sprintf("%v", check.expected) {
-			return nil, errs.Errorf("%s is not set correctly. Expected %v, got %v", check.name, check.expected, value)
+			return errs.Errorf("%s is not set correctly. Expected %v, got %v", check.name, check.expected, value)
 		}
 	}
-
-	slog.InfoContext(ctx, "connected to sqlite database with required PRAGMA settings")
-	commonDb := commondb.New(db, sqlbuilder.SQLite, logSQL)
-	commonDb.IsDeadlock = isDeadlock
-	commonDb.IsUniqueViolation = isUniqueViolation
-	sqliteDb := Database{
-		Database: commonDb,
-	}
-
-	return &sqliteDb, nil
+	return nil
 }
 
 // isDeadlock is SQLite's half of RunInTransaction's classifier, and it is always false: the
