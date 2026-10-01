@@ -331,7 +331,7 @@ func TestAuthorizeRequest_MethodsEnlistInTheCallersTransaction(t *testing.T) {
 // SQLite, whose single connection cannot hold two consumers open at once, so the interleaving can
 // never occur there; the sequential case above is the arbiter it exercises.
 func TestAuthorizeRequest_TwoOverlappingConsumersHaveExactlyOneWinner(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("SQLite has one connection, so two consumers cannot both hold a read open; the sequential case covers it")
 	}
 	other := secondDatabase(t) // before anything is held: see secondDatabase for why

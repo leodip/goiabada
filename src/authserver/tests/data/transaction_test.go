@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -100,10 +101,10 @@ func TestTransaction_ReadYourWritesInsideTransaction(t *testing.T) {
 // unrelated reasons, so it runs on mysql and postgres only.
 func TestTransaction_UncommittedWriteIsNotVisibleOutside(t *testing.T) {
 	switch dbType() {
-	case "", "sqlite":
+	case data.SQLite:
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a read outside " +
 			"an open transaction would queue behind it and the test would hang rather than fail")
-	case "mssql":
+	case data.MSSQL:
 		t.Skip("SQL Server's default READ COMMITTED takes shared row locks rather than reading a " +
 			"snapshot, so reading the uncommitted row would block until the transaction ended " +
 			"instead of returning nothing")

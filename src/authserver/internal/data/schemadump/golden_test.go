@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,7 +61,7 @@ const sampleMigrated = 43
 // sampleGolden is sampleSchema as one engine's whole golden record, which is what Encode now
 // takes. Written as a helper because every case below needs the same three fields and only
 // one of them varies per case.
-func sampleGolden(d Dialect) Golden {
+func sampleGolden(d data.Dialect) Golden {
 	return Golden{Dialect: d, Migrated: sampleMigrated, Schema: sampleSchema()}
 }
 
@@ -72,7 +73,7 @@ func sampleGolden(d Dialect) Golden {
 // The one field that does not survive verbatim is a name the engine invented, which is
 // masked on purpose, so the expectation is the masked schema rather than the input.
 func TestGoldenRoundTrip(t *testing.T) {
-	for _, d := range []Dialect{SQLite, MySQL, Postgres, MSSQL} {
+	for _, d := range []data.Dialect{data.SQLite, data.MySQL, data.Postgres, data.MSSQL} {
 		encoded, err := Encode(sampleGolden(d))
 		require.NoErrorf(t, err, "Encode on %s", d)
 
@@ -132,7 +133,7 @@ func TestGoldenMasksOnlyEngineInventedNames(t *testing.T) {
 		},
 	}}}
 
-	encoded, err := Encode(Golden{Dialect: MSSQL, Migrated: sampleMigrated, Schema: schema})
+	encoded, err := Encode(Golden{Dialect: data.MSSQL, Migrated: sampleMigrated, Schema: schema})
 	require.NoError(t, err)
 	got, err := Parse(encoded)
 	require.NoError(t, err)
@@ -162,7 +163,7 @@ func TestGoldenKeepsTwoMaskedIndexesApart(t *testing.T) {
 		},
 	}}}
 
-	encoded, err := Encode(Golden{Dialect: MSSQL, Migrated: sampleMigrated, Schema: schema})
+	encoded, err := Encode(Golden{Dialect: data.MSSQL, Migrated: sampleMigrated, Schema: schema})
 	require.NoError(t, err)
 	got, err := Parse(encoded)
 	require.NoError(t, err)
@@ -180,7 +181,7 @@ func TestGoldenKeepsTwoMaskedIndexesApart(t *testing.T) {
 // decided by the encoder. Reversing every slice on the way in must change nothing on the way
 // out.
 func TestGoldenIsDeterministic(t *testing.T) {
-	forward, err := Encode(sampleGolden(MySQL))
+	forward, err := Encode(sampleGolden(data.MySQL))
 	require.NoError(t, err)
 
 	shuffled := sampleSchema()
@@ -190,7 +191,7 @@ func TestGoldenIsDeterministic(t *testing.T) {
 		reverse(shuffled[i].Table.Indexes)
 		reverse(shuffled[i].Table.ForeignKeys)
 	}
-	backward, err := Encode(Golden{Dialect: MySQL, Migrated: sampleMigrated, Schema: shuffled})
+	backward, err := Encode(Golden{Dialect: data.MySQL, Migrated: sampleMigrated, Schema: shuffled})
 	require.NoError(t, err)
 
 	assert.Equal(t, string(forward), string(backward), "the input order must not reach the file")
@@ -206,13 +207,13 @@ func reverse[T any](s []T) {
 // the encoder instead. An empty file compared against an empty file reads as "nothing
 // changed" and passes, which is the one outcome that would make the whole check worthless.
 func TestEncodeRefusesAnEmptyDump(t *testing.T) {
-	_, err := Encode(Golden{Dialect: SQLite, Migrated: sampleMigrated, Schema: Schema{}})
+	_, err := Encode(Golden{Dialect: data.SQLite, Migrated: sampleMigrated, Schema: Schema{}})
 	assert.Error(t, err, "an empty schema is a fault, not a result")
 
-	_, err = Encode(Golden{Dialect: SQLite, Migrated: sampleMigrated, Schema: Schema{{Name: "t"}}})
+	_, err = Encode(Golden{Dialect: data.SQLite, Migrated: sampleMigrated, Schema: Schema{{Name: "t"}}})
 	assert.Error(t, err, "a table with no columns is a fault, not a result")
 
-	_, err = Encode(Golden{Dialect: Dialect("oracle"), Migrated: sampleMigrated, Schema: sampleSchema()})
+	_, err = Encode(Golden{Dialect: data.Dialect("oracle"), Migrated: sampleMigrated, Schema: sampleSchema()})
 	assert.Error(t, err, "an unrecognised dialect must not be encoded")
 }
 
@@ -225,11 +226,11 @@ func TestEncodeRefusesAnEmptyDump(t *testing.T) {
 // Each case differs from the accepting twin above in the Migrated field alone.
 func TestEncodeRefusesAnUnmigratedVersion(t *testing.T) {
 	for _, migrated := range []int{0, -1} {
-		_, err := Encode(Golden{Dialect: SQLite, Migrated: migrated, Schema: sampleSchema()})
+		_, err := Encode(Golden{Dialect: data.SQLite, Migrated: migrated, Schema: sampleSchema()})
 		assert.Errorf(t, err, "migration version %d is not a migrated database", migrated)
 	}
 
-	_, err := Encode(Golden{Dialect: SQLite, Migrated: 1, Schema: sampleSchema()})
+	_, err := Encode(Golden{Dialect: data.SQLite, Migrated: 1, Schema: sampleSchema()})
 	assert.NoError(t, err, "the twin differing only in the version is accepted, so the case above tests the version")
 }
 
@@ -238,7 +239,7 @@ func TestEncodeRefusesAnUnmigratedVersion(t *testing.T) {
 // write, a hand edit. Reading one leniently would turn a corrupted record into a smaller
 // schema that compares equal to another smaller schema.
 func TestParseRefusesADamagedFile(t *testing.T) {
-	good, err := Encode(sampleGolden(Postgres))
+	good, err := Encode(sampleGolden(data.Postgres))
 	require.NoError(t, err)
 	lines := strings.Split(strings.TrimRight(string(good), "\n"), "\n")
 
@@ -308,7 +309,7 @@ func TestGoldenPath(t *testing.T) {
 	root, err := SourceRoot()
 	require.NoError(t, err, "the test's own working directory is inside the repository")
 
-	for _, d := range []Dialect{SQLite, MySQL, Postgres, MSSQL} {
+	for _, d := range []data.Dialect{data.SQLite, data.MySQL, data.Postgres, data.MSSQL} {
 		path, goldenPathErr := GoldenPath(d)
 		require.NoErrorf(t, goldenPathErr, "GoldenPath(%s)", d)
 		assert.Equalf(t, filepath.Join(root, "authserver", "internal", "data", string(d)+"db", "schema.golden"), path,
@@ -317,7 +318,7 @@ func TestGoldenPath(t *testing.T) {
 		assert.NoErrorf(t, statErr, "the directory holding the %s golden file exists", d)
 	}
 
-	_, err = GoldenPath(Dialect("oracle"))
+	_, err = GoldenPath(data.Dialect("oracle"))
 	assert.Error(t, err, "an unrecognised dialect names no golden file")
 }
 

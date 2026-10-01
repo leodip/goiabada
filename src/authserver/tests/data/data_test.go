@@ -67,20 +67,6 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	// Log database configuration
-	dbType := appConfig.Database.Type
-	slog.Info(fmt.Sprintf("running data tests for %s", dbType))
-
-	switch dbType {
-	case "mysql", "postgres":
-		slog.Info("config.DBUsername=" + appConfig.Database.Username)
-		slog.Info("config.DBHost=" + appConfig.Database.Host)
-		slog.Info("config.DBPort=" + fmt.Sprintf("%d", appConfig.Database.Port))
-		slog.Info("config.DBName=" + appConfig.Database.Name)
-	case "sqlite":
-		slog.Info("config.DBDSN=" + appConfig.Database.DSN)
-	}
-
 	// Initialize database
 	var err error
 	database, err = datafactory.NewDatabase(context.Background(), &appConfig.Database,
@@ -88,6 +74,20 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		slog.Error("failed to initialize database", "error", err)
 		os.Exit(1)
+	}
+
+	// Log database configuration. After the open, because the open is what refuses a type that
+	// does not parse, so dbType() cannot panic here.
+	slog.Info(fmt.Sprintf("running data tests for %s", dbType()))
+
+	switch dbType() {
+	case data.MySQL, data.Postgres:
+		slog.Info("config.DBUsername=" + appConfig.Database.Username)
+		slog.Info("config.DBHost=" + appConfig.Database.Host)
+		slog.Info("config.DBPort=" + fmt.Sprintf("%d", appConfig.Database.Port))
+		slog.Info("config.DBName=" + appConfig.Database.Name)
+	case data.SQLite:
+		slog.Info("config.DBDSN=" + appConfig.Database.DSN)
 	}
 
 	// Run tests

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,23 +54,20 @@ func assertAuthorizeRequestsShape(t *testing.T, h *isolatedDB, when string) {
 
 	// The pin each engine's catalog reports for a string column: MySQL and SQL Server spell the
 	// case-sensitive collation; PostgreSQL and SQLite compare byte-wise by default and report it.
-	stringCollation := map[string]string{
-		"mysql":    "utf8mb4_0900_as_cs",
-		"mssql":    "Latin1_General_100_CS_AS_KS_WS_SC_UTF8",
-		"postgres": "default",
-		"sqlite":   "BINARY",
+	stringCollation := map[data.Dialect]string{
+		data.MySQL:    "utf8mb4_0900_as_cs",
+		data.MSSQL:    "Latin1_General_100_CS_AS_KS_WS_SC_UTF8",
+		data.Postgres: "default",
+		data.SQLite:   "BINARY",
 	}
-	handleHashType := map[string]string{
-		"mysql": "varchar(64)", "postgres": "character varying(64)", "mssql": "nvarchar(64)", "sqlite": "TEXT",
+	handleHashType := map[data.Dialect]string{
+		data.MySQL: "varchar(64)", data.Postgres: "character varying(64)", data.MSSQL: "nvarchar(64)", data.SQLite: "TEXT",
 	}
 	// The unbounded type of each engine. MySQL's TEXT stops at 65,535 bytes, so it is LONGTEXT.
-	requestFormType := map[string]string{
-		"mysql": "longtext", "postgres": "text", "mssql": "nvarchar(max)", "sqlite": "TEXT",
+	requestFormType := map[data.Dialect]string{
+		data.MySQL: "longtext", data.Postgres: "text", data.MSSQL: "nvarchar(max)", data.SQLite: "TEXT",
 	}
 	engine := dbType()
-	if engine == "" {
-		engine = "sqlite"
-	}
 
 	shape := dumpTable(t, h, "authorize_requests")
 

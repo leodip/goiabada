@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,7 +93,7 @@ func seedPreMigration000024User(t *testing.T, h *isolatedDB) int64 {
 
 	// boolean columns are `boolean` on PostgreSQL and integer-like everywhere else.
 	falseLit := "0"
-	if dbType() == "postgres" {
+	if dbType() == data.Postgres {
 		falseLit = "false"
 	}
 
@@ -151,13 +152,13 @@ func generationColumnShape000024(t *testing.T, h *isolatedDB, table string) (boo
 	const col = "auth_state_generation"
 	var q string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		q = fmt.Sprintf(`SELECT IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.columns
 			WHERE table_schema = DATABASE() AND table_name = '%s' AND column_name = '%s'`, table, col)
-	case "postgres":
+	case data.Postgres:
 		q = fmt.Sprintf(`SELECT is_nullable, column_default FROM information_schema.columns
 			WHERE table_name = '%s' AND column_name = '%s'`, table, col)
-	case "mssql":
+	case data.MSSQL:
 		q = fmt.Sprintf(`SELECT CAST(c.is_nullable AS VARCHAR(1)), dc.definition
 			FROM sys.columns c
 			LEFT JOIN sys.default_constraints dc
@@ -174,9 +175,9 @@ func generationColumnShape000024(t *testing.T, h *isolatedDB, table string) (boo
 
 	notNull := false
 	switch dbType() {
-	case "mysql", "postgres":
+	case data.MySQL, data.Postgres:
 		notNull = strings.EqualFold(nullFlag.String, "NO")
-	case "mssql":
+	case data.MSSQL:
 		notNull = nullFlag.String == "0"
 	default: // sqlite
 		notNull = nullFlag.String == "1"
@@ -201,7 +202,7 @@ type expectedIndex000024 struct {
 // Mirrors decision 10's table in the spec. If that table and this list disagree, the
 // spec is wrong, not this test.
 func expectedIndexes000024() []expectedIndex000024 {
-	if dbType() == "mysql" {
+	if dbType() == data.MySQL {
 		return []expectedIndex000024{
 			{"codes", "idx_codes_session_identifier"}, // added by 000024
 			{"codes", "fk_codes_user"},                // inline KEY, initial migration

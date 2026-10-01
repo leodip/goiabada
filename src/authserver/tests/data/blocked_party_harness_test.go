@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,7 +79,7 @@ func unrelatedContention(t *testing.T) (release func()) {
 }
 
 func TestBlockedParty_UnrelatedContentionIsNotThisParty(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("SQLite's pool has one connection, so a second held transaction cannot open; the harness there names no blocker")
 	}
 
@@ -110,7 +111,7 @@ func TestBlockedParty_UnrelatedContentionIsNotThisParty(t *testing.T) {
 }
 
 func TestBlockedParty_AWaitBehindTheForegroundIsReported(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("SQLite's pool has one connection, so a second held transaction cannot open; the harness there names no blocker")
 	}
 
@@ -148,7 +149,7 @@ func TestBlockedParty_AWaitBehindTheForegroundIsReported(t *testing.T) {
 // connections, and the harness must name the one holding the locks. Each writes first, because
 // on MySQL a transaction has no id until it has run an InnoDB statement.
 func TestBlockedParty_IdentityIsTheTransactionsOwnConnection(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("SQLite's pool has one connection, so two transactions on it cannot be open at once")
 	}
 

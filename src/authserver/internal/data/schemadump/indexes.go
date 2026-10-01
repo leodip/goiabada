@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -14,10 +15,10 @@ import (
 //
 // Origin is the catalog's own answer to who named the index, never a pattern matched
 // against the name: see IndexOrigin.
-func dumpIndexes(ctx context.Context, db *sql.DB, d Dialect, table string) ([]IndexShape, error) {
+func dumpIndexes(ctx context.Context, db *sql.DB, d data.Dialect, table string) ([]IndexShape, error) {
 	var q string
 	switch d {
-	case MySQL:
+	case data.MySQL:
 		// MySQL cannot answer the second half of the origin question and this says so
 		// rather than guessing. It maps CREATE UNIQUE INDEX onto ALTER TABLE ADD UNIQUE
 		// INDEX, so both spellings report CONSTRAINT_TYPE = 'UNIQUE' in TABLE_CONSTRAINTS
@@ -30,7 +31,7 @@ func dumpIndexes(ctx context.Context, db *sql.DB, d Dialect, table string) ([]In
 			FROM information_schema.statistics
 			WHERE table_schema = DATABASE() AND table_name = '%s'
 			ORDER BY INDEX_NAME, SEQ_IN_INDEX`, table)
-	case Postgres:
+	case data.Postgres:
 		// indkey is an int2vector of column numbers; unnesting it WITH ORDINALITY is
 		// what preserves the index's own column order. indkey holds INCLUDE columns
 		// after the key ones, so the position is bounded by indnkeyatts to keep this
@@ -51,7 +52,7 @@ func dumpIndexes(ctx context.Context, db *sql.DB, d Dialect, table string) ([]In
 			WHERE tb.relname = '%s' AND n.nspname = current_schema()
 			  AND k.ord <= ix.indnkeyatts
 			ORDER BY i.relname, k.ord`, table)
-	case MSSQL:
+	case data.MSSQL:
 		// i.name IS NULL is the heap, which is not an index and has no shape to record.
 		// is_included_column = 0 keeps INCLUDE columns out: they are payload, not key
 		// columns, and they carry key_ordinal 0.

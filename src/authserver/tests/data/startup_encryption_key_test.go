@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ import (
 // shared database this tier runs against. The guard is engine-independent, being a length check
 // in datafactory that runs before any engine sees the key.
 func TestNewDatabase_RefusesAnAESKeyOfTheWrongLength(t *testing.T) {
-	if engine := dbType(); engine != "sqlite" && engine != "" {
+	if engine := dbType(); engine != data.SQLite {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the length check under test is engine-independent")
 	}
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +44,7 @@ func TestMigration000037_AuditLogsDetailsDefault(t *testing.T) {
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
-	if dbType() != "mysql" {
+	if dbType() != data.MySQL {
 		details, err := insertAuditLogWithoutDetails000037(t, h, "already-defaulted")
 		require.NoErrorf(t, err, "on %s, audit_logs.details already carries a default at 000035", dbType())
 		assert.Equalf(t, "{}", details,

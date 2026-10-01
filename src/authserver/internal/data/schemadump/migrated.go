@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -20,8 +21,8 @@ import (
 // file nobody regenerated, which is the one outcome that would make the rule worthless. So a
 // dirty row is refused, because a half-applied database's catalog is not a record of any
 // migration chain, and an empty table is refused, because that is an unmigrated database.
-func MigratedVersion(ctx context.Context, db *sql.DB, d Dialect) (int, error) {
-	if !d.valid() {
+func MigratedVersion(ctx context.Context, db *sql.DB, d data.Dialect) (int, error) {
+	if !valid(d) {
 		return 0, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 

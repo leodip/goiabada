@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,7 +102,7 @@ func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 	// stands today, read out of four different catalogs. A dumper that could not see the
 	// difference could not be used to prove the difference was removed.
 	wantUserClientAction := "CASCADE"
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		// SQL Server refuses the cascade here: users <- codes <- refresh_tokens(code_id)
 		// alongside users <- refresh_tokens(user_id) is a multiple cascade path (Msg
 		// 1785), so 000011 declared NO ACTION.
@@ -118,7 +119,7 @@ func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 
 	// And divergence 3 as it stands today, on the other axis the dumper is trusted for:
 	// SQLite still holds codes.code_challenge NOT NULL where the other three do not.
-	wantChallengeNullable := dbType() != "" && dbType() != "sqlite"
+	wantChallengeNullable := dbType() != data.SQLite
 	assert.Equalf(t, wantChallengeNullable, codes.column(t, "code_challenge").Nullable,
 		"codes.code_challenge is NOT NULL on sqlite and nullable on the other three at 000035 (%s)",
 		dbType())
@@ -194,7 +195,7 @@ func assertOriginProjectionIsNotAConstant(t *testing.T, h *isolatedDB) {
 	t.Helper()
 
 	unique := "u BIGINT NOT NULL UNIQUE,"
-	if dbType() == "mysql" {
+	if dbType() == data.MySQL {
 		unique = "u BIGINT NOT NULL, UNIQUE KEY uq_dumptable_origin_probe_u (u),"
 	}
 	ddl := fmt.Sprintf(`CREATE TABLE dumptable_origin_probe (
@@ -222,7 +223,7 @@ func assertOriginProjectionIsNotAConstant(t *testing.T, h *isolatedDB) {
 	assert.NotZerof(t, origins[schemadump.OriginCreated],
 		"an index created by name must read c on %s; got %v", dbType(), probe.Indexes)
 
-	if dbType() == "mysql" {
+	if dbType() == data.MySQL {
 		assert.Zerof(t, origins[schemadump.OriginUnique],
 			"MySQL's catalog cannot report u, so reporting one would mean the branch is guessing; got %v",
 			probe.Indexes)
@@ -277,7 +278,7 @@ func assertDefaultNameProjection(t *testing.T, h *isolatedDB, refreshTokens tabl
 	assert.Falsef(t, jti.DefaultIsSystemNamed,
 		"a column with no default constraint has no name for the engine to have invented, on %s", dbType())
 
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		assert.Emptyf(t, gen.DefaultName,
 			"%s names no default constraint, so DefaultName must stay empty even for a column that has a default",
 			dbType())
@@ -319,19 +320,19 @@ func assertCollationProjectionIsNotAConstant(t *testing.T, h *isolatedDB) {
 
 	var ddl, wantOverride string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		ddl = `CREATE TABLE dumptable_collation_probe (
 			inherited VARCHAR(16) NOT NULL,
 			overridden VARCHAR(16) COLLATE utf8mb4_bin NOT NULL,
 			n BIGINT NOT NULL)`
 		wantOverride = "utf8mb4_bin"
-	case "postgres":
+	case data.Postgres:
 		ddl = `CREATE TABLE dumptable_collation_probe (
 			inherited text NOT NULL,
 			overridden text COLLATE "C" NOT NULL,
 			n bigint NOT NULL)`
 		wantOverride = "C"
-	case "mssql":
+	case data.MSSQL:
 		ddl = `CREATE TABLE dumptable_collation_probe (
 			inherited NVARCHAR(16) NOT NULL,
 			overridden NVARCHAR(16) COLLATE Latin1_General_BIN2 NOT NULL,
@@ -360,7 +361,7 @@ func assertCollationProjectionIsNotAConstant(t *testing.T, h *isolatedDB) {
 	assert.NotEqualf(t, inherited, overridden,
 		"two columns at different collations must not report the same one on %s", dbType())
 
-	if dbType() == "" || dbType() == "sqlite" {
+	if dbType() == data.SQLite {
 		// SQLite assigns BINARY to every column whatever it holds, and reports no
 		// collation for any of them, so its integer column reads BINARY rather than "".
 		assert.Equal(t, "BINARY", numeric,
@@ -380,11 +381,11 @@ func authStateGenerationShape(t *testing.T) (typ, def string) {
 	t.Helper()
 
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return "bigint", "0"
-	case "postgres":
+	case data.Postgres:
 		return "bigint", "0"
-	case "mssql":
+	case data.MSSQL:
 		// A named default constraint (df_refresh_tokens_auth_state_generation), whose
 		// definition SQL Server renders with its own parentheses.
 		return "bigint", "((0))"

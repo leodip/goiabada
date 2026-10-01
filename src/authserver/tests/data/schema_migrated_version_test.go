@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ const migratedVersionKnownNumber = 18
 //	--run TestSchemaMigratedVersion_ReadsTheRecordedVersion
 func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	h := newIsolatedDB(t)
-	d := dumpDialect(t)
+	d := dbType()
 
 	// A number this test chose, so the reader is held to reporting the version actually
 	// recorded rather than to agreeing with itself about the head.
@@ -102,7 +103,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	assert.Errorf(t, err, "a query failure is an error and not a version on %s", dbType())
 	assert.Zerof(t, got, "a query failure answers 0 alongside the error on %s", dbType())
 
-	_, err = schemadump.MigratedVersion(context.Background(), h.SQL, schemadump.Dialect("oracle"))
+	_, err = schemadump.MigratedVersion(context.Background(), h.SQL, data.Dialect("oracle"))
 	assert.Error(t, err, "an unrecognised dialect is refused before any query runs")
 }
 
@@ -122,7 +123,7 @@ func setSchemaMigrationsDirty(t *testing.T, h *isolatedDB, dirty bool) {
 // statement rather than passed as a parameter because the four drivers spell placeholders
 // three different ways.
 func boolLiteral(v bool) string {
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		if v {
 			return "1"
 		}

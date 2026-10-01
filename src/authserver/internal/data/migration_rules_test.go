@@ -1,4 +1,4 @@
-package data
+package data_test
 
 // The four migration directories are written four times by hand, once per engine, and until
 // #282 nothing compared the results. Diffing four fully migrated catalogs found five structural
@@ -26,21 +26,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/require"
 )
 
 // migrationDialects is every engine that must have a migrations directory. It is the same four
 // names schemadump and parityDialects carry, so the lint, the dumper and the cross-engine
 // comparison share one vocabulary and <dialect>db is always the directory.
-var migrationDialects = []schemadump.Dialect{
-	schemadump.MySQL, schemadump.Postgres, schemadump.MSSQL, schemadump.SQLite,
+var migrationDialects = []data.Dialect{
+	data.MySQL, data.Postgres, data.MSSQL, data.SQLite,
 }
 
 // migrationTree is a set of migration directories held in memory: one entry per engine, each
 // mapping a filename to that file's whole contents. Every rule below reads one of these and
 // nothing else, so a case can build the exact tree it wants to test without creating a file.
-type migrationTree map[schemadump.Dialect]map[string]string
+type migrationTree map[data.Dialect]map[string]string
 
 // migrationFinding is one rule broken in one place. Rule is the name a failure message groups
 // by, Where is the file or the number the finding is about, and Say is the sentence a person
@@ -88,11 +88,11 @@ type sqlMark struct {
 // A double quote would be an identifier quote on PostgreSQL and SQLite and a string delimiter on
 // MySQL. It appears in no statement on any engine, and scanSQL refuses it rather than picking
 // one of the two meanings.
-func identifierQuotes(d schemadump.Dialect) (open, close byte) {
+func identifierQuotes(d data.Dialect) (open, close byte) {
 	switch d {
-	case schemadump.MSSQL:
+	case data.MSSQL:
 		return '[', ']'
-	case schemadump.MySQL, schemadump.SQLite:
+	case data.MySQL, data.SQLite:
 		return '`', '`'
 	default:
 		return 0, 0
@@ -134,9 +134,9 @@ func identifierQuotes(d schemadump.Dialect) (open, close byte) {
 // '"' anywhere at the top level for the reason identifierQuotes gives, and unbalanced state at
 // end of file. A scanner that cannot say where the statements are must not be the reason a file
 // reports clean, so it fails loudly and names the line.
-func scanSQL(d schemadump.Dialect, text string) (string, string, []sqlMark, error) {
+func scanSQL(d data.Dialect, text string) (string, string, []sqlMark, error) {
 	idOpen, idClose := identifierQuotes(d)
-	backslashEscapes := d == schemadump.MySQL
+	backslashEscapes := d == data.MySQL
 
 	clean := []byte(text)
 	masked := []byte(text)
@@ -156,7 +156,7 @@ func scanSQL(d schemadump.Dialect, text string) (string, string, []sqlMark, erro
 				masked[i] = ' '
 				i++
 			}
-		case c == '#' && d == schemadump.MySQL:
+		case c == '#' && d == data.MySQL:
 			for i < len(text) && text[i] != '\n' {
 				clean[i] = ' '
 				masked[i] = ' '
@@ -452,8 +452,8 @@ var (
 // integer, as golang-migrate did before it, so it has always worked, and renaming it now would
 // change a version already recorded in every deployment. Naming it here rather than relaxing the rule is what stops a new
 // five-digit file landing beside it.
-func migrationNameExempt(d schemadump.Dialect, name string) bool {
-	return d == schemadump.SQLite &&
+func migrationNameExempt(d data.Dialect, name string) bool {
+	return d == data.SQLite &&
 		(name == "00001_initial_create.up.sql" || name == "00001_initial_create.down.sql")
 }
 
@@ -476,7 +476,7 @@ func parseMigrationFilename(name string) (num int, slug, half string, ok bool) {
 // migrationFile is one migration read and scanned once, so no rule re-parses what another rule
 // already parsed and every rule sees the same statements.
 type migrationFile struct {
-	Dialect    schemadump.Dialect
+	Dialect    data.Dialect
 	Name       string
 	Number     int
 	Slug       string
@@ -640,14 +640,14 @@ func checkPairing(tree migrationTree) []migrationFinding {
 // twice passes every rule in this file while the runner's own source parser refuses to load
 // it. Uniqueness has to be decided before the index is flattened, so the index cannot be the
 // thing that flattens it.
-func migrationNumbers(files []migrationFile) map[int]map[schemadump.Dialect][]string {
-	numbers := map[int]map[schemadump.Dialect][]string{}
+func migrationNumbers(files []migrationFile) map[int]map[data.Dialect][]string {
+	numbers := map[int]map[data.Dialect][]string{}
 	for _, f := range files {
 		if f.Half != "up" {
 			continue
 		}
 		if numbers[f.Number] == nil {
-			numbers[f.Number] = map[schemadump.Dialect][]string{}
+			numbers[f.Number] = map[data.Dialect][]string{}
 		}
 		numbers[f.Number][f.Dialect] = append(numbers[f.Number][f.Dialect], f.Slug)
 	}
@@ -738,14 +738,14 @@ func migrationParityDeclaration(f migrationFile) (rest string, line int, found b
 // parseParityEngines reads the engine list a declaration names: the names before the word
 // `only`, separated by commas and by the word `and`. The vocabulary is the four dialect names
 // and nothing else.
-func parseParityEngines(list string) ([]schemadump.Dialect, string, bool) {
-	var out []schemadump.Dialect
+func parseParityEngines(list string) ([]data.Dialect, string, bool) {
+	var out []data.Dialect
 	for _, part := range strings.Split(strings.ReplaceAll(list, " and ", ","), ",") {
 		name := strings.ToLower(strings.TrimSpace(part))
 		if name == "" {
 			return nil, part, false
 		}
-		d := schemadump.Dialect(name)
+		d := data.Dialect(name)
 		if !slicesContains(migrationDialects, d) {
 			return nil, name, false
 		}
@@ -778,7 +778,7 @@ func checkCoverage(files []migrationFile) []migrationFinding {
 
 	var out []migrationFinding
 	for _, num := range sortedNumbers(numbers) {
-		carrying := make([]schemadump.Dialect, 0, len(migrationDialects))
+		carrying := make([]data.Dialect, 0, len(migrationDialects))
 		absent := make([]string, 0, len(migrationDialects))
 		for _, d := range migrationDialects {
 			if _, ok := numbers[num][d]; ok {
@@ -909,7 +909,7 @@ var (
 // contentFiles is the .up.sql files of one engine that the scanner could read, in filename
 // order. A file the scanner refused is already a finding of its own (checkScannable), so
 // skipping it here reports one problem rather than a cascade of nonsense from a mis-split file.
-func contentFiles(files []migrationFile, d schemadump.Dialect) []migrationFile {
+func contentFiles(files []migrationFile, d data.Dialect) []migrationFile {
 	var out []migrationFile
 	for _, f := range files {
 		if f.Dialect == d && f.Half == "up" && f.ScanErr == nil {
@@ -927,7 +927,7 @@ func at(f migrationFile, line int) string { return fmt.Sprintf("%s:%d", f.Where(
 // column spells no collation at all, because the first one did (decision 7).
 func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrationFinding {
 	var out []migrationFinding
-	for _, f := range contentFiles(files, schemadump.MSSQL) {
+	for _, f := range contentFiles(files, data.MSSQL) {
 		for _, s := range f.Statements {
 			// An alias type is the one way to put a string column's type outside the closed
 			// list mssqlStringTypes reads, and CREATE TYPE is the only way to make one. It is
@@ -1178,7 +1178,7 @@ func isMSSQLWordByte(c byte) bool {
 // utf8mb4_unicode_ci and one at utf8mb4_0900_ai_ci, the last added in the most recent migration.
 func checkMySQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrationFinding {
 	var out []migrationFinding
-	for _, f := range contentFiles(files, schemadump.MySQL) {
+	for _, f := range contentFiles(files, data.MySQL) {
 		if f.Number <= cutoffs.MySQLCollation {
 			continue
 		}
@@ -1255,9 +1255,9 @@ func shorten(text string) string {
 // ITS HONEST LIMIT: it catches a migration added without a regeneration, not a shipped migration
 // edited in place, which would leave the version unmoved. That edit is forbidden anyway, and
 // TestSchemaGolden_MatchesTheCommittedFile catches it on all four engines against a real database.
-func checkGoldenVersion(tree migrationTree, recorded map[schemadump.Dialect]int) []migrationFinding {
+func checkGoldenVersion(tree migrationTree, recorded map[data.Dialect]int) []migrationFinding {
 	files := readMigrationFiles(tree)
-	highest := map[schemadump.Dialect]int{}
+	highest := map[data.Dialect]int{}
 	for _, f := range files {
 		if f.Half == "up" && f.Number > highest[f.Dialect] {
 			highest[f.Dialect] = f.Number
@@ -1321,8 +1321,8 @@ func checkMigrationDirectories(found []string) []migrationFinding {
 // Small helpers
 // ---------------------------------------------------------------------------
 
-func sortedDialects(tree migrationTree) []schemadump.Dialect {
-	out := make([]schemadump.Dialect, 0, len(tree))
+func sortedDialects(tree migrationTree) []data.Dialect {
+	out := make([]data.Dialect, 0, len(tree))
 	for d := range tree {
 		out = append(out, d)
 	}
@@ -1339,7 +1339,7 @@ func sortedFilenames(files map[string]string) []string {
 	return out
 }
 
-func sortedNumbers(numbers map[int]map[schemadump.Dialect][]string) []int {
+func sortedNumbers(numbers map[int]map[data.Dialect][]string) []int {
 	out := make([]int, 0, len(numbers))
 	for n := range numbers {
 		out = append(out, n)
@@ -1352,8 +1352,8 @@ func sortedNumbers(numbers map[int]map[schemadump.Dialect][]string) []int {
 // rather than migrationDialects so a directory that is not one of the four is still judged: a
 // fifth engine is a finding of its own (checkMigrationDirectories) and not a reason to stop
 // looking at its files.
-func indexDialects(byDialect map[schemadump.Dialect][]string) []schemadump.Dialect {
-	out := make([]schemadump.Dialect, 0, len(byDialect))
+func indexDialects(byDialect map[data.Dialect][]string) []data.Dialect {
+	out := make([]data.Dialect, 0, len(byDialect))
 	for d := range byDialect {
 		out = append(out, d)
 	}
@@ -1361,7 +1361,7 @@ func indexDialects(byDialect map[schemadump.Dialect][]string) []schemadump.Diale
 	return out
 }
 
-func slicesContains(haystack []schemadump.Dialect, needle schemadump.Dialect) bool {
+func slicesContains(haystack []data.Dialect, needle data.Dialect) bool {
 	for _, d := range haystack {
 		if d == needle {
 			return true
@@ -1370,8 +1370,8 @@ func slicesContains(haystack []schemadump.Dialect, needle schemadump.Dialect) bo
 	return false
 }
 
-func sameDialectSet(a, b []schemadump.Dialect) bool {
-	seen := map[schemadump.Dialect]bool{}
+func sameDialectSet(a, b []data.Dialect) bool {
+	seen := map[data.Dialect]bool{}
 	for _, d := range a {
 		seen[d] = true
 	}
@@ -1386,7 +1386,7 @@ func sameDialectSet(a, b []schemadump.Dialect) bool {
 	return true
 }
 
-func joinDialects(ds []schemadump.Dialect) string {
+func joinDialects(ds []data.Dialect) string {
 	names := make([]string, 0, len(ds))
 	for _, d := range migrationDialects {
 		if slicesContains(ds, d) {
@@ -1406,38 +1406,38 @@ func joinDialects(ds []schemadump.Dialect) string {
 func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 	tests := []struct {
 		name     string
-		dialect  schemadump.Dialect
+		dialect  data.Dialect
 		text     string
 		want     []string
 		refuseOn string
 	}{
 		{
 			name:    "a semicolon inside a literal does not split",
-			dialect: schemadump.SQLite,
+			dialect: data.SQLite,
 			text:    "UPDATE t SET a = 'x;y';\nUPDATE t SET b = 1;",
 			want:    []string{"UPDATE t SET a = 'x;y'", "UPDATE t SET b = 1"},
 		},
 		{
 			name:    "a double dash inside a literal does not strip",
-			dialect: schemadump.SQLite,
+			dialect: data.SQLite,
 			text:    "UPDATE t SET a = 'x--y';",
 			want:    []string{"UPDATE t SET a = 'x--y'"},
 		},
 		{
 			name:    "a semicolon inside a quoted identifier does not split",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "ALTER TABLE [we;ird] ADD [a] INT;\nALTER TABLE [b] ADD [c] INT;",
 			want:    []string{"ALTER TABLE [we;ird] ADD [a] INT", "ALTER TABLE [b] ADD [c] INT"},
 		},
 		{
 			name:    "a double dash inside a quoted identifier does not strip",
-			dialect: schemadump.MySQL,
+			dialect: data.MySQL,
 			text:    "ALTER TABLE `we--ird` ADD `a` INT;",
 			want:    []string{"ALTER TABLE `we--ird` ADD `a` INT"},
 		},
 		{
 			name:    "a comment is blanked and the statement around it survives",
-			dialect: schemadump.Postgres,
+			dialect: data.Postgres,
 			text:    "-- a leading comment\nALTER TABLE t ADD a INT; -- trailing\nALTER TABLE t ADD b INT;",
 			want:    []string{"ALTER TABLE t ADD a INT", "ALTER TABLE t ADD b INT"},
 		},
@@ -1447,7 +1447,7 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 			// parenthesis here would open a literal and unbalance the depth if it were not
 			// blanked, and the collation pin written in one counted as a table option.
 			name:    "a hash comment is blanked on mysql and the statement around it survives",
-			dialect: schemadump.MySQL,
+			dialect: data.MySQL,
 			text:    "# a leading comment with a ' and a (\nALTER TABLE t ADD a INT; # trailing\nALTER TABLE t ADD b INT;",
 			want:    []string{"ALTER TABLE t ADD a INT", "ALTER TABLE t ADD b INT"},
 		},
@@ -1455,14 +1455,14 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 			// And on MySQL alone: on SQL Server a # opens a temporary table's name, so blanking
 			// the rest of the line there would swallow a real statement.
 			name:    "a hash is an ordinary character off mysql",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "SELECT [a] INTO #tmp FROM [t];\nALTER TABLE [t] ADD [b] INT;",
 			want:    []string{"SELECT [a] INTO #tmp FROM [t]", "ALTER TABLE [t] ADD [b] INT"},
 		},
 		{
 			// mssqldb/000029 spells this over two lines.
 			name:    "a doubled quote escapes and the literal spans two lines",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "EXEC('UPDATE [c] SET [x] = 1\n WHERE [i] LIKE ''dcr!_%'' ESCAPE ''!''');\nALTER TABLE [t] ADD [a] INT;",
 			want: []string{
 				"EXEC('UPDATE [c] SET [x] = 1\n WHERE [i] LIKE ''dcr!_%'' ESCAPE ''!''')",
@@ -1472,7 +1472,7 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 		{
 			// mssqldb/000034 line 114. A backslash is an ordinary character here.
 			name:    "a lone backslash in a literal closes normally off mysql",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "UPDATE [w] SET [x] = 1 WHERE CHARINDEX('\\', [authority]) > 0;\nALTER TABLE [t] ADD [a] INT;",
 			want: []string{
 				"UPDATE [w] SET [x] = 1 WHERE CHARINDEX('\\', [authority]) > 0",
@@ -1482,7 +1482,7 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 		{
 			// mysqldb/000034 line 89, which has to double it for exactly this reason.
 			name:    "a doubled backslash in a literal closes normally on mysql",
-			dialect: schemadump.MySQL,
+			dialect: data.MySQL,
 			text:    "UPDATE `w` SET `x` = 1 WHERE INSTR(`authority`, '\\\\') > 0;\nALTER TABLE `t` ADD `a` INT;",
 			want: []string{
 				"UPDATE `w` SET `x` = 1 WHERE INSTR(`authority`, '\\\\') > 0",
@@ -1494,49 +1494,49 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 			// closing quote, the literal never ends, and the file is refused rather than read
 			// as a statement whose tail is string interior.
 			name:     "mysql refuses the lone backslash form, which is why 000034 doubles it",
-			dialect:  schemadump.MySQL,
+			dialect:  data.MySQL,
 			text:     "UPDATE `w` SET `x` = 1 WHERE INSTR(`authority`, '\\') > 0;\n",
 			refuseOn: "never closed",
 		},
 		{
 			name:     "a block comment is refused",
-			dialect:  schemadump.Postgres,
+			dialect:  data.Postgres,
 			text:     "ALTER TABLE t ADD a INT;\n/* not modelled */\n",
 			refuseOn: "block comment",
 		},
 		{
 			name:     "a double quote is refused",
-			dialect:  schemadump.Postgres,
+			dialect:  data.Postgres,
 			text:     "ALTER TABLE \"users\" ADD a INT;\n",
 			refuseOn: "double quote",
 		},
 		{
 			name:     "a dollar sign at the top level is refused",
-			dialect:  schemadump.Postgres,
+			dialect:  data.Postgres,
 			text:     "CREATE FUNCTION f() RETURNS void AS $$ BEGIN END $$;\n",
 			refuseOn: "dollar-quoted",
 		},
 		{
 			name:     "an unterminated literal is refused",
-			dialect:  schemadump.SQLite,
+			dialect:  data.SQLite,
 			text:     "UPDATE t SET a = 'never closed;\n",
 			refuseOn: "never closed",
 		},
 		{
 			name:     "an unterminated quoted identifier is refused",
-			dialect:  schemadump.MSSQL,
+			dialect:  data.MSSQL,
 			text:     "ALTER TABLE [never closed ADD a INT;\n",
 			refuseOn: "never closed",
 		},
 		{
 			name:     "an unbalanced parenthesis is refused",
-			dialect:  schemadump.SQLite,
+			dialect:  data.SQLite,
 			text:     "CREATE TABLE t (\n  id integer\n;\n",
 			refuseOn: "still open",
 		},
 		{
 			name:     "a closing parenthesis with nothing open is refused",
-			dialect:  schemadump.SQLite,
+			dialect:  data.SQLite,
 			text:     "CREATE TABLE t id integer);\n",
 			refuseOn: "nothing open",
 		},
@@ -1572,13 +1572,13 @@ func TestMigrationScanner_ReadsTheLexicalFormsTheTreeUses(t *testing.T) {
 func TestMigrationScanner_MasksValueAndNameText(t *testing.T) {
 	tests := []struct {
 		name    string
-		dialect schemadump.Dialect
+		dialect data.Dialect
 		text    string
 		want    string
 	}{
 		{
 			name:    "a literal's interior is blanked and its quotes stay",
-			dialect: schemadump.SQLite,
+			dialect: data.SQLite,
 			text:    "UPDATE t SET a = 'x;y';",
 			want:    "UPDATE t SET a = '   ';",
 		},
@@ -1586,13 +1586,13 @@ func TestMigrationScanner_MasksValueAndNameText(t *testing.T) {
 			// A column called [constraint] is a name, and the named-default rule asks whether
 			// the word CONSTRAINT is present. Masking is what keeps the two apart.
 			name:    "a quoted identifier keeps its shape and loses its spelling",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "ALTER TABLE [constraint] ADD [a] INT;",
 			want:    "ALTER TABLE [xxxxxxxxxx] ADD [x] INT;",
 		},
 		{
 			name:    "a comment is blanked in the mask as well",
-			dialect: schemadump.Postgres,
+			dialect: data.Postgres,
 			text:    "-- note\nALTER TABLE t ADD a INT;",
 			want:    "       \nALTER TABLE t ADD a INT;",
 		},
@@ -1600,13 +1600,13 @@ func TestMigrationScanner_MasksValueAndNameText(t *testing.T) {
 			// mssqldb/000029's shape. Every newline survives, so an offset in the mask still
 			// names the line a finding will report.
 			name:    "a literal spanning two lines keeps its newline",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "EXEC('line one\nline two');",
 			want:    "EXEC('        \n        ');",
 		},
 		{
 			name:    "a doubled quote inside a literal is masked with the rest of it",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "EXEC('a''b');",
 			want:    "EXEC('    ');",
 		},
@@ -1629,13 +1629,13 @@ func TestMigrationScanner_MasksValueAndNameText(t *testing.T) {
 func TestMigrationScanner_SplitsDeclarationsAtTheTopLevelOnly(t *testing.T) {
 	tests := []struct {
 		name    string
-		dialect schemadump.Dialect
+		dialect data.Dialect
 		text    string
 		want    []string
 	}{
 		{
 			name:    "a create table body splits at its top-level commas",
-			dialect: schemadump.MSSQL,
+			dialect: data.MSSQL,
 			text:    "CREATE TABLE [t] (\n  [id] BIGINT NOT NULL,\n  [a] NVARCHAR(64) COLLATE X NOT NULL,\n  PRIMARY KEY ([id])\n);",
 			want: []string{
 				"[id] BIGINT NOT NULL",
@@ -1645,25 +1645,25 @@ func TestMigrationScanner_SplitsDeclarationsAtTheTopLevelOnly(t *testing.T) {
 		},
 		{
 			name:    "a comma inside a precision argument does not split",
-			dialect: schemadump.MySQL,
+			dialect: data.MySQL,
 			text:    "CREATE TABLE `t` (\n  `id` bigint NOT NULL,\n  `amount` decimal(10,2) NOT NULL\n) ENGINE=InnoDB;",
 			want:    []string{"`id` bigint NOT NULL", "`amount` decimal(10,2) NOT NULL"},
 		},
 		{
 			name:    "a comma inside a literal does not split",
-			dialect: schemadump.SQLite,
+			dialect: data.SQLite,
 			text:    "CREATE TABLE t (\n  a text NOT NULL DEFAULT 'x,y',\n  b text\n);",
 			want:    []string{"a text NOT NULL DEFAULT 'x,y'", "b text"},
 		},
 		{
 			name:    "an alter table splits at depth zero",
-			dialect: schemadump.MySQL,
+			dialect: data.MySQL,
 			text:    "ALTER TABLE `t` ADD `a` int NOT NULL, ADD `b` decimal(10,2) NULL;",
 			want:    []string{"ALTER TABLE `t` ADD `a` int NOT NULL", "ADD `b` decimal(10,2) NULL"},
 		},
 		{
 			name:    "anything else has no declarations",
-			dialect: schemadump.SQLite,
+			dialect: data.SQLite,
 			text:    "UPDATE t SET a = 1, b = 2;",
 			want:    nil,
 		},
@@ -1694,11 +1694,11 @@ func TestMigrationScanner_SplitsDeclarationsAtTheTopLevelOnly(t *testing.T) {
 // exactly one thing in it, so a case cannot pass with the rule it names deleted: it differs from
 // a green tree in the thing under test and in nothing else.
 func migrationTreeFixture() migrationTree {
-	create := func(d schemadump.Dialect) string {
+	create := func(d data.Dialect) string {
 		switch d {
-		case schemadump.MSSQL:
+		case data.MSSQL:
 			return "CREATE TABLE [widgets] (\n  [id] BIGINT NOT NULL\n);\n"
-		case schemadump.MySQL:
+		case data.MySQL:
 			return "CREATE TABLE `widgets` (\n  `id` bigint NOT NULL\n);\n"
 		default:
 			return "CREATE TABLE widgets (\n  id bigint NOT NULL\n);\n"
@@ -1733,8 +1733,8 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 			// with the naming rule deleted.
 			name: "a five-digit name is refused",
 			breaks: func(tr migrationTree) {
-				rename(tr, schemadump.Postgres, "000001_initial_create.up.sql", "00001_initial_create.up.sql")
-				rename(tr, schemadump.Postgres, "000001_initial_create.down.sql", "00001_initial_create.down.sql")
+				rename(tr, data.Postgres, "000001_initial_create.up.sql", "00001_initial_create.up.sql")
+				rename(tr, data.Postgres, "000001_initial_create.down.sql", "00001_initial_create.down.sql")
 			},
 			wantRule: "naming",
 			wantSay:  "six digits",
@@ -1742,8 +1742,8 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "sqlite's own five-digit pair is the one exemption",
 			breaks: func(tr migrationTree) {
-				rename(tr, schemadump.SQLite, "000001_initial_create.up.sql", "00001_initial_create.up.sql")
-				rename(tr, schemadump.SQLite, "000001_initial_create.down.sql", "00001_initial_create.down.sql")
+				rename(tr, data.SQLite, "000001_initial_create.up.sql", "00001_initial_create.up.sql")
+				rename(tr, data.SQLite, "000001_initial_create.down.sql", "00001_initial_create.down.sql")
 			},
 		},
 		{
@@ -1764,7 +1764,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "an up with no down is refused",
 			breaks: func(tr migrationTree) {
-				delete(tr[schemadump.MySQL], "000001_initial_create.down.sql")
+				delete(tr[data.MySQL], "000001_initial_create.down.sql")
 			},
 			wantRule: "pairing",
 			wantSay:  "has no .down.sql",
@@ -1772,7 +1772,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a down with no up is refused",
 			breaks: func(tr migrationTree) {
-				tr[schemadump.MySQL]["000002_orphan.down.sql"] = "-- Migration 000002 down: intentional no-op.\n"
+				tr[data.MySQL]["000002_orphan.down.sql"] = "-- Migration 000002 down: intentional no-op.\n"
 			},
 			wantRule: "pairing",
 			wantSay:  "has no .up.sql",
@@ -1782,8 +1782,8 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "one number naming two changes is refused",
 			breaks: func(tr migrationTree) {
-				rename(tr, schemadump.MSSQL, "000001_initial_create.up.sql", "000001_initial_setup.up.sql")
-				rename(tr, schemadump.MSSQL, "000001_initial_create.down.sql", "000001_initial_setup.down.sql")
+				rename(tr, data.MSSQL, "000001_initial_create.up.sql", "000001_initial_setup.up.sql")
+				rename(tr, data.MSSQL, "000001_initial_create.down.sql", "000001_initial_setup.down.sql")
 			},
 			wantRule: "number identity",
 			wantSay:  "names a different change per engine",
@@ -1796,7 +1796,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 			// refuses this tree outright, so nothing here would ever have run.
 			name: "two up migrations at one number on one engine are refused",
 			breaks: func(tr migrationTree) {
-				addMigration(tr, schemadump.MySQL, "000001_a_second_change",
+				addMigration(tr, data.MySQL, "000001_a_second_change",
 					"ALTER TABLE widgets ADD gadgets int;\n")
 			},
 			wantRule: "number identity",
@@ -1820,7 +1820,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a partial migration with no declaration is refused",
 			breaks: func(tr migrationTree) {
-				addMigration(tr, schemadump.SQLite, "000002_add_gadgets", "ALTER TABLE widgets ADD gadgets int;\n")
+				addMigration(tr, data.SQLite, "000002_add_gadgets", "ALTER TABLE widgets ADD gadgets int;\n")
 			},
 			wantRule: "coverage",
 			wantSay:  "does not say why it is partial",
@@ -1828,7 +1828,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a partial migration that declares itself passes",
 			breaks: func(tr migrationTree) {
-				addMigration(tr, schemadump.SQLite, "000002_add_gadgets",
+				addMigration(tr, data.SQLite, "000002_add_gadgets",
 					"-- parity: sqlite only. The other three already carry the column.\n"+
 						"ALTER TABLE widgets ADD gadgets int;\n")
 			},
@@ -1836,7 +1836,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a declaration naming the wrong engine set is refused",
 			breaks: func(tr migrationTree) {
-				addMigration(tr, schemadump.SQLite, "000002_add_gadgets",
+				addMigration(tr, data.SQLite, "000002_add_gadgets",
 					"-- parity: mysql only. The other three already carry the column.\n"+
 						"ALTER TABLE widgets ADD gadgets int;\n")
 			},
@@ -1848,14 +1848,14 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 			breaks: func(tr migrationTree) {
 				body := "-- parity: mysql and sqlite only. Postgres and SQL Server were written later.\n" +
 					"ALTER TABLE widgets ADD gadgets int;\n"
-				addMigration(tr, schemadump.SQLite, "000002_add_gadgets", body)
-				addMigration(tr, schemadump.MySQL, "000002_add_gadgets", body)
+				addMigration(tr, data.SQLite, "000002_add_gadgets", body)
+				addMigration(tr, data.MySQL, "000002_add_gadgets", body)
 			},
 		},
 		{
 			name: "a declaration with no prose is refused",
 			breaks: func(tr migrationTree) {
-				addMigration(tr, schemadump.SQLite, "000002_add_gadgets",
+				addMigration(tr, data.SQLite, "000002_add_gadgets",
 					"-- parity: sqlite only.\nALTER TABLE widgets ADD gadgets int;\n")
 			},
 			wantRule: "coverage",
@@ -1864,7 +1864,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a declaration naming an engine that does not exist is refused",
 			breaks: func(tr migrationTree) {
-				addMigration(tr, schemadump.SQLite, "000002_add_gadgets",
+				addMigration(tr, data.SQLite, "000002_add_gadgets",
 					"-- parity: oracle only. Nothing else needs it.\nALTER TABLE widgets ADD gadgets int;\n")
 			},
 			wantRule: "coverage",
@@ -1885,7 +1885,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "the same words inside a literal are not a declaration",
 			breaks: func(tr migrationTree) {
-				addMigration(tr, schemadump.SQLite, "000002_add_gadgets",
+				addMigration(tr, data.SQLite, "000002_add_gadgets",
 					"UPDATE widgets SET note = '-- parity: sqlite only. Not a comment.';\n")
 			},
 			wantRule: "coverage",
@@ -1896,7 +1896,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a statement-free down with no declaration is refused",
 			breaks: func(tr migrationTree) {
-				tr[schemadump.Postgres]["000001_initial_create.down.sql"] = "-- nothing to do here\n"
+				tr[data.Postgres]["000001_initial_create.down.sql"] = "-- nothing to do here\n"
 			},
 			wantRule: "reversibility",
 			wantSay:  "holds no statement and does not declare itself one",
@@ -1904,14 +1904,14 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a statement-free down that declares itself passes",
 			breaks: func(tr migrationTree) {
-				tr[schemadump.Postgres]["000001_initial_create.down.sql"] =
+				tr[data.Postgres]["000001_initial_create.down.sql"] =
 					"-- Migration 000001 down: intentional no-op.\n--\n-- The change is one-way.\n"
 			},
 		},
 		{
 			name: "a declaration naming another migration's number is refused",
 			breaks: func(tr migrationTree) {
-				tr[schemadump.Postgres]["000001_initial_create.down.sql"] =
+				tr[data.Postgres]["000001_initial_create.down.sql"] =
 					"-- Migration 000033 down: intentional no-op.\n"
 			},
 			wantRule: "reversibility",
@@ -1922,7 +1922,7 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 		{
 			name: "a file the scanner refuses is a finding rather than a silent pass",
 			breaks: func(tr migrationTree) {
-				tr[schemadump.Postgres]["000001_initial_create.up.sql"] = "CREATE TABLE \"widgets\" (id bigint);\n"
+				tr[data.Postgres]["000001_initial_create.up.sql"] = "CREATE TABLE \"widgets\" (id bigint);\n"
 			},
 			wantRule: "scanner",
 			wantSay:  "double quote",
@@ -1953,12 +1953,12 @@ func TestMigrationRules_AcceptAGreenTreeAndRefuseOneBrokenThing(t *testing.T) {
 	}
 }
 
-func rename(tr migrationTree, d schemadump.Dialect, from, to string) {
+func rename(tr migrationTree, d data.Dialect, from, to string) {
 	tr[d][to] = tr[d][from]
 	delete(tr[d], from)
 }
 
-func addMigration(tr migrationTree, d schemadump.Dialect, stem, up string) {
+func addMigration(tr migrationTree, d data.Dialect, stem, up string) {
 	tr[d][stem+".up.sql"] = up
 	num, _, _, _ := parseMigrationFilename(stem + ".up.sql")
 	tr[d][stem+".down.sql"] = fmt.Sprintf("-- Migration %06d down: intentional no-op.\n-- One-way.\n", num)
@@ -2059,9 +2059,9 @@ func migrationContentFixture(num int) migrationTree {
 	for _, d := range migrationDialects {
 		body := "CREATE TABLE gadgets (\n  id bigint NOT NULL\n);\n"
 		switch d {
-		case schemadump.MSSQL:
+		case data.MSSQL:
 			body = greenMSSQLGadgets()
-		case schemadump.MySQL:
+		case data.MySQL:
 			body = greenMySQLGadgets()
 		}
 		tree[d][stem+".up.sql"] = body
@@ -2073,7 +2073,7 @@ func migrationContentFixture(num int) migrationTree {
 // editUp rewrites one span of one up migration. It panics when the span is gone, because a case
 // whose anchor no longer matches would otherwise stop testing anything and keep passing: it
 // would be running the green fixture under a name that claims a violation.
-func editUp(tr migrationTree, d schemadump.Dialect, num int, from, to string) {
+func editUp(tr migrationTree, d data.Dialect, num int, from, to string) {
 	name := fmt.Sprintf("%06d_add_gadgets.up.sql", num)
 	body, ok := tr[d][name]
 	if !ok {
@@ -2112,7 +2112,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a bare VARCHAR is refused",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] VARCHAR(64)")
+				editUp(tr, data.MSSQL, 50, "[name] NVARCHAR(64)", "[name] VARCHAR(64)")
 			},
 			wantRule: "mssql/nvarchar",
 			wantSay:  "declares a bare VARCHAR",
@@ -2120,7 +2120,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "NVARCHAR is not read as a bare VARCHAR",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] NVARCHAR(128)")
+				editUp(tr, data.MSSQL, 50, "[name] NVARCHAR(64)", "[name] NVARCHAR(128)")
 			},
 		},
 
@@ -2128,7 +2128,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "the second string column of a table cannot ride on the first one's COLLATE",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] NVARCHAR(32) NULL")
 			},
@@ -2138,7 +2138,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a string column pinned to a folding collation is refused",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation,
 					"[label] NVARCHAR(32) COLLATE "+wrongMSSQL)
 			},
@@ -2148,7 +2148,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a non-string column is not asked for a collation",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "[id] BIGINT NOT NULL,", "[id] INT NOT NULL,")
+				editUp(tr, data.MSSQL, 50, "[id] BIGINT NOT NULL,", "[id] INT NOT NULL,")
 			},
 		},
 
@@ -2159,7 +2159,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// default, which on a database created outside NewMsSQLDatabase folds case.
 			name: "an NTEXT column is refused by its type rather than asked for a COLLATE",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] NTEXT NULL")
 			},
@@ -2171,7 +2171,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// opening parenthesis would never see it.
 			name: "a length-less NVARCHAR is still a string column",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] NVARCHAR NULL")
 			},
@@ -2181,7 +2181,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a length-less NVARCHAR that spells the pin passes",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] NVARCHAR COLLATE "+migrationMSSQLCollation+" NULL")
 			},
@@ -2192,7 +2192,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// 7 exists to avoid: a gate whose failure mode is a false alarm.
 			name: "a VARCHAR spelled inside a default value is not a declaration",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "DEFAULT ''", "DEFAULT 'varchar(64)'")
+				editUp(tr, data.MSSQL, 50, "DEFAULT ''", "DEFAULT 'varchar(64)'")
 			},
 		},
 
@@ -2203,7 +2203,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// column name, so the type has to be read by position and unmasked there.
 			name: "a bracketed type is still a string column",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] [NVARCHAR](32) NULL")
 			},
@@ -2213,7 +2213,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a bracketed type that spells the pin passes",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] [NVARCHAR](32) COLLATE "+migrationMSSQLCollation+" NULL")
 			},
@@ -2221,7 +2221,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a bracketed VARCHAR is still a bare VARCHAR",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] [VARCHAR](64)")
+				editUp(tr, data.MSSQL, 50, "[name] NVARCHAR(64)", "[name] [VARCHAR](64)")
 			},
 			wantRule: "mssql/nvarchar",
 			wantSay:  "declares a bare VARCHAR",
@@ -2232,7 +2232,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// ask an integer column for a collation.
 			name: "a column named after a type is not read as one",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "[id] BIGINT NOT NULL,", "[nvarchar] BIGINT NOT NULL,")
+				editUp(tr, data.MSSQL, 50, "[id] BIGINT NOT NULL,", "[nvarchar] BIGINT NOT NULL,")
 			},
 		},
 		{
@@ -2241,7 +2241,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// an expression cannot reach it.
 			name: "a CONVERT in a default does not excuse the column from its collation",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] NVARCHAR(32) NULL CONSTRAINT [df_gadgets_label] "+
 						"DEFAULT CONVERT(NVARCHAR(32), '')")
@@ -2255,7 +2255,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// accepting the pin when it is written, so it is a string column like any other.
 			name: "a sysname column is a string column",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] sysname NULL")
 			},
@@ -2265,7 +2265,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a sysname column that spells the pin passes",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] sysname COLLATE "+migrationMSSQLCollation+" NULL")
 			},
@@ -2276,7 +2276,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// column as an integer one and asks it for nothing.
 			name: "an ANSI spelling of NVARCHAR is still a string column",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] national character varying(32) NULL")
 			},
@@ -2287,7 +2287,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// And this one resolves to varchar, which is the narrow type rule's business.
 			name: "an ANSI spelling of VARCHAR is still a bare VARCHAR",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "[name] NVARCHAR(64)", "[name] character varying(64)")
+				editUp(tr, data.MSSQL, 50, "[name] NVARCHAR(64)", "[name] character varying(64)")
 			},
 			wantRule: "mssql/nvarchar",
 			wantSay:  "declares a bare CHARACTER VARYING",
@@ -2296,7 +2296,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// TEXT is NTEXT's narrow twin and refuses the pin for the same reason.
 			name: "a TEXT column is refused by its type as well",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] TEXT NULL")
 			},
@@ -2308,7 +2308,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// collation and refusing it would be a false alarm.
 			name: "the SQL Server pin spelled in a different case is the same pin",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation,
 					"[label] NVARCHAR(32) COLLATE "+strings.ToUpper(migrationMSSQLCollation))
 			},
@@ -2319,7 +2319,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// later `[c] [MyString] NOT NULL` is a string column nothing here can recognise.
 			name: "an alias type is refused rather than followed",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"ALTER TABLE [widgets] ALTER COLUMN [id] BIGINT NOT NULL;",
 					"CREATE TYPE [MyString] FROM NVARCHAR(64);\n"+
 						"ALTER TABLE [widgets] ALTER COLUMN [id] BIGINT NOT NULL;")
@@ -2332,7 +2332,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "an unnamed default constraint is refused",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50, "CONSTRAINT [df_widgets_note] DEFAULT", "DEFAULT")
+				editUp(tr, data.MSSQL, 50, "CONSTRAINT [df_widgets_note] DEFAULT", "DEFAULT")
 			},
 			wantRule: "mssql/named-default",
 			wantSay:  "no CONSTRAINT name",
@@ -2342,7 +2342,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// VALUE names no constraint, so this default is still unnamed.
 			name: "a CONSTRAINT spelled inside a default value names nothing",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"CONSTRAINT [df_widgets_note] DEFAULT ''", "DEFAULT 'constraint'")
 			},
 			wantRule: "mssql/named-default",
@@ -2353,7 +2353,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// spelling while keeping its shape is what tells the two apart.
 			name: "a column called constraint does not name the default",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"[note] NVARCHAR(16) COLLATE "+migrationMSSQLCollation+
 						" NOT NULL CONSTRAINT [df_widgets_note] DEFAULT ''",
 					"[constraint] NVARCHAR(16) COLLATE "+migrationMSSQLCollation+
@@ -2367,7 +2367,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "an ALTER COLUMN that restates the type and drops NOT NULL is refused",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"ALTER COLUMN [id] BIGINT NOT NULL", "ALTER COLUMN [id] BIGINT")
 			},
 			wantRule: "mssql/nullability",
@@ -2376,7 +2376,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "an ALTER COLUMN that says NULL out loud passes",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MSSQL, 50,
+				editUp(tr, data.MSSQL, 50,
 					"ALTER COLUMN [id] BIGINT NOT NULL", "ALTER COLUMN [id] BIGINT NULL")
 			},
 		},
@@ -2385,7 +2385,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "the second CREATE TABLE in a file cannot ride on the first one's collation",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50,
+				editUp(tr, data.MySQL, 50,
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
 						migrationMySQLCollation+";",
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;")
@@ -2396,7 +2396,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a column pinned to a folding collation is refused even where the table is right",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50, "name varchar(64) NOT NULL",
+				editUp(tr, data.MySQL, 50, "name varchar(64) NOT NULL",
 					"name varchar(64) COLLATE "+wrongMySQL+" NOT NULL")
 			},
 			wantRule: "mysql/collation",
@@ -2408,7 +2408,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// for the pin anywhere in the statement passes a table that is half pinned.
 			name: "a pin on one column does not stand in for the table's",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50,
+				editUp(tr, data.MySQL, 50,
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
 						migrationMySQLCollation+";",
 					"  id bigint NOT NULL,\n  tag varchar(32) COLLATE "+migrationMySQLCollation+
@@ -2421,7 +2421,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// And the pin spelled inside a default VALUE pins nothing at all.
 			name: "the pin spelled inside a default value does not pin the table",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50,
+				editUp(tr, data.MySQL, 50,
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
 						migrationMySQLCollation+";",
 					"  id bigint NOT NULL,\n  tag varchar(32) NOT NULL DEFAULT 'COLLATE="+
@@ -2435,7 +2435,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// string, and refusing it would be a false alarm on a legitimate migration.
 			name: "a folding collation spelled inside a default value is not a violation",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50, "name varchar(64) NOT NULL",
+				editUp(tr, data.MySQL, 50, "name varchar(64) NOT NULL",
 					"name varchar(64) NOT NULL DEFAULT 'COLLATE "+wrongMySQL+"'")
 			},
 		},
@@ -2445,7 +2445,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// The scanner blanks it for the same reason it blanks a --.
 			name: "the pin spelled in a hash comment does not pin the table",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50,
+				editUp(tr, data.MySQL, 50,
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
 						migrationMySQLCollation+";",
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 # COLLATE="+
@@ -2459,7 +2459,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// partition may be called anything, and this one collates nothing at all.
 			name: "the pin used as an identifier does not pin the table",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50,
+				editUp(tr, data.MySQL, 50,
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
 						migrationMySQLCollation+";",
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n"+
@@ -2475,7 +2475,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// open a literal and unbalance the depth if the line were read as SQL.
 			name: "a hash comment beside a pinned table is not a violation",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50,
+				editUp(tr, data.MySQL, 50,
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
 						migrationMySQLCollation+";",
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
@@ -2488,7 +2488,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// nor reports as a folding one.
 			name: "the MySQL pin spelled in a different case is the same pin",
 			breaks: func(tr migrationTree) {
-				editUp(tr, schemadump.MySQL, 50,
+				editUp(tr, data.MySQL, 50,
 					"COLLATE="+migrationMySQLCollation+";\nCREATE TABLE doodads",
 					"COLLATE="+strings.ToUpper(migrationMySQLCollation)+";\nCREATE TABLE doodads")
 			},
@@ -2498,7 +2498,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "postgres and sqlite carry no content rule",
 			breaks: func(tr migrationTree) {
-				for _, d := range []schemadump.Dialect{schemadump.Postgres, schemadump.SQLite} {
+				for _, d := range []data.Dialect{data.Postgres, data.SQLite} {
 					editUp(tr, d, 50, "id bigint NOT NULL", "id bigint NOT NULL,\n  name varchar(64) NOT NULL")
 				}
 			},
@@ -2508,7 +2508,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 		{
 			name: "a down migration restoring the rejected shape is not a violation",
 			breaks: func(tr migrationTree) {
-				tr[schemadump.MSSQL]["000050_add_gadgets.down.sql"] =
+				tr[data.MSSQL]["000050_add_gadgets.down.sql"] =
 					"ALTER TABLE [widgets] ALTER COLUMN [note] VARCHAR(16);\nDROP TABLE [gadgets];\n"
 			},
 		},
@@ -2555,21 +2555,21 @@ func TestMigrationContentRules_ApplyOnlyAboveTheirCutoff(t *testing.T) {
 			rule:   "mssql/nvarchar",
 			cutoff: migrationCutoffsDefault.MSSQLNVarchar,
 			breaks: func(tr migrationTree, num int) {
-				editUp(tr, schemadump.MSSQL, num, "[name] NVARCHAR(64)", "[name] VARCHAR(64)")
+				editUp(tr, data.MSSQL, num, "[name] NVARCHAR(64)", "[name] VARCHAR(64)")
 			},
 		},
 		{
 			rule:   "mssql/named-default",
 			cutoff: migrationCutoffsDefault.MSSQLNamedDefault,
 			breaks: func(tr migrationTree, num int) {
-				editUp(tr, schemadump.MSSQL, num, "CONSTRAINT [df_widgets_note] DEFAULT", "DEFAULT")
+				editUp(tr, data.MSSQL, num, "CONSTRAINT [df_widgets_note] DEFAULT", "DEFAULT")
 			},
 		},
 		{
 			rule:   "mssql/collate",
 			cutoff: migrationCutoffsDefault.MSSQLCollate,
 			breaks: func(tr migrationTree, num int) {
-				editUp(tr, schemadump.MSSQL, num,
+				editUp(tr, data.MSSQL, num,
 					"[label] NVARCHAR(32) COLLATE "+migrationMSSQLCollation+" NULL",
 					"[label] NVARCHAR(32) NULL")
 			},
@@ -2578,7 +2578,7 @@ func TestMigrationContentRules_ApplyOnlyAboveTheirCutoff(t *testing.T) {
 			rule:   "mysql/collation",
 			cutoff: migrationCutoffsDefault.MySQLCollation,
 			breaks: func(tr migrationTree, num int) {
-				editUp(tr, schemadump.MySQL, num,
+				editUp(tr, data.MySQL, num,
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE="+
 						migrationMySQLCollation+";",
 					"  id bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;")
@@ -2610,7 +2610,7 @@ func TestMigrationContentRules_ApplyOnlyAboveTheirCutoff(t *testing.T) {
 // keyword, so pinning it now is free and pinning it later would mean another issue.
 func TestMigrationNullabilityRule_HasNoCutoff(t *testing.T) {
 	tree := migrationContentFixture(2)
-	editUp(tree, schemadump.MSSQL, 2, "ALTER COLUMN [id] BIGINT NOT NULL", "ALTER COLUMN [id] BIGINT")
+	editUp(tree, data.MSSQL, 2, "ALTER COLUMN [id] BIGINT NOT NULL", "ALTER COLUMN [id] BIGINT")
 
 	findings := checkMigrationSource(tree)
 	require.NotEmpty(t, findings, "000002 is below every cutoff, but nullability has none")
@@ -2626,8 +2626,8 @@ func TestMigrationNullabilityRule_HasNoCutoff(t *testing.T) {
 func TestMigrationGoldenVersion_HoldsEachGoldenToItsOwnHighestNumber(t *testing.T) {
 	// A fresh tree and a fresh map per case: they are independent claims, and a case that
 	// mutated a shared one would silently change what the next case is testing.
-	fixture := func() (migrationTree, map[schemadump.Dialect]int) {
-		recorded := map[schemadump.Dialect]int{}
+	fixture := func() (migrationTree, map[data.Dialect]int) {
+		recorded := map[data.Dialect]int{}
 		for _, d := range migrationDialects {
 			recorded[d] = 50
 		}
@@ -2641,7 +2641,7 @@ func TestMigrationGoldenVersion_HoldsEachGoldenToItsOwnHighestNumber(t *testing.
 
 	t.Run("a golden left behind by a new migration is refused", func(t *testing.T) {
 		tree, stale := fixture()
-		stale[schemadump.MSSQL] = 49
+		stale[data.MSSQL] = 49
 
 		findings := checkGoldenVersion(tree, stale)
 		require.Len(t, findings, 1, joinMigrationFindings(findings))
@@ -2653,11 +2653,11 @@ func TestMigrationGoldenVersion_HoldsEachGoldenToItsOwnHighestNumber(t *testing.
 		// The real tree is like this: postgres 39, mssql 40, mysql 42, sqlite 43. Only sqlite
 		// carries 000051 here, so only sqlite's golden owes that number.
 		tree, moved := fixture()
-		tree[schemadump.SQLite]["000051_sqlite_only.up.sql"] =
+		tree[data.SQLite]["000051_sqlite_only.up.sql"] =
 			"-- parity: sqlite only. The other three already carry the index.\n" +
 				"CREATE INDEX idx_gadgets_id ON gadgets (id);\n"
-		tree[schemadump.SQLite]["000051_sqlite_only.down.sql"] = "DROP INDEX idx_gadgets_id;\n"
-		moved[schemadump.SQLite] = 51
+		tree[data.SQLite]["000051_sqlite_only.down.sql"] = "DROP INDEX idx_gadgets_id;\n"
+		moved[data.SQLite] = 51
 
 		require.Empty(t, checkMigrationSource(tree), "the added migration is green on its own")
 		require.Empty(t, checkGoldenVersion(tree, moved))
@@ -2665,7 +2665,7 @@ func TestMigrationGoldenVersion_HoldsEachGoldenToItsOwnHighestNumber(t *testing.
 
 	t.Run("a golden recording no version at all is refused", func(t *testing.T) {
 		tree, none := fixture()
-		delete(none, schemadump.Postgres)
+		delete(none, data.Postgres)
 
 		findings := checkGoldenVersion(tree, none)
 		require.Len(t, findings, 1, joinMigrationFindings(findings))

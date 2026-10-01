@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 // The two arms of insertReturningId, pinned at the scripted-driver seam.
@@ -86,7 +87,7 @@ func TestInsertReturningId_LastInsertIdArmReportsARefusingDriver(t *testing.T) {
 
 // TestInsertReturningId_LastInsertIdArmWrapsTheInsertFailure pins the message and the sentinel on
 // the arm SQLite and MySQL take. The wrapping matters because the handler above asks errors.Is
-// for ErrUniqueViolation to answer 409 rather than 500.
+// for data.ErrUniqueViolation to answer 409 rather than 500.
 func TestInsertReturningId_LastInsertIdArmWrapsTheInsertFailure(t *testing.T) {
 	driverErr := &driverUniqueError{msg: "UNIQUE constraint failed: widgets.name"}
 	d := scriptedDB(t, &scriptedDriver{execs: []*scriptedExec{{err: driverErr}}})
@@ -99,8 +100,8 @@ func TestInsertReturningId_LastInsertIdArmWrapsTheInsertFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("a refused statement was reported as a successful insert")
 	}
-	if !errors.Is(err, ErrUniqueViolation) {
-		t.Errorf("errors.Is(err, ErrUniqueViolation) = false; err = %v", err)
+	if !errors.Is(err, data.ErrUniqueViolation) {
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false; err = %v", err)
 	}
 	want := "unable to insert widget: unable to execute SQL: unique constraint violation: " +
 		"UNIQUE constraint failed: widgets.name"
@@ -167,8 +168,8 @@ func TestInsertReturningId_ReturningArmSurfacesADeferredViolation(t *testing.T) 
 		t.Fatalf("a violation the driver deferred to the result set was reported as a "+
 			"successful insert with id %d", id)
 	}
-	if !errors.Is(err, ErrUniqueViolation) {
-		t.Errorf("errors.Is(err, ErrUniqueViolation) = false, so the handler above cannot "+
+	if !errors.Is(err, data.ErrUniqueViolation) {
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false, so the handler above cannot "+
 			"answer 409 on these two engines; err = %v", err)
 	}
 	if want := "unable to insert widget: unique constraint violation: " + driverErr.msg; err.Error() != want {

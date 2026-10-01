@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"sort"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -17,20 +18,20 @@ import (
 // An empty list is an error. A dump of no tables compared against a golden file of no
 // tables reads as "nothing changed" and passes, which is the failure mode that would make
 // the whole check worthless.
-func Tables(ctx context.Context, db *sql.DB, d Dialect) ([]string, error) {
-	if !d.valid() {
+func Tables(ctx context.Context, db *sql.DB, d data.Dialect) ([]string, error) {
+	if !valid(d) {
 		return nil, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 
 	var q string
 	switch d {
-	case MySQL:
+	case data.MySQL:
 		// BASE TABLE excludes views; DATABASE() is the schema the connection is bound to.
 		q = `SELECT TABLE_NAME FROM information_schema.tables
 			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'`
-	case Postgres:
+	case data.Postgres:
 		q = `SELECT tablename FROM pg_tables WHERE schemaname = current_schema()`
-	case MSSQL:
+	case data.MSSQL:
 		q = `SELECT t.name FROM sys.tables t
 			JOIN sys.schemas s ON s.schema_id = t.schema_id
 			WHERE s.name = 'dbo'`
@@ -69,7 +70,7 @@ func Tables(ctx context.Context, db *sql.DB, d Dialect) ([]string, error) {
 // Dump reads every table in the connected database. This is the seam the generator writes a
 // golden file from and the seam the per-engine data test reads through, so the file cannot
 // record a shape the checker could not have produced.
-func Dump(ctx context.Context, db *sql.DB, d Dialect) (Schema, error) {
+func Dump(ctx context.Context, db *sql.DB, d data.Dialect) (Schema, error) {
 	names, err := Tables(ctx, db, d)
 	if err != nil {
 		return nil, err
@@ -100,8 +101,8 @@ func Dump(ctx context.Context, db *sql.DB, d Dialect) (Schema, error) {
 // It refuses a table carrying a construct this shape cannot represent, rather than dropping
 // it silently: see guardTable. Dropping it would put the omission in the golden file too,
 // where nothing downstream could recover it.
-func DumpTable(ctx context.Context, db *sql.DB, d Dialect, table string) (TableShape, error) {
-	if !d.valid() {
+func DumpTable(ctx context.Context, db *sql.DB, d data.Dialect, table string) (TableShape, error) {
+	if !valid(d) {
 		return TableShape{}, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	if err := checkIdentifier("table", table); err != nil {
@@ -164,8 +165,8 @@ func DumpTable(ctx context.Context, db *sql.DB, d Dialect, table string) (TableS
 // repeated, both of which are the failures worth catching. Unlike DumpTable it does not run
 // the guard, because a migration test calls it against a table part way through the chain
 // rather than against a finished schema.
-func DescribeIndex(ctx context.Context, db *sql.DB, d Dialect, table, index string) (IndexShape, error) {
-	if !d.valid() {
+func DescribeIndex(ctx context.Context, db *sql.DB, d data.Dialect, table, index string) (IndexShape, error) {
+	if !valid(d) {
 		return IndexShape{}, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	if err := checkIdentifier("table", table); err != nil {

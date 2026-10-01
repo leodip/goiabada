@@ -238,7 +238,7 @@ func TestSchemadumpTables_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	h := newIsolatedDB(t)
 	require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head")
 
-	names, err := schemadump.Tables(cancelled(), h.SQL, dumpDialect(t))
+	names, err := schemadump.Tables(cancelled(), h.SQL, dbType())
 
 	require.Error(t, err, "a catalog read must not be issued on behalf of a caller that is already gone")
 	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")

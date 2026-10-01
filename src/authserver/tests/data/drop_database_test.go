@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -26,7 +27,7 @@ import (
 //
 // SQLite is skipped: it has no server to drop a database from, only a file.
 func TestDropDatabase_DropsTheDatabaseAndToleratesAnAbsentOne(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite has no server to drop a database from, only a file")
 	}
 
@@ -37,7 +38,7 @@ func TestDropDatabase_DropsTheDatabaseAndToleratesAnAbsentOne(t *testing.T) {
 	var handle *sql.DB
 	var drop func() error
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		engineCfg := &mysqldb.DatabaseConfig{
 			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -46,7 +47,7 @@ func TestDropDatabase_DropsTheDatabaseAndToleratesAnAbsentOne(t *testing.T) {
 		require.NoErrorf(t, err, "NewMySQLDatabase at %s", name)
 		handle = db.DB
 		drop = func() error { return mysqldb.DropDatabase(context.Background(), engineCfg) }
-	case "postgres":
+	case data.Postgres:
 		engineCfg := &postgresdb.DatabaseConfig{
 			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -55,7 +56,7 @@ func TestDropDatabase_DropsTheDatabaseAndToleratesAnAbsentOne(t *testing.T) {
 		require.NoErrorf(t, err, "NewPostgresDatabase at %s", name)
 		handle = db.DB
 		drop = func() error { return postgresdb.DropDatabase(context.Background(), engineCfg) }
-	case "mssql":
+	case data.MSSQL:
 		engineCfg := &mssqldb.DatabaseConfig{
 			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,

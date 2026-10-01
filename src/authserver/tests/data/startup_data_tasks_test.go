@@ -51,7 +51,7 @@ func seedThrowawayDatabase(t *testing.T, name string, seed func(db data.Database
 // PEM. Seeded under the previous key, a startup carrying that key rewrites it under the current
 // one; a startup that lost it leaves the row as it was (#353).
 func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
-	if engine := dbType(); engine != "sqlite" && engine != "" {
+	if engine := dbType(); engine != data.SQLite {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the call under test is engine-independent")
 	}
 
@@ -112,7 +112,7 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 // reach NewDatabase without running the startup pass over the shared database this tier runs
 // against. The arm under test is engine-independent, being a return in datafactory.
 func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
-	if engine := dbType(); engine != "sqlite" && engine != "" {
+	if engine := dbType(); engine != data.SQLite {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the arm under test is engine-independent")
 	}
 
@@ -188,7 +188,7 @@ func TestNewDatabase_RefusesAStartupWhoseOpenFailed(t *testing.T) {
 // reach NewDatabase without touching the shared database this tier runs against. The arm under
 // test is engine-independent, being a return in datafactory.
 func TestNewDatabase_RefusesADirtyDatabase(t *testing.T) {
-	if engine := dbType(); engine != "sqlite" && engine != "" {
+	if engine := dbType(); engine != data.SQLite {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the arm under test is engine-independent")
 	}
 

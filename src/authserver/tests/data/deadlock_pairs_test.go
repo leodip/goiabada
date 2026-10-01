@@ -142,7 +142,7 @@ func (d pausedBeforeTokenUpdate) UpdateRefreshToken(ctx context.Context, tx *sql
 
 func skipIfSQLite(t *testing.T) {
 	t.Helper()
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("SQLite runs on one connection, so two transactions never overlap and nothing can deadlock")
 	}
 }

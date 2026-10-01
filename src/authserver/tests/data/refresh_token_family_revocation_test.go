@@ -222,7 +222,7 @@ func TestRefreshTokenFamilyRevocation_TheLookupComparesTheJtiExactly(t *testing.
 // Only SQLite can do this here: its column declaration is the one thing a test can swap without a
 // migration. The other engines are held by the case above, which is the real thing.
 func TestRefreshTokenFamilyRevocation_TheLookupDoesNotTrustAnEngineThatFolds(t *testing.T) {
-	if dbType() != "sqlite" && dbType() != "" {
+	if dbType() != data.SQLite {
 		t.Skipf("%s is held by the trailing space case above; only SQLite's column declaration can be swapped without a migration", dbType())
 	}
 	ctx := context.Background()

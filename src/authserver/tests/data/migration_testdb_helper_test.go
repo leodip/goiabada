@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -45,8 +44,15 @@ func isolatedDBName() string {
 	return fmt.Sprintf("goiabada_mig_%d_%d", os.Getpid(), isolatedDBCounter.Add(1))
 }
 
-func dbType() string {
-	return strings.Trim(strings.TrimSpace(appConfig.Database.Type), `"'`)
+// dbType is the engine this run is against, parsed as the server parses it, and the tier's one read
+// of the raw GOIABADA_DB_TYPE. A refusal cannot reach a test: TestMain has already opened the
+// database through datafactory.NewDatabase, which refuses the same input (#438 decision 6).
+func dbType() data.Dialect {
+	d, err := data.ParseDialect(appConfig.Database.Type)
+	if err != nil {
+		panic(err)
+	}
+	return d
 }
 
 // newIsolatedDB creates a fresh, empty database of the configured dialect and a
@@ -56,7 +62,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 	cfg := &appConfig.Database
 
 	switch dbType() {
-	case "", "sqlite":
+	case data.SQLite:
 		// A file-based DB in a temp dir: the sqlite driver requires WAL, which
 		// an in-memory database cannot provide.
 		dsn := filepath.Join(t.TempDir(), "migration_test.db")
@@ -65,7 +71,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		t.Cleanup(func() { _ = db.DB.Close() }) // temp dir is removed by t.TempDir
 		return newIsolated(t, db, db.DB, "")
 
-	case "mysql":
+	case data.MySQL:
 		name := isolatedDBName()
 		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
 			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
@@ -76,7 +82,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		assertCreatedDatabaseCollation(t, db.DB)
 		return newIsolated(t, db, db.DB, name)
 
-	case "postgres":
+	case data.Postgres:
 		name := isolatedDBName()
 		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
@@ -86,7 +92,7 @@ func newIsolatedDB(t *testing.T) *isolatedDB {
 		t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
 		return newIsolated(t, db, db.DB, name)
 
-	case "mssql":
+	case data.MSSQL:
 		name := isolatedDBName()
 		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
@@ -127,9 +133,9 @@ func assertCreatedDatabaseCollation(t *testing.T, sqlDB *sql.DB) {
 
 	var want string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		want = mysqlCollationAfter000040
-	case "mssql":
+	case data.MSSQL:
 		want = mssqlCollationAfter000040
 	default:
 		return
@@ -151,9 +157,9 @@ func readDatabaseDefaultCollation(t *testing.T, sqlDB *sql.DB) string {
 
 	var query string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		query = "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE()"
-	case "mssql":
+	case data.MSSQL:
 		query = `SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS NVARCHAR(128))`
 	default:
 		t.Fatalf("%s has no database-level default collation to read", dbType())
@@ -201,23 +207,13 @@ type (
 	tableShape schemadump.TableShape
 )
 
-// dumpDialect is the configured dialect in the vocabulary schemadump takes. The package
-// takes it as a parameter rather than reading the configuration itself, because the
-// generator connects to all four engines in one process.
-func dumpDialect(t *testing.T) schemadump.Dialect {
-	t.Helper()
-	d, err := schemadump.ParseDialect(appConfig.Database.Type)
-	require.NoErrorf(t, err, "the configured database type %q is not one of the four dialects", dbType())
-	return d
-}
-
 // dumpTable reads a table's columns, indexes and foreign keys out of the configured
 // dialect's catalog, failing the test on the errors schemadump returns rather than handing
 // them back. Every failure it can report means the dump is not usable: a table that read no
 // columns, or one carrying a construct the shape cannot record.
 func dumpTable(t *testing.T, h *isolatedDB, table string) tableShape {
 	t.Helper()
-	shape, err := schemadump.DumpTable(context.Background(), h.SQL, dumpDialect(t), table)
+	shape, err := schemadump.DumpTable(context.Background(), h.SQL, dbType(), table)
 	require.NoErrorf(t, err, "dump table %s on %s", table, dbType())
 	return tableShape(shape)
 }
@@ -227,7 +223,7 @@ func dumpTable(t *testing.T, h *isolatedDB, table string) tableShape {
 // carry it.
 func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape {
 	t.Helper()
-	shape, err := schemadump.DescribeIndex(context.Background(), h.SQL, dumpDialect(t), table, index)
+	shape, err := schemadump.DescribeIndex(context.Background(), h.SQL, dbType(), table, index)
 	require.NoErrorf(t, err, "describe index %s on %s (%s)", index, table, dbType())
 	return shape
 }
@@ -237,7 +233,7 @@ func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape 
 // tables compared against a golden file of no tables reads as "nothing changed".
 func listTables(t *testing.T, h *isolatedDB) []string {
 	t.Helper()
-	names, err := schemadump.Tables(context.Background(), h.SQL, dumpDialect(t))
+	names, err := schemadump.Tables(context.Background(), h.SQL, dbType())
 	require.NoErrorf(t, err, "list tables on %s", dbType())
 	return names
 }
@@ -246,7 +242,7 @@ func listTables(t *testing.T, h *isolatedDB) []string {
 // golden file from and what the per-engine assertion reads through.
 func dumpSchema(t *testing.T, h *isolatedDB) schemadump.Schema {
 	t.Helper()
-	schema, err := schemadump.Dump(context.Background(), h.SQL, dumpDialect(t))
+	schema, err := schemadump.Dump(context.Background(), h.SQL, dbType())
 	require.NoErrorf(t, err, "dump the whole schema on %s", dbType())
 	return schema
 }
@@ -448,7 +444,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 	}
 
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		admin, err := sql.Open("mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg))
 		require.NoError(t, err, "open mysql as the tier's own login")
 		r.admin = admin
@@ -470,7 +466,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 			_ = admin.Close()
 		})
 
-	case "postgres":
+	case data.Postgres:
 		admin, err := sql.Open("pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg))
 		require.NoError(t, err, "open postgres as the tier's own role")
 		r.admin = admin
@@ -488,7 +484,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 			_ = admin.Close()
 		})
 
-	case "mssql":
+	case data.MSSQL:
 		admin, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
 		require.NoError(t, err, "open master as the tier's own login")
 		r.admin = admin
@@ -546,7 +542,7 @@ func (r *restrictedLoginDB) constructRestricted(t *testing.T) (migratable, *sql.
 	cfg := &appConfig.Database
 
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
 			Type: "mysql", Username: r.username, Password: r.password,
 			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
@@ -555,7 +551,7 @@ func (r *restrictedLoginDB) constructRestricted(t *testing.T) (migratable, *sql.
 		t.Cleanup(func() { _ = db.DB.Close() })
 		return db, db.DB
 
-	case "postgres":
+	case data.Postgres:
 		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 			Type: "postgres", Username: r.username, Password: r.password,
 			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,
@@ -564,7 +560,7 @@ func (r *restrictedLoginDB) constructRestricted(t *testing.T) (migratable, *sql.
 		t.Cleanup(func() { _ = db.DB.Close() })
 		return db, db.DB
 
-	case "mssql":
+	case data.MSSQL:
 		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 			Type: "mssql", Username: r.username, Password: r.password,
 			Host: cfg.Host, Port: cfg.Port, Name: r.name, Create: false,

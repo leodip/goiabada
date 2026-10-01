@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -208,5 +209,5 @@ func rewriteSchemaMigrationsToDriverShape000041(t *testing.T, h *isolatedDB) {
 }
 
 func isSQLite000041() bool {
-	return dbType() == "" || dbType() == "sqlite"
+	return dbType() == data.SQLite
 }

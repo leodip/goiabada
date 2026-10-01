@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -27,11 +28,11 @@ import (
 // version they do have.
 func predecessor000039() int {
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return 37 // 000037 is MySQL's own, the audit_logs default
-	case "postgres":
+	case data.Postgres:
 		return 35 // PostgreSQL has none of 000036 to 000038
-	case "mssql":
+	case data.MSSQL:
 		return 38 // 000038 is SQL Server's own, the nvarchar columns; its head
 	default: // sqlite
 		return 36 // 000036 is SQLite's own, the refresh_tokens(client_id) index
@@ -39,9 +40,9 @@ func predecessor000039() int {
 }
 
 // hasMigration000039 is false on SQL Server alone, which needs no file.
-func hasMigration000039() bool { return dbType() != "mssql" }
+func hasMigration000039() bool { return dbType() != data.MSSQL }
 
-func isSQLite000039() bool { return dbType() == "" || dbType() == "sqlite" }
+func isSQLite000039() bool { return dbType() == data.SQLite }
 
 // TestMigration000039_ShapeDifferenceIsExactlyIntended is decision 5's whole purpose. The
 // SQLite half of this migration hand-writes codes (22 columns, 2 foreign keys, 3 indexes)
@@ -451,11 +452,11 @@ func refreshTokenFields000039(token *models.RefreshToken) []any {
 // values rather than formatting timestamps into literals four ways.
 func flavor000039() sqlbuilder.Flavor {
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return sqlbuilder.MySQL
-	case "postgres":
+	case data.Postgres:
 		return sqlbuilder.PostgreSQL
-	case "mssql":
+	case data.MSSQL:
 		return sqlbuilder.SQLServer
 	default:
 		return sqlbuilder.SQLite

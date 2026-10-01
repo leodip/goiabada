@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ const deleteUserinfoPermission000050 = 50
 // beforeDeleteUserinfoPermission000050 is the version below 000050 on the configured engine.
 // SQLite carries no 000049, so it steps from 000048.
 func beforeDeleteUserinfoPermission000050() int {
-	if dbType() == "sqlite" {
+	if dbType() == data.SQLite {
 		return 48
 	}
 	return 49
@@ -185,7 +186,7 @@ func TestMigration000050_DeletesTheUserinfoPermissionAndItsGrants(t *testing.T) 
 //
 // Run via: ./run-tests.sh --type data --db sqlite --run TestMigration000050
 func TestMigration000050_SQLiteWithForeignKeysOff(t *testing.T) {
-	if dbType() != "sqlite" {
+	if dbType() != data.SQLite {
 		t.Skipf("SQLite only: %s enforces the link tables' cascade on every connection", dbType())
 	}
 	h := newIsolatedDB(t)

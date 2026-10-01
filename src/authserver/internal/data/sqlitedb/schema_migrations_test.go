@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +38,7 @@ func TestNewMigrator_PinsTheSchemaMigrationsShape(t *testing.T) {
 	_, err = db.NewMigrator(context.Background())
 	require.NoError(t, err, "NewMigrator")
 
-	shape, err := schemadump.DumpTable(context.Background(), db.DB, schemadump.SQLite, "schema_migrations")
+	shape, err := schemadump.DumpTable(context.Background(), db.DB, data.SQLite, "schema_migrations")
 	require.NoError(t, err, "dump schema_migrations")
 
 	version, ok := shape.Column("version")

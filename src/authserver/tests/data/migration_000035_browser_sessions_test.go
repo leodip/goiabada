@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -432,7 +433,7 @@ func clientCredentialsEnabled000035(t *testing.T, h *isolatedDB) bool {
 }
 
 func enabledLiteral000035() string {
-	if dbType() == "postgres" {
+	if dbType() == data.Postgres {
 		return "true"
 	}
 	return "1"
@@ -445,13 +446,13 @@ func tableExists000035(t *testing.T, h *isolatedDB, table string) bool {
 
 	var q string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		q = fmt.Sprintf(`SELECT COUNT(*) FROM information_schema.tables
 			WHERE table_schema = DATABASE() AND table_name = '%s'`, table)
-	case "postgres":
+	case data.Postgres:
 		q = fmt.Sprintf(`SELECT COUNT(*) FROM information_schema.tables
 			WHERE table_schema = 'public' AND table_name = '%s'`, table)
-	case "mssql":
+	case data.MSSQL:
 		q = fmt.Sprintf(`SELECT COUNT(*) FROM sys.tables WHERE name = '%s'`, table)
 	default: // sqlite
 		q = fmt.Sprintf(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '%s'`, table)
@@ -508,9 +509,9 @@ func seedGroup000035(t *testing.T, h *isolatedDB, identifier string) int64 {
 
 func groupsTable000035() string {
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return "`groups`"
-	case "mssql":
+	case data.MSSQL:
 		return "[groups]"
 	default: // sqlite, postgres
 		return `"groups"`

@@ -17,47 +17,16 @@ package schemadump
 
 import (
 	"regexp"
-	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// Dialect names the engine whose catalog is being read. It is a parameter rather than
-// something read from the process configuration because the generator connects to all four
-// engines in one process, so there is no single configured dialect to read.
-type Dialect string
-
-const (
-	SQLite   Dialect = "sqlite"
-	MySQL    Dialect = "mysql"
-	Postgres Dialect = "postgres"
-	MSSQL    Dialect = "mssql"
-)
-
-// ParseDialect maps a configured database type onto a Dialect. The empty string is SQLite,
-// which is what the loaded configuration's Database.Type reports when nothing is set, and
-// surrounding quotes and whitespace are tolerated because an environment variable often carries
-// them.
-//
-// Anything else is an error rather than a fallback. Every switch this package replaced fell
-// through its default arm to SQLite, which in a four-engine process would read the wrong
-// catalog, find nothing, and report success.
-func ParseDialect(s string) (Dialect, error) {
-	switch d := Dialect(strings.Trim(strings.TrimSpace(s), `"'`)); d {
-	case "":
-		return SQLite, nil
-	case SQLite, MySQL, Postgres, MSSQL:
-		return d, nil
-	default:
-		return "", errs.Errorf("schemadump: unrecognised database dialect %q", s)
-	}
-}
-
 // valid reports whether d is one of the four engines. Every entry point checks it, so a
 // zero Dialect value cannot silently select a branch.
-func (d Dialect) valid() bool {
+func valid(d data.Dialect) bool {
 	switch d {
-	case SQLite, MySQL, Postgres, MSSQL:
+	case data.SQLite, data.MySQL, data.Postgres, data.MSSQL:
 		return true
 	}
 	return false

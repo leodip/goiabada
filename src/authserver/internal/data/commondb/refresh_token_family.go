@@ -29,7 +29,7 @@ import (
 // The row is read before it is written, so the common repeat, a replayed token presented again,
 // neither inserts nor trips the unique key. Two calls for the same family that overlap can both
 // read absent, and the second insert then loses on the key: that is reported as
-// ErrUniqueViolation, and a caller reruns its transaction once, because on PostgreSQL the
+// data.ErrUniqueViolation, and a caller reruns its transaction once, because on PostgreSQL the
 // refused insert aborts the transaction it ran in.
 func (d *CommonDatabase) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string,
 	reason string) (bool, error) {

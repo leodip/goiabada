@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/stretchr/testify/require"
@@ -92,7 +93,7 @@ var (
 func rcsiDatabase(t *testing.T) *rcsiFixture {
 	t.Helper()
 
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skip("READ_COMMITTED_SNAPSHOT is a SQL Server setting: PostgreSQL and MySQL are MVCC already, and SQLite has one writer")
 	}
 

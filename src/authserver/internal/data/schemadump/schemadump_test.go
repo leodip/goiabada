@@ -4,34 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
-
-// TestParseDialect covers the arm that used to be a silent fallback. Every switch this
-// package replaced fell through its default to SQLite, so a misspelled dialect in a
-// four-engine process would have read SQLite's catalog against a PostgreSQL connection,
-// found nothing, and reported success.
-func TestParseDialect(t *testing.T) {
-	for _, tc := range []struct {
-		in   string
-		want Dialect
-	}{
-		{"", SQLite},
-		{"sqlite", SQLite},
-		{"  mysql  ", MySQL},
-		{`"postgres"`, Postgres},
-		{"'mssql'", MSSQL},
-	} {
-		got, err := ParseDialect(tc.in)
-		require.NoErrorf(t, err, "ParseDialect(%q)", tc.in)
-		assert.Equalf(t, tc.want, got, "ParseDialect(%q)", tc.in)
-	}
-
-	for _, bad := range []string{"postgresql", "sqlite3", "SQLITE", "oracle"} {
-		_, err := ParseDialect(bad)
-		assert.Errorf(t, err, "ParseDialect(%q) must not fall back to a dialect", bad)
-	}
-}
 
 // TestCheckIdentifier holds the one place a table or index name reaches a catalog query by
 // interpolation. Every name the package meets comes from the catalog or from a test

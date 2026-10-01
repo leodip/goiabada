@@ -30,6 +30,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -47,7 +48,7 @@ import (
 // is actively shedding dependencies rather than adding one for a developer tool. A wrong
 // value fails at connect time, before anything is written.
 type target struct {
-	dialect  schemadump.Dialect
+	dialect  data.Dialect
 	host     string
 	port     int
 	username string
@@ -56,10 +57,10 @@ type target struct {
 
 func targets() []target {
 	return []target{
-		{dialect: schemadump.SQLite},
-		{dialect: schemadump.MySQL, host: "mysql-server", port: 13306, username: "root", password: "mySqlPass123"},
-		{dialect: schemadump.Postgres, host: "postgres-server", port: 15432, username: "postgres", password: "myPostgresPass123"},
-		{dialect: schemadump.MSSQL, host: "mssql-server", port: 11433, username: "sa", password: "YourStr0ngPassw0rd!"},
+		{dialect: data.SQLite},
+		{dialect: data.MySQL, host: "mysql-server", port: 13306, username: "root", password: "mySqlPass123"},
+		{dialect: data.Postgres, host: "postgres-server", port: 15432, username: "postgres", password: "myPostgresPass123"},
+		{dialect: data.MSSQL, host: "mssql-server", port: 11433, username: "sa", password: "YourStr0ngPassw0rd!"},
 	}
 }
 
@@ -122,7 +123,7 @@ func main() {
 }
 
 func run() error {
-	dumps := map[schemadump.Dialect][]byte{}
+	dumps := map[data.Dialect][]byte{}
 	for _, t := range targets() {
 		resolved, err := t.withOverrides()
 		if err != nil {
@@ -198,7 +199,7 @@ type migratable interface {
 // path the data tier's isolated databases take.
 func open(t target, name string) (migratable, *sql.DB, func(), error) {
 	switch t.dialect {
-	case schemadump.SQLite:
+	case data.SQLite:
 		// A file rather than :memory:, because the SQLite driver requires WAL and an
 		// in-memory database cannot provide it. The whole directory goes at cleanup.
 		dir, err := os.MkdirTemp("", "goiabada-schemadump-")
@@ -214,7 +215,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 		}
 		return db, db.DB, func() { _ = db.DB.Close(); _ = os.RemoveAll(dir) }, nil
 
-	case schemadump.MySQL:
+	case data.MySQL:
 		cfg := t.mysqlConfig(name)
 		db, err := mysqldb.NewMySQLDatabase(cfg, false)
 		if err != nil {
@@ -225,7 +226,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 			reportDrop(name, mysqldb.DropDatabase(context.Background(), cfg))
 		}, nil
 
-	case schemadump.Postgres:
+	case data.Postgres:
 		cfg := t.postgresConfig(name)
 		db, err := postgresdb.NewPostgresDatabase(cfg, false)
 		if err != nil {
@@ -236,7 +237,7 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 			reportDrop(name, postgresdb.DropDatabase(context.Background(), cfg))
 		}, nil
 
-	case schemadump.MSSQL:
+	case data.MSSQL:
 		cfg := t.mssqlConfig(name)
 		db, err := mssqldb.NewMsSQLDatabase(cfg, false)
 		if err != nil {
@@ -269,7 +270,7 @@ func reportDrop(name string, err error) {
 // scratchName is unique to this process, so two runs against one server cannot collide and
 // a leftover from a previous run is never reused. Lowercase, so the name is the same whether
 // or not a statement quotes it: PostgreSQL folds an unquoted identifier.
-func scratchName(d schemadump.Dialect) string {
+func scratchName(d data.Dialect) string {
 	return fmt.Sprintf("goiabada_golden_%s_%d", d, os.Getpid())
 }
 

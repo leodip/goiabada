@@ -5,21 +5,22 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // dumpForeignKeys reads one table's foreign keys as the tuple ForeignKeyShape documents.
-func dumpForeignKeys(ctx context.Context, db *sql.DB, d Dialect, table string) ([]ForeignKeyShape, error) {
+func dumpForeignKeys(ctx context.Context, db *sql.DB, d data.Dialect, table string) ([]ForeignKeyShape, error) {
 	var q string
 	switch d {
-	case MySQL:
+	case data.MySQL:
 		q = fmt.Sprintf(`SELECT k.COLUMN_NAME, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME, r.DELETE_RULE
 			FROM information_schema.KEY_COLUMN_USAGE k
 			JOIN information_schema.REFERENTIAL_CONSTRAINTS r
 			  ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
 			WHERE k.TABLE_SCHEMA = DATABASE() AND k.TABLE_NAME = '%s'
 			  AND k.REFERENCED_TABLE_NAME IS NOT NULL`, table)
-	case Postgres:
+	case data.Postgres:
 		// confdeltype is a single letter; the CASE is what puts it in the same
 		// vocabulary as the other three catalogs. conkey and confkey are parallel
 		// arrays, so they are unnested together on the shared ordinality.
@@ -36,7 +37,7 @@ func dumpForeignKeys(ctx context.Context, db *sql.DB, d Dialect, table string) (
 			JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = lk.attnum
 			JOIN pg_attribute ratt ON ratt.attrelid = con.confrelid AND ratt.attnum = rk.attnum
 			WHERE con.contype = 'f' AND tb.relname = '%s' AND n.nspname = current_schema()`, table)
-	case MSSQL:
+	case data.MSSQL:
 		// delete_referential_action_desc spells it NO_ACTION and SET_NULL, so the
 		// underscore is replaced to match the other three.
 		q = fmt.Sprintf(`SELECT pc.name, rt.name, rc.name,

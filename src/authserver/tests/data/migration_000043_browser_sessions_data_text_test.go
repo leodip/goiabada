@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +52,7 @@ func TestMigration000043_BrowserSessionsDataText(t *testing.T) {
 		// choice, being the engine's largest string. That is precisely why the SQLite
 		// copy was wrong and why this is asserted per engine rather than as "not
 		// longtext", which fails on the one engine the word belongs to.
-		want := map[string]string{"mysql": "longtext", "postgres": "text", "mssql": "nvarchar(max)"}
+		want := map[data.Dialect]string{data.MySQL: "longtext", data.Postgres: "text", data.MSSQL: "nvarchar(max)"}
 		assert.Equalf(t, want[dbType()], dumpTable(t, h, "browser_sessions").column(t, "data").Type,
 			"%s declares browser_sessions.data in its own vocabulary and needs no file", dbType())
 		return
