@@ -72,9 +72,9 @@ func (apiBearerRefusals) internalError(w http.ResponseWriter, r *http.Request, e
 	apiresponse.WriteInternalServerError(w, r, err, "sid", sid)
 }
 
-// jsonErrorWriter is the one thing the /userinfo refusals need of the auth server's JSON writer:
-// the RFC 6749 error writer the userinfo handler answers through. handlerhelpers.HttpHelper
-// satisfies it.
+// jsonErrorWriter is the one thing the /userinfo refusals and LimitROPC need of the auth server's
+// JSON writer: the RFC 6749 error writer the userinfo and token handlers answer through.
+// handlerhelpers.HttpHelper satisfies it.
 type jsonErrorWriter interface {
 	JsonError(w http.ResponseWriter, r *http.Request, err error)
 }

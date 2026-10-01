@@ -98,7 +98,8 @@ func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimit
 
 func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
-	return NewRateLimiterMiddleware(ceremonyStore, handlerhelpers.NewHttpHelper(testTemplateFS), auditLog, enabled), auditLog
+	httpHelper := handlerhelpers.NewHttpHelper(testTemplateFS)
+	return NewRateLimiterMiddleware(ceremonyStore, httpHelper, httpHelper, auditLog, enabled), auditLog
 }
 
 // limiterRequest builds the request a limited route actually receives. Settings are on the
@@ -2276,6 +2277,109 @@ func TestLimitROPC_PerIP(t *testing.T) {
 				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
 					i+1, code, reached)
 			}
+		}
+	})
+}
+
+// TestLimitROPC_AFormThatDoesNotParseIsAnsweredNotForwarded pins the limiter's answer to a token
+// request whose form does not parse: the token endpoint's own 400 invalid_request, written here, with
+// the handler never run. Forwarding it was the defect. net/http keeps the pairs that did parse and
+// answers the handler's own ParseForm with nil, so the handler acted on part of the request: a
+// password grant beside one malformed pair reached the password check with neither tier consulted,
+// and a parameter whose second copy was malformed passed as sent once (#228, #437).
+//
+// Each case varies where the malformed bytes sit, so a limiter that judged the body alone, or the
+// pairs it read rather than the parse's error, fails one of them. The end-to-end answer, the same
+// whether the limiter is on or off, is TestInitRoutes_TokenFormThatDoesNotParse in internal/server.
+func TestLimitROPC_AFormThatDoesNotParseIsAnsweredNotForwarded(t *testing.T) {
+	const passwordGrant = "grant_type=password&username=victim%40example.com&password=guess"
+
+	tests := []struct {
+		name   string
+		target string
+		body   func(w http.ResponseWriter) io.Reader
+	}{
+		{"a malformed second copy of a parameter the endpoint reads", "/auth/token", func(http.ResponseWriter) io.Reader {
+			return strings.NewReader("grant_type=client_credentials&client_id=app&client_id=%zz&client_secret=s")
+		}},
+		{"a malformed pair the endpoint ignores, beside a password grant", "/auth/token", func(http.ResponseWriter) io.Reader {
+			return strings.NewReader(passwordGrant + "&junk=%zz")
+		}},
+		{"a malformed query beside a password grant in the body", "/auth/token?junk=%zz", func(http.ResponseWriter) io.Reader {
+			return strings.NewReader(passwordGrant)
+		}},
+		{"a password grant cut one byte short by the request-body limit", "/auth/token", func(w http.ResponseWriter) io.Reader {
+			return http.MaxBytesReader(w, io.NopCloser(strings.NewReader(passwordGrant)), int64(len(passwordGrant)-1))
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			m := newTestMiddleware(nil, true)
+			rr := httptest.NewRecorder()
+			req := limiterRequest(http.MethodPost, test.target, test.body(rr))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			reached := false
+
+			m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				reached = true
+				w.WriteHeader(http.StatusTeapot)
+			})).ServeHTTP(rr, req)
+
+			if reached {
+				t.Fatal("a form that does not parse reached the handler")
+			}
+			if rr.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+			}
+			for header, want := range map[string]string{
+				"Content-Type": "application/json", "Cache-Control": "no-store", "Pragma": "no-cache",
+			} {
+				if got := rr.Header().Get(header); got != want {
+					t.Errorf("%s = %q, want %q", header, got, want)
+				}
+			}
+			var body map[string]string
+			if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+				t.Fatalf("body %q is not JSON: %v", rr.Body.String(), err)
+			}
+			want := map[string]string{"error": "invalid_request", "error_description": "The request body could not be parsed."}
+			if !reflect.DeepEqual(body, want) {
+				t.Errorf("body = %v, want %v", body, want)
+			}
+		})
+	}
+
+	// The control: the same bytes well formed are classified and forwarded, so what refused the cases
+	// above is the parse failing, not the shape of the request.
+	t.Run("the same password grant well formed reaches the handler", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(passwordGrant+"&junk=ok"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		if !reached || rr.Code != http.StatusTeapot {
+			t.Errorf("got code %d, handler reached %v; want %d and true", rr.Code, reached, http.StatusTeapot)
+		}
+	})
+
+	// Off, the limiter parses nothing, so the handler is the first to parse and answers the failure
+	// itself.
+	t.Run("a disabled limiter forwards it to the handler, which parses it first", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(passwordGrant+"&junk=%zz"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+		var parseErr error
+		m.LimitROPC(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			parseErr = r.ParseForm()
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		if rr.Code != http.StatusTeapot || parseErr == nil {
+			t.Errorf("got code %d, handler's ParseForm error %v; want %d and the parse error", rr.Code, parseErr, http.StatusTeapot)
 		}
 	})
 }

@@ -71,6 +71,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	rateLimiter := middleware.NewRateLimiterMiddleware(
 		ceremonyStore,
 		httpHelper,
+		httpHelper,
 		auditLogger,
 		authServerConfig.RateLimiterEnabled,
 	)

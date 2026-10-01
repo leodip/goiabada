@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
@@ -280,8 +281,11 @@ func (m *RateLimiterMiddleware) RecordCredentialFailure(r *http.Request) {
 type RateLimiterMiddleware struct {
 	ceremonyStore authContextGetter
 	renderer      errorRenderer
-	auditLogger   auditEventLogger
-	enabled       bool
+	// jsonWriter is the token endpoint's own error writer, which LimitROPC answers a form that does
+	// not parse through, so its refusal and the handler's read the same on the wire.
+	jsonWriter  jsonErrorWriter
+	auditLogger auditEventLogger
+	enabled     bool
 	// pwdAccount is shared with the ROPC grant: both are a password guessed against one
 	// account, so one budget covers them.
 	pwdAccount *accountFailureGate
@@ -301,12 +305,13 @@ type RateLimiterMiddleware struct {
 	ropcIp          *tier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
-func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRenderer, auditLogger auditEventLogger,
-	enabled bool) *RateLimiterMiddleware {
+func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRenderer, jsonWriter jsonErrorWriter,
+	auditLogger auditEventLogger, enabled bool) *RateLimiterMiddleware {
 
 	return &RateLimiterMiddleware{
 		ceremonyStore: ceremonyStore,
 		renderer:      renderer,
+		jsonWriter:    jsonWriter,
 		auditLogger:   auditLogger,
 		enabled:       enabled,
 		// per-account password failures, in two tiers. 10 per 15 minutes against one
@@ -974,10 +979,14 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 			return
 		}
 
-		// Only apply to grant_type=password requests
-		// Parse form to check grant_type (don't consume body)
+		// Only apply to grant_type=password requests. The form is parsed here first, so a form that
+		// does not parse is answered here, as the token endpoint answers it. It cannot be forwarded:
+		// net/http keeps the pairs that did parse and answers the handler's own ParseForm with nil, so
+		// the handler would act on part of the request. A password grant beside one malformed pair
+		// then reached the password check with neither tier below consulted, and a parameter whose
+		// second copy was malformed passed as sent once (#228, #437).
 		if err := r.ParseForm(); err != nil {
-			next.ServeHTTP(w, r)
+			m.jsonWriter.JsonError(w, r, protocolvalidation.UnparseableRequest())
 			return
 		}
 
