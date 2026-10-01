@@ -244,7 +244,7 @@ func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t 
 	switch dbType() {
 	case data.MySQL:
 		t.Skip("MySQL is immune structurally, not by luck: it serialises on the schema metadata lock and demotes the duplicate to Note 1007, which the driver never raises. 288 full sequences at 24-way concurrency, 0 failures (#293 decision 6)")
-	case data.SQLite, "":
+	case data.SQLite:
 		t.Skip("SQLite has no create statement to race: the driver creates the file")
 	case data.Postgres, data.MSSQL:
 	default:
@@ -432,7 +432,7 @@ func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryResta
 	switch dbType() {
 	case data.MySQL:
 		t.Skip("MySQL takes no database-creation lock: CREATE DATABASE IF NOT EXISTS is serialised by the engine itself (#293 decision 6)")
-	case data.SQLite, "":
+	case data.SQLite:
 		t.Skip("SQLite has no maintenance database, so there is no shared lock space and no lock")
 	case data.Postgres, data.MSSQL:
 	default:
