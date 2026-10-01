@@ -150,9 +150,7 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
 
 	// The pre-create runs inside NewMigrator, so this is what puts the lock ceremony under test
 	// rather than the runner's own.
-	source, ok := h.DB.(migratable)
-	require.Truef(t, ok, "the %s database must expose NewMigrator", dbType())
-	_, err := source.NewMigrator(context.Background())
+	_, err := h.DB.NewMigrator(context.Background())
 	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
 
 	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")

@@ -31,11 +31,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	_ "github.com/microsoft/go-mssqldb"
 )
@@ -170,7 +172,11 @@ func dumpOne(t target) ([]byte, error) {
 	}
 	defer cleanup()
 
-	if migrateErr := db.Migrate(ctx); migrateErr != nil {
+	m, err := db.NewMigrator(ctx)
+	if err != nil {
+		return nil, errs.Errorf("prepare the scratch database's migration runner: %w", err)
+	}
+	if _, migrateErr := m.UpToHead(ctx, constants.Version); migrateErr != nil {
 		return nil, errs.Errorf("migrate the scratch database to head: %w", migrateErr)
 	}
 	// Read off the database that was just migrated rather than counted from the files on
@@ -191,7 +197,7 @@ func dumpOne(t target) ([]byte, error) {
 // one method this command calls on them rather than over data.Database, whose two hundred-odd
 // methods none of this needs.
 type migratable interface {
-	Migrate(ctx context.Context) error
+	NewMigrator(ctx context.Context) (*migrator.Migrator, error)
 }
 
 // open creates the scratch database and returns a handle to it plus the cleanup that closes

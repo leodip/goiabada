@@ -12,7 +12,6 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	sqlitedriver "modernc.org/sqlite"
 )
@@ -232,8 +231,8 @@ func (d *SQLiteDatabase) ensureSchemaMigrationsTable(ctx context.Context) error 
 }
 
 // NewMigrator builds a runner bound to this database and the embedded migration files.
-// Migrate delegates to it; tests use it to step to a specific version (e.g. seed at
-// 000020, then apply 000021 in isolation).
+// Startup brings it to head through UpToHead; tests use it to step to a specific version (e.g.
+// seed at 000020, then apply 000021 in isolation).
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
@@ -247,27 +246,4 @@ func (d *SQLiteDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, e
 		return nil, errs.Wrap(err, "unable to create migration instance")
 	}
 	return m, nil
-}
-
-func (d *SQLiteDatabase) Migrate(ctx context.Context) error {
-	m, err := d.NewMigrator(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = m.Up(ctx)
-	// IsNoChange rather than errors.Is: a run whose unlock failed answers the sentinel JOINED
-	// with that failure, and errors.Is would report this start as successful while the migration
-	// lock stays held against every other process on the database (#268).
-	if migrator.IsNoChange(err) {
-		slog.InfoContext(ctx, "no need to migrate the database")
-		return nil
-	}
-	if err != nil {
-		// StartupRefusal explains the one failure a starting server can be talked out of: a
-		// database a newer release already migrated. Everything else passes through.
-		return errs.Wrap(migrator.StartupRefusal(err, constants.Version), "unable to migrate the database")
-	}
-
-	return nil
 }

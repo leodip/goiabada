@@ -248,7 +248,7 @@ func (m *Migrator) readVersion(ctx context.Context, conn *sql.Conn) (int, bool, 
 	case 1:
 		return recorded[0].Version, recorded[0].Dirty, nil
 	default:
-		return NilVersion, false, ErrMultipleVersions{Rows: recorded}
+		return NilVersion, false, MultipleVersionsError{Rows: recorded}
 	}
 }
 
@@ -261,8 +261,8 @@ func (m *Migrator) currentVersion(ctx context.Context, conn *sql.Conn) (int, err
 	}
 	if dirty {
 		// The row records the version reached and nothing about direction, so which file was
-		// running is not knowable from here; ErrDirty says so rather than guessing.
-		return NilVersion, ErrDirty{
+		// running is not knowable from here; DirtyError says so rather than guessing.
+		return NilVersion, DirtyError{
 			Version: current,
 			Applied: AppliedUnknown,
 			Below:   m.src.prev(current),
@@ -289,7 +289,7 @@ func (m *Migrator) checkCarried(v int) error {
 		return nil
 	}
 	below, above := m.src.neighbours(v)
-	return ErrUnknownVersion{
+	return UnknownVersionError{
 		Version: v,
 		Engine:  m.eng.name,
 		Head:    m.src.head(),
@@ -414,7 +414,7 @@ func (m *Migrator) apply(ctx context.Context, conn *sql.Conn, steps []step) erro
 					// Below is the source's own predecessor of the marker, never marker minus
 					// one: the sets have gaps, and beneath the first migration there is no
 					// version at all rather than 000000.
-					ErrDirty{Version: s.marker, Applied: s.apply, Below: m.src.prev(s.marker),
+					DirtyError{Version: s.marker, Applied: s.apply, Below: m.src.prev(s.marker),
 						Above: NilVersion, Carried: true})
 			}
 		}

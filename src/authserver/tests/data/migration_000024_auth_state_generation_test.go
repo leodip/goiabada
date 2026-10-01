@@ -69,7 +69,7 @@ func TestMigration000024_AuthStateGeneration(t *testing.T) {
 	// 4. Down, then up again.
 	//
 	// This case is not in the spec's plan. It is here because nothing else in the
-	// suite ever executes a down migration: Migrate() only calls Up(), and the one
+	// suite ever executes a down migration: startup's UpToHead() only calls Up(), and the one
 	// other migrator test starts from an empty database, so its Migrate(20) goes
 	// UP to 20 rather than down to it. That left every down migration in the repo
 	// unverified, and this one has an engine-specific hazard worth covering: SQL
