@@ -197,24 +197,26 @@ func TestGetPreRegistrationByEmail_RefusesAnAlreadyCancelledContext(t *testing.T
 	assert.Nil(t, got, "no row is returned alongside the refusal")
 }
 
-// TestRotateEncryptionKeyIfNeeded_RefusesAnAlreadyCancelledContext reaches reencrypt.go, the one
-// file in this batch whose exported method is not a query of its own: it reads the signing keys
-// to find its canary and only then opens a transaction. The refusal therefore comes from the
-// read, before any re-keying starts, which is the fail-closed direction -- a rotation that began
-// and was then abandoned would leave secrets under a key the running process does not hold.
+// TestReencryptToKey_RefusesAnAlreadyCancelledContext reaches reencrypt.go, the one file in this
+// batch whose exported method is not a query of its own: it opens one transaction and re-keys every
+// encrypted row inside it. The refusal therefore comes from RunInTransaction, before any re-keying
+// starts, which is the fail-closed direction -- a re-key that began and was then abandoned would
+// leave secrets under a key the running process does not hold.
 //
-// Two DISTINCT 32-byte keys, because the method answers false and no error when the previous key
-// is absent or equal to the current one, and would then never reach the database at all.
-func TestRotateEncryptionKeyIfNeeded_RefusesAnAlreadyCancelledContext(t *testing.T) {
-	current := make([]byte, 32)
-	previous := make([]byte, 32)
-	previous[0] = 1
+// Two valid 32-byte keys, because the method refuses a short one before it reaches the database
+// at all. Neither is the tier's data key, so a re-key that did start against this shared database
+// would fail at its first decrypt and roll back rather than rewrite anything.
+func TestReencryptToKey_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	oldKey := make([]byte, 32)
+	newKey := make([]byte, 32)
+	newKey[0] = 1
+	require.NotEqual(t, dataKey, oldKey,
+		"the old key must not be the tier's, or a re-key that did start would rewrite the shared database")
 
-	rotated, err := database.RotateEncryptionKeyIfNeeded(cancelled(), current, previous)
+	err := database.ReencryptToKey(cancelled(), oldKey, newKey)
 
-	require.Error(t, err, "the canary read must not be issued on behalf of a caller that is already gone")
+	require.Error(t, err, "the transaction must not be opened on behalf of a caller that is already gone")
 	assert.ErrorIs(t, err, context.Canceled)
-	assert.False(t, rotated, "nothing was re-keyed alongside the refusal")
 }
 
 // TestIsEmpty_RefusesAnAlreadyCancelledContext is main's first question of a new database, asked

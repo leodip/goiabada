@@ -14,8 +14,8 @@ import (
 // needs (#386 decisions 3 and 8). Four things still need the whole list, and they are the whole of
 // the list:
 //
-//   - datafactory, which builds one and returns it, and the `migrate` subcommand that feeds
-//     datafactory's pre-flight the handle it built;
+//   - datafactory, which builds one and returns it; its own two readers, the email case pre-flight
+//     and the startup task, take ports like everything else (#438 decision 8);
 //   - server.Server, which holds it and hands it to every constructor, each of which narrows it;
 //   - tests/data, which exercises all 223 of these methods on every engine, and is the tier that
 //     proves each one works there;
@@ -50,7 +50,11 @@ type Database interface {
 	// comparison is the caller's (#351). It replaced BackfillLowercaseEmails, which repaired
 	// the data at startup rather than refusing to migrate it.
 	ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error)
-	RotateEncryptionKeyIfNeeded(ctx context.Context, currentKey, previousKey []byte) (bool, error)
+	// ReencryptToKey re-encrypts every secret stored at rest, and every RSA private key, from
+	// oldKey to newKey, both 32 bytes, in one RunInTransaction: a failure leaves everything
+	// under oldKey. It decides nothing. Whether the data is under oldKey at all is the startup
+	// task's question, answered from a canary before this is called (#83, #438 decision 8).
+	ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error
 	IsEmpty(ctx context.Context) (bool, error)
 
 	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error

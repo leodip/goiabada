@@ -24,16 +24,17 @@ var aesProtectedColumns = []struct{ table, column string }{
 	{"pre_registrations", "verification_code_encrypted"},
 }
 
-// reencryptToKey re-encrypts every secret stored at rest from oldKey to newKey and re-encrypts
+// ReencryptToKey re-encrypts every secret stored at rest from oldKey to newKey and re-encrypts
 // the RSA private keys. The whole operation runs in ONE transaction: it is all-or-nothing, so a
 // failure leaves the data under oldKey and the caller can retry cleanly (fail-closed). See issue
 // #83.
 //
-// It is unexported because rotation is its only caller. It was the exported
-// ReencryptDataToNewKey until #359 deleted the 1.5.x startup conversion that was the other one
-// (#262); with that gone it re-keys and does nothing else, in particular it no longer blanks
-// settings.aes_encryption_key, which was the conversion's own bookkeeping.
-func (d *CommonDatabase) reencryptToKey(ctx context.Context, oldKey, newKey []byte) error {
+// It re-keys and decides nothing. Whether the data is under oldKey at all is answered by the
+// datafactory startup task from a canary it reads first: that is policy over one read, so it sits
+// above the data layer where a mock can drive every branch of it, and this method is the write it
+// ends in (#438 decision 8). It does not blank settings.aes_encryption_key, which was the 1.5.x
+// conversion's own bookkeeping, deleted by #359 (#262).
+func (d *CommonDatabase) ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error {
 	if len(oldKey) != 32 || len(newKey) != 32 {
 		return errs.New("re-encryption requires 32-byte old and new keys")
 	}
@@ -43,54 +44,6 @@ func (d *CommonDatabase) reencryptToKey(ctx context.Context, oldKey, newKey []by
 	return d.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		return d.reencryptAll(ctx, tx, oldKey, newKey)
 	})
-}
-
-// RotateEncryptionKeyIfNeeded supports env-to-env rotation of the data key
-// (issue #83). Given the current key and an optional previous key, it decides
-// whether the stored data is already under currentKey (nothing to do) or still
-// under previousKey (re-encrypt to currentKey). Detection uses a canary — an
-// encrypted RSA private key PEM, always present after seeding — so the method is
-// idempotent: it is safe to leave GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS set
-// across restarts. It returns whether a rotation was performed.
-//
-// It is a no-op when previousKey is empty, equals currentKey, or there is no
-// encrypted data yet (fresh database). If the canary decrypts under neither key,
-// it errors (misconfiguration) rather than risk corrupting data.
-func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(ctx context.Context, currentKey, previousKey []byte) (bool, error) {
-	if len(currentKey) != 32 {
-		return false, errs.New("rotation requires a 32-byte current key")
-	}
-	if len(previousKey) != 32 || bytes.Equal(previousKey, currentKey) {
-		return false, nil
-	}
-
-	keys, err := d.GetAllSigningKeys(ctx, nil)
-	if err != nil {
-		return false, errs.Wrap(err, "unable to load signing keys for rotation check")
-	}
-	var canary []byte
-	for _, k := range keys {
-		if len(k.PrivateKeyPEM) > 0 {
-			canary = k.PrivateKeyPEM
-			break
-		}
-	}
-	if canary == nil {
-		return false, nil // no encrypted data yet
-	}
-
-	if _, err := encryption.DecryptText(canary, currentKey); err == nil {
-		return false, nil // already encrypted under the current key
-	}
-	if _, err := encryption.DecryptText(canary, previousKey); err != nil {
-		return false, errs.New(
-			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
-	}
-
-	if err := d.reencryptToKey(ctx, previousKey, currentKey); err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func (d *CommonDatabase) reencryptAll(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
@@ -170,9 +123,9 @@ func (d *CommonDatabase) reencryptStringColumn(ctx context.Context, tx *sql.Tx, 
 //
 // The plaintext-PEM branch below is unreachable rather than wrong. It existed for the 1.5.x
 // startup conversion, where the PEMs were still plaintext; #359 deleted that caller (#262), and
-// the one caller left, RotateEncryptionKeyIfNeeded, picks the first non-empty PrivateKeyPEM as its
-// canary and errors before calling here when it decrypts under neither key. So a plaintext PEM
-// fails closed at the canary, never reaching this branch. It is kept because deleting it would
+// the one caller left, datafactory's startup task, picks the first non-empty PrivateKeyPEM as its
+// canary and refuses before calling ReencryptToKey when it decrypts under neither key (#438
+// decision 8). So a plaintext PEM fails closed at the canary, never reaching this branch. It is kept because deleting it would
 // change a crypto path for no observable gain.
 func (d *CommonDatabase) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
 	sb := sqlbuilder.NewSelectBuilder()

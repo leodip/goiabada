@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/datafactory"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -170,14 +170,19 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 	return inv, nil
 }
 
+// emailCaseReader is what the `migrate to` pre-flight reads through the opened database: the
+// stored addresses, beside each one as the engine's own LOWER() reduces it.
+type emailCaseReader interface {
+	ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error)
+}
+
 // runMigrate is the whole of the `migrate` subcommand: the arguments that followed the word
 // "migrate", the opened database, a migrator over the configured engine's embedded set, the
 // lowest version it may step down to, and somewhere to print. It returns the process exit code.
 //
-// The database is the whole data.Database rather than a port, which is what every other consumer
-// now takes (#386). This command calls no method on it: it hands it to
-// datafactory.CheckEmailCaseBeforeMigrating, which is composition and keeps the wide interface.
-// A port would have nothing in it.
+// The database is the one read the pre-flight makes, emailCaseReader, rather than the whole
+// data.Database: this command calls no method on it and hands it to
+// datafactory.CheckEmailCaseBeforeMigrating, whose own port names that one method (#386, #438).
 //
 // The database is here for the pre-flight migrateTo runs before an upward step (#351). The
 // migrator alone cannot answer it: the check reads the users table through the engine's own SQL,
@@ -188,7 +193,7 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 // database above the floor and step it down. On a release where the floor is the head, which is
 // this one, no downward step is reachable through the constant at all, and the direction the
 // command exists for would go untested.
-func runMigrate(ctx context.Context, args []string, database data.Database, m *migrator.Migrator, floor int, out io.Writer) int {
+func runMigrate(ctx context.Context, args []string, database emailCaseReader, m *migrator.Migrator, floor int, out io.Writer) int {
 	if len(args) == 0 {
 		outf(out, "%s\n", migrateUsage)
 		return migrateExitUsage
@@ -265,7 +270,7 @@ func migrateVersion(ctx context.Context, m *migrator.Migrator, out io.Writer) in
 // which is a fact about the data rather than about the schema (#351). Everything else is printed
 // as the runner phrased it, because DirtyError and UnknownVersionError already carry the facts an
 // operator needs (decision 7 of #268).
-func migrateTo(ctx context.Context, database data.Database, m *migrator.Migrator, target int, floor int, out io.Writer) int {
+func migrateTo(ctx context.Context, database emailCaseReader, m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	if target < floor {
 		// Neutral about direction on purpose: the floor refuses any target below it, and a
 		// database still at an old version can ask for one on the way UP as easily as down.

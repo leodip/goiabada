@@ -22,8 +22,9 @@ import (
 // it will run against in production, not a double that agrees with it. A file rather than
 // :memory: because the migrations create and drop real objects across many statements.
 //
-// It returns the data.Database as well, because runMigrate takes one from #351 onward: migrateTo
-// runs the email case pre-flight before an upward step, and that check reads the users table.
+// It returns the data.Database as well, because runMigrate takes the database from #351 onward:
+// migrateTo runs the email case pre-flight before an upward step, and that check reads the users
+// table. The database satisfies runMigrate's one-method port as it is (#438).
 func newTestMigrator(t *testing.T) (data.Database, *migrator.Migrator, *sql.DB) {
 	t.Helper()
 

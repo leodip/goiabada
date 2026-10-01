@@ -3,60 +3,58 @@ package datatests
 import (
 	"bytes"
 	"context"
-	"path/filepath"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestRotateEncryptionKeyIfNeeded exercises env-to-env key rotation (issue #83):
-// idempotent, canary-based detection, and fail-closed on a mismatch. Uses an
-// isolated file-based sqlite DB and explicit keys.
+// The keys every case below re-keys between. Distinct and 32 bytes each, so a value under one
+// opens under that one alone.
+var (
+	rekeyKeyA = []byte("0123456789abcdef0123456789abcdef")
+	rekeyKeyB = []byte("fedcba9876543210fedcba9876543210")
+	rekeyKeyC = []byte("aaaabbbbccccddddaaaabbbbccccdddd")
+)
+
+// rekeyEncrypt is the ciphertext under key that the seeded rows carry.
+func rekeyEncrypt(t *testing.T, plaintext string, key []byte) []byte {
+	t.Helper()
+	ciphertext, err := encryption.EncryptText(plaintext, key)
+	require.NoError(t, err)
+	return ciphertext
+}
+
+// rekeyKeyPair is a key pair holding pem as its private key, the row shape ReencryptToKey re-keys
+// apart from the string columns.
+func rekeyKeyPair(pem []byte) *models.KeyPair {
+	return &models.KeyPair{
+		State: models.KeyStateCurrent.String(), KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
+		PrivateKeyPEM: pem,
+	}
+}
+
+// TestReencryptToKey exercises the re-key behind env-to-env key rotation (#83) on the tier's own
+// engine, in a database of its own because it rewrites every encrypted row there is.
 //
-// It also owns the exhaustive table over commondb.aesProtectedColumns. That table used to be
-// reencrypt_test.go's, over the 1.5.x startup conversion; #359 deleted the conversion (#262) and
-// rotation is now the only caller of the re-keying machinery, so the coverage moved here rather
-// than leaving four of the eight columns unreached. The list is "an enumeration nothing derives"
-// by its own comment, so this test is what derives it: every column is seeded under keyA, and
-// after the rotation every one must decrypt under keyB and NO LONGER under keyA. A column dropped
-// from the enumeration survives as ciphertext readable only under the retired key, which is
-// exactly what the second half of each pair catches.
-func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "rotate.db")
-	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{DSN: dbPath}, false)
-	if err != nil {
-		t.Fatalf("NewSQLiteDatabase: %v", err)
-	}
-	m, err := db.NewMigrator(context.Background())
-	if err != nil {
-		t.Fatalf("NewMigrator: %v", err)
-	}
-	if upErr := m.Up(context.Background()); upErr != nil {
-		t.Fatalf("Up: %v", upErr)
-	}
-
-	keyA := []byte("0123456789abcdef0123456789abcdef")
-	keyB := []byte("fedcba9876543210fedcba9876543210")
-	keyC := []byte("aaaabbbbccccddddaaaabbbbccccdddd")
-
-	encA := func(s string) []byte {
-		b, encryptTextErr := encryption.EncryptText(s, keyA)
-		if encryptTextErr != nil {
-			t.Fatalf("EncryptText: %v", encryptTextErr)
-		}
-		return b
-	}
-
-	// No data yet: no canary, so nothing to rotate.
-	if rotated, rotateErr := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA); rotateErr != nil || rotated {
-		t.Errorf("rotate on empty db = (%v, %v), want (false, nil)", rotated, rotateErr)
-	}
+// It owns the exhaustive table over commondb.aesProtectedColumns. The list is "an enumeration
+// nothing derives" by its own comment, so this test is what derives it: every column is seeded
+// under keyA, and after the re-key every one must decrypt under keyB and NO LONGER under keyA. A
+// column dropped from the enumeration survives as ciphertext readable only under the retired key,
+// which is exactly what the second half of each pair catches.
+//
+// Whether to re-key at all is not asked here. That is the canary decision, which #438 decision 8
+// moved to datafactory's startup task, where its unit table covers every branch.
+func TestReencryptToKey(t *testing.T) {
+	h := migratedIsolatedDB(t)
+	db := h.DB
+	ctx := context.Background()
 
 	// One seeded value per entry of aesProtectedColumns, plus the RSA private key PEM that
-	// reencryptPrivateKeys handles separately and that doubles as the rotation canary.
+	// reencryptPrivateKeys handles separately.
 	const (
 		pem        = "-----BEGIN RSA PRIVATE KEY-----\nfakepem\n-----END RSA PRIVATE KEY-----\n"
 		smtpPass   = "smtp-password"
@@ -71,213 +69,159 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	)
 
 	// A recognizable legacy data key, seeded so the assertion below has something to fail on.
-	// It is neither keyA nor keyB: rotation must not read it and must not write it.
+	// It is neither keyA nor keyB: the re-key must not read it and must not write it.
 	legacyKey := []byte("legacy-key-legacy-key-legacy-key")
 
-	if createKeyPairErr := db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
-		State: "current", KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
-		PrivateKeyPEM: encA(pem), // canary, encrypted under keyA
-	}); createKeyPairErr != nil {
-		t.Fatalf("CreateKeyPair: %v", createKeyPairErr)
-	}
-	settings := &models.Settings{
-		AESEncryptionKeyLegacy: legacyKey,
-		SMTPPasswordEncrypted:  encA(smtpPass),
-	}
-	if createSettingsErr := db.CreateSettings(context.Background(), nil, settings); createSettingsErr != nil {
-		t.Fatalf("CreateSettings: %v", createSettingsErr)
-	}
+	require.NoError(t, db.CreateKeyPair(ctx, nil, rekeyKeyPair(rekeyEncrypt(t, pem, rekeyKeyA))))
+	settings := initialSettings("Rotate")
+	settings.AESEncryptionKeyLegacy = legacyKey
+	settings.SMTPPasswordEncrypted = rekeyEncrypt(t, smtpPass, rekeyKeyA)
+	require.NoError(t, db.CreateSettings(ctx, nil, settings))
 	client := &models.Client{
 		ClientIdentifier:      "c-" + fake.UUID(),
-		ClientSecretEncrypted: encA(clientSec),
+		ClientSecretEncrypted: rekeyEncrypt(t, clientSec, rekeyKeyA),
 	}
-	if createClientErr := db.CreateClient(context.Background(), nil, client); createClientErr != nil {
-		t.Fatalf("CreateClient: %v", createClientErr)
-	}
+	require.NoError(t, db.CreateClient(ctx, nil, client))
 	user := &models.User{
 		Subject:                              fake.UUID(),
-		Username:                             fake.UUID(),
-		Email:                                fake.UUID() + "@example.com",
+		Username:                             fake.Username(),
+		Email:                                fake.Email(),
 		PasswordHash:                         "x",
-		EmailVerificationCodeEncrypted:       encA(emailCode),
-		PhoneNumberVerificationCodeEncrypted: encA(phoneCode),
-		OTPSecretEncrypted:                   encA(otpSeed),
-		ForgotPasswordCodeEncrypted:          encA(forgotCode),
-		OtpEnrollmentSecretEncrypted:         encA(otpEnrolment),
+		EmailVerificationCodeEncrypted:       rekeyEncrypt(t, emailCode, rekeyKeyA),
+		PhoneNumberVerificationCodeEncrypted: rekeyEncrypt(t, phoneCode, rekeyKeyA),
+		OTPSecretEncrypted:                   rekeyEncrypt(t, otpSeed, rekeyKeyA),
+		ForgotPasswordCodeEncrypted:          rekeyEncrypt(t, forgotCode, rekeyKeyA),
+		OtpEnrollmentSecretEncrypted:         rekeyEncrypt(t, otpEnrolment, rekeyKeyA),
 	}
-	if createUserErr := db.CreateUser(context.Background(), nil, user); createUserErr != nil {
-		t.Fatalf("CreateUser: %v", createUserErr)
-	}
+	require.NoError(t, db.CreateUser(ctx, nil, user))
 	preReg := &models.PreRegistration{
-		Email:                     fake.UUID() + "@example.com",
+		Email:                     fake.Email(),
 		PasswordHash:              "x",
-		VerificationCodeEncrypted: encA(preRegCode),
+		VerificationCodeEncrypted: rekeyEncrypt(t, preRegCode, rekeyKeyA),
+		VerificationCodeHash:      codeHashOf(t, fake.UUID()),
 	}
-	if createPreRegistrationErr := db.CreatePreRegistration(context.Background(), nil, preReg); createPreRegistrationErr != nil {
-		t.Fatalf("CreatePreRegistration: %v", createPreRegistrationErr)
-	}
+	require.NoError(t, db.CreatePreRegistration(ctx, nil, preReg))
 
-	// Same key, or no previous key: no-op.
-	if rotated, rotateErr := db.RotateEncryptionKeyIfNeeded(context.Background(), keyA, keyA); rotateErr != nil || rotated {
-		t.Errorf("same key = (%v, %v), want (false, nil)", rotated, rotateErr)
-	}
-	if rotated, rotateErr := db.RotateEncryptionKeyIfNeeded(context.Background(), keyA, nil); rotateErr != nil || rotated {
-		t.Errorf("no previous = (%v, %v), want (false, nil)", rotated, rotateErr)
-	}
-
-	// Data is under keyA; asking to rotate between keyB (current) and keyC
-	// (previous) matches neither -> fail-closed.
-	if _, rotateErr := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyC); rotateErr == nil {
-		t.Error("expected error when data decrypts under neither key")
-	}
-
-	// Rotate keyA -> keyB.
-	rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA)
-	if err != nil {
-		t.Fatalf("rotate: %v", err)
-	}
-	if !rotated {
-		t.Fatal("expected rotation to occur")
-	}
+	require.NoError(t, db.ReencryptToKey(ctx, rekeyKeyA, rekeyKeyB))
 
 	// rekeyed asserts both halves for one column: it reads under the new key, and it no longer
 	// reads under the retired one. The second half is what catches a column missing from
 	// commondb.aesProtectedColumns, since an untouched column still decrypts under keyA.
 	rekeyed := func(name string, ct []byte, want string) {
 		t.Helper()
-		got, decryptTextErr := encryption.DecryptText(ct, keyB)
-		if decryptTextErr != nil {
-			t.Errorf("%s: does not decrypt under the new key: %v", name, decryptTextErr)
-		} else if got != want {
-			t.Errorf("%s: got %q, want %q", name, got, want)
+		got, decryptTextErr := encryption.DecryptText(ct, rekeyKeyB)
+		if assert.NoErrorf(t, decryptTextErr, "%s: does not decrypt under the new key", name) {
+			assert.Equalf(t, want, got, "%s: the re-key changed the plaintext", name)
 		}
-		if _, decryptTextErr := encryption.DecryptText(ct, keyA); decryptTextErr == nil {
-			t.Errorf("%s still decrypts under the retired key: is the column missing "+
-				"from commondb.aesProtectedColumns?", name)
-		}
+		_, decryptTextErr = encryption.DecryptText(ct, rekeyKeyA)
+		assert.Errorf(t, decryptTextErr,
+			"%s still decrypts under the retired key: is the column missing from commondb.aesProtectedColumns?", name)
 	}
 
-	gotSettings, err := db.GetSettingsById(context.Background(), nil, settings.Id)
-	if err != nil {
-		t.Fatalf("GetSettingsById: %v", err)
-	}
+	gotSettings, err := db.GetSettingsById(ctx, nil, settings.Id)
+	require.NoError(t, err)
 	rekeyed("settings.smtp_password_encrypted", gotSettings.SMTPPasswordEncrypted, smtpPass)
-	// Rotation leaves the legacy data-key column alone. Blanking it was the 1.5.x startup
+	// The re-key leaves the legacy data-key column alone. Blanking it was the 1.5.x startup
 	// conversion's own bookkeeping and rotation only ever reached it by sharing reencryptAll;
 	// #359 removed that statement (#262), and this is what fails if someone puts it back.
-	if !bytes.Equal(gotSettings.AESEncryptionKeyLegacy, legacyKey) {
-		t.Errorf("rotation rewrote settings.aes_encryption_key: got len=%d, want the seeded value",
-			len(gotSettings.AESEncryptionKeyLegacy))
-	}
+	assert.True(t, bytes.Equal(gotSettings.AESEncryptionKeyLegacy, legacyKey),
+		"the re-key rewrote settings.aes_encryption_key: got len=%d, want the seeded value",
+		len(gotSettings.AESEncryptionKeyLegacy))
 
-	gotClient, err := db.GetClientById(context.Background(), nil, client.Id)
-	if err != nil {
-		t.Fatalf("GetClientById: %v", err)
-	}
+	gotClient, err := db.GetClientById(ctx, nil, client.Id)
+	require.NoError(t, err)
 	rekeyed("clients.client_secret_encrypted", gotClient.ClientSecretEncrypted, clientSec)
 
-	gotUser, err := db.GetUserById(context.Background(), nil, user.Id)
-	if err != nil {
-		t.Fatalf("GetUserById: %v", err)
-	}
+	gotUser, err := db.GetUserById(ctx, nil, user.Id)
+	require.NoError(t, err)
 	rekeyed("users.email_verification_code_encrypted", gotUser.EmailVerificationCodeEncrypted, emailCode)
 	rekeyed("users.phone_number_verification_code_encrypted", gotUser.PhoneNumberVerificationCodeEncrypted, phoneCode)
 	rekeyed("users.otp_secret_encrypted", gotUser.OTPSecretEncrypted, otpSeed)
 	rekeyed("users.forgot_password_code_encrypted", gotUser.ForgotPasswordCodeEncrypted, forgotCode)
 	rekeyed("users.otp_enrollment_secret_encrypted", gotUser.OtpEnrollmentSecretEncrypted, otpEnrolment)
 
-	gotPreReg, err := db.GetPreRegistrationById(context.Background(), nil, preReg.Id)
-	if err != nil {
-		t.Fatalf("GetPreRegistrationById: %v", err)
-	}
+	gotPreReg, err := db.GetPreRegistrationById(ctx, nil, preReg.Id)
+	require.NoError(t, err)
 	rekeyed("pre_registrations.verification_code_encrypted", gotPreReg.VerificationCodeEncrypted, preRegCode)
 
-	keys, err := db.GetAllSigningKeys(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("GetAllSigningKeys: %v", err)
-	}
+	keys, err := db.GetAllSigningKeys(ctx, nil)
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
 	rekeyed("key_pairs.private_key_pem", keys[0].PrivateKeyPEM, pem)
+}
 
-	// Idempotent: data is already under keyB, so a repeat is a no-op.
-	if rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA); err != nil || rotated {
-		t.Errorf("second rotate = (%v, %v), want (false, nil)", rotated, err)
+// TestReencryptToKey_RefusesShortKeys pins the length check on both keys. A short new key would
+// encrypt every secret under a key the configuration could never supply again, and a short old
+// key reads nothing, so each is refused before the transaction opens and nothing is rewritten.
+func TestReencryptToKey_RefusesShortKeys(t *testing.T) {
+	h := migratedIsolatedDB(t)
+	ctx := context.Background()
+
+	const clientSec = "client-secret"
+	client := &models.Client{
+		ClientIdentifier:      "c-" + fake.UUID(),
+		ClientSecretEncrypted: rekeyEncrypt(t, clientSec, rekeyKeyA),
+	}
+	require.NoError(t, h.DB.CreateClient(ctx, nil, client))
+
+	cases := []struct {
+		name           string
+		oldKey, newKey []byte
+	}{
+		{"a short old key", rekeyKeyA[:16], rekeyKeyB},
+		{"a short new key", rekeyKeyA, rekeyKeyB[:16]},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := h.DB.ReencryptToKey(ctx, tc.oldKey, tc.newKey)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "re-encryption requires 32-byte old and new keys")
+
+			got, err := h.DB.GetClientById(ctx, nil, client.Id)
+			require.NoError(t, err)
+			plaintext, err := encryption.DecryptText(got.ClientSecretEncrypted, rekeyKeyA)
+			require.NoError(t, err, "a refused re-key must leave the secret under the old key")
+			assert.Equal(t, clientSec, plaintext)
+		})
 	}
 }
 
-// TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed is the one statement this tree can make
-// about a database that never booted 1.6.x. #359 deleted the startup conversion that encrypted a
-// plaintext RSA PEM (#262) and ships no pre-flight to refuse such a database (decision 8), so what
-// is left to establish is that rotation does not quietly half-convert one: the canary is the first
-// non-empty PrivateKeyPEM, a plaintext PEM decrypts under neither key, and RotateEncryptionKeyIfNeeded
-// errors before re-keying anything.
-//
-// That is why commondb.reencryptPrivateKeys keeps its plaintext-PEM branch as unreachable code
-// rather than deleting it: nothing can reach it, and this test is the reason that claim holds.
-//
-// It needs a database of its own because the canary is whichever key pair comes back first, so a
-// plaintext one cannot be added beside the encrypted canary of the test above and still be read.
-func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "rotate-plaintext-pem.db")
-	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{DSN: dbPath}, false)
-	if err != nil {
-		t.Fatalf("NewSQLiteDatabase: %v", err)
-	}
-	m, err := db.NewMigrator(context.Background())
-	if err != nil {
-		t.Fatalf("NewMigrator: %v", err)
-	}
-	if upErr := m.Up(context.Background()); upErr != nil {
-		t.Fatalf("Up: %v", upErr)
-	}
-
-	keyA := []byte("0123456789abcdef0123456789abcdef")
-	keyB := []byte("fedcba9876543210fedcba9876543210")
+// TestReencryptToKey_AFailureLeavesEverythingUnderTheOldKey pins the one-transaction property. The
+// client secret is under keyA and is re-keyed first; the private key is under keyC, so the re-key
+// fails at its last step, after every string column has been rewritten inside the transaction.
+// What a failure must leave is the database as it was: the client secret still under keyA, not
+// under keyB beside a private key nobody re-keyed. Half a re-key is a database no single key opens.
+func TestReencryptToKey_AFailureLeavesEverythingUnderTheOldKey(t *testing.T) {
+	h := migratedIsolatedDB(t)
+	ctx := context.Background()
 
 	const (
-		pemPlain  = "-----BEGIN RSA PRIVATE KEY-----\nMIIabc123fakepemcontent\n-----END RSA PRIVATE KEY-----\n"
 		clientSec = "client-secret"
+		pem       = "-----BEGIN RSA PRIVATE KEY-----\nfakepem\n-----END RSA PRIVATE KEY-----\n"
 	)
-
-	if createKeyPairErr := db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
-		State: "current", KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
-		PrivateKeyPEM: []byte(pemPlain), // the pre-1.6.0 state: never encrypted
-	}); createKeyPairErr != nil {
-		t.Fatalf("CreateKeyPair: %v", createKeyPairErr)
-	}
-	secretUnderA, err := encryption.EncryptText(clientSec, keyA)
-	if err != nil {
-		t.Fatalf("EncryptText: %v", err)
-	}
 	client := &models.Client{
 		ClientIdentifier:      "c-" + fake.UUID(),
-		ClientSecretEncrypted: secretUnderA,
+		ClientSecretEncrypted: rekeyEncrypt(t, clientSec, rekeyKeyA),
 	}
-	if createClientErr := db.CreateClient(context.Background(), nil, client); createClientErr != nil {
-		t.Fatalf("CreateClient: %v", createClientErr)
-	}
+	require.NoError(t, h.DB.CreateClient(ctx, nil, client))
+	unreadable := rekeyEncrypt(t, pem, rekeyKeyC)
+	require.NoError(t, h.DB.CreateKeyPair(ctx, nil, rekeyKeyPair(unreadable)))
 
-	rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA)
-	if err == nil {
-		t.Fatal("expected an error: a plaintext PEM decrypts under neither key")
-	}
-	if rotated {
-		t.Error("rotation reported success on a database it refused to read")
-	}
+	err := h.DB.ReencryptToKey(ctx, rekeyKeyA, rekeyKeyB)
 
-	// Nothing was re-keyed. The PEM is still the plaintext it was, and the client secret still
-	// reads under keyA: the refusal happens before reencryptToKey opens its transaction.
-	keys, err := db.GetAllSigningKeys(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("GetAllSigningKeys: %v", err)
-	}
-	if !bytes.Equal(keys[0].PrivateKeyPEM, []byte(pemPlain)) {
-		t.Error("the plaintext PEM was rewritten by a rotation that reported failure")
-	}
-	gotClient, err := db.GetClientById(context.Background(), nil, client.Id)
-	if err != nil {
-		t.Fatalf("GetClientById: %v", err)
-	}
-	if dec, err := encryption.DecryptText(gotClient.ClientSecretEncrypted, keyA); err != nil || dec != clientSec {
-		t.Errorf("client secret after the refused rotation = (%q, %v), want (%q, nil)", dec, err, clientSec)
-	}
+	require.Error(t, err, "a private key that does not open under the old key must fail the re-key")
+	assert.Contains(t, err.Error(), "re-encrypting RSA private keys")
+
+	got, err := h.DB.GetClientById(ctx, nil, client.Id)
+	require.NoError(t, err)
+	plaintext, err := encryption.DecryptText(got.ClientSecretEncrypted, rekeyKeyA)
+	require.NoError(t, err,
+		"the client secret was re-keyed by a transaction that failed: the re-key is not all-or-nothing")
+	assert.Equal(t, clientSec, plaintext)
+
+	keys, err := h.DB.GetAllSigningKeys(ctx, nil)
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, unreadable, keys[0].PrivateKeyPEM, "the private key is the row the failure was on, and it is unchanged")
 }
