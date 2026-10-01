@@ -79,7 +79,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)
+	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, nil, true)
 	handler := HandleAPIAccountEmailVerificationPost(database, auditLogger, rateLimiter, testDataCipher)
 
 	return &verificationEnv{

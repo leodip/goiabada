@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -567,4 +568,67 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 			"grant_type=password&username=victim@example.com&password="+routesTestWrongPassword)),
 			"the ROPC grant keeps its own budget when the password form's is spent")
 	})
+}
+
+// TestInitRoutes_TokenFormThatDoesNotParse drives POST /auth/token through the real registration,
+// the limiter and the token handler with its real validator, and requires the same 400
+// invalid_request whether the limiter is on or off, with nothing past the parse reached. The limiter
+// parses the form first when it is on, and it used to forward a failure: net/http kept the pairs
+// that did parse, the handler's own ParseForm answered nil over them, and the request was validated
+// as if those pairs were all it carried. A repeated parameter whose second copy was malformed passed
+// as sent once, and a password grant beside one malformed pair reached the password check past both
+// of the limiter's tiers (#228, #437).
+//
+// The client named is one the database mock has no answer for, so a request that reached the client
+// lookup would fail the case on the mock as well as on the answer.
+func TestInitRoutes_TokenFormThatDoesNotParse(t *testing.T) {
+	const passwordGrant = "grant_type=password&username=victim%40example.com&password=" + routesTestWrongPassword
+	const clientCredentials = "grant_type=client_credentials&client_id=unstubbed-client&client_secret=s"
+
+	tests := []struct {
+		name   string
+		target string
+		body   func() io.Reader
+	}{
+		{"a malformed second copy of client_id", "/auth/token", func() io.Reader {
+			return strings.NewReader(clientCredentials + "&client_id=%zz")
+		}},
+		{"a malformed pair the endpoint ignores, beside a client credentials grant", "/auth/token", func() io.Reader {
+			return strings.NewReader(clientCredentials + "&junk=%zz")
+		}},
+		{"a malformed pair the endpoint ignores, beside a password grant", "/auth/token", func() io.Reader {
+			return strings.NewReader(passwordGrant + "&junk=%zz")
+		}},
+		{"a malformed query beside a well-formed body", "/auth/token?junk=%zz", func() io.Reader {
+			return strings.NewReader(clientCredentials)
+		}},
+		{"a password grant cut one byte short by the request-body limit", "/auth/token", func() io.Reader {
+			return http.MaxBytesReader(httptest.NewRecorder(), io.NopCloser(strings.NewReader(passwordGrant)),
+				int64(len(passwordGrant)-1))
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			answers := map[string]*httptest.ResponseRecorder{}
+			for limiter, enabled := range map[string]bool{"on": true, "off": false} {
+				server := newRoutesTestServerWith(t, func(cfg *config.Config) {
+					cfg.AuthServer.RateLimiterEnabled = enabled
+				})
+				r := httptest.NewRequest(http.MethodPost, test.target, test.body())
+				r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				answers[limiter] = serve(server, withRoutesTestSettings(r))
+			}
+
+			for limiter, rr := range answers {
+				assert.Equal(t, http.StatusBadRequest, rr.Code, "limiter %s", limiter)
+				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"), "limiter %s", limiter)
+				assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "limiter %s", limiter)
+				assert.Equal(t, "no-cache", rr.Header().Get("Pragma"), "limiter %s", limiter)
+				assert.JSONEq(t, `{"error":"invalid_request","error_description":"The request body could not be parsed."}`,
+					rr.Body.String(), "limiter %s", limiter)
+			}
+			assert.Equal(t, answers["off"].Body.String(), answers["on"].Body.String(),
+				"the limiter answers a form that does not parse byte for byte as the handler does")
+		})
+	}
 }
