@@ -63,12 +63,6 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 	slog.InfoContext(ctx, "using database", "type", "postgres", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
 
-	// Open with database/sql for commondb compatibility
-	db, err := sql.Open("pgx", DSN(dbConfig))
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to open database")
-	}
-
 	if dbConfig.Create {
 		// Create database if not exists.
 		//
@@ -94,7 +88,18 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		// production checklist's "don't use root/admin accounts" asks for and what this
 		// engine refused to allow before (#293).
 		slog.InfoContext(ctx, "database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
+	}
 
+	// Opened after the creating arm, as MySQL and SQL Server open theirs, so a creation that
+	// fails or gives up at the caller's deadline returns before there is a pool to leave open:
+	// opened first, each of those two returns abandoned it, a goroutine and a handle nobody
+	// could close (#438).
+	db, err := sql.Open("pgx", DSN(dbConfig))
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to open database")
+	}
+
+	if !dbConfig.Create {
 		// sql.Open only parses the URL, so without this an absent database would come back as
 		// a usable handle and a nil error, and the failure would surface inside the migrator
 		// as somebody else's problem. Ping forces first use here, so the caller gets

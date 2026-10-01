@@ -2,7 +2,9 @@ package sqlitedb
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -45,4 +47,53 @@ func TestNew_AnUnopenableFileIsAConnectionError(t *testing.T) {
 	require.Truef(t, errors.As(err, &sqliteErr),
 		"the driver's error stays in the chain, so a caller can still match it with errors.As; got %v", err)
 	assert.Equal(t, sqliteCantOpen, sqliteErr.Code(), "the driver's code survives the wrap")
+}
+
+// TestNew_ARefusedPragmaClosesThePool is the input that gets past the ping and is then refused: a
+// real file in SQLite's default DELETE journal mode, opened read-only, connects and cannot be
+// switched to WAL. The constructor returns no database, so the caller has nothing to close, and
+// before #438 the pool kept its descriptor to the file for the life of the process.
+func TestNew_ARefusedPragmaClosesThePool(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "read_only.db")
+	seed, err := sql.Open("sqlite", path)
+	require.NoError(t, err)
+	_, err = seed.Exec("CREATE TABLE t (x INTEGER)")
+	require.NoError(t, err, "write the file in the default journal mode")
+	require.NoError(t, seed.Close())
+	dsn := "file:" + filepath.ToSlash(path) + "?mode=ro"
+
+	// The counter has to see a descriptor it should see, or a zero below proves nothing.
+	held, err := sql.Open("sqlite", dsn)
+	require.NoError(t, err)
+	require.NoError(t, held.PingContext(context.Background()))
+	require.Positive(t, descriptorsTo(t, path), "an open pool on the file holds a descriptor to it")
+	require.NoError(t, held.Close())
+	require.Zero(t, descriptorsTo(t, path), "a closed pool holds none")
+
+	db, err := New(context.Background(), dsn, false)
+
+	require.Error(t, err, "a read-only file cannot take WAL, so it must not construct")
+	assert.Nil(t, db, "a failed construction returns no database")
+	assert.Containsf(t, err.Error(), "journal_mode",
+		"the refusal is the WAL PRAGMA's, past the ping; got %q", err.Error())
+	assert.Zero(t, descriptorsTo(t, path), "a refused construction leaves no descriptor to the file open")
+}
+
+// descriptorsTo counts this process's open descriptors on path, read from /proc/self/fd. The unit
+// tier's container and CI are both Linux; elsewhere there is nothing to read and the test skips.
+func descriptorsTo(t *testing.T, path string) int {
+	t.Helper()
+	entries, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		t.Skipf("counting descriptors needs /proc/self/fd: %v", err)
+	}
+	want, err := filepath.EvalSymlinks(path)
+	require.NoError(t, err)
+	n := 0
+	for _, e := range entries {
+		if target, err := os.Readlink(filepath.Join("/proc/self/fd", e.Name())); err == nil && target == want {
+			n++
+		}
+	}
+	return n
 }
