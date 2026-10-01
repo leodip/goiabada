@@ -12,8 +12,13 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// DeleteOldAuditLogs deletes up to maxDeletions audit rows older than cutoff and reports how many
+// went. SQL Server has no LIMIT at all; DELETE TOP (n) is its bound on a delete.
+//
+// commondb declares no DeleteOldAuditLogs, so each engine has to write its own and an engine that
+// forgets fails to compile against data.Database rather than inheriting another engine's syntax
+// (#438 decision 7).
 func (d *Database) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
-	// MSSQL uses DELETE TOP(n) syntax
 	sqlStr := fmt.Sprintf("DELETE TOP (%d) FROM audit_logs WHERE created_at < @p1", maxDeletions)
 
 	result, err := d.ExecSQL(ctx, tx, sqlStr, cutoff)
@@ -49,6 +54,10 @@ func requestIdIsByteExact(b interface{ Var(arg any) string }, requestId string) 
 	return "CAST(request_id AS VARBINARY(512)) = CAST(" + b.Var(requestId) + " AS VARBINARY(512))"
 }
 
+// GetAuditLogsPaginated replaces commondb's for two reasons. SQL Server pages only with
+// ORDER BY ... OFFSET n ROWS FETCH NEXT m ROWS ONLY, which this body appends to the built
+// statement. And its `=` pads, so a request-id filter needs requestIdIsByteExact in the page query
+// and the count query alike, where commondb drops the folded rows after the scan (#328).
 func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
 	requestId string) ([]models.AuditLog, int, error) {
 	if page < 1 {
