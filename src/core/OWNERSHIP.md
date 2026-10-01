@@ -399,6 +399,7 @@ command itself and fails on a tree it changed.
 | `core/middleware` | `ParseTrustedProxies` | both-apps | — |
 | `core/middleware` | `RequestTargetForLog` | own-package | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
+| `core/oauth` | `IsWellFormedSpaceDelimited` | kernel | — |
 | `core/oauth` | `Jwk` | both-apps | — |
 | `core/oauth` | `Jwks` | both-apps | — |
 | `core/oauth` | `JwtToken` | both-apps | — |

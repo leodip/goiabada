@@ -25,17 +25,24 @@ const (
 
 var bcp47ShapeRe = regexp.MustCompile(bcp47ShapePattern)
 
-// SanitizeUILocales filters and bounds an OIDC ui_locales value: splits it
-// as every other space-delimited parameter is split (oauth.SplitSpaceDelimited,
-// so a no-break space is no separator here either, #244), drops entries that
-// don't match a permissive BCP 47 shape, caps at 10 tags and 256 total bytes
-// (preserving order, dropping the tail when caps trip). Bounds prevent
-// attacker-controlled input from bloating the session cookie.
+// SanitizeUILocales filters and bounds an OIDC ui_locales value: reads it
+// as every other space-delimited parameter is read (oauth.IsWellFormedSpaceDelimited
+// and oauth.SplitSpaceDelimited, so only a single space separates two tags, #244),
+// drops entries that don't match a permissive BCP 47 shape, caps at 10 tags and
+// 256 total bytes (preserving order, dropping the tail when caps trip). Bounds
+// prevent attacker-controlled input from bloating the session cookie.
+//
+// A value that is not well formed, a run of spaces or one at either end, is
+// read as no ui_locales rather than refused: OIDC Core 1.0 section 3.1.2.1 says
+// "an error SHOULD NOT result if some or all of the requested locales are not
+// supported", and the parameter is a preference the server may ignore. A tab or
+// a no-break space between two tags joins them into one entry the shape filter
+// drops.
 //
 // Returning nil means "no usable ui_locales was supplied" — callers should
 // treat that as if the parameter was absent.
 func SanitizeUILocales(raw string) []string {
-	if raw == "" {
+	if raw == "" || !oauth.IsWellFormedSpaceDelimited(raw) {
 		return nil
 	}
 	var out []string

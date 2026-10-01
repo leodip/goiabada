@@ -21,36 +21,47 @@ func (s *stubUILocalesReader) UILocales(_ *http.Request) []string {
 
 func TestSanitizeUILocales(t *testing.T) {
 	cases := []struct {
+		name string
 		in   string
 		want []string
 	}{
-		{"", nil},
-		{"   ", nil},
-		{"pt-BR", []string{"pt-BR"}},
-		{"pt-BR es en", []string{"pt-BR", "es", "en"}},
-		{"PT-br ZH-Hans-CN", []string{"PT-br", "ZH-Hans-CN"}}, // case preserved
-		{"!!!! garbage 😈 ", nil},
-		{"pt-BR garbage es", []string{"pt-BR", "es"}}, // garbage dropped, others kept
+		{"empty", "", nil},
+		{"one tag", "pt-BR", []string{"pt-BR"}},
+		{"three tags", "pt-BR es en", []string{"pt-BR", "es", "en"}},
+		{"case preserved", "PT-br ZH-Hans-CN", []string{"PT-br", "ZH-Hans-CN"}},
+		{"garbage only", "!!!! garbage \U0001F608", nil},
+		{"garbage dropped, others kept", "pt-BR garbage es", []string{"pt-BR", "es"}},
 
-		// ui_locales is split as every other space-delimited parameter is (#244): a tab, a newline,
-		// a form feed and a carriage return still separate two tags, and a no-break space, a
-		// next-line character and a vertical tab do not, so "pt-BR" joined to "es" by one is a
-		// single tag no locale has and is dropped whole. The escapes are spelled out so no editor
-		// can turn one into a plain space.
-		{"pt-BR\tes", []string{"pt-BR", "es"}},
-		{"pt-BR\nes", []string{"pt-BR", "es"}},
-		{"pt-BR\fes", []string{"pt-BR", "es"}},
-		{"pt-BR\res", []string{"pt-BR", "es"}},
-		{"pt-BR es", nil},
-		{"pt-BR\u0085es", nil},
-		{"pt-BR\ves", nil},
-		{"pt-BR es en", []string{"en"}}, // the joined tag is dropped, the next one kept
-		// The edge trim stays: a tag padded with one of them is still that tag.
-		{"pt-BR ", []string{"pt-BR"}},
-		{" pt-BR es", []string{"pt-BR", "es"}},
+		// ui_locales is held to the grammar every space-delimited parameter is (#244): one space
+		// between each two tags and none at either end. A value that breaks it is read as no
+		// ui_locales, not refused, because OIDC Core 1.0 3.1.2.1 says an error "SHOULD NOT result"
+		// from the locales asked for. Each of these used to be read as the tags inside it.
+		{"spaces alone", "   ", nil},
+		{"a run of two spaces", "pt-BR  es", nil},
+		{"a leading space", " pt-BR es", nil},
+		{"a trailing space", "pt-BR ", nil},
+		{"garbage with a trailing space", "!!!! garbage \U0001F608 ", nil},
+
+		// No character but the space separates, so two tags joined by any other one are a single
+		// entry no locale has, and the shape filter drops it whole. A tab, a newline, a form feed
+		// and a carriage return used to separate; a no-break space, a next-line character and a
+		// vertical tab did not. The escapes are spelled out so no editor can turn one into a space.
+		{"a tab joins two tags", "pt-BR\tes", nil},
+		{"a newline joins two tags", "pt-BR\nes", nil},
+		{"a form feed joins two tags", "pt-BR\fes", nil},
+		{"a carriage return joins two tags", "pt-BR\res", nil},
+		{"a no-break space joins two tags", "pt-BR\u00a0es", nil},
+		{"a next-line character joins two tags", "pt-BR\u0085es", nil},
+		{"a vertical tab joins two tags", "pt-BR\ves", nil},
+		{"the joined entry is dropped, the next tag kept", "pt-BR\u00a0es en", []string{"en"}},
+
+		// Nothing is trimmed: a tag padded with any of them is not that tag. The edge trim used to
+		// admit both of these as "pt-BR".
+		{"a no-break space after a tag", "pt-BR\u00a0", nil},
+		{"a tab before a tag", "\tpt-BR es", []string{"es"}},
 	}
 	for _, c := range cases {
-		t.Run(c.in, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			got := SanitizeUILocales(c.in)
 			assert.Equal(t, c.want, got)
 		})
@@ -98,10 +109,10 @@ func TestMiddlewareLocale_QueryParamWins(t *testing.T) {
 }
 
 // The middleware runs on every request of both processes before any handler, so it is where the
-// shared splitter reaches ui_locales first (#244): a query whose tags are separated by a tab is an
-// explicit preference, and one whose tags are joined by a no-break space carries no usable tag and
-// falls through to Accept-Language.
-func TestMiddlewareLocale_UILocalesUsesTheSharedSplitter(t *testing.T) {
+// shared grammar reaches ui_locales first (#244): a query whose tags are separated by one space is an
+// explicit preference, and one whose tags are separated by a tab, or by two spaces, carries no usable
+// tag and falls through to Accept-Language.
+func TestMiddlewareLocale_UILocalesUsesTheSharedGrammar(t *testing.T) {
 	mw := MiddlewareLocale(nil)
 
 	run := func(query string) (title string, explicit bool) {
@@ -115,13 +126,15 @@ func TestMiddlewareLocale_UILocalesUsesTheSharedSplitter(t *testing.T) {
 		return title, explicit
 	}
 
-	title, explicit := run("pt-BR%09es")
+	title, explicit := run("pt-BR%20es")
 	assert.Equal(t, "Entrar", title)
-	assert.True(t, explicit, "a tab separates the two tags, so ui_locales is a stated preference")
+	assert.True(t, explicit, "one space separates the two tags, so ui_locales is a stated preference")
 
-	title, explicit = run("pt-BR%C2%A0es")
-	assert.NotEqual(t, "Entrar", title, "a no-break space joins the tags into one that no locale has")
-	assert.False(t, explicit, "no usable tag, so ui_locales states no preference")
+	for _, query := range []string{"pt-BR%09es", "pt-BR%20%20es", "pt-BR%C2%A0es"} {
+		title, explicit = run(query)
+		assert.NotEqual(t, "Entrar", title, "%v carries no usable tag", query)
+		assert.False(t, explicit, "%v: no usable tag, so ui_locales states no preference", query)
+	}
 }
 
 func TestMiddlewareLocale_UILocalesReaderWinsOverHeader(t *testing.T) {

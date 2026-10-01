@@ -106,8 +106,9 @@ func resolveParkedAuthorizeRequest(w http.ResponseWriter, r *http.Request, pageR
 		return nil, false
 	}
 
-	// Copies of the handle that differ name no single request, and identical ones are one (#228).
-	if protocolvalidation.ConflictingParameter(params, []string{authorizerequest.HandleParameter}) != "" {
+	// A handle sent twice is refused like any other repeated parameter, whether or not the copies
+	// agree (#228).
+	if protocolvalidation.RepeatedParameter(params, []string{authorizerequest.HandleParameter}) != "" {
 		return refuse()
 	}
 	for _, name := range authorizeParkedParameters {

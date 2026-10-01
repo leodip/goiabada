@@ -27,8 +27,8 @@ var (
 	nonceBound = parameterBound{errorCode: "invalid_request", name: "nonce", maxBytes: models.NonceMaxBytes}
 
 	// scopeBound bounds a scope where it enters: at the authorization endpoint and at the password
-	// grant. It counts the normalized scope, duplicates dropped and whitespace collapsed, because
-	// that is the value stored.
+	// grant. It counts the normalized scope, duplicates dropped, because that is the value stored;
+	// a scope reaches it only once its grammar has been found well formed.
 	scopeBound = parameterBound{errorCode: "invalid_scope", name: "scope", maxBytes: models.ScopeMaxBytes}
 )
 

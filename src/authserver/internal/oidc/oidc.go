@@ -52,7 +52,9 @@ func HasOfflineAccessScope(scope string) bool {
 // through oauth.SplitSpaceDelimited, the one splitter every space-delimited parameter reads
 // through (#244). Duplicates are kept; NormalizeScope drops them. Every site that reads a scope's
 // values goes through here or through NormalizeScope, where each used to carry its own copy of the
-// rule and three of them disagreed on the edges (#116).
+// rule and three of them disagreed on the edges (#116). It judges no grammar: a scope entering at
+// either endpoint is held to oauth.IsWellFormedSpaceDelimited where it enters, and a stored one was
+// written with single spaces.
 func SplitScope(scope string) []string {
 	return oauth.SplitSpaceDelimited(scope)
 }
@@ -64,9 +66,9 @@ func SplitScope(scope string) []string {
 // whitespace-collapsed copy and carried the raw value onward, and a tab-separated scope passed
 // validation and then answered 500 from the issuer.
 //
-// A value holding nothing but whitespace normalizes to "", the same as an absent one. The token
-// endpoint tells the two apart by also reading the raw value, and must: an empty client
-// credentials scope grants everything the client holds.
+// A value holding nothing but spaces normalizes to "", the same as an absent one. Neither endpoint
+// lets one get this far: each refuses it as malformed first, and the token endpoint must, since an
+// empty client credentials scope grants everything the client holds.
 func NormalizeScope(scope string) string {
 	unique := []string{}
 	for _, value := range SplitScope(scope) {

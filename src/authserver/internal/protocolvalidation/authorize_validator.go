@@ -64,14 +64,23 @@ func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValida
 	}
 }
 
-// ValidateScopes validates the scope of an authorization request, as the client asked for it,
-// normalized: duplicates dropped and whitespace collapsed (oidc.NormalizeScope), which is what
+// ValidateScopes validates the scope parameter of an authorization request, exactly as the client
+// sent it. A scope that is not one space between each two values, with none at either end, is
+// refused as malformed before anything else is read of it (RFC 6749 section 3.3, #244), which is why
+// it takes the raw value: normalizing first would hide the very runs of spaces it refuses.
+//
+// The rest is judged with duplicates dropped (oidc.NormalizeScope), which is what
 // AuthContext.SetScope stores. What is stored can only be shorter, when the response type does not
 // honour offline_access (ResponseTypeInfo.ScopeHonoured), so the bound below still counts at least
 // the value that is saved in the consent, the code and the refresh token (#437). It validates the
 // request rather than the stored value so that a request for offline_access alone is refused for
 // what it is on every response type, and not called missing where the response type emptied it.
 func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
+
+	if err := ValidateSpaceDelimited("scope", "invalid_scope", scope); err != nil {
+		return err
+	}
+	scope = oidc.NormalizeScope(scope)
 
 	scopes := oidc.SplitScope(scope)
 
@@ -294,9 +303,15 @@ func SupportedResponseTypes() []string {
 func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
 
 	// Check for empty/missing response_type first
-	if len(oauth.SplitSpaceDelimited(input.ResponseType)) == 0 {
+	if input.ResponseType == "" {
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"The response_type parameter is missing.", http.StatusBadRequest)
+	}
+
+	// Then its grammar: values separated by single spaces, with none at either end (RFC 6749
+	// 3.1.1). A value of spaces alone is malformed rather than missing: something was sent (#244).
+	if err := ValidateSpaceDelimited("response_type", "invalid_request", input.ResponseType); err != nil {
+		return err
 	}
 
 	// Parse response_type (can be space-separated for OIDC, e.g., "id_token token")
@@ -455,10 +470,11 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 }
 
 // ValidatePrompt validates and normalizes the OIDC prompt parameter.
-// It returns the normalized prompt string (trimmed, deduplicated, single-space-delimited)
-// or an error if the prompt value is invalid or contains conflicting values.
+// It returns the normalized prompt string (deduplicated, single-space-delimited)
+// or an error if the prompt value is malformed, invalid or contains conflicting values.
 //
 // Per OIDC Core 1.0 Section 3.1.2.1:
+// - A space delimited list: one space between each two values, none at either end (#244)
 // - Values the specification defines: none, login, consent, select_account
 // - prompt=none cannot be combined with other values
 // - Other values can be combined (e.g., "login consent")
@@ -469,17 +485,17 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 // rather than invalid_request, which said the value was not one: the request is well formed and the
 // server is what cannot serve it. discovery's prompt_values_supported does not list it (#244).
 func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
-	// Empty or whitespace-only prompt is valid (treated as absent)
-	trimmed := strings.TrimSpace(prompt)
-	if trimmed == "" {
+	// An empty prompt is valid (treated as absent). One of spaces alone, or padded with them, is not:
+	// it used to be trimmed and read as absent or as the value inside (#244).
+	if prompt == "" {
 		return "", nil
+	}
+	if err := ValidateSpaceDelimited("prompt", "invalid_request", prompt); err != nil {
+		return "", err
 	}
 
-	// Parse prompt values (handles multiple spaces, deduplicates)
-	values := parsePromptValues(trimmed)
-	if len(values) == 0 {
-		return "", nil
-	}
+	// Parse prompt values (deduplicates)
+	values := parsePromptValues(prompt)
 
 	// Validate each value
 	validValues := map[string]bool{
@@ -518,8 +534,8 @@ func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
 	return strings.Join(values, " "), nil
 }
 
-// parsePromptValues parses a prompt string into individual values.
-// It handles multiple spaces and deduplicates values while preserving order.
+// parsePromptValues parses a well-formed prompt string into individual values, deduplicating them
+// while preserving order.
 func parsePromptValues(prompt string) []string {
 	// The one splitter every space-delimited parameter reads through, so this and the handler's
 	// silence test read a prompt the same way (#244).
