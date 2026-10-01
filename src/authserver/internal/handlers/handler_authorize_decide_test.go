@@ -365,14 +365,17 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "not-a-token", false).
 				Run(record("DecodeAndValidateTokenString")).Return(nil, errors.New("malformed")).Maybe()
 
-			params := url.Values{"prompt": {"login"}}
+			// ValidateScopes is handed the scope as sent, never the request's normalized copy, whose
+			// spaces would hide a malformed one (#244): the copy below differs, so a call with it
+			// matches no expectation.
+			params := url.Values{"prompt": {"login"}, "scope": {"openid"}}
 			if tc.hint != "" {
 				params.Set("id_token_hint", tc.hint)
 			}
 
 			validation, err := validateAuthorizeRequest(context.Background(), authorizeValidator, tokenParser,
 				&models.Settings{Issuer: "https://test-issuer.com"}, params,
-				&protocolvalidation.ValidateRequestInput{Scope: "openid"})
+				&protocolvalidation.ValidateRequestInput{Scope: "the normalized copy"})
 
 			assert.Equal(t, tc.wantCalls, calls)
 			if tc.wantFault {

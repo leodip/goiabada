@@ -40,9 +40,9 @@ func TestIsWellFormedSpaceDelimited(t *testing.T) {
 		{"a carriage return inside a value", "a\rb", true},
 		{"a form feed inside a value", "a\fb", true},
 		{"a vertical tab inside a value", "a\vb", true},
-		{"a no-break space inside a value", "a b", true},
+		{"a no-break space inside a value", "a\u00a0b", true},
 		{"a tab at an edge", "\ta", true},
-		{"a no-break space at an edge", "a ", true},
+		{"a no-break space at an edge", "a\u00a0", true},
 		// A tab next to a space is still one space between two values.
 		{"a tab beside a single space", "a \tb", true},
 	}
@@ -83,14 +83,14 @@ func TestSplitSpaceDelimited(t *testing.T) {
 		{"a carriage return does not split", "a\rb", []string{"a\rb"}},
 		{"a carriage return and newline do not split", "a\r\nb", []string{"a\r\nb"}},
 		{"a vertical tab does not split", "a\vb", []string{"a\vb"}},
-		{"a no-break space does not split", "a b", []string{"a b"}},
+		{"a no-break space does not split", "a\u00a0b", []string{"a\u00a0b"}},
 		{"a next-line character does not split", "a\u0085b", []string{"a\u0085b"}},
-		{"an ideographic space does not split", "a　b", []string{"a　b"}},
-		{"an en space does not split", "a b", []string{"a b"}},
+		{"an ideographic space does not split", "a\u3000b", []string{"a\u3000b"}},
+		{"an en space does not split", "a\u2002b", []string{"a\u2002b"}},
 
 		// Nothing is trimmed: a value padded with any of them is not the value.
 		{"a tab at an edge stays", "\ta", []string{"\ta"}},
-		{"a no-break space after a value stays", "a ", []string{"a "}},
+		{"a no-break space after a value stays", "a\u00a0", []string{"a\u00a0"}},
 		{"a vertical tab either side stays", "\va\v", []string{"\va\v"}},
 		{"a tab beside a space stays with its value", "a \tb", []string{"a", "\tb"}},
 		{"such characters alone are a value", "\t", []string{"\t"}},

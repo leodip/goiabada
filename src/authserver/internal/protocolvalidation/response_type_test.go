@@ -112,26 +112,30 @@ func TestParseResponseType(t *testing.T) {
 			wantToken:    true,
 			wantIdToken:  false,
 		},
+		// A run of spaces is malformed, which ValidateRequest refuses, but the values are still read
+		// from it, so the mode an error is answered in follows what was asked for (#244).
 		{
-			name:         "multiple spaces between tokens",
+			name:         "multiple spaces between tokens are still read",
 			responseType: "id_token  token",
 			wantCode:     false,
 			wantToken:    true,
 			wantIdToken:  true,
 		},
+		// Only a space separates: a tab or a newline joins two types into one value that is neither.
+		// Both used to split (#244).
 		{
-			name:         "tab between tokens",
+			name:         "tab between tokens joins them",
 			responseType: "id_token\ttoken",
 			wantCode:     false,
-			wantToken:    true,
-			wantIdToken:  true,
+			wantToken:    false,
+			wantIdToken:  false,
 		},
 		{
-			name:         "newline between tokens",
+			name:         "newline between tokens joins them",
 			responseType: "id_token\ntoken",
 			wantCode:     false,
-			wantToken:    true,
-			wantIdToken:  true,
+			wantToken:    false,
+			wantIdToken:  false,
 		},
 
 		// Invalid/unrecognized response types

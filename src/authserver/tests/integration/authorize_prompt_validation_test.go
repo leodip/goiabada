@@ -10,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // =============================================================================
@@ -426,31 +427,48 @@ func TestPrompt_EmptyParameter(t *testing.T) {
 	assert.NotEmpty(t, redirectLocation)
 }
 
+// A prompt of spaces alone used to be trimmed and read as absent. Since #244 it is malformed (OIDC
+// Core 1.0 3.1.2.1 makes prompt space delimited, and spaces alone are no values separated by single
+// spaces), so it is refused invalid_request. A browser with a valid session is answered at once
+// (#213), which puts the refusal on the redirect itself; an empty prompt is the control, and reaches
+// the client as an issued code's route.
 func TestPrompt_WhitespaceOnlyParameter(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	httpClient, client, redirectUri, _, _ := createSessionWithAcrLevel1AndPassword(t)
 
-	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
-	// Whitespace-only prompt parameter should be treated as absent
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
-		"&response_type=code" +
-		"&code_challenge_method=S256" +
-		"&code_challenge=" + requestCodeChallenge +
-		"&scope=" + url.QueryEscape("openid profile") +
-		"&state=" + requestState +
-		"&prompt=%20%20%20" // URL encoded spaces
-
-	resp, err := httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
+	request := func(prompt string) *http.Response {
+		t.Helper()
+		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+			"&response_type=code" +
+			"&code_challenge_method=S256" +
+			"&code_challenge=" + fake.LetterN(43) +
+			"&scope=" + url.QueryEscape("openid profile") +
+			"&state=" + fake.LetterN(8) +
+			"&prompt=" + prompt
+		resp, err := httpClient.Get(destUrl)
+		require.NoError(t, err)
+		return resp
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	// Should redirect to normal auth flow (level1), not return an error
-	redirectLocation := assertRedirect(t, resp, "/auth/level1")
-	assert.NotEmpty(t, redirectLocation)
+	t.Run("spaces alone are malformed", func(t *testing.T) {
+		resp := request("%20%20%20")
+		defer func() { _ = resp.Body.Close() }()
+
+		require.Equal(t, http.StatusFound, resp.StatusCode)
+		location, err := url.Parse(resp.Header.Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, redirectUri.URI, location.Scheme+"://"+location.Host+location.Path)
+		assert.Equal(t, "invalid_request", location.Query().Get("error"))
+		assert.Equal(t, "The 'prompt' parameter is malformed. Separate its values with a single space, with no space before the first value or after the last.",
+			location.Query().Get("error_description"))
+	})
+
+	t.Run("an empty prompt is absent", func(t *testing.T) {
+		resp := request("")
+		defer func() { _ = resp.Body.Close() }()
+
+		assertRedirect(t, resp, "/auth/level1completed")
+	})
 }
 
 func TestPrompt_UrlEncodedSpaces(t *testing.T) {

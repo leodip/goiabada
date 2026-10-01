@@ -235,16 +235,38 @@ func TestAuthorize_OverlongValueIsRefusedAtOnce(t *testing.T) {
 	})
 
 	// A leniency chosen on purpose: the bound counts the normalized scope, which is what is stored,
-	// so a request whose raw scope is far over it in repeated, tab-separated values is the
-	// one-value scope it collapses to, and the sign-in goes on.
+	// so a request whose raw scope is far over it in repeated values, each separated from the next
+	// by one space, is the one-value scope it collapses to, and the sign-in goes on.
 	t.Run("a raw scope over the bound that normalizes under it proceeds", func(t *testing.T) {
-		scope := strings.Repeat("openid\t", 3*models.ScopeMaxBytes/len("openid\t"))
+		scope := repeatedOpenidScope()
 		require.Greater(t, len(scope), models.ScopeMaxBytes)
 
 		location := answer(t, request(map[string]string{"scope": scope}))
 
 		assert.Equal(t, "/auth/level1completed", location.Path, "the session holder's sign-in goes on: %v", location)
 	})
+
+	// The same values joined by a tab used to collapse the same way. A tab separates nothing since
+	// #244, so they are one value far over the bound.
+	t.Run("the same values joined by a tab are one value over the bound", func(t *testing.T) {
+		scope := strings.ReplaceAll(repeatedOpenidScope(), " ", "\t")
+
+		location := answer(t, request(map[string]string{"scope": scope}))
+
+		assert.Equal(t, "invalid_scope", location.Query().Get("error"))
+		assert.Equal(t, fmt.Sprintf("The 'scope' parameter is too long (%d bytes, the maximum is %d).",
+			len(scope), models.ScopeMaxBytes), location.Query().Get("error_description"))
+	})
+}
+
+// repeatedOpenidScope is openid repeated, one space between each copy, to three times the scope
+// bound: a well-formed scope far over the bound whose normalized value is "openid".
+func repeatedOpenidScope() string {
+	copies := make([]string, 3*models.ScopeMaxBytes/len("openid "))
+	for i := range copies {
+		copies[i] = "openid"
+	}
+	return strings.Join(copies, " ")
 }
 
 func TestROPC_ScopeBound(t *testing.T) {
@@ -322,7 +344,7 @@ func TestROPC_ScopeBound(t *testing.T) {
 	// it.
 	t.Run("a raw scope over the bound that normalizes under it is granted", func(t *testing.T) {
 		client, user, password := setup(t)
-		scope := strings.Repeat("openid\t", 3*models.ScopeMaxBytes/len("openid\t"))
+		scope := repeatedOpenidScope()
 		require.Greater(t, len(scope), models.ScopeMaxBytes)
 
 		data := postToTokenEndpoint(t, createHttpClient(t), tokenUrl, request(client, user, password, scope))

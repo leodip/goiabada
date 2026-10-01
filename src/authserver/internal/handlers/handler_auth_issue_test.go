@@ -2470,15 +2470,19 @@ func TestIsImplicitFlow_EdgeCases(t *testing.T) {
 			responseType: "   ",
 			expected:     false,
 		},
+		// The space alone separates (#244), so a tab or a newline joins two values into one the
+		// parser does not recognise, which names no implicit flow. The rows above are malformed and
+		// ValidateRequest refuses them, but their values are still read, so an error answers in the
+		// mode the client asked for.
 		{
 			name:         "tab character",
 			responseType: "token\tid_token",
-			expected:     true,
+			expected:     false,
 		},
 		{
 			name:         "newline character",
 			responseType: "token\nid_token",
-			expected:     true,
+			expected:     false,
 		},
 		{
 			name:         "unknown response type",

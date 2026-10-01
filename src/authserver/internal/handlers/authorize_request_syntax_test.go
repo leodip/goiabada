@@ -269,24 +269,52 @@ func TestHandleAuthorizeGet_SelectAccountIsAnsweredAsUnsupported(t *testing.T) {
 }
 
 // TestHandleAuthorizeGet_SilenceIsReadThroughTheSharedSplitter: the handler decides a request is
-// silent from the raw prompt, and reads it as the validator does, so a tab between two values is a
-// separator and both are seen, and a no-break space is not and the two words are one unknown value.
-// A silent request is answered at once whoever is at the browser; one that is not is parked (#244).
+// silent from the raw prompt, and reads it with the validator's splitter, on the space alone. A
+// space between two values is a separator and both are seen; a tab or a no-break space is not, and
+// the two words are one unknown value. A malformed prompt is still split, so one that asks for none
+// with a space too many is silent and refused for its grammar at once. A silent request is answered
+// at once whoever is at the browser; one that is not is parked (#244).
 func TestHandleAuthorizeGet_SilenceIsReadThroughTheSharedSplitter(t *testing.T) {
-	t.Run("none and login joined by a tab is silent, and refused as the combination it is", func(t *testing.T) {
+	// answeredAtOnce follows the redirect a silent request gets. No browser is stubbed: a silent
+	// request reads no session here and is answered at once, which is what shows it was seen as
+	// silent and not parked behind a login.
+	answeredAtOnce := func(t *testing.T, prompt string) url.Values {
+		t.Helper()
 		e := newSyntaxAuthorizeEndpoint(t)
-		// No browser is stubbed: a silent request reads no session here and is answered at once,
-		// which is what shows it was seen as silent and not parked behind a login.
 		e.ceremonyStore.On("ClearAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
-		rr := e.get(t, syntaxQuery(map[string]string{"prompt": "none\tlogin"}))
+		rr := e.get(t, syntaxQuery(map[string]string{"prompt": prompt}))
 
 		require.Equal(t, http.StatusFound, rr.Code)
 		location, err := url.Parse(rr.Header().Get("Location"))
 		require.NoError(t, err)
 		assert.Equal(t, "example.com", location.Host)
-		assert.Equal(t, "invalid_request", location.Query().Get("error"))
-		assert.Equal(t, "prompt=none cannot be combined with other values", location.Query().Get("error_description"))
+		return location.Query()
+	}
+
+	t.Run("none and login joined by a space is silent, and refused as the combination it is", func(t *testing.T) {
+		answer := answeredAtOnce(t, "none login")
+		assert.Equal(t, "invalid_request", answer.Get("error"))
+		assert.Equal(t, "prompt=none cannot be combined with other values", answer.Get("error_description"))
+	})
+
+	for _, prompt := range []string{"none ", " none", "none  login"} {
+		t.Run("a malformed prompt asking for none is silent, and refused as malformed: "+prompt, func(t *testing.T) {
+			answer := answeredAtOnce(t, prompt)
+			assert.Equal(t, "invalid_request", answer.Get("error"))
+			assert.Equal(t, "The 'prompt' parameter is malformed. Separate its values with a single space, with no space before the first value or after the last.",
+				answer.Get("error_description"))
+		})
+	}
+
+	// A tab used to separate, which made this silent (#244).
+	t.Run("none and login joined by a tab is one unknown value and is not silent", func(t *testing.T) {
+		e := newSyntaxAuthorizeEndpoint(t)
+
+		saved := parkedBy(t, e, syntaxQuery(map[string]string{"prompt": "none\tlogin"}))
+
+		assert.Equal(t, "invalid_request", saved.DeferredErrorCode)
+		assert.Contains(t, saved.DeferredErrorDescription, "Invalid prompt value:")
 	})
 
 	t.Run("none and login joined by a no-break space is one unknown value and is not silent", func(t *testing.T) {

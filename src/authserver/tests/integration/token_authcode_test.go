@@ -378,17 +378,18 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 }
 
-// TestToken_Refresh_TabSeparatedDownScopeIsNormalized is step 5 of the scope normalization work.
+// TestToken_Refresh_DownScopeSeparators holds a refresh's down-scope to the scope grammar: one space
+// (U+0020) between each two scopes, none at either end (RFC 6749 section 3.3).
 //
-// Refresh had the identical shape as the client credentials defect: token_validator.go collapsed
-// whitespace into a LOCAL variable for the subset comparison and then carried the caller's raw
-// input.Scope onward, where the issuer re-parsed it and failed with a **500**. Measured by reverting
-// the handler to pass the raw scope, where this test fails with server_error. No token was reissued
-// carrying unmatchable scopes; the issuer rejected first.
+// A tab-separated down-scope used to be normalized and granted, and before that answered 500
+// because the issuer split on spaces alone. Since #244 a tab separates nothing, so "openid<TAB>
+// profile" is one scope the original grant does not hold, refused invalid_scope; a run of spaces is
+// refused as malformed. Neither refusal spends the refresh token: the single-space down-scope that
+// follows them, the control both vary from, is still granted with the same token.
 //
-// Deliberately thin, because the whitespace rule's exhaustive table is oidc.NormalizeScope's; this
-// asserts only that refresh benefits from the shared helper.
-func TestToken_Refresh_TabSeparatedDownScopeIsNormalized(t *testing.T) {
+// Deliberately thin, because the grammar's exhaustive table is core/oauth's; this asserts only that
+// the refresh grant reads it.
+func TestToken_Refresh_DownScopeSeparators(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 
 	// Not offline_access: it routes the flow through /auth/consent, which createAuthCode does not
@@ -409,14 +410,31 @@ func TestToken_Refresh_TabSeparatedDownScopeIsNormalized(t *testing.T) {
 	refreshToken, ok := first["refresh_token"].(string)
 	assert.True(t, ok, "expected a refresh token: %v", first)
 
-	// Down-scope to a subset of the original grant, separated by a TAB.
-	refreshed := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
-		"grant_type":    {"refresh_token"},
-		"client_id":     {code.Client.ClientIdentifier},
-		"client_secret": {clientSecret},
-		"refresh_token": {refreshToken},
-		"scope":         {"openid\tprofile"},
-	})
+	refresh := func(scope string) map[string]interface{} {
+		return postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+			"grant_type":    {"refresh_token"},
+			"client_id":     {code.Client.ClientIdentifier},
+			"client_secret": {clientSecret},
+			"refresh_token": {refreshToken},
+			"scope":         {scope},
+		})
+	}
+
+	// Down-scope to a subset of the original grant, separated by a TAB: one scope it does not hold.
+	refused := refresh("openid\tprofile")
+	assert.Equal(t, "invalid_scope", refused["error"], "%v", refused)
+	assert.Contains(t, refused["error_description"], "is not recognized. The original access token does not grant")
+	assert.NotContains(t, refused, "access_token")
+
+	// The same two scopes with two spaces between them.
+	refused = refresh("openid  profile")
+	assert.Equal(t, "invalid_scope", refused["error"], "%v", refused)
+	assert.Equal(t, "The 'scope' parameter is malformed. Separate its values with a single space, with no space before the first value or after the last.",
+		refused["error_description"])
+	assert.NotContains(t, refused, "access_token")
+
+	// The control, with the same refresh token: neither refusal spent it.
+	refreshed := refresh("openid profile")
 
 	assert.Nil(t, refreshed["error"], "the refresh should succeed: %v", refreshed)
 
@@ -426,10 +444,8 @@ func TestToken_Refresh_TabSeparatedDownScopeIsNormalized(t *testing.T) {
 	claims := decodeJWTPayload(t, newAccessToken)
 	scopeClaim, ok := claims["scope"].(string)
 	assert.True(t, ok, "the reissued token should carry a scope claim")
-	assert.NotContains(t, scopeClaim, "\t", "the scope claim must be space-separated")
 
-	// Matched with production's own matcher, not string equality: before the fix the claim was the
-	// raw "openid\tprofile" and HasScope, which splits on spaces only, matched neither.
+	// Matched with production's own matcher, not string equality.
 	jwtToken := oauth.JwtToken{Claims: claims}
 	assert.True(t, jwtToken.HasScope("openid"), "HasScope should match openid in %q", scopeClaim)
 	assert.True(t, jwtToken.HasScope("profile"), "HasScope should match profile in %q", scopeClaim)

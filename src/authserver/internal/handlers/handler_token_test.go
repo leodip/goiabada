@@ -1160,17 +1160,20 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 		wantValidatorCalled bool
 	}{
 		{
-			name:                "tab-separated scopes are collapsed",
+			name:                "one space between two scopes reaches the validator unchanged",
 			grantType:           "client_credentials",
-			rawScope:            "billing-api:read\tbilling-api:write",
+			rawScope:            "billing-api:read billing-api:write",
 			wantScope:           "billing-api:read billing-api:write",
 			wantValidatorCalled: true,
 		},
 		{
-			name:                "surrounding whitespace is trimmed",
+			// The space alone separates (#244): a tab is part of the value it sits in, so the scope
+			// is one value, which the validator then refuses as an unknown scope. It used to be
+			// collapsed to two.
+			name:                "a tab is not a separator, so one joined value reaches the validator",
 			grantType:           "client_credentials",
-			rawScope:            "  billing-api:read  ",
-			wantScope:           "billing-api:read",
+			rawScope:            "billing-api:read\tbilling-api:write",
+			wantScope:           "billing-api:read\tbilling-api:write",
 			wantValidatorCalled: true,
 		},
 		{
@@ -1181,14 +1184,34 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			wantValidatorCalled: true,
 		},
 		{
-			// The widening #116's one splitter brought to this endpoint: a U+00A0 beside a
-			// separator is trimmed off its element, where the endpoint used to hand the validator
-			// " billing-api:write" and have it refused as an unknown scope.
-			name:                "a U+00A0 after a separator is trimmed",
+			// Nothing is trimmed (#244): a U+00A0 after a single space stays on its element, where
+			// #116's splitter trimmed it off.
+			name:                "a U+00A0 after a space is kept with its element",
 			grantType:           "refresh_token",
-			rawScope:            "billing-api:read  billing-api:write",
-			wantScope:           "billing-api:read billing-api:write",
+			rawScope:            "billing-api:read \u00a0billing-api:write",
+			wantScope:           "billing-api:read \u00a0billing-api:write",
 			wantValidatorCalled: true,
+		},
+		// RFC 6749 3.3's grammar allows one space between two scopes and none at either end, so
+		// each of these is refused as malformed before the validator, for every grant that reads
+		// the scope. Each used to be collapsed or trimmed and handed on (#244).
+		{
+			name:                "surrounding spaces are refused before the validator, client credentials",
+			grantType:           "client_credentials",
+			rawScope:            "  billing-api:read  ",
+			wantValidatorCalled: false,
+		},
+		{
+			name:                "a run of spaces is refused before the validator, refresh",
+			grantType:           "refresh_token",
+			rawScope:            "billing-api:read  billing-api:write",
+			wantValidatorCalled: false,
+		},
+		{
+			name:                "a trailing space is refused before the validator, ROPC",
+			grantType:           "password",
+			rawScope:            "openid ",
+			wantValidatorCalled: false,
 		},
 		{
 			name:                "whitespace-only is rejected before the validator, client credentials",
@@ -1309,7 +1332,8 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			if assert.NotNil(t, rejection, "the handler should have rejected the request") {
 				assert.Equal(t, "invalid_scope", rejection.GetCode())
 				assert.Equal(t, http.StatusBadRequest, rejection.GetHttpStatusCode())
-				assert.Contains(t, rejection.GetDescription(), "provided but contains no scopes")
+				assert.Equal(t, "The 'scope' parameter is malformed. Separate its values with a single space, with no space before the first value or after the last.",
+					rejection.GetDescription())
 			}
 		})
 	}
