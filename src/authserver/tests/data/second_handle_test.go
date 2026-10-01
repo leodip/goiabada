@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/datafactory"
+	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/stretchr/testify/require"
 )
 
