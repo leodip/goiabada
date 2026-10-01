@@ -399,12 +399,19 @@ func (ac *AuthContext) OwnsSession(userSession *models.UserSession) bool {
 
 // parseAcrValuesFromAuthorizeRequest reads acr_values, which OIDC Core 1.0 section 3.1.2.1 defines
 // as a space-separated string, through oauth.SplitSpaceDelimited, the one splitter for the
-// space-delimited parameters, keeping each recognised level once in request order. The splitter
-// also trims each value with strings.TrimSpace, so a value padded with Unicode whitespace is
-// recognised; that can only raise the target, because computeTargetAcrLevel floors it at the
-// client's default (#436).
+// space-delimited parameters, keeping each recognised level once in request order.
+//
+// A value that is not well formed (oauth.IsWellFormedSpaceDelimited: one space between each two
+// levels, none at either end) is read as no acr_values at all, and is not refused: OIDC Core makes
+// acr_values a request the server may decline to honour (sections 3.1.2.1 and 5.5.1.1), and declining
+// can only leave the target at the client's default, the floor computeTargetAcrLevel sets. A level
+// padded with a tab or a no-break space is not recognised either, where a trim used to admit it
+// (#244, #436).
 func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []models.AcrLevel {
 	arr := []models.AcrLevel{}
+	if !oauth.IsWellFormedSpaceDelimited(ac.AcrValuesFromAuthorizeRequest) {
+		return arr
+	}
 	for _, v := range oauth.SplitSpaceDelimited(ac.AcrValuesFromAuthorizeRequest) {
 		acr, err := models.AcrLevelFromString(v)
 		if err == nil && !slices.Contains(arr, acr) {

@@ -128,12 +128,13 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		// RFC 6749 4.1.2 returns state as "the exact value received from the client". Two differing
-		// copies leave no such value, so the ceremony carries none and the invalid_request that
-		// refuses the request below reaches the client without one, #146's rule that state is
-		// emitted only when there is exactly one value to emit (#228).
+		// RFC 6749 4.1.2 returns state as "the exact value received from the client". A repeated
+		// state was not received as one value, whether or not its copies agree, so the ceremony
+		// carries none and the invalid_request that refuses the request below reaches the client
+		// without one, #146's rule that state is emitted only when exactly one value was received.
+		// The test is the repeat check's own, so the two cannot disagree about what a repeat is (#228).
 		state := params.Get("state")
-		if protocolvalidation.ConflictingParameter(params, []string{"state"}) != "" {
+		if protocolvalidation.RepeatedParameter(params, []string{"state"}) != "" {
 			state = ""
 		}
 
@@ -161,8 +162,9 @@ func HandleAuthorizeGet(
 			UserAgent:                     r.UserAgent(),
 			IpAddress:                     authserver_middleware.GetClientIPFromRequest(r),
 		}
-		// The scope the client asked for, normalized, is what the validator judges below; the scope
-		// stored is what the response type can honour of it. They differ only when offline_access is
+		// The scope the client asked for, normalized, is what the validator judges below, once
+		// ValidateScopes has found the scope as sent well formed; the scope stored is what the
+		// response type can honour of it. They differ only when offline_access is
 		// asked for a response type that returns no code, which OIDC Core 11 says to ignore, and
 		// validating the request rather than the stored value keeps a request for offline_access
 		// alone refused as that, on every response type (#244).
@@ -234,13 +236,15 @@ func HandleAuthorizeGet(
 		// OIDC Core 3.1.2.3 forbids interacting with a request that "contains the prompt parameter
 		// with the value none" whether or not the rest of the value parsed. So "none login", which
 		// ValidatePrompt refuses below, is still a silent request and must not be shown a login
-		// page. Case-sensitively, and on whitespace-separated tokens, because OIDC prompt values
+		// page. Case-sensitively, and on space-separated tokens, because OIDC prompt values
 		// are case-sensitive: "NONE" and "Login" carry no recognised token and are interactive
-		// (#213 decision 5).
+		// (#213 decision 5). The split judges no grammar, so "none " and " none", which ValidatePrompt
+		// refuses as malformed, still ask for none and are answered without a login page; a tab is
+		// no separator, so "none<TAB>login" asks for neither (#244).
 		//
-		// Every copy is read, not the first: a prompt sent twice with different values is refused
-		// below, and a copy asking for none still means nobody may be shown a login page before that
-		// refusal reaches the client. One copy, or identical copies, read as they always did (#228).
+		// Every copy is read, not the first: a prompt sent twice is refused below, and a copy asking
+		// for none still means nobody may be shown a login page before that refusal reaches the
+		// client (#228).
 		rawPrompt := oauth.SplitSpaceDelimited(strings.Join(params["prompt"], " "))
 		facts := authorizeRouteFacts{
 			requestsSilence: slices.Contains(rawPrompt, "none"),
@@ -405,12 +409,11 @@ func HandleAuthorizeGet(
 }
 
 // authorizeDeliveryParameters are the parameters that decide where an authorization response goes
-// and how it is encoded. A repeat of one with differing values is answered on the refusal page,
-// never by redirect (#228).
+// and how it is encoded. A repeat of one is answered on the refusal page, never by redirect (#228).
 var authorizeDeliveryParameters = []string{"client_id", "redirect_uri", "response_type", "response_mode"}
 
 // authorizeRequestParameters are every parameter HandleAuthorizeGet reads a value of, and so every
-// one whose copies must agree. TestAuthorizeRequestParameters_EveryReadIsListed holds the list to
+// one that may arrive once. TestAuthorizeRequestParameters_EveryReadIsListed holds the list to
 // the reads, so a parameter read later cannot be left out of the check. request and request_uri
 // are absent because they are refused whatever their value (#228).
 var authorizeRequestParameters = []string{
@@ -480,12 +483,13 @@ func refuseUnaddressableAuthorizeRequest(w http.ResponseWriter, r *http.Request,
 	authorizeValidator AuthorizeValidator, requestId string, params url.Values) bool {
 
 	// The parameters that decide where an answer goes and how it is encoded are checked for
-	// repeats first, above everything that could redirect: with two client_ids, redirect_uris,
-	// response_types or response_modes there is no single answer to "where does this response
-	// go, and in what form", so it goes nowhere and the page answers instead. RFC 6749 4.1.2.1
-	// already keeps a bad client_id or redirect_uri off the client for the same reason (#228).
-	if name := protocolvalidation.ConflictingParameter(params, authorizeDeliveryParameters); name != "" {
-		renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), "auth_error.conflicting_parameter.message",
+	// repeats first, above everything that could redirect: a request carrying two client_ids,
+	// redirect_uris, response_types or response_modes does not say, in the one form the grammar
+	// allows, where its response goes and how, so it goes nowhere and the page answers instead.
+	// RFC 6749 4.1.2.1 already keeps an invalid client_id or redirect_uri off the client for the
+	// same reason. Copies that agree are no exception, as the repeat check makes none (#228).
+	if name := protocolvalidation.RepeatedParameter(params, authorizeDeliveryParameters); name != "" {
+		renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), "auth_error.repeated_parameter.message",
 			map[string]any{"parameter": name}), http.StatusBadRequest)
 		return true
 	}
@@ -557,7 +561,7 @@ type authorizeValidation struct {
 }
 
 // validateAuthorizeRequest runs the validations that answer by redirect, in the order the client is
-// told about them: parameters repeated with differing values, unsupported request parameters, the
+// told about them: repeated parameters, unsupported request parameters, the
 // request itself, the scopes, the prompt, the id_token_hint. The first refusal stops the rest. An error that is not an ErrorDetail
 // is a fault inside a validator and is returned for the 500.
 //
@@ -584,11 +588,11 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 		return authorizeValidation{}, err
 	}
 
-	// First, because a parameter sent twice with differing values makes every later check read a
-	// copy the client may not have meant. The delivery parameters were checked above, before the
-	// client was loaded; the rest are refused here, so the refusal reaches the client through the
-	// deferral path like the four below (#228).
-	err := protocolvalidation.ValidateNoConflictingParameters(params, authorizeRequestParameters)
+	// First, because every later check reads the first copy of a parameter, and a parameter sent
+	// twice may have meant the other. The delivery parameters were checked above, before the client
+	// was loaded; the rest are refused here, so the refusal reaches the client through the deferral
+	// path like the four below (#228).
+	err := protocolvalidation.ValidateNoRepeatedParameters(params, authorizeRequestParameters)
 	if err != nil {
 		return stop(err)
 	}
@@ -606,7 +610,9 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 		return stop(err)
 	}
 
-	err = authorizeValidator.ValidateScopes(ctx, request.Scope)
+	// The scope as sent, not request.Scope's normalized copy, because its grammar is judged on the
+	// spaces the client put in it (#244).
+	err = authorizeValidator.ValidateScopes(ctx, params.Get("scope"))
 	if err != nil {
 		return stop(err)
 	}

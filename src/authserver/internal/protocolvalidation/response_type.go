@@ -24,15 +24,22 @@ type ResponseTypeInfo struct {
 	// parser used to collapse it into that, so a request repeating a value was accepted as the
 	// request it repeated (#244).
 	Repeated bool
+
+	// Malformed is set when the values are not separated by single spaces, or a space comes before
+	// the first or after the last (oauth.IsWellFormedSpaceDelimited). "code " is not "code": RFC
+	// 6749 3.1.1's grammar is response-name *( SP response-name ) (#244).
+	Malformed bool
 }
 
 // ParseResponseType parses a response_type string and returns information about
 // which response types are requested. The response_type can contain multiple
 // space-separated values per OIDC Core specification, split as every other space-delimited
-// parameter is (oauth.SplitSpaceDelimited). A value it does not recognise, or a recognised one it
-// sees twice, is reported on the result, and ValidateRequest refuses the request for either.
+// parameter is (oauth.SplitSpaceDelimited). A value it does not recognise, a recognised one it
+// sees twice, or separators the grammar does not allow are reported on the result, and
+// ValidateRequest refuses the request for each. The values are still read from a malformed one, so
+// the response mode an error is answered in follows what the client asked for.
 func ParseResponseType(responseType string) ResponseTypeInfo {
-	info := ResponseTypeInfo{}
+	info := ResponseTypeInfo{Malformed: !oauth.IsWellFormedSpaceDelimited(responseType)}
 	for _, rt := range oauth.SplitSpaceDelimited(responseType) {
 		var seen *bool
 		switch rt {
@@ -62,7 +69,7 @@ func (r ResponseTypeInfo) IsImplicitFlow() bool {
 }
 
 // IsCodeOnly reports whether the response type is exactly "code": the code was asked for and
-// nothing else was, recognised or not, and nothing was asked for twice.
+// nothing else was, recognised or not, nothing was asked for twice, and no space came with it.
 //
 // It is what scopes RFC 8252 section 7.3's loopback port flexibility to the authorization code
 // flow, at the three places that decide it (ValidateClientAndRedirectURI, redirectWillBeEmitted and
@@ -72,7 +79,7 @@ func (r ResponseTypeInfo) IsImplicitFlow() bool {
 // result carries the whole answer. And not !IsImplicitFlow(), which is true for "code token" and
 // for garbage such as "foo": only the exact type buys an arbitrary loopback port (#41, #244).
 func (r ResponseTypeInfo) IsCodeOnly() bool {
-	return r.HasCode && !r.HasToken && !r.HasIdToken && !r.Unrecognised && !r.Repeated
+	return r.HasCode && !r.HasToken && !r.HasIdToken && !r.Unrecognised && !r.Repeated && !r.Malformed
 }
 
 // ScopeHonoured is scope as this response type can use it: offline_access is dropped when the

@@ -117,7 +117,7 @@
 "auth_error.unable_to_authorize.title" = "Não foi possível autorizar"
 "auth_error.unsupported_response_mode.message" = "Parâmetro response_mode inválido. Os valores aceitos são: query, fragment, form_post."
 "auth_error.malformed_request.message" = "Não foi possível ler a solicitação de autorização: um de seus parâmetros não está codificado corretamente."
-"auth_error.conflicting_parameter.message" = "O parâmetro {{.parameter}} foi enviado mais de uma vez com valores diferentes."
+"auth_error.repeated_parameter.message" = "O parâmetro {{.parameter}} foi enviado mais de uma vez."
 "auth_error.request_handle_unusable.message" = "Este link de login não é mais válido. Ele pode ter expirado, já ter sido usado ou ter sido alterado. Volte ao aplicativo em que você estava entrando e comece novamente."
 
 # --- Redirecionamento retido para cliente auto-registrado (auth_redirect_blocked.html)

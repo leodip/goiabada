@@ -176,8 +176,16 @@ func TestHandleAuthorizePost_ARequestTheGetWouldRefuseOnThePageWritesNoRow(t *te
 
 	t.Run("a delivery parameter repeated with differing values", func(t *testing.T) {
 		e := newAuthorizePostEndpoint(t)
-		e.expectsPage(conflictMessage("redirect_uri"), http.StatusBadRequest)
+		e.expectsPage(repeatMessage("redirect_uri"), http.StatusBadRequest)
 		rr := e.post("", validAuthorizeQuery+"&redirect_uri="+url.QueryEscape("https://evil.example"))
+		assert.Empty(t, rr.Header().Get("Location"))
+	})
+
+	// Identical copies used to be parked as one value (#228).
+	t.Run("a delivery parameter repeated with identical values", func(t *testing.T) {
+		e := newAuthorizePostEndpoint(t)
+		e.expectsPage(repeatMessage("redirect_uri"), http.StatusBadRequest)
+		rr := e.post("", validAuthorizeQuery+"&redirect_uri="+url.QueryEscape("https://example.com"))
 		assert.Empty(t, rr.Header().Get("Location"))
 	})
 
@@ -205,22 +213,6 @@ func TestHandleAuthorizePost_ARequestTheGetWouldRefuseOnThePageWritesNoRow(t *te
 		rr := e.post("", validAuthorizeQuery+"&response_mode=web_message")
 		assert.Empty(t, rr.Header().Get("Location"))
 	})
-}
-
-// A leniency chosen on purpose (decision 18): identical copies of a delivery parameter are one
-// value, so they are parked and the request proceeds. Refusing them would refuse requests that
-// work today and are unambiguous.
-func TestHandleAuthorizePost_IdenticalCopiesOfADeliveryParameterAreParked(t *testing.T) {
-	e := newAuthorizePostEndpoint(t)
-	e.passesTheGate()
-	stored := e.parks()
-
-	rr := e.post("", validAuthorizeQuery+"&redirect_uri="+url.QueryEscape("https://example.com"))
-
-	require.Equal(t, http.StatusSeeOther, rr.Code)
-	parked, err := url.ParseQuery((*stored).RequestForm)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"https://example.com", "https://example.com"}, parked["redirect_uri"])
 }
 
 func TestHandleAuthorizePost_AFailedInsertIsA500AndNoRedirect(t *testing.T) {
@@ -482,18 +474,15 @@ func TestHandleAuthorizeGet_AnUnusableRequestHandleIsOneAnswer(t *testing.T) {
 		e.assertExpectations(t)
 	})
 
-	// The leniency of decision 18, kept: identical copies are one value.
-	t.Run("identical copies of one handle are one handle", func(t *testing.T) {
-		e := newBoundedAuthorizeEndpoint(t)
-		e.stubLoggedOutBrowser()
-		e.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		e.consumes(parkedHandle, url.Values{
-			"client_id": {"test-client"}, "redirect_uri": {"https://example.com"}, "response_type": {"code"}, "scope": {"openid"},
-		}, true)
+	// Identical copies used to be taken as one handle (#228). The strict database registered no
+	// claim, so a case that consumed the handle would fail.
+	t.Run("two identical handles are refused, consuming nothing", func(t *testing.T) {
+		e := newAuthorizeEndpoint(t)
+		e.expectsPage(unusableHandlePage())
 
 		rr := e.get(t, handleQuery(parkedHandle)+"&"+handleQuery(parkedHandle))
 
-		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
+		assert.Empty(t, rr.Header().Get("Location"))
 		e.assertExpectations(t)
 	})
 }

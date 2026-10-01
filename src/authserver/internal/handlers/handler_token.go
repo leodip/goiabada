@@ -76,9 +76,8 @@ var tokenRequestParameters = []string{
 }
 
 // parseTokenRequest reads the token request's form into the validator's input, refusing what can be
-// refused before any client is known: a body that cannot be parsed, a parameter repeated with
-// differing values, two client authentication methods at once, and a scope that was provided but
-// holds none.
+// refused before any client is known: a body that cannot be parsed, a repeated parameter, two
+// client authentication methods at once, and a scope that is not well formed.
 func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenRequestInput, error) {
 	// A body that cannot be parsed is the client's malformed request, RFC 6749 section 5.2's
 	// invalid_request, and not a server fault: a url-encoding broken by the client, or a body cut
@@ -93,8 +92,8 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	// RFC 6749 5.2 names a request that "repeats a parameter" or "includes multiple credentials"
 	// as invalid_request. Checked before anything is read, so a repeated grant_type cannot pick the
 	// grant and a repeated client_id or client_secret cannot pick the client. The body only, as every
-	// read below is; identical copies proceed (#228, #437 decision 18).
-	if err := protocolvalidation.ValidateNoConflictingParameters(r.PostForm, tokenRequestParameters); err != nil {
+	// read below is; copies that agree are refused too (#228).
+	if err := protocolvalidation.ValidateNoRepeatedParameters(r.PostForm, tokenRequestParameters); err != nil {
 		return nil, err
 	}
 
@@ -117,19 +116,20 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	//     from the issuer rather than the 400 the request deserves.
 	//   - It must run before that same test for the opposite reason too: normalizing "   " to
 	//     "" WOULD select the all-permissions branch, turning an accidentally malformed
-	//     least-privilege request into a maximal one. The rejection below is what stops that.
+	//     least-privilege request into a maximal one. The rejection below, which refuses a scope
+	//     of spaces alone as malformed, is what stops that.
 	//
 	// So the normalization and the rejection belong together, upstream of the validator.
 	// Moving either into the validator reopens one of the two holes.
 	rawScope := r.PostForm.Get("scope")
-	normalizedScope := oidc.NormalizeScope(rawScope)
 
-	// A scope that was provided but contains nothing is rejected rather than treated as
-	// omitted, for the grant types that read it. Note `rawScope != ""`: PostForm.Get cannot
-	// distinguish `scope=` from an absent parameter, and an explicitly empty `scope=` is
-	// already accepted today as "omitted", so whitespace-only is the only input in this
-	// category. Plenty of clients serialize empty values, and newly rejecting them would break
-	// working integrations for no security gain.
+	// A scope that is not well formed, one space between each two values and none at either end
+	// (RFC 6749 section 3.3), is refused as invalid_scope for the grant types that read it, before
+	// it is normalized, since normalizing would hide the runs of spaces it is refused for (#244).
+	// That covers a scope of spaces alone, which is refused rather than treated as omitted. An
+	// explicitly empty `scope=` is not refused: PostForm.Get cannot tell it from an absent
+	// parameter, RFC 6749 3.1 treats a parameter sent without a value as omitted, and plenty of
+	// clients serialize empty values.
 	//
 	// Deliberately NOT audited: this runs before the client is authenticated, so emitting an
 	// audit event here would record an unverified, caller-chosen client_id and let anyone
@@ -139,11 +139,12 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	// omitted-scope behaviour differs (client credentials grants everything the client holds,
 	// refresh preserves the original token's scope, ROPC defaults to "openid"), so naming any
 	// one of those would be wrong for the other two.
-	if rawScope != "" && normalizedScope == "" && grantType.ReadsScope() {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
-			"The 'scope' parameter was provided but contains no scopes. Either omit it entirely or supply one or more scopes separated by spaces.",
-			http.StatusBadRequest)
+	if grantType.ReadsScope() {
+		if err := protocolvalidation.ValidateSpaceDelimited("scope", "invalid_scope", rawScope); err != nil {
+			return nil, err
+		}
 	}
+	normalizedScope := oidc.NormalizeScope(rawScope)
 
 	return &protocolvalidation.ValidateTokenRequestInput{
 		GrantType:    grantType,
