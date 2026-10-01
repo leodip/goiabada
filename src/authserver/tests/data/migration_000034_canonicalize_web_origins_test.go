@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
@@ -344,5 +345,5 @@ func seedWebOrigin000034(t *testing.T, h *isolatedDB, clientId int64, raw string
 }
 
 func isSQLite000034() bool {
-	return dbType() == "" || dbType() == "sqlite"
+	return dbType() == data.SQLite
 }

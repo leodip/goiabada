@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,12 +29,11 @@ var renamedIndexes000042 = []struct {
 // agree" is the cross-engine comparison's claim to make over the golden files and this tier
 // can only ever see one engine at a time. What it pins here is that none of the other three
 // gained a ceiling while MySQL was losing one.
-var auditDetailsType000042 = map[string]string{
-	"":         "TEXT", // sqlite, which is what an unset GOIABADA_DB_TYPE means
-	"sqlite":   "TEXT",
-	"mysql":    "longtext",
-	"postgres": "text",
-	"mssql":    "nvarchar(max)",
+var auditDetailsType000042 = map[data.Dialect]string{
+	data.SQLite:   "TEXT",
+	data.MySQL:    "longtext",
+	data.Postgres: "text",
+	data.MSSQL:    "nvarchar(max)",
 }
 
 // mysqlVersionBefore000042 is 40 and not 41. 000041 is #284's own schema_migrations rebuild
@@ -180,4 +180,4 @@ func insertAuditLog000042(t *testing.T, h *isolatedDB, size int) error {
 	return err
 }
 
-func isMySQL000042() bool { return dbType() == "mysql" }
+func isMySQL000042() bool { return dbType() == data.MySQL }

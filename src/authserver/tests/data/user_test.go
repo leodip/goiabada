@@ -1136,7 +1136,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 // honesty: overlap can be made likely but not forced, so a green run detects a broken
 // implementation probabilistically rather than certifying atomicity.
 func TestTryConsumeUserOTPStep_ConcurrentCallersProduceOneWinner(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so callers queue " +
 			"rather than contend; the test would pass without ever creating overlap")
 	}
@@ -1634,7 +1634,7 @@ func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *test
 // implementation probabilistically rather than certifying atomicity. A lock-wait timeout
 // counts as "did not claim", because in production it is a 500 and the reset is refused.
 func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so callers queue " +
 			"rather than contend; the test would pass without ever creating overlap")
 	}

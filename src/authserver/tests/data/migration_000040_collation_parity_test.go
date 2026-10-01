@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -174,7 +175,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 	// a DIFFERENCE rather than as a list of 23 index names, for seam 2's reason: a hand-written
 	// list drifts as migrations are added and a difference cannot.
 	var shapeBefore []string
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		shapeBefore = mssqlSchemaShape000040(t, h)
 		require.NotEmpty(t, shapeBefore, "the catalog sweep read no index or default at all")
 	}
@@ -197,7 +198,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 	// CONVERT TO, its DDL is not transactional so the tables converted before the failing one
 	// stay converted, and each statement is idempotent, so what makes MySQL survivable is the
 	// retry below rather than atomicity.
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		assert.Equalf(t, shapeBefore, mssqlSchemaShape000040(t, h),
 			"the refused rollback must leave every index and default constraint exactly as it found them")
 		assertCollations000040(t, h, collationAfter000040, "after the refused rollback")
@@ -246,7 +247,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigration000040_UpRollsBack
 func TestMigration000040_UpRollsBackALateFailure(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s has no transactional 000040 up file to roll back", dbType())
 	}
 
@@ -343,13 +344,13 @@ func mssqlSchemaShape000040(t *testing.T, h *isolatedDB) []string {
 }
 
 // engineMoves000040 is the two engines that fold case today and stop after 000040.
-func engineMoves000040() bool { return dbType() == "mysql" || dbType() == "mssql" }
+func engineMoves000040() bool { return dbType() == data.MySQL || dbType() == data.MSSQL }
 
 // priorVersion000040 is the version immediately before 000040 on this engine. It is not the
 // same number on both: mssql has no 000036, 000037 or 000039, and the runner refuses a
 // target version its source does not carry.
 func priorVersion000040() int {
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		return 38
 	}
 	return 39
@@ -367,12 +368,12 @@ func priorVersion000040() int {
 // which is what the migration itself relies on.
 func newFixture000040(t *testing.T) *isolatedDB {
 	t.Helper()
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		return newPreCreatedMsSQLDB(t, mssqlCollationBefore000040)
 	}
 
 	h := newIsolatedDB(t)
-	if dbType() == "mysql" {
+	if dbType() == data.MySQL {
 		_, err := h.SQL.Exec("ALTER DATABASE CHARACTER SET utf8mb4 COLLATE " + mysqlCollationBefore000040)
 		require.NoError(t, err, "put the fixture's database default back where a pre-#283 install stands")
 	}
@@ -395,14 +396,14 @@ func newFixture000040(t *testing.T) *isolatedDB {
 // decision 4 accepts the operator's default there and pins all 92 columns explicitly instead.
 // A future 000040 that tried to move it would hang a real upgrade and fails here first.
 func databaseDefaultBefore000040() string {
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		return mssqlCollationBefore000040
 	}
 	return mysqlCollationBefore000040
 }
 
 func databaseDefaultAfter000040() string {
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		return mssqlCollationBefore000040
 	}
 	return mysqlCollationAfter000040
@@ -420,7 +421,7 @@ func assertDatabaseDefault000040(t *testing.T, h *isolatedDB, want string, phase
 // table must report, before and after. Before is per table on MySQL, because the schema was
 // not uniform: see mysqlUnicodeTables000040.
 func collationBefore000040(table string) string {
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		return mssqlCollationBefore000040
 	}
 	if mysqlUnicodeTables000040[table] {
@@ -430,7 +431,7 @@ func collationBefore000040(table string) string {
 }
 
 func collationAfter000040(table string) string {
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		return mssqlCollationAfter000040
 	}
 	return mysqlCollationAfter000040
@@ -449,7 +450,7 @@ func assertCollations000040(t *testing.T, h *isolatedDB, want func(string) strin
 
 	var q string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		q = `SELECT TABLE_NAME, COLUMN_NAME, COLLATION_NAME
 			FROM information_schema.columns
 			WHERE table_schema = DATABASE() AND COLLATION_NAME IS NOT NULL
@@ -546,7 +547,7 @@ func assertOnlyCollationMoved000040(t *testing.T, before, after map[string]table
 // silently.
 func assertDefaultsAreNamed000040(t *testing.T, shapes map[string]tableShape, phase string) {
 	t.Helper()
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		return
 	}
 
@@ -561,7 +562,7 @@ func assertDefaultsAreNamed000040(t *testing.T, shapes map[string]tableShape, ph
 
 func assertDefaultsAreAutoNamed000040(t *testing.T, shapes map[string]tableShape, phase string) {
 	t.Helper()
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		return
 	}
 
@@ -635,7 +636,7 @@ func splitQualified000040(key string) (table, column string) {
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigration000040_PreCreated
 func TestMigration000040_PreCreatedDatabaseIsFullyCollated(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s cannot inherit a wrong collation from a pre-created database", dbType())
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,7 +139,7 @@ func seedPreMigration000028User(t *testing.T, h *isolatedDB) int64 {
 
 	// boolean columns are `boolean` on PostgreSQL and integer-like everywhere else.
 	falseLit, trueLit := "0", "1"
-	if dbType() == "postgres" {
+	if dbType() == data.Postgres {
 		falseLit, trueLit = "false", "true"
 	}
 
@@ -198,13 +199,13 @@ func columnShape000028(t *testing.T, h *isolatedDB, table, col string) (bool, bo
 
 	var q string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		q = fmt.Sprintf(`SELECT IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.columns
 			WHERE table_schema = DATABASE() AND table_name = '%s' AND column_name = '%s'`, table, col)
-	case "postgres":
+	case data.Postgres:
 		q = fmt.Sprintf(`SELECT is_nullable, column_default FROM information_schema.columns
 			WHERE table_name = '%s' AND column_name = '%s'`, table, col)
-	case "mssql":
+	case data.MSSQL:
 		q = fmt.Sprintf(`SELECT CAST(c.is_nullable AS VARCHAR(1)), dc.definition
 			FROM sys.columns c
 			LEFT JOIN sys.default_constraints dc
@@ -224,9 +225,9 @@ func columnShape000028(t *testing.T, h *isolatedDB, table, col string) (bool, bo
 
 	notNull := false
 	switch dbType() {
-	case "mysql", "postgres":
+	case data.MySQL, data.Postgres:
 		notNull = strings.EqualFold(nullFlag.String, "NO")
-	case "mssql":
+	case data.MSSQL:
 		notNull = nullFlag.String == "0"
 	default: // sqlite
 		notNull = nullFlag.String == "1"
@@ -251,16 +252,16 @@ func indexShape000028(t *testing.T, h *isolatedDB, table, index string) (bool, b
 
 	var q string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		// NON_UNIQUE is 1 for a plain index and 0 for a unique one, inverted below. One
 		// row per indexed column, so a single-column index yields exactly one.
 		q = fmt.Sprintf(`SELECT NON_UNIQUE FROM information_schema.statistics
 			WHERE table_schema = DATABASE() AND table_name = '%s' AND index_name = '%s'`, table, index)
-	case "postgres":
+	case data.Postgres:
 		q = fmt.Sprintf(`SELECT CASE WHEN i.indisunique THEN 1 ELSE 0 END
 			FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
 			WHERE c.relname = '%s'`, index)
-	case "mssql":
+	case data.MSSQL:
 		q = fmt.Sprintf(`SELECT CAST(is_unique AS INT) FROM sys.indexes
 			WHERE object_id = OBJECT_ID('dbo.%s') AND name = '%s'`, table, index)
 	default: // sqlite
@@ -274,7 +275,7 @@ func indexShape000028(t *testing.T, h *isolatedDB, table, index string) (bool, b
 	}
 	require.NoErrorf(t, err, "index metadata: %s on %s", index, table)
 
-	if dbType() == "mysql" {
+	if dbType() == data.MySQL {
 		return true, flag == 0
 	}
 	return true, flag == 1

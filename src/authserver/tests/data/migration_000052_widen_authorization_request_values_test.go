@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,7 @@ var (
 // skipWithout000052 skips on SQLite, which stores all five columns as TEXT and has no 000052.
 func skipWithout000052(t *testing.T) {
 	t.Helper()
-	if dbType() == "" || dbType() == "sqlite" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite stores these columns as TEXT and has no 000052")
 	}
 }
@@ -34,11 +35,11 @@ func skipWithout000052(t *testing.T) {
 func varchar000052(t *testing.T, width int) string {
 	t.Helper()
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return fmt.Sprintf("varchar(%d)", width)
-	case "postgres":
+	case data.Postgres:
 		return fmt.Sprintf("character varying(%d)", width)
-	case "mssql":
+	case data.MSSQL:
 		return fmt.Sprintf("nvarchar(%d)", width)
 	}
 	require.FailNow(t, "no spelling for this engine", "%s", dbType())
@@ -136,7 +137,7 @@ func TestMigration000052_WidensTheFiveColumnsAndNothingElse(t *testing.T) {
 //
 // On its own isolated database, as 000049's is, because its first attempt ends dirty.
 func TestMigration000052_UpRollsBackALateFailure(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s has no transactional 000052 up file to roll back", dbType())
 	}
 	ctx := context.Background()

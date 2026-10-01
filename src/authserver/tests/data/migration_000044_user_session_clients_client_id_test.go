@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,7 +107,7 @@ func assertUserSessionClientsClientIdIndex000044(t *testing.T, h *isolatedDB, ph
 }
 
 func isMySQL000044() bool {
-	return dbType() == "mysql"
+	return dbType() == data.MySQL
 }
 
 // previousVersion000044 is the highest migration each engine carries below 000044. Written out
@@ -114,11 +115,11 @@ func isMySQL000044() bool {
 // with a version mismatch rather than silently testing the wrong starting point.
 func previousVersion000044() int {
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return 42
-	case "postgres":
+	case data.Postgres:
 		return 39
-	case "mssql":
+	case data.MSSQL:
 		return 40
 	default:
 		return 43

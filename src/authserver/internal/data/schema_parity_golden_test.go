@@ -1,4 +1,4 @@
-package data
+package data_test
 
 // The cross-engine comparison pointed at the four files that are actually committed (#284,
 // seam 3, goals 2 and 3). schema_parity_test.go is the machinery and
@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +38,7 @@ import (
 // already excuses makes both counts meaningless and is refused rather than resolved by
 // declaration order.
 func TestSchemaParity_TheFourCommittedGoldenFiles(t *testing.T) {
-	dumps := map[schemadump.Dialect]schemadump.Schema{}
+	dumps := map[data.Dialect]schemadump.Schema{}
 	for _, d := range parityDialects {
 		path, err := schemadump.GoldenPath(d)
 		require.NoErrorf(t, err, "locate the %s golden file", d)
@@ -92,9 +93,9 @@ func parityAllowlist() []parityRule {
 			Count:  71,
 			Digest: "072d5beacffe303b",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
-					d.Says[schemadump.SQLite] == "datetime(no declared precision)" &&
-					strings.HasPrefix(d.Says[schemadump.MySQL], "datetime(")
+				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
+					d.Says[data.SQLite] == "datetime(no declared precision)" &&
+					strings.HasPrefix(d.Says[data.MySQL], "datetime(")
 			},
 		},
 		{
@@ -106,9 +107,9 @@ func parityAllowlist() []parityRule {
 			Count:  96,
 			Digest: "29a0bc2278a19e6b",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
-					d.Says[schemadump.SQLite] == "string(no declared length)" &&
-					strings.HasPrefix(d.Says[schemadump.MySQL], "string(")
+				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
+					d.Says[data.SQLite] == "string(no declared length)" &&
+					strings.HasPrefix(d.Says[data.MySQL], "string(")
 			},
 		},
 		{
@@ -121,8 +122,8 @@ func parityAllowlist() []parityRule {
 			Count:  51,
 			Digest: "a3c53422fbb123fa",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisType && oddOneOut(d, schemadump.MySQL) &&
-					d.Says[schemadump.MySQL] == "uint64" && d.Says[schemadump.SQLite] == "int64"
+				return d.Axis == parityAxisType && oddOneOut(d, data.MySQL) &&
+					d.Says[data.MySQL] == "uint64" && d.Says[data.SQLite] == "int64"
 			},
 		},
 		{
@@ -133,8 +134,8 @@ func parityAllowlist() []parityRule {
 			Count:  19,
 			Digest: "91d0722568988b8c",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
-					d.Says[schemadump.SQLite] == "numeric" && d.Says[schemadump.MySQL] == "bool"
+				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
+					d.Says[data.SQLite] == "numeric" && d.Says[data.MySQL] == "bool"
 			},
 		},
 		{
@@ -145,8 +146,8 @@ func parityAllowlist() []parityRule {
 			Count:  11,
 			Digest: "035e7590db34c34d",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
-					d.Says[schemadump.SQLite] == "int64" && d.Says[schemadump.MySQL] == "bool"
+				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
+					d.Says[data.SQLite] == "int64" && d.Says[data.MySQL] == "bool"
 			},
 		},
 		{
@@ -158,8 +159,8 @@ func parityAllowlist() []parityRule {
 			Count:  8,
 			Digest: "818505b5881de1aa",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
-					d.Says[schemadump.SQLite] == "int64" && d.Says[schemadump.MySQL] == "int32"
+				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
+					d.Says[data.SQLite] == "int64" && d.Says[data.MySQL] == "int32"
 			},
 		},
 		{
@@ -172,8 +173,8 @@ func parityAllowlist() []parityRule {
 			Count:  26,
 			Digest: "3b05209a603a4b08",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisIndex && oddOneOut(d, schemadump.SQLite) &&
-					d.Object == "unique index(id)" && d.Says[schemadump.SQLite] == "absent"
+				return d.Axis == parityAxisIndex && oddOneOut(d, data.SQLite) &&
+					d.Object == "unique index(id)" && d.Says[data.SQLite] == "absent"
 			},
 		},
 		{
@@ -189,8 +190,8 @@ func parityAllowlist() []parityRule {
 			Count:  17,
 			Digest: "49bf86090a71d4ad",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisIndex && oddOneOut(d, schemadump.MySQL) &&
-					d.Says[schemadump.MySQL] == "present" && d.Says[schemadump.SQLite] == "absent"
+				return d.Axis == parityAxisIndex && oddOneOut(d, data.MySQL) &&
+					d.Says[data.MySQL] == "present" && d.Says[data.SQLite] == "absent"
 			},
 		},
 		{
@@ -202,8 +203,8 @@ func parityAllowlist() []parityRule {
 			Count:  26,
 			Digest: "5029973d93c83df6",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisNullable && oddOneOut(d, schemadump.SQLite) &&
-					d.Object == "id" && d.Says[schemadump.SQLite] == "nullable"
+				return d.Axis == parityAxisNullable && oddOneOut(d, data.SQLite) &&
+					d.Object == "id" && d.Says[data.SQLite] == "nullable"
 			},
 		},
 		{
@@ -216,9 +217,9 @@ func parityAllowlist() []parityRule {
 			Count:  26,
 			Digest: "36ec951726aaf10d",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisDefault && oddOneOut(d, schemadump.Postgres) &&
-					strings.HasPrefix(d.Says[schemadump.Postgres], `default "nextval(`) &&
-					d.Says[schemadump.SQLite] == "no default"
+				return d.Axis == parityAxisDefault && oddOneOut(d, data.Postgres) &&
+					strings.HasPrefix(d.Says[data.Postgres], `default "nextval(`) &&
+					d.Says[data.SQLite] == "no default"
 			},
 		},
 		{
@@ -231,9 +232,9 @@ func parityAllowlist() []parityRule {
 			Count:  1,
 			Digest: "3dcfa8347268e73a",
 			Excuses: func(d parityDivergence) bool {
-				return d.Axis == parityAxisDefault && oddOneOut(d, schemadump.MySQL) &&
+				return d.Axis == parityAxisDefault && oddOneOut(d, data.MySQL) &&
 					d.Table == "audit_logs" && d.Object == "details" &&
-					strings.Contains(d.Says[schemadump.MySQL], "_utf8mb4")
+					strings.Contains(d.Says[data.MySQL], "_utf8mb4")
 			},
 		},
 	}
@@ -251,11 +252,11 @@ func parityAllowlist() []parityRule {
 func TestSchemaParity_AllowlistRefusesATwoEngineDivergence(t *testing.T) {
 	before := parityDivergence{
 		Table: "audit_logs", Object: "details", Axis: parityAxisType,
-		Says: map[schemadump.Dialect]string{
-			schemadump.SQLite:   "string(no declared length)",
-			schemadump.MySQL:    "string(65535)",
-			schemadump.Postgres: "string(unbounded)",
-			schemadump.MSSQL:    "string(unbounded)",
+		Says: map[data.Dialect]string{
+			data.SQLite:   "string(no declared length)",
+			data.MySQL:    "string(65535)",
+			data.Postgres: "string(unbounded)",
+			data.MSSQL:    "string(unbounded)",
 		},
 	}
 	_, unexcused, conflicts := applyAllowlist([]parityDivergence{before}, parityAllowlist())
@@ -267,11 +268,11 @@ func TestSchemaParity_AllowlistRefusesATwoEngineDivergence(t *testing.T) {
 	// and SQLite's undeclared length is the only idiom left. That one IS excused, which is
 	// what says the rule above is refusing the second odd engine rather than the shape.
 	after := before
-	after.Says = map[schemadump.Dialect]string{
-		schemadump.SQLite:   "string(no declared length)",
-		schemadump.MySQL:    "string(unbounded)",
-		schemadump.Postgres: "string(unbounded)",
-		schemadump.MSSQL:    "string(unbounded)",
+	after.Says = map[data.Dialect]string{
+		data.SQLite:   "string(no declared length)",
+		data.MySQL:    "string(unbounded)",
+		data.Postgres: "string(unbounded)",
+		data.MSSQL:    "string(unbounded)",
 	}
 	_, unexcused, conflicts = applyAllowlist([]parityDivergence{after}, parityAllowlist())
 	require.Empty(t, conflicts)
@@ -287,7 +288,7 @@ func TestSchemaParity_AllowlistRefusesATwoEngineDivergence(t *testing.T) {
 // not hypothetical: audit_logs.details had SQLite declaring no length, MySQL capped at 64 KiB
 // and the other two unbounded, which is two odd ones out and a defect that #284 fixed rather
 // than allowlisted (migration 000042).
-func oddOneOut(d parityDivergence, want schemadump.Dialect) bool {
+func oddOneOut(d parityDivergence, want data.Dialect) bool {
 	var others []string
 	for _, dialect := range parityDialects {
 		if dialect == want {

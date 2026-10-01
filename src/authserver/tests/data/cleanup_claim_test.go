@@ -2,11 +2,11 @@ package datatests
 
 import (
 	"context"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
@@ -179,7 +179,7 @@ func TestTryClaimCleanupRun_ClaimBlocksTheNextInterval(t *testing.T) {
 // likely — so this detects a broken implementation probabilistically rather than
 // proving a correct one. Several rounds are run to raise that probability.
 func TestTryClaimCleanupRun_ConcurrentCallersProduceOneWinner(t *testing.T) {
-	if strings.Trim(appConfig.Database.Type, `"'`) == "sqlite" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so callers queue " +
 			"rather than contend; the test would pass without ever creating overlap")
 	}

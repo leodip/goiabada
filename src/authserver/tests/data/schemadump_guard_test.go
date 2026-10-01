@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,21 +25,21 @@ func TestSchemaDump_RefusesWhatItCannotRead(t *testing.T) {
 	// An unrecognised dialect. Every switch this package replaced fell through its default
 	// arm to SQLite, so in the generator's four-engine process a misspelling would have read
 	// SQLite's catalog against another engine's connection and reported success.
-	_, err := schemadump.DumpTable(context.Background(), h.SQL, schemadump.Dialect("postgresql"), "refresh_tokens")
+	_, err := schemadump.DumpTable(context.Background(), h.SQL, data.Dialect("postgresql"), "refresh_tokens")
 	assert.ErrorContains(t, err, "unrecognised database dialect",
 		"an unrecognised dialect must be refused, not treated as SQLite")
-	_, err = schemadump.Tables(context.Background(), h.SQL, schemadump.Dialect(""))
+	_, err = schemadump.Tables(context.Background(), h.SQL, data.Dialect(""))
 	assert.ErrorContains(t, err, "unrecognised database dialect",
 		"the zero Dialect selects no engine")
 
 	// A table that does not exist. Every catalog answers with an empty row set rather than
 	// an error, so this is the dumper's own guard and not the driver's.
-	_, err = schemadump.DumpTable(context.Background(), h.SQL, dumpDialect(t), "no_such_table")
+	_, err = schemadump.DumpTable(context.Background(), h.SQL, dbType(), "no_such_table")
 	assert.ErrorContains(t, err, "read no columns",
 		"a table with no columns is not something any of the four engines can produce")
 
 	// A name the package would have to interpolate into a catalog query.
-	_, err = schemadump.DumpTable(context.Background(), h.SQL, dumpDialect(t), "refresh_tokens; DROP TABLE codes")
+	_, err = schemadump.DumpTable(context.Background(), h.SQL, dbType(), "refresh_tokens; DROP TABLE codes")
 	assert.ErrorContains(t, err, "not a plain identifier")
 }
 
@@ -59,10 +60,10 @@ func TestSchemaDump_RefusesAnEmptyTableList(t *testing.T) {
 	_, err := h.SQL.Exec("DROP TABLE schema_migrations")
 	require.NoErrorf(t, err, "drop schema_migrations on %s", dbType())
 
-	_, err = schemadump.Tables(context.Background(), h.SQL, dumpDialect(t))
+	_, err = schemadump.Tables(context.Background(), h.SQL, dbType())
 	assert.ErrorContains(t, err, "reported no tables at all",
 		"an empty dump compared against an empty golden file reads as no change and passes")
-	_, err = schemadump.Dump(context.Background(), h.SQL, dumpDialect(t))
+	_, err = schemadump.Dump(context.Background(), h.SQL, dbType())
 	assert.ErrorContains(t, err, "reported no tables at all",
 		"Dump fails for the same reason Tables does, rather than returning an empty schema")
 }
@@ -88,7 +89,7 @@ type guardCase struct {
 //	--run TestSchemaDump_RefusesUnrepresentableConstructs
 func TestSchemaDump_RefusesUnrepresentableConstructs(t *testing.T) {
 	h := newIsolatedDB(t)
-	d := dumpDialect(t)
+	d := dbType()
 
 	for _, stmt := range []string{
 		"CREATE TABLE guard_parent1 (id BIGINT NOT NULL PRIMARY KEY)",
@@ -124,7 +125,7 @@ func TestSchemaDump_RefusesUnrepresentableConstructs(t *testing.T) {
 // syntax has it: MySQL has no filtered index, no INCLUDE columns and no DEFERRABLE, SQL
 // Server has no DEFERRABLE, and the unnamed-index case is MySQL's alone because it is the
 // only engine that invents a name for an index whose declaration gave none.
-func guardCasesFor(engine string) []guardCase {
+func guardCasesFor(engine data.Dialect) []guardCase {
 	composite := guardCase{
 		construct: "a composite foreign key",
 		ddl: []string{`CREATE TABLE guard_probe (a BIGINT NOT NULL, b BIGINT NOT NULL,
@@ -175,17 +176,17 @@ func guardCasesFor(engine string) []guardCase {
 	// that column.
 	method := guardCase{construct: "an index built with a non-default method"}
 	switch engine {
-	case "mysql":
+	case data.MySQL:
 		method.ddl = []string{
 			"CREATE TABLE guard_probe (a TEXT NOT NULL)",
 			"CREATE FULLTEXT INDEX idx_guard_probe ON guard_probe (a)",
 		}
-	case "postgres":
+	case data.Postgres:
 		method.ddl = []string{
 			"CREATE TABLE guard_probe (a bigint NOT NULL)",
 			"CREATE INDEX idx_guard_probe ON guard_probe USING hash (a)",
 		}
-	case "mssql":
+	case data.MSSQL:
 		method.ddl = []string{
 			"CREATE TABLE guard_probe (a BIGINT NOT NULL)",
 			"CREATE NONCLUSTERED COLUMNSTORE INDEX idx_guard_probe ON guard_probe (a)",
@@ -205,7 +206,7 @@ func guardCasesFor(engine string) []guardCase {
 	}
 
 	expression := guardCase{construct: "an expression (functional) index"}
-	if engine == "sqlite" {
+	if engine == data.SQLite {
 		expression.ddl = []string{
 			"CREATE TABLE guard_probe (a BIGINT NOT NULL)",
 			"CREATE INDEX idx_guard_probe ON guard_probe (a + 1)",
@@ -219,26 +220,26 @@ func guardCasesFor(engine string) []guardCase {
 
 	generated := guardCase{construct: "a generated (computed) column"}
 	switch engine {
-	case "mysql":
+	case data.MySQL:
 		generated.ddl = []string{"CREATE TABLE guard_probe (a BIGINT NOT NULL, g BIGINT AS (a + 1))"}
-	case "postgres":
+	case data.Postgres:
 		generated.ddl = []string{"CREATE TABLE guard_probe (a bigint NOT NULL, g bigint GENERATED ALWAYS AS (a + 1) STORED)"}
-	case "mssql":
+	case data.MSSQL:
 		generated.ddl = []string{"CREATE TABLE guard_probe (a BIGINT NOT NULL, g AS (a + 1))"}
 	default: // sqlite
 		generated.ddl = []string{"CREATE TABLE guard_probe (a BIGINT NOT NULL, g BIGINT GENERATED ALWAYS AS (a + 1) VIRTUAL)"}
 	}
 
 	switch engine {
-	case "mysql":
+	case data.MySQL:
 		return []guardCase{composite, check, generated, onUpdate, descending, expression, method, {
 			construct: "an index MySQL named for itself",
 			ddl:       []string{"CREATE TABLE guard_probe (a BIGINT NOT NULL, KEY (a))"},
 		}}
-	case "postgres":
+	case data.Postgres:
 		return []guardCase{composite, check, generated, onUpdate, descending, partial, include,
 			deferrable, expression, method, nullOrder}
-	case "mssql":
+	case data.MSSQL:
 		return []guardCase{composite, check, generated, onUpdate, descending, partial, include, method}
 	default: // sqlite
 		return []guardCase{composite, check, generated, onUpdate, descending, partial, deferrable, expression}

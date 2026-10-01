@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/datafactory"
@@ -32,7 +33,7 @@ const beforeLowercaseEmails000047 = datafactory.LowercaseEmailsVersion - 1
 // and invisible on every engine but SQL Server for two others.
 type lowercaseCase000047 struct {
 	raw    string
-	agrees map[string]bool // engine name -> does its LOWER() agree with Go on this address
+	agrees map[data.Dialect]bool // engine name -> does its LOWER() agree with Go on this address
 	why    string
 }
 
@@ -49,9 +50,9 @@ type lowercaseCase000047 struct {
 // rule in Go rather than in SQL. SQL Server leaves U+1E9E and U+212A alone at the collation
 // 000040 installs, which decision 17 had recorded as Unicode-aware and is not.
 func lowercaseCases000047() []lowercaseCase000047 {
-	all := map[string]bool{"sqlite": true, "mysql": true, "postgres": true, "mssql": true}
-	asciiOnly := map[string]bool{"sqlite": false, "mysql": true, "postgres": true, "mssql": true}
-	notMsSQL := map[string]bool{"sqlite": false, "mysql": true, "postgres": true, "mssql": false}
+	all := map[data.Dialect]bool{data.SQLite: true, data.MySQL: true, data.Postgres: true, data.MSSQL: true}
+	asciiOnly := map[data.Dialect]bool{data.SQLite: false, data.MySQL: true, data.Postgres: true, data.MSSQL: true}
+	notMsSQL := map[data.Dialect]bool{data.SQLite: false, data.MySQL: true, data.Postgres: true, data.MSSQL: false}
 
 	return []lowercaseCase000047{
 		{"Legacy.User@Example.COM", all,
@@ -69,14 +70,6 @@ func lowercaseCases000047() []lowercaseCase000047 {
 		{"Kelvin@x5.example.com", notMsSQL,
 			"the Kelvin sign, which Go folds to plain ASCII 'k'. Two engines leave it, and one of them is not the one anybody expected"},
 	}
-}
-
-// engineName000047 is the engine this run is against, spelled the way the case table keys it.
-func engineName000047() string {
-	if dbType() == "" {
-		return "sqlite"
-	}
-	return dbType()
 }
 
 // TestMigration000047_LowercaseEmails exercises the migration that replaced
@@ -106,7 +99,7 @@ func engineName000047() string {
 //	--run TestMigration000047_LowercaseEmails
 func TestMigration000047_LowercaseEmails(t *testing.T) {
 	h := newIsolatedDB(t)
-	engine := engineName000047()
+	engine := dbType()
 
 	// To head first, then back down, on migration_000034's pattern: the ORM writes every column
 	// the Go models carry, so seeding at an older version only works if the columns are there.
@@ -221,7 +214,7 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 	lower := seedUserEmail000047(t, h, 1, "collide@example.com")
 
 	err := datafactory.CheckEmailCaseBeforeMigrating(context.Background(), h.DB, beforeLowercaseEmails000047, datafactory.LowercaseEmailsVersion)
-	require.Errorf(t, err, "two addresses differing only by case must refuse the upgrade on %s", engineName000047())
+	require.Errorf(t, err, "two addresses differing only by case must refuse the upgrade on %s", dbType())
 	assert.Contains(t, err.Error(), fmt.Sprintf("users.id=%d", upper))
 	assert.Contains(t, err.Error(), fmt.Sprintf("users.id=%d", lower),
 		"both rows must be named: the operator has to decide which account keeps the address, and this server will not choose")
@@ -230,7 +223,7 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 	// failed migration rather than a tidier one.
 	assert.Errorf(t, h.Migrator.Migrate(context.Background(), datafactory.LowercaseEmailsVersion),
 		"lowercasing both rows onto one value must trip the UNIQUE idx_email on %s; if this passes, the unique index is not being enforced and the pre-flight is guarding nothing",
-		engineName000047())
+		dbType())
 }
 
 // seedUserEmail000047 stores raw verbatim and returns the row's id.
@@ -269,7 +262,7 @@ func assertEmailIndex000047(t *testing.T, h *isolatedDB, phase string) {
 	t.Helper()
 
 	shape := describeIndex(t, h, "users", "idx_email")
-	require.Truef(t, shape.Exists, "[%s] idx_email is missing on %s", phase, engineName000047())
+	require.Truef(t, shape.Exists, "[%s] idx_email is missing on %s", phase, dbType())
 	assert.Truef(t, shape.Unique,
 		"[%s] idx_email must still be UNIQUE: it is what makes an email case collision impossible to create, and this migration writes to the column it covers",
 		phase)
@@ -296,7 +289,7 @@ func assertEmailIndex000047(t *testing.T, h *isolatedDB, phase string) {
 // What is under test is the wiring rather than any engine's LOWER(), and the engines are
 // TestMigration000047_LowercaseEmails' business.
 func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
-	if engineName000047() != "sqlite" {
+	if dbType() != data.SQLite {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the wiring under test is engine-independent")
 	}
 

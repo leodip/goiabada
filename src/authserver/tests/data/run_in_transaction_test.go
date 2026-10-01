@@ -98,7 +98,7 @@ func TestRunInTransaction_ABodyThatReturnsAnErrorIsRolledBackAndTheErrorComesBac
 // SQLite skips: its pool has one connection, so the second transaction cannot open while the
 // first is held and there is no cycle to force, which is also why its classifier is always false.
 func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("SQLite's pool has one connection, so two transactions cannot overlap and nothing can deadlock")
 	}
 

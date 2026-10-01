@@ -1,4 +1,4 @@
-package data
+package data_test
 
 // The cross-engine parity comparison (#284, seam 3): a pure function over four parsed golden
 // files that says whether the four supported engines build the same schema.
@@ -39,14 +39,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 )
 
 // parityDialects is every engine the comparison requires, in the order failure messages
 // print them. Three engines agreeing is not parity, so a dump missing from the input is
 // refused rather than compared.
-var parityDialects = []schemadump.Dialect{
-	schemadump.SQLite, schemadump.MySQL, schemadump.Postgres, schemadump.MSSQL,
+var parityDialects = []data.Dialect{
+	data.SQLite, data.MySQL, data.Postgres, data.MSSQL,
 }
 
 // ---------------------------------------------------------------------------
@@ -144,8 +145,8 @@ const (
 // writes. SQLite reports the declared type verbatim, which is why its half carries three
 // ways of writing a boolean and two ways of writing an integer: the migrations wrote them
 // that way, and folding them together here would hide it.
-var parityTypes = map[schemadump.Dialect]map[string]parityTypeRule{
-	schemadump.SQLite: {
+var parityTypes = map[data.Dialect]map[string]parityTypeRule{
+	data.SQLite: {
 		"text": {family: parityString, bound: parityBoundUndeclared},
 		// There is deliberately no "longtext" here, and adding one would undo a fix.
 		// SQLite has no such type: it accepts any type name and assigns affinity by
@@ -166,7 +167,7 @@ var parityTypes = map[schemadump.Dialect]map[string]parityTypeRule{
 		"numeric":  {family: parityNumeric},
 		"datetime": {family: parityDatetime, precision: parityPrecisionUndeclared, arg: parityArgPrecision},
 	},
-	schemadump.MySQL: {
+	data.MySQL: {
 		"varchar": {family: parityString, arg: parityArgLength},
 		"char":    {family: parityString, arg: parityArgLength},
 		// MySQL has no unbounded string. longtext is its largest at 4 GiB, which is what
@@ -192,7 +193,7 @@ var parityTypes = map[schemadump.Dialect]map[string]parityTypeRule{
 		"timestamp": {family: parityDatetime, precision: 0, arg: parityArgPrecision},
 		"decimal":   {family: parityNumeric},
 	},
-	schemadump.Postgres: {
+	data.Postgres: {
 		"character varying": {family: parityString, bound: parityBoundUnbounded, arg: parityArgLength},
 		"character":         {family: parityString, arg: parityArgLength},
 		"text":              {family: parityString, bound: parityBoundUnbounded},
@@ -207,7 +208,7 @@ var parityTypes = map[schemadump.Dialect]map[string]parityTypeRule{
 		"timestamp without time zone": {family: parityDatetime, precision: 6, arg: parityArgPrecision},
 		"numeric":                     {family: parityNumeric},
 	},
-	schemadump.MSSQL: {
+	data.MSSQL: {
 		"nvarchar":  {family: parityString, arg: parityArgLength},
 		"varchar":   {family: parityString, arg: parityArgLength},
 		"nchar":     {family: parityString, arg: parityArgLength},
@@ -240,9 +241,9 @@ func splitTypeSpelling(s string) (name, arg string) {
 }
 
 // canonicalType maps one engine's spelling onto the common vocabulary.
-func canonicalType(d schemadump.Dialect, spelling string) (parityType, error) {
+func canonicalType(d data.Dialect, spelling string) (parityType, error) {
 	name, arg := splitTypeSpelling(spelling)
-	if d == schemadump.MySQL && name == "tinyint" && arg == "1" {
+	if d == data.MySQL && name == "tinyint" && arg == "1" {
 		return parityType{Family: parityBool}, nil
 	}
 	rule, ok := parityTypes[d][name]
@@ -296,7 +297,7 @@ var parityCollations = map[string]string{
 // is the only place it decides anything. SQLite reports BINARY for every column including
 // its integers and blobs, where the other three report nothing at all, and comparing that
 // would produce a rule excusing two hundred columns for a property none of them has.
-func canonicalCollation(d schemadump.Dialect, raw string, family string) (string, error) {
+func canonicalCollation(d data.Dialect, raw string, family string) (string, error) {
 	if family != parityString || raw == "" {
 		return "", nil
 	}
@@ -346,7 +347,7 @@ func (d parityDefault) String() string {
 //   - The boolean keywords become the digits the other three write, PostgreSQL being the
 //     only engine that renders a boolean default as false rather than 0. Only where the
 //     value was not quoted: 'false' is a five-character string and stays one.
-func canonicalDefault(d schemadump.Dialect, raw string, has bool) parityDefault {
+func canonicalDefault(d data.Dialect, raw string, has bool) parityDefault {
 	if !has {
 		return parityDefault{}
 	}
@@ -355,9 +356,9 @@ func canonicalDefault(d schemadump.Dialect, raw string, has bool) parityDefault 
 		return parityDefault{Present: true, Value: ""}
 	}
 	switch d {
-	case schemadump.MSSQL:
+	case data.MSSQL:
 		v = stripOuterParens(v)
-	case schemadump.Postgres:
+	case data.Postgres:
 		v = stripTrailingCast(v)
 	}
 	if strings.EqualFold(v, "null") {
@@ -446,7 +447,7 @@ type parityDivergence struct {
 	Table  string
 	Object string // the column, index or foreign key; empty for the table itself
 	Axis   string
-	Says   map[schemadump.Dialect]string
+	Says   map[data.Dialect]string
 }
 
 // The axes, named here so a rule's predicate and the comparison cannot drift apart by a
@@ -599,7 +600,7 @@ func applyAllowlist(divergences []parityDivergence, rules []parityRule) (results
 // checkParity is the whole check: it reports one line per problem, and nothing at all when
 // the four engines describe one schema modulo the allowlist. Pure, so the real four-engine
 // case is one input to it rather than the only one.
-func checkParity(dumps map[schemadump.Dialect]schemadump.Schema, rules []parityRule) []string {
+func checkParity(dumps map[data.Dialect]schemadump.Schema, rules []parityRule) []string {
 	var missing []string
 	for _, d := range parityDialects {
 		if len(dumps[d]) == 0 {
@@ -631,11 +632,11 @@ func checkParity(dumps map[schemadump.Dialect]schemadump.Schema, rules []parityR
 // A table missing on an engine stops there rather than reporting every column, index and
 // foreign key it holds as missing too: one line saying the table is absent is the finding,
 // and thirty lines saying its columns are absent bury it.
-func compareDumps(dumps map[schemadump.Dialect]schemadump.Schema) []parityDivergence {
+func compareDumps(dumps map[data.Dialect]schemadump.Schema) []parityDivergence {
 	var out []parityDivergence
 	for _, table := range unionOfTables(dumps) {
-		shapes := map[schemadump.Dialect]schemadump.TableShape{}
-		says := map[schemadump.Dialect]string{}
+		shapes := map[data.Dialect]schemadump.TableShape{}
+		says := map[data.Dialect]string{}
 		complete := true
 		for _, d := range parityDialects {
 			shape, ok := dumps[d].Table(table)
@@ -660,7 +661,7 @@ func presence(ok bool) string {
 	return "absent"
 }
 
-func unionOfTables(dumps map[schemadump.Dialect]schemadump.Schema) []string {
+func unionOfTables(dumps map[data.Dialect]schemadump.Schema) []string {
 	seen := map[string]bool{}
 	for _, d := range parityDialects {
 		for _, entry := range dumps[d] {
@@ -686,7 +687,7 @@ func sortedKeys(m map[string]bool) []string {
 // engine that names a default at all, so comparing it would report all sixty-four of them as
 // divergent and say nothing. It is compared where it means something, which is the per-engine
 // assertion against that engine's own golden file.
-func compareColumns(table string, shapes map[schemadump.Dialect]schemadump.TableShape) []parityDivergence {
+func compareColumns(table string, shapes map[data.Dialect]schemadump.TableShape) []parityDivergence {
 	var out []parityDivergence
 
 	names := map[string]bool{}
@@ -697,8 +698,8 @@ func compareColumns(table string, shapes map[schemadump.Dialect]schemadump.Table
 	}
 
 	for _, name := range sortedKeys(names) {
-		columns := map[schemadump.Dialect]schemadump.ColumnShape{}
-		says := map[schemadump.Dialect]string{}
+		columns := map[data.Dialect]schemadump.ColumnShape{}
+		says := map[data.Dialect]string{}
 		complete := true
 		for _, d := range parityDialects {
 			c, ok := shapes[d].Column(name)
@@ -710,8 +711,8 @@ func compareColumns(table string, shapes map[schemadump.Dialect]schemadump.Table
 			continue
 		}
 
-		types := map[schemadump.Dialect]parityType{}
-		collations := map[schemadump.Dialect]string{}
+		types := map[data.Dialect]parityType{}
+		collations := map[data.Dialect]string{}
 		readable := true
 		for _, d := range parityDialects {
 			t, err := canonicalType(d, columns[d].Type)
@@ -732,25 +733,25 @@ func compareColumns(table string, shapes map[schemadump.Dialect]schemadump.Table
 			continue
 		}
 
-		out = appendIfDisagreed(out, table, name, parityAxisType, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, name, parityAxisType, func(d data.Dialect) string {
 			return types[d].String()
 		})
-		out = appendIfDisagreed(out, table, name, parityAxisCollation, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, name, parityAxisCollation, func(d data.Dialect) string {
 			if collations[d] == "" {
 				return "no collation"
 			}
 			return collations[d]
 		})
-		out = appendIfDisagreed(out, table, name, parityAxisNullable, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, name, parityAxisNullable, func(d data.Dialect) string {
 			if columns[d].Nullable {
 				return "nullable"
 			}
 			return "not null"
 		})
-		out = appendIfDisagreed(out, table, name, parityAxisDefault, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, name, parityAxisDefault, func(d data.Dialect) string {
 			return canonicalDefault(d, columns[d].Default, columns[d].HasDefault).String()
 		})
-		out = appendIfDisagreed(out, table, name, parityAxisGenerated, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, name, parityAxisGenerated, func(d data.Dialect) string {
 			if columns[d].Generated {
 				return "generated"
 			}
@@ -760,8 +761,8 @@ func compareColumns(table string, shapes map[schemadump.Dialect]schemadump.Table
 	return out
 }
 
-func vocabulary(table, object string, d schemadump.Dialect, err error) parityDivergence {
-	says := map[schemadump.Dialect]string{}
+func vocabulary(table, object string, d data.Dialect, err error) parityDivergence {
+	says := map[data.Dialect]string{}
 	for _, other := range parityDialects {
 		says[other] = "-"
 	}
@@ -771,7 +772,7 @@ func vocabulary(table, object string, d schemadump.Dialect, err error) parityDiv
 
 // appendIfDisagreed records one divergence when the four engines do not all say the same
 // thing on one axis, and nothing when they do.
-func appendIfDisagreed(out []parityDivergence, table, object, axis string, say func(schemadump.Dialect) string) []parityDivergence {
+func appendIfDisagreed(out []parityDivergence, table, object, axis string, say func(data.Dialect) string) []parityDivergence {
 	return appendIfDisagreedAmong(out, table, object, axis, parityDialects, say)
 }
 
@@ -785,8 +786,8 @@ func appendIfDisagreed(out []parityDivergence, table, object, axis string, say f
 //
 // Fewer than two engines needs no guard of its own: one engine agrees with itself and none
 // agree vacuously, so both fall out of the loop reporting nothing, which is the answer.
-func appendIfDisagreedAmong(out []parityDivergence, table, object, axis string, among []schemadump.Dialect, say func(schemadump.Dialect) string) []parityDivergence {
-	says := map[schemadump.Dialect]string{}
+func appendIfDisagreedAmong(out []parityDivergence, table, object, axis string, among []data.Dialect, say func(data.Dialect) string) []parityDivergence {
+	says := map[data.Dialect]string{}
 	for _, d := range parityDialects {
 		says[d] = "-"
 	}
@@ -817,8 +818,8 @@ func appendIfDisagreedAmong(out []parityDivergence, table, object, axis string, 
 // meant one engine-named index in the set switched the comparison off for the engines whose
 // names did come from a migration, so the misspelling it exists to catch shipped whenever it
 // landed on a key any engine happened to declare inline (#284).
-func compareIndexes(table string, shapes map[schemadump.Dialect]schemadump.TableShape) []parityDivergence {
-	byKey := map[schemadump.Dialect]map[string][]schemadump.IndexShape{}
+func compareIndexes(table string, shapes map[data.Dialect]schemadump.TableShape) []parityDivergence {
+	byKey := map[data.Dialect]map[string][]schemadump.IndexShape{}
 	keys := map[string]bool{}
 	for _, d := range parityDialects {
 		byKey[d] = map[string][]schemadump.IndexShape{}
@@ -832,7 +833,7 @@ func compareIndexes(table string, shapes map[schemadump.Dialect]schemadump.Table
 	var out []parityDivergence
 	for _, key := range sortedKeys(keys) {
 		before := len(out)
-		out = appendIfDisagreed(out, table, key, parityAxisIndex, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, key, parityAxisIndex, func(d data.Dialect) string {
 			switch n := len(byKey[d][key]); n {
 			case 0:
 				return "absent"
@@ -859,7 +860,7 @@ func compareIndexes(table string, shapes map[schemadump.Dialect]schemadump.Table
 		// the set, where the loop below would find nothing to disagree with and let it
 		// in. The presence comparison above has already returned for that case, so it
 		// costs nothing and stops the two coming apart.
-		migrationNamed := make([]schemadump.Dialect, 0, len(parityDialects))
+		migrationNamed := make([]data.Dialect, 0, len(parityDialects))
 		for _, d := range parityDialects {
 			named := len(byKey[d][key]) > 0
 			for _, ix := range byKey[d][key] {
@@ -869,7 +870,7 @@ func compareIndexes(table string, shapes map[schemadump.Dialect]schemadump.Table
 				migrationNamed = append(migrationNamed, d)
 			}
 		}
-		out = appendIfDisagreedAmong(out, table, key, parityAxisIndexName, migrationNamed, func(d schemadump.Dialect) string {
+		out = appendIfDisagreedAmong(out, table, key, parityAxisIndexName, migrationNamed, func(d data.Dialect) string {
 			names := make([]string, 0, len(byKey[d][key]))
 			for _, ix := range byKey[d][key] {
 				names = append(names, ix.Name)
@@ -894,8 +895,8 @@ func indexKey(ix schemadump.IndexShape) string {
 // compareForeignKeys keys a foreign key by the tuple every catalog reports, which is what
 // the dumper already does and for the same reason: SQLite's PRAGMA foreign_key_list omits
 // the constraint name even when the table declares one.
-func compareForeignKeys(table string, shapes map[schemadump.Dialect]schemadump.TableShape) []parityDivergence {
-	byKey := map[schemadump.Dialect]map[string]schemadump.ForeignKeyShape{}
+func compareForeignKeys(table string, shapes map[data.Dialect]schemadump.TableShape) []parityDivergence {
+	byKey := map[data.Dialect]map[string]schemadump.ForeignKeyShape{}
 	keys := map[string]bool{}
 	for _, d := range parityDialects {
 		byKey[d] = map[string]schemadump.ForeignKeyShape{}
@@ -909,14 +910,14 @@ func compareForeignKeys(table string, shapes map[schemadump.Dialect]schemadump.T
 	var out []parityDivergence
 	for _, key := range sortedKeys(keys) {
 		before := len(out)
-		out = appendIfDisagreed(out, table, key, parityAxisForeignKey, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, key, parityAxisForeignKey, func(d data.Dialect) string {
 			_, ok := byKey[d][key]
 			return presence(ok)
 		})
 		if len(out) != before {
 			continue
 		}
-		out = appendIfDisagreed(out, table, key, parityAxisOnDelete, func(d schemadump.Dialect) string {
+		out = appendIfDisagreed(out, table, key, parityAxisOnDelete, func(d data.Dialect) string {
 			return byKey[d][key].OnDelete
 		})
 	}

@@ -15,9 +15,7 @@ package datafactory
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -48,46 +46,51 @@ type MigratorProvider interface {
 // being brought to head first, which is what NewDatabase does and what makes NewDatabase useless
 // for a rollback. Every other caller wants NewDatabase (#268).
 func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (data.Database, error) {
-	// Remove leading and trailing single or double quotes from dbType
-	dbType := strings.Trim(dbConfig.Type, "\"'")
+	// The parse comes before the record, so a refused type writes only its refusal and never an
+	// opening record naming an engine nothing opened (#438 decision 6).
+	dialect, err := data.ParseDialect(dbConfig.Type)
+	if err != nil {
+		return nil, err
+	}
 
 	// One record for the whole choice. This used to write "db type is x" here and "creating x
 	// database" in the arm, and each engine's constructor then wrote "using database x" a line
 	// later: three records saying the same thing, none of them structured (#320).
-	slog.Info("opening the database", "type", dbType)
+	slog.Info("opening the database", "type", string(dialect))
 
 	// Each arm takes the constructor's two results into a local pair and returns nil on the error
 	// path rather than returning the call directly: all four constructors answer a typed nil
 	// pointer beside their error, and returning that straight out would put a non-nil
 	// data.Database over it, so an `if database == nil` at a caller would read false (#353).
-	switch dbType {
-	case "mysql":
+	switch dialect {
+	case data.MySQL:
 		database, err := mysqldb.NewMySQLDatabase(mysqlConfig(dbConfig), logSQL)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
-	case "sqlite":
+	case data.SQLite:
 		database, err := sqlitedb.NewSQLiteDatabase(sqliteConfig(dbConfig), logSQL)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
-	case "postgres":
+	case data.Postgres:
 		database, err := postgresdb.NewPostgresDatabase(postgresConfig(dbConfig), logSQL)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
-	case "mssql":
+	case data.MSSQL:
 		database, err := mssqldb.NewMsSQLDatabase(mssqlConfig(dbConfig), logSQL)
 		if err != nil {
 			return nil, err
 		}
 		return database, nil
 	default:
-		msg := fmt.Sprintf("unsupported database type: %s (string length %d). supported types are: mysql, sqlite, postgres, mssql", dbType, len(dbType))
-		return nil, errs.New(msg)
+		// Unreachable: ParseDialect answers one of the four or refuses. It names the dialect rather
+		// than falling through, so a fifth constant added there without an arm here fails loudly.
+		return nil, errs.Errorf("no engine for database dialect %q", dialect)
 	}
 }
 

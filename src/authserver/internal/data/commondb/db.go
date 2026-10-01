@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -47,7 +48,7 @@ type CommonDatabase struct {
 	// handle built directly on this type gets by default rather than by remembering to opt out.
 	//
 	// WrapSQLError is the only consumer: a classified failure leaves the data layer carrying
-	// ErrUniqueViolation, so no caller above it ever sees a driver number or a driver sentence
+	// data.ErrUniqueViolation, so no caller above it ever sees a driver number or a driver sentence
 	// (#279).
 	IsUniqueViolation func(error) bool
 
@@ -319,7 +320,7 @@ func (d *CommonDatabase) uniqueViolation(err error) bool {
 }
 
 // WrapSQLError wraps a failure the driver reported with msg, tagging a unique-key violation with
-// the ErrUniqueViolation sentinel first. Nil in, nil out.
+// the data.ErrUniqueViolation sentinel first. Nil in, nil out.
 //
 // It is the one place a driver's dialect-specific refusal becomes something the rest of the tree
 // can match: above this, a caller asks errors.Is(err, data.ErrUniqueViolation) and never a number,
@@ -341,7 +342,7 @@ func (d *CommonDatabase) WrapSQLError(err error, msg string) error {
 		return nil
 	}
 	if d.uniqueViolation(err) {
-		return errs.Wrap(errs.Errorf("%w: %w", ErrUniqueViolation, err), msg)
+		return errs.Wrap(errs.Errorf("%w: %w", data.ErrUniqueViolation, err), msg)
 	}
 	return errs.Wrap(err, msg)
 }

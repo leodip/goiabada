@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -61,23 +62,20 @@ func assertRefreshTokenFamilyRevocationsShape(t *testing.T, h *isolatedDB, when 
 
 	// The pin each engine's catalog reports for a string column: MySQL and SQL Server spell the
 	// case-sensitive collation; PostgreSQL and SQLite compare byte-wise by default and report it.
-	stringCollation := map[string]string{
-		"mysql":    "utf8mb4_0900_as_cs",
-		"mssql":    "Latin1_General_100_CS_AS_KS_WS_SC_UTF8",
-		"postgres": "default",
-		"sqlite":   "BINARY",
+	stringCollation := map[data.Dialect]string{
+		data.MySQL:    "utf8mb4_0900_as_cs",
+		data.MSSQL:    "Latin1_General_100_CS_AS_KS_WS_SC_UTF8",
+		data.Postgres: "default",
+		data.SQLite:   "BINARY",
 	}
 	// Both string columns are 64 wide, the width refresh_tokens.first_refresh_token_jti has.
-	stringType := map[string]string{
-		"mysql": "varchar(64)", "postgres": "character varying(64)", "mssql": "nvarchar(64)", "sqlite": "TEXT",
+	stringType := map[data.Dialect]string{
+		data.MySQL: "varchar(64)", data.Postgres: "character varying(64)", data.MSSQL: "nvarchar(64)", data.SQLite: "TEXT",
 	}
-	revokedAtType := map[string]string{
-		"mysql": "datetime(6)", "postgres": "timestamp(6) without time zone", "mssql": "datetime2(6)", "sqlite": "DATETIME",
+	revokedAtType := map[data.Dialect]string{
+		data.MySQL: "datetime(6)", data.Postgres: "timestamp(6) without time zone", data.MSSQL: "datetime2(6)", data.SQLite: "DATETIME",
 	}
 	engine := dbType()
-	if engine == "" {
-		engine = "sqlite"
-	}
 
 	shape := dumpTable(t, h, "refresh_token_family_revocations")
 

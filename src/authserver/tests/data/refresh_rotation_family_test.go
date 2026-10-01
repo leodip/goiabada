@@ -295,7 +295,7 @@ func startRotation(t *testing.T, ctx context.Context, f *family, pause *pausingI
 // cases below run on every engine, SQLite included.
 func skipWhereTransactionsCannotOverlap(t *testing.T) {
 	t.Helper()
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("SQLite's pool has one connection, so a rotation and a revocation cannot overlap in a deployment; the sequential cases cover it")
 	}
 }

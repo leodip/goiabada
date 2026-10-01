@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ import (
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigrationDowns
 func TestMigrationDowns_DropOnlyTheirOwnDefaultConstraints(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s drops a column with its default attached, so no down there discovers a constraint by catalog lookup", dbType())
 	}
 

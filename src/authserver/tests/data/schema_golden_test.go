@@ -28,15 +28,15 @@ func TestSchemaGolden_MatchesTheCommittedFile(t *testing.T) {
 	h := newIsolatedDB(t)
 	require.NoError(t, h.Migrator.Up(context.Background()), "migrate the isolated database to head on %s", dbType())
 
-	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dumpDialect(t))
+	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dbType())
 	require.NoErrorf(t, err, "read the migration version of the freshly migrated %s database", dbType())
 
 	encoded, err := schemadump.Encode(schemadump.Golden{
-		Dialect: dumpDialect(t), Migrated: migrated, Schema: dumpSchema(t, h),
+		Dialect: dbType(), Migrated: migrated, Schema: dumpSchema(t, h),
 	})
 	require.NoErrorf(t, err, "encode the %s dump", dbType())
 
-	path, err := schemadump.GoldenPath(dumpDialect(t))
+	path, err := schemadump.GoldenPath(dbType())
 	require.NoErrorf(t, err, "locate the %s golden file", dbType())
 	committed, err := os.ReadFile(path)
 	require.NoErrorf(t, err, "read the committed golden file at %s", path)
@@ -60,14 +60,14 @@ func TestSchemaGolden_MatchesTheCommittedFile(t *testing.T) {
 // that quietly stopped including it would still compare equal to a golden file generated
 // from the same mistake.
 func TestSchemaGolden_CommittedFileParses(t *testing.T) {
-	path, err := schemadump.GoldenPath(dumpDialect(t))
+	path, err := schemadump.GoldenPath(dbType())
 	require.NoErrorf(t, err, "locate the %s golden file", dbType())
 	committed, err := os.ReadFile(path)
 	require.NoErrorf(t, err, "read the committed golden file at %s", path)
 
 	g, err := schemadump.Parse(committed)
 	require.NoErrorf(t, err, "parse the committed golden file at %s", path)
-	assert.Equal(t, dumpDialect(t), g.Dialect, "%s names the engine it describes", path)
+	assert.Equal(t, dbType(), g.Dialect, "%s names the engine it describes", path)
 
 	_, ok := g.Schema.Table("schema_migrations")
 	assert.Truef(t, ok, "%s records schema_migrations, which #284 decision 7 dumps like any other table", path)
@@ -81,7 +81,7 @@ func TestSchemaGolden_CommittedFileParses(t *testing.T) {
 	// asserted per engine and never across them.
 	h := newIsolatedDB(t)
 	require.NoError(t, h.Migrator.Up(context.Background()), "migrate the isolated database to head on %s", dbType())
-	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dumpDialect(t))
+	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dbType())
 	require.NoErrorf(t, err, "read the migration version of the freshly migrated %s database", dbType())
 	assert.Equalf(t, migrated, g.Migrated,
 		"%s records migration version %d, but %s migrates to %d. Regenerate all four with:\n"+

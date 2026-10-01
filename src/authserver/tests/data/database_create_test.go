@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -44,14 +45,14 @@ import (
 // "already exists" tolerance does not match, so the server would not start. The production
 // checklist's "don't use root/admin accounts" was advice a PostgreSQL reader could not follow.
 func TestNewDatabase_CreateFalse_StartsUnderALeastPrivilegeLogin(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite has no login and no create statement, so there is nothing to restrict")
 	}
 
 	r := newRestrictedLoginDB(t)
 	db, sqlDB := r.constructRestricted(t)
 
-	if dbType() == "mysql" {
+	if dbType() == data.MySQL {
 		// Read before anything else touches the server. MySQL cannot deny the maintenance DSN
 		// to a login it allows the application DSN to, so the privilege above proves nothing
 		// here and this counter is what does: one connection is the skipping path, two is a
@@ -80,7 +81,7 @@ func TestNewDatabase_CreateFalse_StartsUnderALeastPrivilegeLogin(t *testing.T) {
 // and NewPostgresDatabase used to return a usable-looking handle and a nil error, and the
 // failure surfaced later inside the migrator as somebody else's problem.
 func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite has no create statement to skip; an absent file is decided by the DSN's mode")
 	}
 
@@ -90,19 +91,19 @@ func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing
 	var err error
 	var wantText string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		_, err = mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
 			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		wantText = "Unknown database"
-	case "postgres":
+	case data.Postgres:
 		_, err = postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		wantText = "does not exist"
-	case "mssql":
+	case data.MSSQL:
 		_, err = mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
@@ -135,7 +136,7 @@ func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing
 // a database default, and every string column a future migration adds without spelling COLLATE
 // inherits it (#283 decision 4).
 func TestNewMsSQLDatabase_CreateTrue_LeavesAPreCreatedDatabaseAlone(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s has no database default collation an operator's CREATE DATABASE could fix in place", dbType())
 	}
 
@@ -207,13 +208,13 @@ func serverDatabaseExists(t *testing.T, name string) bool {
 
 	var dsn, driver, query string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?"
-	case "postgres":
+	case data.Postgres:
 		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM pg_database WHERE datname = $1"
-	case "mssql":
+	case data.MSSQL:
 		driver, dsn = "sqlserver", msSQLMasterDSN(cfg)
 		query = "SELECT COUNT(*) FROM sys.databases WHERE name = @p1"
 	default:
@@ -255,11 +256,11 @@ const concurrentConstructors = 8
 // migrator already takes for itself.
 func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t *testing.T) {
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		t.Skip("MySQL is immune structurally, not by luck: it serialises on the schema metadata lock and demotes the duplicate to Note 1007, which the driver never raises. 288 full sequences at 24-way concurrency, 0 failures (#293 decision 6)")
-	case "sqlite", "":
+	case data.SQLite, "":
 		t.Skip("SQLite has no create statement to race: the driver creates the file")
-	case "postgres", "mssql":
+	case data.Postgres, data.MSSQL:
 	default:
 		t.Fatalf("unsupported db type %q", dbType())
 	}
@@ -282,7 +283,7 @@ func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t 
 
 	require.True(t, serverDatabaseExists(t, name), "the winner must have created the database")
 
-	if dbType() == "mssql" {
+	if dbType() == data.MSSQL {
 		// The lock must not have cost the collation: a database Goiabada creates is created at
 		// the collation #283 pinned, whichever racer created it.
 		db, err := sql.Open("sqlserver", msSQLDatabaseDSN(cfg.Username, cfg.Password, name, cfg))
@@ -311,7 +312,7 @@ func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t 
 // SQL Server only. PostgreSQL compares pg_database.datname byte-exact, so there is no fold for a
 // name-derived key to disagree with, which is exactly why it keeps one.
 func TestNewMsSQLDatabase_CreateTrue_CaseVariantNamesRaceToOneDatabase(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s does not compare database names case-insensitively, so there are no case variants to collide", dbType())
 	}
 
@@ -386,7 +387,7 @@ func raceConstructors(t *testing.T, cfg *config.DatabaseConfig, names []string) 
 			defer wg.Done()
 			<-start
 			switch dbType() {
-			case "postgres":
+			case data.Postgres:
 				db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 					Type: "postgres", Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -395,7 +396,7 @@ func raceConstructors(t *testing.T, cfg *config.DatabaseConfig, names []string) 
 				if db != nil {
 					handles[i] = db.DB
 				}
-			case "mssql":
+			case data.MSSQL:
 				db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 					Type: "mssql", Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -443,11 +444,11 @@ func raceConstructors(t *testing.T, cfg *config.DatabaseConfig, names []string) 
 // through would buy this case at the cost of goal 1.
 func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryRestart(t *testing.T) {
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		t.Skip("MySQL takes no database-creation lock: CREATE DATABASE IF NOT EXISTS is serialised by the engine itself (#293 decision 6)")
-	case "sqlite", "":
+	case data.SQLite, "":
 		t.Skip("SQLite has no maintenance database, so there is no shared lock space and no lock")
-	case "postgres", "mssql":
+	case data.Postgres, data.MSSQL:
 	default:
 		t.Fatalf("unsupported db type %q", dbType())
 	}
@@ -496,7 +497,7 @@ func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryResta
 // test fails, and t.Fatalf off the test goroutine is undefined.
 func constructCreating(cfg *config.DatabaseConfig, name string) (io.Closer, error) {
 	switch dbType() {
-	case "postgres":
+	case data.Postgres:
 		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -505,7 +506,7 @@ func constructCreating(cfg *config.DatabaseConfig, name string) (io.Closer, erro
 			return nil, err
 		}
 		return db.DB, err
-	case "mssql":
+	case data.MSSQL:
 		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -536,9 +537,9 @@ func holdCreationLock(t *testing.T, cfg *config.DatabaseConfig, name string) {
 
 	var driver, dsn string
 	switch dbType() {
-	case "postgres":
+	case data.Postgres:
 		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
-	case "mssql":
+	case data.MSSQL:
 		driver, dsn = "sqlserver", msSQLMasterDSN(cfg)
 	default:
 		t.Fatalf("%s has no database-creation lock to hold", dbType())
@@ -550,10 +551,10 @@ func holdCreationLock(t *testing.T, cfg *config.DatabaseConfig, name string) {
 	require.NoError(t, err, "pin a connection for the creation lock")
 
 	switch dbType() {
-	case "postgres":
+	case data.Postgres:
 		_, err = conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", postgresdb.AdvisoryLockKey(name))
 		require.NoError(t, err, "take the advisory lock the creating path serialises on")
-	case "mssql":
+	case data.MSSQL:
 		const takeLock = `DECLARE @lockResult int;
 			EXEC @lockResult = sp_getapplock @Resource = @p1, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = -1;
 			SELECT @lockResult;`
@@ -565,9 +566,9 @@ func holdCreationLock(t *testing.T, cfg *config.DatabaseConfig, name string) {
 
 	t.Cleanup(func() {
 		switch dbType() {
-		case "postgres":
+		case data.Postgres:
 			_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", postgresdb.AdvisoryLockKey(name))
-		case "mssql":
+		case data.MSSQL:
 			_, _ = conn.ExecContext(ctx, `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`, mssqldb.CreateDatabaseResource)
 		}
 		_ = conn.Close()
@@ -583,13 +584,13 @@ func countServerDatabases(t *testing.T, name string) int {
 
 	var dsn, driver, query string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?"
-	case "postgres":
+	case data.Postgres:
 		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM pg_database WHERE datname = $1"
-	case "mssql":
+	case data.MSSQL:
 		driver, dsn = "sqlserver", msSQLMasterDSN(cfg)
 		query = "SELECT COUNT(*) FROM sys.databases WHERE name = @p1"
 	default:
@@ -610,11 +611,11 @@ func countServerDatabases(t *testing.T, name string) int {
 func dropServerDatabase(t *testing.T, cfg *config.DatabaseConfig, name string) {
 	t.Helper()
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		dropMySQL(t, cfg, name)
-	case "postgres":
+	case data.Postgres:
 		dropPostgres(t, cfg, name)
-	case "mssql":
+	case data.MSSQL:
 		dropMsSQL(t, cfg, name)
 	}
 }
@@ -649,7 +650,7 @@ func dropServerDatabase(t *testing.T, cfg *config.DatabaseConfig, name string) {
 //
 // SQLite is skipped: it has no create statement and no name, only a path.
 func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite has no database name, only a DSN path, so there is no identifier to quote")
 	}
 
@@ -669,7 +670,7 @@ func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing
 			var sqlDB *sql.DB
 			var currentDatabase string
 			switch dbType() {
-			case "mysql":
+			case data.MySQL:
 				db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
 					Type: "mysql", Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -677,7 +678,7 @@ func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing
 				require.NoErrorf(t, err, "NewMySQLDatabase at %s", name)
 				t.Cleanup(func() { _ = db.DB.Close(); dropMySQL(t, cfg, name) })
 				sqlDB, currentDatabase = db.DB, "SELECT DATABASE()"
-			case "postgres":
+			case data.Postgres:
 				db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 					Type: "postgres", Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -685,7 +686,7 @@ func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing
 				require.NoErrorf(t, err, "NewPostgresDatabase at %s", name)
 				t.Cleanup(func() { _ = db.DB.Close(); dropPostgres(t, cfg, name) })
 				sqlDB, currentDatabase = db.DB, "SELECT current_database()"
-			case "mssql":
+			case data.MSSQL:
 				db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 					Type: "mssql", Username: cfg.Username, Password: cfg.Password,
 					Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
@@ -730,13 +731,13 @@ func serverDatabasesMatchingFold(t *testing.T, name string) int {
 
 	var dsn, driver, query string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		driver, dsn = "mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE LOWER(SCHEMA_NAME) = LOWER(?)"
-	case "postgres":
+	case data.Postgres:
 		driver, dsn = "pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg)
 		query = "SELECT COUNT(*) FROM pg_database WHERE LOWER(datname) = LOWER($1)"
-	case "mssql":
+	case data.MSSQL:
 		driver, dsn = "sqlserver", msSQLMasterDSN(cfg)
 		query = "SELECT COUNT(*) FROM sys.databases WHERE LOWER(name) = LOWER(@p1)"
 	default:

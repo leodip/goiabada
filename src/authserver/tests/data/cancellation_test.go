@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +69,7 @@ func TestRunInTransaction_WithACancelledContextNeverRunsTheBody(t *testing.T) {
 // connection, so there is nothing for a second open to block on and the case would measure
 // nothing at all there.
 func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T) {
-	if dbType() != "sqlite" && dbType() != "" {
+	if dbType() != data.SQLite {
 		t.Skip("the single-connection pool is SQLite's; on the other engines a second open has nothing to wait for")
 	}
 

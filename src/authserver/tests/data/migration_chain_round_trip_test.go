@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
@@ -101,11 +102,11 @@ func TestMigrationChain_EveryDownRestoresTheCatalog(t *testing.T) {
 func encodeCatalogAt(t *testing.T, h *isolatedDB, want int, when string) string {
 	t.Helper()
 
-	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dumpDialect(t))
+	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dbType())
 	require.NoErrorf(t, err, "read the recorded version %s at %06d on %s", when, want, dbType())
 
 	encoded, err := schemadump.Encode(schemadump.Golden{
-		Dialect: dumpDialect(t), Migrated: migrated, Schema: applicationTables(t, h, want),
+		Dialect: dbType(), Migrated: migrated, Schema: applicationTables(t, h, want),
 	})
 	require.NoErrorf(t, err, "encode the catalog %s at %06d on %s", when, want, dbType())
 	return string(encoded)
@@ -168,7 +169,7 @@ const collationPinnedFrom = 40
 // no per-column collation to inherit, and MySQL's 000040 repairs the database default and every
 // table with it.
 func maskCollation(version int) bool {
-	return dbType() == "mssql" && version < collationPinnedFrom
+	return dbType() == data.MSSQL && version < collationPinnedFrom
 }
 
 // assertUnmigratedCatalog holds the floor of the chain: rolling the first migration back leaves

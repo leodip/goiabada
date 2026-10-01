@@ -1,4 +1,4 @@
-package data
+package data_test
 
 // The one place the four committed migration directories are judged.
 //
@@ -18,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/require"
 )
@@ -124,7 +125,7 @@ func committedMigrationTree(t *testing.T) migrationTree {
 
 	tree := migrationTree{}
 	for _, dir := range dirs {
-		d := schemadump.Dialect(strings.TrimSuffix(filepath.Base(filepath.Dir(dir)), "db"))
+		d := data.Dialect(strings.TrimSuffix(filepath.Base(filepath.Dir(dir)), "db"))
 		entries, err := os.ReadDir(dir)
 		require.NoErrorf(t, err, "read %s", dir)
 
@@ -147,10 +148,10 @@ func committedMigrationTree(t *testing.T) migrationTree {
 // committedGoldenVersions reads the migration version out of each engine's committed
 // schema.golden, through the same Parse the dumper and the data tier use, so a header this
 // build cannot read is a failure here rather than a missing entry the rule reads as absent.
-func committedGoldenVersions(t *testing.T) map[schemadump.Dialect]int {
+func committedGoldenVersions(t *testing.T) map[data.Dialect]int {
 	t.Helper()
 
-	recorded := map[schemadump.Dialect]int{}
+	recorded := map[data.Dialect]int{}
 	for _, d := range migrationDialects {
 		path, err := schemadump.GoldenPath(d)
 		require.NoErrorf(t, err, "locate %s's golden file", d)

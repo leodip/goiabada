@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -228,15 +229,15 @@ func identify(t *testing.T, tx *sql.Tx) blocker {
 
 	var query string
 	switch dbType() {
-	case "postgres":
+	case data.Postgres:
 		query = "SELECT pg_backend_pid()"
-	case "mysql":
+	case data.MySQL:
 		query = "SELECT ENGINE_TRANSACTION_ID FROM performance_schema.data_locks WHERE THREAD_ID = " +
 			"(SELECT THREAD_ID FROM performance_schema.threads WHERE PROCESSLIST_ID = CONNECTION_ID()) LIMIT 1"
-	case "mssql":
+	case data.MSSQL:
 		query = "SELECT @@SPID"
 	default:
-		// SQLite, and the empty GOIABADA_DB_TYPE the tier falls back to. See the header.
+		// SQLite. See the header.
 		return blocker{}
 	}
 
@@ -283,16 +284,16 @@ func waitersBehind(b blocker) (int, error) {
 
 	var query string
 	switch dbType() {
-	case "postgres":
+	case data.Postgres:
 		// pg_blocking_pids(pid) lists the backends holding what pid is waiting for. A row-lock
 		// wait and a table-level wait both appear.
 		query = "SELECT count(*) FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))"
-	case "mysql":
+	case data.MySQL:
 		// InnoDB publishes each blocked request against the lock blocking it. Populated
 		// directly from the storage engine, so no instrument has to be enabled for it. Matched
 		// by transaction id, not thread id: see identify.
 		query = "SELECT count(*) FROM performance_schema.data_lock_waits WHERE BLOCKING_ENGINE_TRANSACTION_ID = ?"
-	case "mssql":
+	case data.MSSQL:
 		// blocking_session_id is set on a request queued behind an incompatible lock held by
 		// that session, which is exactly the state a blocked party is in.
 		query = "SELECT count(*) FROM sys.dm_exec_requests WHERE blocking_session_id = @p1"

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -55,7 +56,7 @@ const goldenVersion = 3
 // that silently ignores a header field it was not asked for is how an older file gets
 // compared against a newer one.
 type Golden struct {
-	Dialect  Dialect
+	Dialect  data.Dialect
 	Migrated int
 	Schema   Schema
 }
@@ -109,7 +110,7 @@ func maskedDefaultName(c ColumnShape) string {
 // columns are not.
 func Encode(g Golden) ([]byte, error) {
 	d, schema := g.Dialect, g.Schema
-	if !d.valid() {
+	if !valid(d) {
 		return nil, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	if len(schema) == 0 {
@@ -300,7 +301,7 @@ func Parse(b []byte) (Golden, error) {
 // missing one is refused rather than read with a zero in its place, which is the failure
 // goldenVersion's own comment describes and which migrated= would be the easiest field to
 // suffer it, zero being a value the version rule could otherwise compare.
-func parseHeader(text string) (Dialect, int, error) {
+func parseHeader(text string) (data.Dialect, int, error) {
 	fields := strings.Split(text, "\t")
 	var version, engine string
 	migrated := ""
@@ -317,8 +318,8 @@ func parseHeader(text string) (Dialect, int, error) {
 	if version != strconv.Itoa(goldenVersion) {
 		return "", 0, errs.Errorf("golden file format version %q, but this build writes and reads version %d", version, goldenVersion)
 	}
-	d := Dialect(engine)
-	if !d.valid() {
+	d := data.Dialect(engine)
+	if !valid(d) {
 		return "", 0, errs.Errorf("golden file names engine %q, which is none of the four dialects", engine)
 	}
 	if migrated == "" {
@@ -498,8 +499,8 @@ func firstError(errs ...error) error {
 // simply absent, so the ascent identifies the root by requiring every module to be under it.
 // core/testutil.sourceRoot does the same walk for the gofmt guard; it is not shared because
 // that one takes a *testing.T and fails a test, and this one has to answer a command.
-func GoldenPath(d Dialect) (string, error) {
-	if !d.valid() {
+func GoldenPath(d data.Dialect) (string, error) {
+	if !valid(d) {
 		return "", errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
 	root, err := SourceRoot()

@@ -174,7 +174,9 @@ func dispatchRecord(t *testing.T, capture *logtest.SlogCapture) logtest.Captured
 }
 
 // TestOpenDatabase_Dispatch is seam 1: which engine each configured name reaches, what Create
-// does to the connection ordering inside that engine, the quote trim, and the refusal.
+// does to the connection ordering inside that engine, and that the configured type reaches
+// data.ParseDialect: one quoted row accepted, one refusal. Every other input to the parse is
+// data.ParseDialect's own table (#438 decision 6).
 //
 // Every engine is observed through Goiabada's own errs.Wrap prefix and never through driver text.
 // pgx leaking `user=u database=x` and go-sql-driver leaking `dial tcp 127.0.0.1:1` would be
@@ -190,9 +192,9 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  func(t *testing.T) *config.DatabaseConfig
-		// wantType is the value of the dispatch record's type attribute, which is the requested
-		// type after the trim and never the engine reached.
-		wantType string
+		// wantType is the value of the dispatch record's type attribute, which is the parsed
+		// dialect and never the engine reached. Empty for the refusal, which writes no record.
+		wantType data.Dialect
 		// wantErr is the whole error for the refusal and the errs.Wrap prefix for a failed open;
 		// empty means the open must succeed.
 		wantErr string
@@ -202,42 +204,42 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 		{
 			name:     "mysql opens the configured database when Create is off",
 			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("mysql", false) },
-			wantType: "mysql",
+			wantType: data.MySQL,
 			wantErr:  "unable to connect to database",
 			why:      "the only connection attempted is the configured one",
 		},
 		{
 			name:     "mysql creates before connecting when Create is on",
 			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("mysql", true) },
-			wantType: "mysql",
+			wantType: data.MySQL,
 			wantErr:  "unable to create database",
 			why:      "Create reached mysqldb, which issues its CREATE DATABASE before opening the configured one",
 		},
 		{
 			name:     "postgres opens the configured database when Create is off",
 			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("postgres", false) },
-			wantType: "postgres",
+			wantType: data.Postgres,
 			wantErr:  "unable to connect to database",
 			why:      "no maintenance connection is opened, so the configured database is the only one attempted",
 		},
 		{
 			name:     "postgres asks the maintenance database first when Create is on",
 			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("postgres", true) },
-			wantType: "postgres",
+			wantType: data.Postgres,
 			wantErr:  "unable to check whether the database exists",
 			why:      "Create reached postgresdb, which connects to the postgres database to ask before it creates anything",
 		},
 		{
 			name:     "mssql opens the configured database when Create is off",
 			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("mssql", false) },
-			wantType: "mssql",
+			wantType: data.MSSQL,
 			wantErr:  "unable to connect to database",
 			why:      "master is left alone, so the configured database is the only one attempted",
 		},
 		{
 			name:     "mssql connects to master first when Create is on",
 			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("mssql", true) },
-			wantType: "mssql",
+			wantType: data.MSSQL,
 			wantErr:  "unable to connect to master database",
 			why:      "Create reached mssqldb, which takes master before it creates anything",
 		},
@@ -246,7 +248,7 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 			cfg: func(t *testing.T) *config.DatabaseConfig {
 				return &config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "off.db")}
 			},
-			wantType: "sqlite",
+			wantType: data.SQLite,
 			why:      "sqlite is reached and opens for real, which is the arm no unreachable host can observe",
 		},
 		{
@@ -254,54 +256,22 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 			cfg: func(t *testing.T) *config.DatabaseConfig {
 				return &config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "on.db"), Create: true}
 			},
-			wantType: "sqlite",
+			wantType: data.SQLite,
 			why:      "GOIABADA_DB_CREATE changes nothing on SQLite because sqliteConfig does not carry it; what decides whether an absent file is created is mode=rw in the operator's own DSN (#293)",
 		},
 		{
 			name:     "a double-quoted type dispatches to its engine",
 			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("\"mysql\"", true) },
-			wantType: "mysql",
+			wantType: data.MySQL,
 			wantErr:  "unable to create database",
 			why:      "an operator whose env file quotes the value reaches MySQL rather than the refusal, and the engine-unique prefix is what says so",
 		},
 		{
-			name:     "a single-quoted type dispatches to its engine",
-			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("'postgres'", true) },
-			wantType: "postgres",
-			wantErr:  "unable to check whether the database exists",
-			why:      "apostrophes are trimmed by the same call, and PostgreSQL's own prefix is what says the trim happened before the switch",
-		},
-		{
-			name:     "an unknown type is refused, and the message names it with its length",
-			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("wat", false) },
-			wantType: "wat",
-			wantErr:  "unsupported database type: wat (string length 3). supported types are: mysql, sqlite, postgres, mssql",
-			exact:    true,
-			why:      "this string is the whole of what an operator gets for a mistyped GOIABADA_DB_TYPE, so it is pinned byte for byte",
-		},
-		{
-			name:     "the refusal reports the trimmed length",
-			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("\"wat\"", false) },
-			wantType: "wat",
-			wantErr:  "unsupported database type: wat (string length 3). supported types are: mysql, sqlite, postgres, mssql",
-			exact:    true,
-			why:      "the quotes are gone before the message is built, so the length an operator reads is the length the switch compared",
-		},
-		{
-			name:     "a type with a trailing space is refused, and the length is why the message carries one",
-			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("mysql ", false) },
-			wantType: "mysql ",
-			wantErr:  "unsupported database type: mysql  (string length 6). supported types are: mysql, sqlite, postgres, mssql",
-			exact:    true,
-			why:      "only quotes are trimmed, so whitespace is still a refusal, and the printed length is the only thing distinguishing this from a plain mysql the switch somehow refused",
-		},
-		{
-			name:     "an unset type is refused at length zero",
-			cfg:      func(t *testing.T) *config.DatabaseConfig { return unreachable("", false) },
-			wantType: "",
-			wantErr:  "unsupported database type:  (string length 0). supported types are: mysql, sqlite, postgres, mssql",
-			exact:    true,
-			why:      "an operator who set nothing sees the same refusal, and the length is what tells them the variable was empty rather than wrong",
+			name:    "an unknown type is refused, and the message names it with its length",
+			cfg:     func(t *testing.T) *config.DatabaseConfig { return unreachable("wat", false) },
+			wantErr: "unsupported database type: wat (string length 3). supported types are: mysql, sqlite, postgres, mssql",
+			exact:   true,
+			why:     "this string is the whole of what an operator gets for a mistyped GOIABADA_DB_TYPE, so it is pinned byte for byte; a refused type writes only its refusal, never an opening record naming an engine nothing opened. data.ParseDialect's own table owns every other refused input",
 		},
 	}
 
@@ -334,14 +304,22 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 				}
 			}
 
+			if tc.wantType == "" {
+				for _, record := range capture.Records() {
+					assert.NotEqualf(t, "opening the database", record.Message,
+						"a refused type writes no opening record: %s", tc.why)
+				}
+				return
+			}
+
 			// The record is pinned here as a rider on cases already written, and is never the
-			// dispatch assertion: it carries the type that was requested, so a test resting on it
+			// dispatch assertion: it carries the dialect that was parsed, so a test resting on it
 			// would pass with every arm wired to the same constructor.
 			record := dispatchRecord(t, capture)
 			assert.Equal(t, slog.LevelInfo, record.Level,
 				"opening the database is lifecycle, which is Info: an operator reads it to know which engine a process chose")
-			assert.Equalf(t, tc.wantType, record.Attrs["type"],
-				"the record carries the trimmed type it dispatched on, which is what makes a refusal legible beside it")
+			assert.Equalf(t, string(tc.wantType), record.Attrs["type"],
+				"the record carries the dialect it dispatched on")
 		})
 	}
 }

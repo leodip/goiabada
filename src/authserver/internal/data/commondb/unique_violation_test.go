@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -30,15 +31,15 @@ func classifyingDB() *CommonDatabase {
 }
 
 // TestWrapSQLError_TagsAClassifiedViolation is the translation WrapSQLError exists for: a driver
-// failure the dialect recognised leaves the data layer carrying ErrUniqueViolation, so every
+// failure the dialect recognised leaves the data layer carrying data.ErrUniqueViolation, so every
 // caller above it asks errors.Is and never a driver number or a driver sentence (#279).
 func TestWrapSQLError_TagsAClassifiedViolation(t *testing.T) {
 	driverErr := &driverUniqueError{msg: "UNIQUE constraint failed: users.email"}
 
 	err := classifyingDB().WrapSQLError(driverErr, "unable to execute SQL")
 
-	if !errors.Is(err, ErrUniqueViolation) {
-		t.Errorf("errors.Is(err, ErrUniqueViolation) = false, want true; err = %v", err)
+	if !errors.Is(err, data.ErrUniqueViolation) {
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false, want true; err = %v", err)
 	}
 
 	// The driver's own error stays in the tree. A caller that needs to know WHICH key was
@@ -63,7 +64,7 @@ func TestWrapSQLError_LeavesAnUnclassifiedErrorExactlyAsItWas(t *testing.T) {
 
 	err := classifyingDB().WrapSQLError(driverErr, "unable to execute SQL")
 
-	if errors.Is(err, ErrUniqueViolation) {
+	if errors.Is(err, data.ErrUniqueViolation) {
 		t.Errorf("an unclassified failure must not carry the sentinel; err = %v", err)
 	}
 	if want := errs.Wrap(driverErr, "unable to execute SQL").Error(); err.Error() != want {
@@ -81,7 +82,7 @@ func TestWrapSQLError_WithNoClassifierTagsNothing(t *testing.T) {
 	err := d.WrapSQLError(&driverUniqueError{msg: "UNIQUE constraint failed: users.email"},
 		"unable to execute SQL")
 
-	if errors.Is(err, ErrUniqueViolation) {
+	if errors.Is(err, data.ErrUniqueViolation) {
 		t.Errorf("with no classifier wired, nothing may be tagged; err = %v", err)
 	}
 }
@@ -118,7 +119,7 @@ func TestWrapSQLError_SurvivesTheDataLayersOwnWrapping(t *testing.T) {
 	err = errs.Wrap(err, "unable to insert user")
 	err = errs.Wrap(err, "unable to create user")
 
-	if !errors.Is(err, ErrUniqueViolation) {
+	if !errors.Is(err, data.ErrUniqueViolation) {
 		t.Errorf("the sentinel must survive the wrapping between here and a handler; err = %v", err)
 	}
 }
@@ -136,7 +137,7 @@ func TestWrapSQLError_DoesNotTagUnrelatedFailures(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := classifyingDB().WrapSQLError(tc.err, "unable to execute SQL")
-			if errors.Is(err, ErrUniqueViolation) {
+			if errors.Is(err, data.ErrUniqueViolation) {
 				t.Errorf("WrapSQLError tagged %v, which the classifier did not recognise", tc.err)
 			}
 		})

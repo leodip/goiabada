@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,7 +85,7 @@ func seedPreMigration000027User(t *testing.T, h *isolatedDB) int64 {
 
 	// boolean columns are `boolean` on PostgreSQL and integer-like everywhere else.
 	falseLit, trueLit := "0", "1"
-	if dbType() == "postgres" {
+	if dbType() == data.Postgres {
 		falseLit, trueLit = "false", "true"
 	}
 
@@ -131,13 +132,13 @@ func lastOTPStepShape000027(t *testing.T, h *isolatedDB) (bool, bool, string) {
 	const table, col = "users", "last_otp_step"
 	var q string
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		q = fmt.Sprintf(`SELECT IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.columns
 			WHERE table_schema = DATABASE() AND table_name = '%s' AND column_name = '%s'`, table, col)
-	case "postgres":
+	case data.Postgres:
 		q = fmt.Sprintf(`SELECT is_nullable, column_default FROM information_schema.columns
 			WHERE table_name = '%s' AND column_name = '%s'`, table, col)
-	case "mssql":
+	case data.MSSQL:
 		q = fmt.Sprintf(`SELECT CAST(c.is_nullable AS VARCHAR(1)), dc.definition
 			FROM sys.columns c
 			LEFT JOIN sys.default_constraints dc
@@ -157,9 +158,9 @@ func lastOTPStepShape000027(t *testing.T, h *isolatedDB) (bool, bool, string) {
 
 	notNull := false
 	switch dbType() {
-	case "mysql", "postgres":
+	case data.MySQL, data.Postgres:
 		notNull = strings.EqualFold(nullFlag.String, "NO")
-	case "mssql":
+	case data.MSSQL:
 		notNull = nullFlag.String == "0"
 	default: // sqlite
 		notNull = nullFlag.String == "1"

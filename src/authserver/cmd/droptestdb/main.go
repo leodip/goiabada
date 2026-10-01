@@ -23,6 +23,7 @@ import (
 	"os"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -37,20 +38,20 @@ var disposableDatabases = map[string]bool{
 
 // dropByEngine is the one database call per engine, a variable so a test can stand in for the
 // servers.
-var dropByEngine = map[string]func(ctx context.Context, cfg *config.DatabaseConfig) error{
-	"mysql": func(ctx context.Context, cfg *config.DatabaseConfig) error {
+var dropByEngine = map[data.Dialect]func(ctx context.Context, cfg *config.DatabaseConfig) error{
+	data.MySQL: func(ctx context.Context, cfg *config.DatabaseConfig) error {
 		return mysqldb.DropDatabase(ctx, &mysqldb.DatabaseConfig{
 			Type: cfg.Type, Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: cfg.Name,
 		})
 	},
-	"postgres": func(ctx context.Context, cfg *config.DatabaseConfig) error {
+	data.Postgres: func(ctx context.Context, cfg *config.DatabaseConfig) error {
 		return postgresdb.DropDatabase(ctx, &postgresdb.DatabaseConfig{
 			Type: cfg.Type, Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: cfg.Name,
 		})
 	},
-	"mssql": func(ctx context.Context, cfg *config.DatabaseConfig) error {
+	data.MSSQL: func(ctx context.Context, cfg *config.DatabaseConfig) error {
 		return mssqldb.DropDatabase(ctx, &mssqldb.DatabaseConfig{
 			Type: cfg.Type, Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: cfg.Name,
@@ -75,19 +76,25 @@ func main() {
 	}
 }
 
-// run refuses a name outside disposableDatabases and an engine with no server before it reaches
-// any database, then drops the one cfg names.
+// run refuses a name outside disposableDatabases, then a type that does not parse and an engine
+// with no server, before it reaches any database, then drops the one cfg names. The type is parsed
+// as the server parses it, so a quoted GOIABADA_DB_TYPE the server accepts reaches its drop here too
+// (#438 decision 6).
 func run(ctx context.Context, cfg *config.DatabaseConfig) error {
 	if !disposableDatabases[cfg.Name] {
 		return errs.Errorf("refusing to drop %q: only goiabada_data and goiabada_integration are disposable", cfg.Name)
 	}
-	drop, ok := dropByEngine[cfg.Type]
+	dialect, err := data.ParseDialect(cfg.Type)
+	if err != nil {
+		return err
+	}
+	drop, ok := dropByEngine[dialect]
 	if !ok {
-		return errs.Errorf("refusing to drop a %q database: only mysql, postgres and mssql have a server to drop it from", cfg.Type)
+		return errs.Errorf("refusing to drop a %q database: only mysql, postgres and mssql have a server to drop it from", dialect)
 	}
 	if err := drop(ctx, cfg); err != nil {
-		return errs.Wrapf(err, "unable to drop %s on %s", cfg.Name, cfg.Type)
+		return errs.Wrapf(err, "unable to drop %s on %s", cfg.Name, dialect)
 	}
-	fmt.Printf("droptestdb: dropped %s on %s\n", cfg.Name, cfg.Type)
+	fmt.Printf("droptestdb: dropped %s on %s\n", cfg.Name, dialect)
 	return nil
 }

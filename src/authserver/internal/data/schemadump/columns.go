@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -16,10 +17,10 @@ import (
 // The default expression and the has-a-default flag are two values because one cannot carry
 // both facts: MySQL's catalog reports DEFAULT ” as the empty string, which is also what a
 // column with no default reads as (#284).
-func dumpColumns(ctx context.Context, db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
+func dumpColumns(ctx context.Context, db *sql.DB, d data.Dialect, table string) ([]ColumnShape, error) {
 	var q string
 	switch d {
-	case MySQL:
+	case data.MySQL:
 		// COLUMN_TYPE rather than DATA_TYPE: it carries the length, so varchar(64)
 		// shrinking to varchar(16) is visible. COLLATION_NAME is NULL for a column that
 		// holds no string, which is the '' this reports.
@@ -35,7 +36,7 @@ func dumpColumns(ctx context.Context, db *sql.DB, d Dialect, table string) ([]Co
 			CASE WHEN LOCATE('auto_increment', EXTRA) > 0 THEN '1' ELSE '0' END
 			FROM information_schema.columns
 			WHERE table_schema = DATABASE() AND table_name = '%s'`, table)
-	case Postgres:
+	case data.Postgres:
 		// format_type renders the length the way the DDL spells it; pg_get_expr renders
 		// the default the same way. information_schema would give both in two columns
 		// that then have to be pasted together in Go.
@@ -62,7 +63,7 @@ func dumpColumns(ctx context.Context, db *sql.DB, d Dialect, table string) ([]Co
 			LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
 			WHERE c.relname = '%s' AND n.nspname = current_schema()
 			  AND a.attnum > 0 AND NOT a.attisdropped`, table)
-	case MSSQL:
+	case data.MSSQL:
 		// sys.columns.max_length is bytes, so an NVARCHAR's declared length is half of
 		// it, and -1 is the (max) form. sys.default_constraints is joined rather than
 		// reading INFORMATION_SCHEMA.COLUMN_DEFAULT because it is the same value and
@@ -135,7 +136,7 @@ func dumpColumns(ctx context.Context, db *sql.DB, d Dialect, table string) ([]Co
 		return nil, errs.Errorf("schemadump: iterate column catalog on %s.%s: %w", d, table, err)
 	}
 
-	if d == SQLite && len(cols) > 0 {
+	if d == data.SQLite && len(cols) > 0 {
 		declared, err := sqliteDeclaredColumnFacts(ctx, db, table)
 		if err != nil {
 			return nil, err

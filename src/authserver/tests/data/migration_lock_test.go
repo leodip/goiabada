@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
@@ -140,7 +141,7 @@ func TestMigrationLock_AFailedMigrationStillGivesTheResourceBack(t *testing.T) {
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
 func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
 	}
 
@@ -193,7 +194,7 @@ var errPrecreateUnlockFault = errors.New("injected sp_releaseapplock failure")
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
 func TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails(t *testing.T) {
-	if dbType() != "mssql" {
+	if dbType() != data.MSSQL {
 		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
 	}
 
@@ -324,7 +325,7 @@ func (s precreateFaultStmt) ExecContext(context.Context, []driver.NamedValue) (d
 // process-wide mutex.
 func hasSessionMigrationLock() bool {
 	switch dbType() {
-	case "mysql", "postgres", "mssql":
+	case data.MySQL, data.Postgres, data.MSSQL:
 		return true
 	default:
 		return false
@@ -338,11 +339,11 @@ func migrationLockEngine(t *testing.T, name string) migrator.Engine {
 	require.NotEmptyf(t, name, "the isolated database on %s must carry its server-side name, which the lock resource is computed over", dbType())
 
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return migrator.MySQL(name)
-	case "postgres":
+	case data.Postgres:
 		return migrator.Postgres(name)
-	case "mssql":
+	case data.MSSQL:
 		return migrator.SQLServer(name)
 	default:
 		t.Fatalf("%s has no session-scoped migration lock", dbType())
@@ -415,7 +416,7 @@ func freshPoolTo(t *testing.T, name string) *sql.DB {
 	cfg := &appConfig.Database
 
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
 			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
@@ -424,7 +425,7 @@ func freshPoolTo(t *testing.T, name string) *sql.DB {
 		t.Cleanup(func() { _ = db.DB.Close() })
 		return db.DB
 
-	case "postgres":
+	case data.Postgres:
 		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
 			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
@@ -433,7 +434,7 @@ func freshPoolTo(t *testing.T, name string) *sql.DB {
 		t.Cleanup(func() { _ = db.DB.Close() })
 		return db.DB
 
-	case "mssql":
+	case data.MSSQL:
 		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
 			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,

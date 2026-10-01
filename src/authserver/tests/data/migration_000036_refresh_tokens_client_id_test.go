@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -88,5 +89,5 @@ func assertRefreshTokensClientIdIndex000036(t *testing.T, h *isolatedDB, phase s
 }
 
 func isSQLite000036() bool {
-	return dbType() == "" || dbType() == "sqlite"
+	return dbType() == data.SQLite
 }

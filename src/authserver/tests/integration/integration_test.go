@@ -48,13 +48,18 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	switch appConfig.Database.Type {
-	case "mysql":
+	dialect, dialectErr := data.ParseDialect(appConfig.Database.Type)
+	if dialectErr != nil {
+		slog.Error("unable to parse the database type", "error", dialectErr)
+		os.Exit(1)
+	}
+	switch dialect {
+	case data.MySQL:
 		slog.Info("config.DBUsername=" + appConfig.Database.Username)
 		slog.Info("config.DBHost=" + appConfig.Database.Host)
 		slog.Info("config.DBPort=" + fmt.Sprintf("%d", appConfig.Database.Port))
 		slog.Info("config.DBName=" + appConfig.Database.Name)
-	case "sqlite":
+	case data.SQLite:
 		slog.Info("config.DBDSN=" + appConfig.Database.DSN)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -28,7 +29,7 @@ const awkwardPassword = "p%#?/@:ss1A"
 // afterwards is the database it made, owned by it. The identity it reports back is asserted too:
 // a connection that reached the server as some other login would prove nothing about escaping.
 func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
-	if dbType() == "sqlite" || dbType() == "" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite's DSN is a file path the operator supplies; no builder assembles one")
 	}
 
@@ -41,7 +42,7 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 	var currentUserQuery, currentDatabaseQuery string
 
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		admin, err := sql.Open("mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = admin.Close() })
@@ -62,7 +63,7 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 		currentUserQuery = "SELECT SUBSTRING_INDEX(CURRENT_USER(), '@', 1)"
 		currentDatabaseQuery = "SELECT DATABASE()"
 
-	case "postgres":
+	case data.Postgres:
 		admin, err := sql.Open("pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = admin.Close() })
@@ -80,7 +81,7 @@ func TestNewDatabase_AwkwardPasswordAndDatabaseNameConnect(t *testing.T) {
 		currentUserQuery = "SELECT current_user"
 		currentDatabaseQuery = "SELECT current_database()"
 
-	case "mssql":
+	case data.MSSQL:
 		admin, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = admin.Close() })

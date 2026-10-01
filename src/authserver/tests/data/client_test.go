@@ -1524,7 +1524,7 @@ func TestSetClientPublic(t *testing.T) {
 // re-evaluate. Only the four-engine data tier can catch that, and only on one of its four engines.
 // That was measured on all four engines rather than argued (#245).
 func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T) {
-	if dbType() == "" || dbType() == "sqlite" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second write " +
 			"transaction queues behind the first instead of overlapping it. The interleaving " +
 			"cannot be constructed here, in this process or in the server")
@@ -1669,7 +1669,7 @@ func TestAcquireClientRow(t *testing.T) {
 // re-read wait at all, and no unit test with a mocked database can observe an engine's snapshot
 // rules. Measured on all four engines before this was built (#245).
 func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
-	if dbType() == "" || dbType() == "sqlite" {
+	if dbType() == data.SQLite {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second writer " +
 			"queues behind the open transaction instead of landing inside it. The interleaving " +
 			"cannot be constructed here, in this process or in the server")

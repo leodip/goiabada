@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -149,11 +150,11 @@ func assertUserAgentRoundTrip000046(t *testing.T, h *isolatedDB, userId int64, n
 // derived so that editing one file and forgetting the others fails here.
 func userAgentType000046() string {
 	switch dbType() {
-	case "mysql":
+	case data.MySQL:
 		return "varchar(512)"
-	case "postgres":
+	case data.Postgres:
 		return "character varying(512)"
-	case "mssql":
+	case data.MSSQL:
 		return "nvarchar(512)"
 	default:
 		return "TEXT"
