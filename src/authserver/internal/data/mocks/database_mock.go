@@ -11670,6 +11670,69 @@ func (_c *Database_RecordRefreshTokenFamilyRevoked_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// ReencryptToKey provides a mock function for the type Database
+func (_mock *Database) ReencryptToKey(ctx context.Context, oldKey []byte, newKey []byte) error {
+	ret := _mock.Called(ctx, oldKey, newKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReencryptToKey")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) error); ok {
+		r0 = returnFunc(ctx, oldKey, newKey)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_ReencryptToKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReencryptToKey'
+type Database_ReencryptToKey_Call struct {
+	*mock.Call
+}
+
+// ReencryptToKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - oldKey []byte
+//   - newKey []byte
+func (_e *Database_Expecter) ReencryptToKey(ctx any, oldKey any, newKey any) *Database_ReencryptToKey_Call {
+	return &Database_ReencryptToKey_Call{Call: _e.mock.On("ReencryptToKey", ctx, oldKey, newKey)}
+}
+
+func (_c *Database_ReencryptToKey_Call) Run(run func(ctx context.Context, oldKey []byte, newKey []byte)) *Database_ReencryptToKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []byte
+		if args[1] != nil {
+			arg1 = args[1].([]byte)
+		}
+		var arg2 []byte
+		if args[2] != nil {
+			arg2 = args[2].([]byte)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ReencryptToKey_Call) Return(err error) *Database_ReencryptToKey_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_ReencryptToKey_Call) RunAndReturn(run func(ctx context.Context, oldKey []byte, newKey []byte) error) *Database_ReencryptToKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RefreshTokenLoadClient provides a mock function for the type Database
 func (_mock *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	ret := _mock.Called(ctx, tx, refreshToken)
@@ -12191,78 +12254,6 @@ func (_c *Database_RollbackTransaction_Call) Return(err error) *Database_Rollbac
 }
 
 func (_c *Database_RollbackTransaction_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) error) *Database_RollbackTransaction_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RotateEncryptionKeyIfNeeded provides a mock function for the type Database
-func (_mock *Database) RotateEncryptionKeyIfNeeded(ctx context.Context, currentKey []byte, previousKey []byte) (bool, error) {
-	ret := _mock.Called(ctx, currentKey, previousKey)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RotateEncryptionKeyIfNeeded")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) (bool, error)); ok {
-		return returnFunc(ctx, currentKey, previousKey)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) bool); ok {
-		r0 = returnFunc(ctx, currentKey, previousKey)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, []byte) error); ok {
-		r1 = returnFunc(ctx, currentKey, previousKey)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Database_RotateEncryptionKeyIfNeeded_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RotateEncryptionKeyIfNeeded'
-type Database_RotateEncryptionKeyIfNeeded_Call struct {
-	*mock.Call
-}
-
-// RotateEncryptionKeyIfNeeded is a helper method to define mock.On call
-//   - ctx context.Context
-//   - currentKey []byte
-//   - previousKey []byte
-func (_e *Database_Expecter) RotateEncryptionKeyIfNeeded(ctx any, currentKey any, previousKey any) *Database_RotateEncryptionKeyIfNeeded_Call {
-	return &Database_RotateEncryptionKeyIfNeeded_Call{Call: _e.mock.On("RotateEncryptionKeyIfNeeded", ctx, currentKey, previousKey)}
-}
-
-func (_c *Database_RotateEncryptionKeyIfNeeded_Call) Run(run func(ctx context.Context, currentKey []byte, previousKey []byte)) *Database_RotateEncryptionKeyIfNeeded_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 []byte
-		if args[1] != nil {
-			arg1 = args[1].([]byte)
-		}
-		var arg2 []byte
-		if args[2] != nil {
-			arg2 = args[2].([]byte)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_RotateEncryptionKeyIfNeeded_Call) Return(b bool, err error) *Database_RotateEncryptionKeyIfNeeded_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *Database_RotateEncryptionKeyIfNeeded_Call) RunAndReturn(run func(ctx context.Context, currentKey []byte, previousKey []byte) (bool, error)) *Database_RotateEncryptionKeyIfNeeded_Call {
 	_c.Call.Return(run)
 	return _c
 }

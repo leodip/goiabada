@@ -49,8 +49,7 @@ func seedThrowawayDatabase(t *testing.T, name string, seed func(db data.Database
 // all, which is worth stating because deleting that call left all 598 sqlite data tests green
 // (#353): every other test in this tier passes whether or not the startup pass runs.
 //
-// The detection canary is the one RotateEncryptionKeyIfNeeded uses: an encrypted RSA private key
-// PEM. Seeded under the previous key, a startup carrying that key rewrites it under the current
+// The detection canary is the one the startup task reads: an encrypted RSA private key PEM. Seeded under the previous key, a startup carrying that key rewrites it under the current
 // one; a startup that lost it leaves the row as it was (#353).
 func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 	if engine := dbType(); engine != data.SQLite {
@@ -104,8 +103,7 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 // failed, then serving requests over data it could not re-key -- which is precisely the outcome
 // that branch is fail-closed to prevent (#353).
 //
-// The forcing fixture is the rotation canary seeded under a THIRD key. RotateEncryptionKeyIfNeeded
-// treats a canary that decrypts under the current key as "already rotated" and one that decrypts
+// The forcing fixture is the rotation canary seeded under a THIRD key. The startup task treats a canary that decrypts under the current key as "already rotated" and one that decrypts
 // under the previous key as "rotate now"; a canary that opens under neither is the one
 // misconfiguration it refuses outright rather than guessing at, so it is the cheapest real task
 // failure this tier can construct.
@@ -150,6 +148,77 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 		"the failing task's own message has to survive the arm, since it is all the operator gets")
 	assert.Contains(t, err.Error(), "GOIABADA_AES_ENCRYPTION_KEY",
 		"and it has to keep naming the variables the operator would have to fix")
+}
+
+// TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing is the one statement this tree can
+// make about a database that never booted 1.6.x. #359 deleted the startup conversion that
+// encrypted a plaintext RSA PEM (#262) and ships no pre-flight to refuse such a database, so what
+// is left to establish is that a startup carrying a previous key does not quietly half-convert
+// one: the canary is the first non-empty PrivateKeyPEM, a plaintext PEM decrypts under neither key,
+// and the startup task refuses before ReencryptToKey runs.
+//
+// That is why commondb.reencryptPrivateKeys keeps its plaintext-PEM branch as unreachable code
+// rather than deleting it: nothing in production can reach it, and this test is the reason that
+// claim holds. It used to call the data layer's own rotation method; #438 decision 8 moved the
+// canary to datafactory, so it goes through the startup that reads it.
+//
+// sqlite only, for the reason the cases above give.
+func TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing(t *testing.T) {
+	if engine := dbType(); engine != data.SQLite {
+		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the refusal under test is engine-independent")
+	}
+
+	currentKey := dataKey
+	previousKey := bytes.Repeat([]byte{0x5a}, 32)
+	require.NotEqual(t, currentKey, previousKey,
+		"the canary is not even read when the two keys match, so the fixture would prove nothing")
+
+	const (
+		pemPlain  = "-----BEGIN RSA PRIVATE KEY-----\nMIIabc123fakepemcontent\n-----END RSA PRIVATE KEY-----\n"
+		clientSec = "client-secret"
+	)
+	secretUnderPrevious, err := encryption.EncryptText(clientSec, previousKey)
+	require.NoError(t, err)
+	clientIdentifier := "c-" + fake.UUID()
+
+	cfg := seedThrowawayDatabase(t, "startup_plaintext_pem.db", func(db data.Database) {
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
+			State:         models.KeyStateCurrent.String(),
+			KeyIdentifier: fake.UUID(),
+			Type:          "RSA",
+			Algorithm:     "RS256",
+			PrivateKeyPEM: []byte(pemPlain), // the pre-1.6.0 state: never encrypted
+		}), "the plaintext canary is the fixture")
+		require.NoError(t, db.CreateClient(context.Background(), nil, &models.Client{
+			ClientIdentifier:      clientIdentifier,
+			ClientSecretEncrypted: secretUnderPrevious,
+		}), "and a secret under the previous key, which a re-key would have moved")
+	})
+
+	opened, err := datafactory.NewDatabase(context.Background(), cfg, currentKey, previousKey, false)
+
+	require.Error(t, err, "a plaintext PEM decrypts under neither key, so the startup is refused")
+	assert.Nil(t, opened)
+	assert.Contains(t, err.Error(), "decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
+
+	// Nothing was re-keyed: the PEM is the plaintext it was, and the client secret still reads
+	// under the previous key, because the refusal comes before ReencryptToKey opens its transaction.
+	reopened, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: cfg.DSN}, false)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = reopened.DB.Close() })
+
+	keys, err := reopened.GetAllSigningKeys(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, []byte(pemPlain), keys[0].PrivateKeyPEM,
+		"the plaintext PEM was rewritten by a startup that reported failure")
+
+	client, err := reopened.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	plaintext, err := encryption.DecryptText(client.ClientSecretEncrypted, previousKey)
+	require.NoError(t, err, "the client secret was re-keyed by a startup that refused to rotate")
+	assert.Equal(t, clientSec, plaintext)
 }
 
 // TestNewDatabase_RefusesAStartupWhoseOpenFailed pins the first arm of the same pipeline: when

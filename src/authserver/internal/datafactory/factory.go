@@ -8,9 +8,9 @@
 // chooses between implementations of it (#353, #359).
 //
 // It is one of the four places that still names the whole data.Database, and the one that produces
-// it. Everything here opens, migrates or pre-flights a database rather than reading rows through
-// one, so there is no narrower capability to declare; the ports are at the consumers this hands
-// the result to (#386 decision 8).
+// it: OpenDatabase and NewDatabase hand it out, and Migratable embeds it. The two functions here
+// that read through a database take ports like every other consumer, the email case pre-flight
+// one read and the startup task the signing keys and the re-key (#386 decision 8, #438 decision 8).
 package datafactory
 
 import (

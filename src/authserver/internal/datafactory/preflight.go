@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
@@ -16,6 +15,12 @@ import (
 // lowercase form. The pre-flight below is about that one migration, so the number is here rather
 // than derived: a later migration renumbering this one would have to move the check with it.
 const LowercaseEmailsVersion = 47
+
+// emailCaseScanner is the one read the pre-flight makes. The `migrate` subcommand, the other
+// caller, declares its own port with the same method rather than naming this one (#438).
+type emailCaseScanner interface {
+	ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error)
+}
 
 // CheckEmailCaseBeforeMigrating refuses an upgrade that crosses migration 000047 when the stored
 // addresses hold something that migration cannot resolve, and leaves the database untouched when
@@ -52,7 +57,7 @@ const LowercaseEmailsVersion = 47
 // still serving traffic can insert the lowercase twin of a legacy address between this read and
 // 000047's UPDATE. #351 decision 18 answered that with downtime and a release note rather than
 // machinery, so an upgrade across 000047 wants traffic stopped first.
-func CheckEmailCaseBeforeMigrating(ctx context.Context, database data.Database, recorded int, target int) error {
+func CheckEmailCaseBeforeMigrating(ctx context.Context, database emailCaseScanner, recorded int, target int) error {
 	if recorded == migrator.NilVersion || recorded >= LowercaseEmailsVersion {
 		return nil
 	}
@@ -168,7 +173,7 @@ func describeEmailCaseHazards(collisions [][]models.EmailCaseRow, unreachable []
 // the policy and every test live. It is the startup half of that check; the `migrate to`
 // subcommand has the other, because it reaches OpenDatabase directly and never comes through here
 // (#351).
-func preflightEmailCase(ctx context.Context, database data.Database, m *migrator.Migrator) error {
+func preflightEmailCase(ctx context.Context, database emailCaseScanner, m *migrator.Migrator) error {
 	recorded, _, err := m.Version(ctx)
 	if migrator.IsNilVersion(err) {
 		recorded = migrator.NilVersion
