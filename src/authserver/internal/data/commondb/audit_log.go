@@ -33,28 +33,6 @@ func (d *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *mod
 	return nil
 }
 
-func (d *Database) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
-
-	// SQLite and MySQL support LIMIT on DELETE
-	deleteBuilder := d.Flavor.NewDeleteBuilder()
-	deleteBuilder.DeleteFrom("audit_logs")
-	deleteBuilder.Where(deleteBuilder.LessThan("created_at", cutoff))
-	deleteBuilder.Limit(maxDeletions)
-
-	sql, args := deleteBuilder.Build()
-	result, err := d.ExecSQL(ctx, tx, sql, args...)
-	if err != nil {
-		return 0, errs.Wrap(err, "unable to delete old audit logs")
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return 0, errs.Wrap(err, "unable to get rows affected")
-	}
-
-	return int(rowsAffected), nil
-}
-
 func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
 	requestId string) ([]models.AuditLog, int, error) {
 
