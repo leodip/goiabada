@@ -65,8 +65,9 @@ func requireTooLong(t *testing.T, err error, code, parameter string, length, bou
 }
 
 // claimScopesOfBytes returns a scope of exactly n bytes made only of the claim scopes openid and
-// email, which are accepted without a lookup. The duplicates are deliberate: ValidateScopes counts
-// the string it is handed, and every caller that stores a scope has already dropped them.
+// email, which are accepted without a lookup. The duplicates are deliberate: the password grant's
+// validator counts the string it is handed, which its caller has already normalized, while
+// ValidateScopes normalizes what it is handed and so counts it as two values.
 func claimScopesOfBytes(t *testing.T, n int) string {
 	t.Helper()
 	// Each token costs its length plus one separator, less one for the last: n+1 = 7a + 6b.
@@ -195,13 +196,24 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 		assert.NoError(t, NewAuthorizeValidator(mockDB).ValidateScopes(context.Background(), scope))
 	})
 
-	t.Run("claim scopes filling the bound are accepted", func(t *testing.T) {
-		scope := claimScopesOfBytes(t, models.ScopeMaxBytes)
+	// ValidateScopes takes the scope as sent, to judge its grammar, and counts it as it is stored,
+	// with duplicates dropped: a raw scope over the bound that normalizes under it is accepted (#244).
+	t.Run("claim scopes over the bound that normalize under it are accepted", func(t *testing.T) {
+		scope := claimScopesOfBytes(t, models.ScopeMaxBytes+1)
 		assert.NoError(t, NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), scope))
 	})
 
 	t.Run("one byte over the bound is invalid_scope before any lookup", func(t *testing.T) {
-		scope := claimScopesOfBytes(t, models.ScopeMaxBytes+1)
+		// 255 distinct scopes of seven bytes and one of nine, joined by 255 spaces: 2049 bytes that
+		// normalize to themselves.
+		scopes := make([]string, 0, 256)
+		for i := 0; i < 255; i++ {
+			scopes = append(scopes, fmt.Sprintf("r:p%04d", i))
+		}
+		scopes = append(scopes, "r:p002555")
+		scope := strings.Join(scopes, " ")
+		require.Len(t, scope, models.ScopeMaxBytes+1, "the fixture is off the bound, so the case no longer observes the edge")
+
 		err := NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), scope)
 		requireTooLong(t, err, "invalid_scope", "scope", models.ScopeMaxBytes+1, models.ScopeMaxBytes, scope)
 	})

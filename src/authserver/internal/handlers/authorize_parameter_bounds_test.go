@@ -152,8 +152,8 @@ func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *te
 
 // A value at the bound is served, and stored intact for the code that will carry it. The scope row
 // is a leniency chosen on purpose: the bound counts the normalized scope, so a request whose raw
-// scope is three times the bound in repeated, tab-separated values is the one-value scope it
-// collapses to, and is not refused.
+// scope is three times the bound in repeated, single-space-separated values is the one-value scope
+// it collapses to, and is not refused.
 func TestHandleAuthorizeGet_AValueAtTheBoundProceeds(t *testing.T) {
 	state := strings.Repeat("s", models.StateMaxBytes)
 	nonce := strings.Repeat("n", models.NonceMaxBytes)
@@ -173,7 +173,7 @@ func TestHandleAuthorizeGet_AValueAtTheBoundProceeds(t *testing.T) {
 		},
 		{
 			name:      "a raw scope over the bound that normalizes under it",
-			overrides: map[string]string{"scope": strings.Repeat("openid\t", 3*models.ScopeMaxBytes/len("openid\t"))},
+			overrides: map[string]string{"scope": strings.TrimSuffix(strings.Repeat("openid ", 3*models.ScopeMaxBytes/len("openid ")), " ")},
 			check: func(t *testing.T, ac *ceremony.AuthContext) {
 				assert.Equal(t, "openid", ac.Scope)
 			},

@@ -83,14 +83,14 @@ func TestHasOfflineAccessScope(t *testing.T) {
 		{"no offline_access", "openid profile email", false},
 		{"empty", "", false},
 
-		// Read through SplitScope (#244), so it agrees with the splitter on every separator: a scope
-		// that reached it unnormalized is still read as the token endpoint and the authorization
-		// endpoint read it, where strings.Split(scope, " ") saw one value.
-		{"after a tab", "openid\toffline_access", true},
-		{"after a newline", "openid\noffline_access", true},
-		{"after a run of separators", "openid \t\r\n offline_access", true},
-		{"joined to a word by a no-break space", "openid offline_access", false},
-		{"padded by a no-break space", "openid offline_access ", true},
+		// Read through SplitScope (#244), so it agrees with the splitter: only a space separates, so
+		// offline_access after a tab, a newline or a no-break space is part of another value, and a
+		// value padded with one is not offline_access.
+		{"after a run of spaces", "openid  offline_access", true},
+		{"after a tab", "openid\toffline_access", false},
+		{"after a newline", "openid\noffline_access", false},
+		{"joined to a word by a no-break space", "openid\u00a0offline_access", false},
+		{"padded by a no-break space", "openid offline_access\u00a0", false},
 	}
 
 	for _, tc := range testCases {
@@ -100,14 +100,15 @@ func TestHasOfflineAccessScope(t *testing.T) {
 	}
 }
 
-// scopeWhitespaceCases is the one whitespace table for the scope splitter: every site that splits a
+// / scopeWhitespaceCases is the one whitespace table for the scope splitter: every site that splits a
 // scope reads it through SplitScope or NormalizeScope, so this is where the rule is pinned and
 // every consumer's own test stays thin (#116). split is SplitScope's answer and normalized
 // NormalizeScope's.
 //
-// The separators are RE2's \s, the set the regexes these functions replaced matched: space, tab,
-// newline, form feed, carriage return. Vertical tab, U+0085 and U+00A0 are not separators, so each
-// stays inside the element it sits in; strings.Fields would split on all three.
+// The separator is the space (U+0020) alone, and nothing is trimmed (#244). Whether a scope is well
+// formed is oauth.IsWellFormedSpaceDelimited's question, asked where a scope enters, so a run of
+// spaces still splits into no empty value here; every other character, a tab, a newline, a form
+// feed, a carriage return, a vertical tab, U+0085 or U+00A0, stays inside the element it sits in.
 var scopeWhitespaceCases = []struct {
 	name       string
 	scope      string
@@ -119,24 +120,19 @@ var scopeWhitespaceCases = []struct {
 	{"leading space", " openid profile", []string{"openid", "profile"}, "openid profile"},
 	{"trailing space", "openid profile ", []string{"openid", "profile"}, "openid profile"},
 	{"leading and trailing runs", "  openid profile  ", []string{"openid", "profile"}, "openid profile"},
-	{"tab", "openid\tprofile", []string{"openid", "profile"}, "openid profile"},
-	{"newline", "openid\nprofile", []string{"openid", "profile"}, "openid profile"},
-	{"carriage return and newline", "openid\r\nprofile", []string{"openid", "profile"}, "openid profile"},
-	{"form feed", "openid\fprofile", []string{"openid", "profile"}, "openid profile"},
-	{"mixed runs", " billing-api:read \t  billing-api:write\t", []string{"billing-api:read", "billing-api:write"}, "billing-api:read billing-api:write"},
-	{"vertical tab inside an element is not a separator", "openid\vprofile", []string{"openid\vprofile"}, "openid\vprofile"},
-	{"U+00A0 inside an element is not a separator", "openid profile", []string{"openid profile"}, "openid profile"},
-	{"U+0085 inside an element is not a separator", "openid\u0085profile", []string{"openid\u0085profile"}, "openid\u0085profile"},
-	{"U+00A0 leading the whole value is trimmed", " openid", []string{"openid"}, "openid"},
-	// The two rows below are the only answers #116's consolidation changed, both widenings at the
-	// token endpoint: whitespace outside the separator set standing beside a separator is trimmed
-	// off its element, as SetScope and ROPC already did, where the token endpoint used to keep
-	// " profile" and "\v" as elements and refuse them as unknown scopes. Keep them.
-	{"U+00A0 after a separator is trimmed (widened, #116)", "openid  profile", []string{"openid", "profile"}, "openid profile"},
-	{"a lone vertical tab between separators is dropped (widened, #116)", "openid \v profile", []string{"openid", "profile"}, "openid profile"},
+	{"a tab is not a separator", "openid\tprofile", []string{"openid\tprofile"}, "openid\tprofile"},
+	{"a newline is not a separator", "openid\nprofile", []string{"openid\nprofile"}, "openid\nprofile"},
+	{"a carriage return and newline are not a separator", "openid\r\nprofile", []string{"openid\r\nprofile"}, "openid\r\nprofile"},
+	{"a form feed is not a separator", "openid\fprofile", []string{"openid\fprofile"}, "openid\fprofile"},
+	{"a vertical tab is not a separator", "openid\vprofile", []string{"openid\vprofile"}, "openid\vprofile"},
+	{"U+00A0 is not a separator", "openid\u00a0profile", []string{"openid\u00a0profile"}, "openid\u00a0profile"},
+	{"U+0085 is not a separator", "openid\u0085profile", []string{"openid\u0085profile"}, "openid\u0085profile"},
+	{"U+00A0 leading the whole value is kept", "\u00a0openid", []string{"\u00a0openid"}, "\u00a0openid"},
+	{"U+00A0 after a space is kept with its element", "openid \u00a0profile", []string{"openid", "\u00a0profile"}, "openid \u00a0profile"},
+	{"a tab beside a space is kept with its element", "openid \tprofile", []string{"openid", "\tprofile"}, "openid \tprofile"},
 	{"empty", "", []string{}, ""},
 	{"spaces only", "   ", []string{}, ""},
-	{"tab only", "\t", []string{}, ""},
+	{"a tab alone is an element", "\t", []string{"\t"}, "\t"},
 	{"a duplicate is kept by the split and dropped by normalizing", "openid openid profile", []string{"openid", "openid", "profile"}, "openid profile"},
 	{"a duplicate across a run", "a:b  a:b", []string{"a:b", "a:b"}, "a:b"},
 	{"a later duplicate keeps the first occurrence's place", "billing-api:read billing-api:write billing-api:read", []string{"billing-api:read", "billing-api:write", "billing-api:read"}, "billing-api:read billing-api:write"},

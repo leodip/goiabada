@@ -563,22 +563,16 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	assert.Equal(t, genuineScope, data["scope"])
 }
 
-// TestToken_ClientCred_TabSeparatedScopeIsNormalized is the end-to-end half of the scope
-// normalization work, and the only step that shows the defect is actually fixed.
+// TestToken_ClientCred_ScopeSeparators is the end-to-end half of the scope grammar at the client
+// credentials grant: one space (U+0020) between each two scopes, none at either end (RFC 6749
+// section 3.3).
 //
-// The token endpoint used to collapse whitespace onto a local copy and never assign it back, so the
-// caller's raw string was carried onward. A tab-separated request passed scope validation, which
-// collapses whitespace before checking, and then failed with a **500**: the issuer re-parses the
-// scope, splits on spaces alone, and the tab-joined string arrives as one element whose colon-split
-// yields three parts. Measured by reverting the handler to pass the raw scope, where this test fails
-// with server_error and the server logs `invalid scope: <the tab-joined string>`.
-//
-// So no token was issued with silently unmatchable scopes; the issuer rejected first.
-//
-// Asserting string equality on the response alone would not prove the fix, because the assertion
-// and the bug could share the same expectation. So this drives the real HasScope, the same matcher
-// the Admin API middleware uses, over the claim as decoded from the issued token.
-func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
+// A tab used to separate two scopes here, and before that answered 500 because the issuer split on
+// spaces alone. Since #244 a tab separates nothing, so a tab between two granted scopes is one scope
+// the resolver cannot read, refused invalid_scope; a run of spaces is refused as malformed. Neither
+// issues a token. The single-space request is the control both vary from, and its claim is matched
+// with the real HasScope, the matcher the Admin API middleware uses, over the decoded token.
+func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
@@ -612,21 +606,40 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 	readScope := resourceIdentifier + ":" + readPermission.PermissionIdentifier
 	writeScope := resourceIdentifier + ":" + writePermission.PermissionIdentifier
 
-	// A TAB between two genuinely granted scopes.
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
-		"grant_type":    {"client_credentials"},
-		"client_id":     {client.ClientIdentifier},
-		"client_secret": {clientSecret},
-		"scope":         {readScope + "\t" + writeScope},
+	request := func(scope string) map[string]interface{} {
+		return postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+			"grant_type":    {"client_credentials"},
+			"client_id":     {client.ClientIdentifier},
+			"client_secret": {clientSecret},
+			"scope":         {scope},
+		})
+	}
+
+	t.Run("a tab joins two granted scopes into one it cannot read", func(t *testing.T) {
+		refused := request(readScope + "\t" + writeScope)
+
+		assert.Equal(t, "invalid_scope", refused["error"], "%v", refused)
+		assert.Contains(t, refused["error_description"], "Invalid scope format: '")
+		assert.NotContains(t, refused, "access_token")
 	})
+
+	t.Run("a run of spaces is malformed", func(t *testing.T) {
+		refused := request(readScope + "  " + writeScope)
+
+		assert.Equal(t, "invalid_scope", refused["error"], "%v", refused)
+		assert.Equal(t, "The 'scope' parameter is malformed. Separate its values with a single space, with no space before the first value or after the last.",
+			refused["error_description"])
+		assert.NotContains(t, refused, "access_token")
+	})
+
+	// The control: one space between the same two scopes.
+	data := request(readScope + " " + writeScope)
 
 	assert.Nil(t, data["error"], "the request should succeed: %v", data)
 
 	responseScope, ok := data["scope"].(string)
 	assert.True(t, ok, "scope should be a string")
-	assert.Equal(t, readScope+" "+writeScope, responseScope,
-		"the response scope should be space-separated")
-	assert.NotContains(t, responseScope, "\t")
+	assert.Equal(t, readScope+" "+writeScope, responseScope)
 
 	accessToken, ok := data["access_token"].(string)
 	assert.True(t, ok)

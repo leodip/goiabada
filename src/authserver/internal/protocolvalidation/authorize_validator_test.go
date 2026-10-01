@@ -793,18 +793,27 @@ func TestValidateScopes_MultipleScopesInSingleRequest(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// RFC 6749 3.3's grammar is one space between each two scopes and none at either end, so a scope
+// padded or doubled with spaces is refused as malformed before any lookup: the strict database has
+// nothing registered, and reaching it fails the case. It used to be accepted as the scopes inside
+// (#244).
 func TestValidateScopes_WithLeadingAndTrailingSpaces(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
+	for _, scope := range []string{
+		"  openid  profile  resource1:permission1  ",
+		" openid", "openid ", "openid  profile", " ", "   ",
+	} {
+		t.Run(scope, func(t *testing.T) {
+			validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
 
-	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&models.Resource{Id: 1}, nil)
-	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&models.Resource{Id: 1}, nil)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "permission1"}}, nil)
+			err := validator.ValidateScopes(context.Background(), scope)
 
-	scope := "  openid  profile  resource1:permission1  "
-	err := validator.ValidateScopes(context.Background(), scope)
-
-	assert.NoError(t, err)
+			var detail *customerrors.ErrorDetail
+			require.ErrorAs(t, err, &detail)
+			assert.Equal(t, "invalid_scope", detail.GetCode())
+			assert.Equal(t, malformedText("scope"), detail.GetDescription())
+			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+		})
+	}
 }
 
 func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
@@ -1467,13 +1476,24 @@ func TestValidatePrompt_EmptyString(t *testing.T) {
 	assert.Equal(t, "", result)
 }
 
+// A prompt of spaces alone was trimmed and read as absent; it is malformed (#244).
 func TestValidatePrompt_WhitespaceOnly(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("   ")
 
-	assert.NoError(t, err)
+	assertPromptMalformed(t, result, err)
+}
+
+// assertPromptMalformed requires ValidatePrompt's refusal of a prompt whose spaces the grammar does
+// not allow.
+func assertPromptMalformed(t *testing.T, result string, err error) {
+	t.Helper()
+	var detail *customerrors.ErrorDetail
+	require.ErrorAs(t, err, &detail)
+	assert.Equal(t, "invalid_request", detail.GetCode())
+	assert.Equal(t, malformedText("prompt"), detail.GetDescription())
 	assert.Equal(t, "", result)
 }
 
@@ -1517,24 +1537,28 @@ func TestValidatePrompt_MultipleValues_LoginConsent(t *testing.T) {
 	assert.Equal(t, "login consent", result)
 }
 
+// A run of spaces between two values used to be collapsed; it is malformed (#244).
+// TestValidatePrompt_MultipleValues_LoginConsent is the single-space control.
 func TestValidatePrompt_MultipleSpaces(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	result, err := validator.ValidatePrompt("login  consent")
 
-	assert.NoError(t, err)
-	assert.Equal(t, "login consent", result)
+	assertPromptMalformed(t, result, err)
 }
 
+// Spaces around a value used to be trimmed; they are malformed (#244).
+// TestValidatePrompt_SingleValue_Login is the control.
 func TestValidatePrompt_LeadingTrailingSpaces(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	result, err := validator.ValidatePrompt("  login  ")
+	for _, prompt := range []string{"  login  ", " login", "login "} {
+		result, err := validator.ValidatePrompt(prompt)
 
-	assert.NoError(t, err)
-	assert.Equal(t, "login", result)
+		assertPromptMalformed(t, result, err)
+	}
 }
 
 func TestValidatePrompt_Duplicates(t *testing.T) {

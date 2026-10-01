@@ -77,10 +77,10 @@ func TestHasPromptValue_WhitespaceHandling(t *testing.T) {
 	assert.True(t, ac.HasPromptValue("consent"))
 }
 
-// HasPromptValue reads the stored prompt with the splitter every space-delimited parameter is read
+// / HasPromptValue reads the stored prompt with the splitter every space-delimited parameter is read
 // with (#244), so it agrees with ValidatePrompt, which normalized what it reads, and with the
-// handler's silence test. A tab still separates; a no-break space joins two words into one value
-// that is neither.
+// handler's silence test. Only a space separates: a tab, a newline or a no-break space joins two
+// words into one value that is neither, and nothing is trimmed off a value's edges.
 func TestHasPromptValue_SharedSeparators(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -88,15 +88,17 @@ func TestHasPromptValue_SharedSeparators(t *testing.T) {
 		value  string
 		want   bool
 	}{
-		{"a tab separates", "login\tconsent", "consent", true},
-		{"a newline separates", "login\nconsent", "login", true},
-		{"a form feed separates", "login\fconsent", "consent", true},
-		{"a carriage return separates", "login\rconsent", "login", true},
-		{"a no-break space does not separate, the first word", "login consent", "login", false},
-		{"a no-break space does not separate, the second word", "login consent", "consent", false},
+		{"a space separates, the first word", "login consent", "login", true},
+		{"a space separates, the second word", "login consent", "consent", true},
+		{"a tab does not separate", "login\tconsent", "consent", false},
+		{"a newline does not separate", "login\nconsent", "login", false},
+		{"a form feed does not separate", "login\fconsent", "consent", false},
+		{"a carriage return does not separate", "login\rconsent", "login", false},
+		{"a no-break space does not separate, the first word", "login\u00a0consent", "login", false},
+		{"a no-break space does not separate, the second word", "login\u00a0consent", "consent", false},
 		{"a vertical tab does not separate", "login\vconsent", "login", false},
 		{"a next-line character does not separate", "login\u0085consent", "consent", false},
-		{"a padded value is still that value", "login ", "login", true},
+		{"a value padded with a no-break space is not that value", "login\u00a0", "login", false},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -390,13 +392,13 @@ func TestSetTargetAcrLevel_RoundTripsEveryLevel(t *testing.T) {
 	}
 }
 
-// acr_values is split by oauth.SplitSpaceDelimited, the rule the space-delimited parameters share:
-// the separators are space, tab, newline, form feed and carriage return, and each value is trimmed
-// with strings.TrimSpace. The trim is the one edge that moved when the per-call regexp went: a value
-// padded with Unicode whitespace used to be one unrecognized value and is now recognized. That can
-// only raise the target, since the client's level stays the floor, which is why it was taken (#436).
-// The row that joins two levels with a no-break space is decision 20's keep case (#244): it is one
-// value that names no level, and stays so.
+// / acr_values is read with the grammar the space-delimited parameters share (#244): one space between
+// each two levels and none at either end. A value that breaks it is read as no acr_values at all,
+// never refused, since OIDC Core makes acr_values a request the server may decline; the client's
+// level is the floor either way, so declining can never lower the target. Only a space separates,
+// and nothing is trimmed: a tab, a newline, a no-break space, U+0085 or a vertical tab joins two
+// levels into one value that names none. Until #244 a tab or a newline separated and a padded level
+// was trimmed and recognized.
 func TestSetTargetAcrLevel_SplitsAcrValuesAsTheSharedSplitterDoes(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -405,28 +407,46 @@ func TestSetTargetAcrLevel_SplitsAcrValuesAsTheSharedSplitterDoes(t *testing.T) 
 		want          models.AcrLevel
 	}{
 		{
-			name:          "tab and newline separate values",
-			acrValues:     "urn:example:unknown\turn:goiabada:level2_optional\nurn:goiabada:level1",
+			name:          "one space separates values, the first recognized wins",
+			acrValues:     "urn:example:unknown urn:goiabada:level2_optional urn:goiabada:level1",
 			clientDefault: models.AcrLevel1,
 			want:          models.AcrLevel2Optional,
 		},
 		{
-			name:          "a value padded with Unicode whitespace is recognized",
-			acrValues:     " urn:goiabada:level2_mandatory ",
+			name:          "a tab and a newline do not separate values",
+			acrValues:     "urn:example:unknown\turn:goiabada:level2_optional\nurn:goiabada:level1",
 			clientDefault: models.AcrLevel1,
-			want:          models.AcrLevel2Mandatory,
+			want:          models.AcrLevel1,
 		},
 		{
-			name:          "a recognized padded value still never lowers the client's level",
-			acrValues:     " urn:goiabada:level1 ",
+			name:          "a value padded with spaces is malformed and read as no acr_values",
+			acrValues:     " urn:goiabada:level2_mandatory ",
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel1,
+		},
+		{
+			name:          "a run of spaces is malformed and read as no acr_values",
+			acrValues:     "urn:goiabada:level2_mandatory  urn:goiabada:level1",
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel1,
+		},
+		{
+			name:          "a malformed value still leaves the client's level in place",
+			acrValues:     " urn:goiabada:level1 ",
 			clientDefault: models.AcrLevel2Mandatory,
 			want:          models.AcrLevel2Mandatory,
 		},
 		{
-			// The same three characters strings.Fields split on, spelled as escapes so that no editor
-			// can turn them into plain spaces: each joins the two levels into one value.
+			name:          "a value padded with a no-break space names no level",
+			acrValues:     "urn:goiabada:level2_mandatory\u00a0",
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel1,
+		},
+		{
+			// Spelled as escapes so that no editor can turn them into plain spaces: each joins the
+			// two levels into one value.
 			name:          "a no-break space between two values does not separate them",
-			acrValues:     "urn:goiabada:level2_mandatory urn:goiabada:level1",
+			acrValues:     "urn:goiabada:level2_mandatory\u00a0urn:goiabada:level1",
 			clientDefault: models.AcrLevel1,
 			want:          models.AcrLevel1,
 		},
@@ -439,15 +459,6 @@ func TestSetTargetAcrLevel_SplitsAcrValuesAsTheSharedSplitterDoes(t *testing.T) 
 		{
 			name:          "a vertical tab between two values does not separate them",
 			acrValues:     "urn:goiabada:level2_mandatory\vurn:goiabada:level1",
-			clientDefault: models.AcrLevel1,
-			want:          models.AcrLevel1,
-		},
-		{
-			// Unicode whitespace pads a value and does not separate two: this is one value, which
-			// names no level, so the client's level answers. Split there, the first value would
-			// raise the target to level2_mandatory.
-			name:          "Unicode whitespace between two values does not separate them",
-			acrValues:     "urn:goiabada:level2_mandatory urn:goiabada:level1",
 			clientDefault: models.AcrLevel1,
 			want:          models.AcrLevel1,
 		},
@@ -465,15 +476,30 @@ func TestSetTargetAcrLevel_SplitsAcrValuesAsTheSharedSplitterDoes(t *testing.T) 
 }
 
 func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
-	t.Run("collapses repeated whitespace", func(t *testing.T) {
+	t.Run("one space between two levels", func(t *testing.T) {
 		ac := &AuthContext{
-			AcrValuesFromAuthorizeRequest: "urn:goiabada:level1     urn:goiabada:level2_mandatory",
+			AcrValuesFromAuthorizeRequest: "urn:goiabada:level1 urn:goiabada:level2_mandatory",
 		}
 
 		result := ac.parseAcrValuesFromAuthorizeRequest()
 
 		assert.Equal(t, []models.AcrLevel{models.AcrLevel1, models.AcrLevel2Mandatory}, result)
 	})
+
+	// The grammar allows one space, and a value that breaks it is read as none (#244). Repeated
+	// whitespace used to be collapsed.
+	for _, malformed := range []string{
+		"urn:goiabada:level1     urn:goiabada:level2_mandatory",
+		" urn:goiabada:level1",
+		"urn:goiabada:level1 ",
+		" ",
+	} {
+		t.Run("a malformed value yields an empty slice: "+malformed, func(t *testing.T) {
+			ac := &AuthContext{AcrValuesFromAuthorizeRequest: malformed}
+
+			assert.Empty(t, ac.parseAcrValuesFromAuthorizeRequest())
+		})
+	}
 
 	t.Run("deduplicates repeated values preserving first position", func(t *testing.T) {
 		ac := &AuthContext{
@@ -760,7 +786,9 @@ func TestSetScope_NormalizesWhitespaceAndDuplicates(t *testing.T) {
 		{"repeated spaces", "openid    profile", "openid profile"},
 		{"leading and trailing spaces", "  openid profile  ", "openid profile"},
 		{"duplicate scopes", "openid openid profile", "openid profile"},
-		{"tabs and newlines", "openid\tprofile\nemail", "openid profile email"},
+		// SetScope stores a scope the validator found well formed. It splits on the space alone
+		// (#244), so a tab or a newline is part of a value, not a separator, and is kept as it is.
+		{"tabs and newlines are not separators", "openid\tprofile\nemail", "openid\tprofile\nemail"},
 		{"empty", "", ""},
 		{"whitespace only", "   ", ""},
 	}
