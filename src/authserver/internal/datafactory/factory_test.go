@@ -3,6 +3,7 @@ package datafactory
 import (
 	"context"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -18,8 +19,8 @@ import (
 
 // sourceConfig is one loaded GOIABADA_DB_* configuration in which no two values are equal.
 //
-// The distinctness is what makes the mapper tables below load-bearing. Eight fields copied by
-// hand is eight chances to write one into another's place, and neither the engine's error nor
+// The distinctness is what makes the mapper tables below load-bearing. Six fields copied by
+// hand is six chances to write one into another's place, and neither the engine's error nor
 // the dispatch record can see the difference: a swapped Host and Name still answers `dial tcp`,
 // and Password appears in no engine's error at all. With two fields sharing a value, a mapper
 // writing one into the other's slot would still match.
@@ -66,19 +67,20 @@ func assertMapping(t *testing.T, engine string, mapped any, cases []fieldCase) {
 		engine, declared, len(cases))
 }
 
-// TestMysqlConfig_CopiesEveryField is seam 2 for MySQL: all eight fields, Create included.
+// TestMysqlConfig_CopiesEveryField is seam 2 for MySQL: all six fields, Create included. The
+// loaded Type and DSN are not among them, because the engine reads neither, and the field count
+// assertMapping pins is what says they stay out (#438 decision 3). SQLite has no mapper: its
+// constructor takes the DSN alone.
 func TestMysqlConfig_CopiesEveryField(t *testing.T) {
 	c := sourceConfig()
 	got := mysqlConfig(c)
 
 	assertMapping(t, "mysqldb", got, []fieldCase{
-		{"Type", got.Type, c.Type},
 		{"Username", got.Username, c.Username},
 		{"Password", got.Password, c.Password},
 		{"Host", got.Host, c.Host},
 		{"Port", got.Port, c.Port},
 		{"Name", got.Name, c.Name},
-		{"DSN", got.DSN, c.DSN},
 		{"Create", got.Create, c.Create},
 	})
 }
@@ -89,13 +91,11 @@ func TestPostgresConfig_CopiesEveryField(t *testing.T) {
 	got := postgresConfig(c)
 
 	assertMapping(t, "postgresdb", got, []fieldCase{
-		{"Type", got.Type, c.Type},
 		{"Username", got.Username, c.Username},
 		{"Password", got.Password, c.Password},
 		{"Host", got.Host, c.Host},
 		{"Port", got.Port, c.Port},
 		{"Name", got.Name, c.Name},
-		{"DSN", got.DSN, c.DSN},
 		{"Create", got.Create, c.Create},
 	})
 }
@@ -106,40 +106,13 @@ func TestMssqlConfig_CopiesEveryField(t *testing.T) {
 	got := mssqlConfig(c)
 
 	assertMapping(t, "mssqldb", got, []fieldCase{
-		{"Type", got.Type, c.Type},
 		{"Username", got.Username, c.Username},
 		{"Password", got.Password, c.Password},
 		{"Host", got.Host, c.Host},
 		{"Port", got.Port, c.Port},
 		{"Name", got.Name, c.Name},
-		{"DSN", got.DSN, c.DSN},
 		{"Create", got.Create, c.Create},
 	})
-}
-
-// TestSqliteConfig_CopiesSevenFieldsAndNotCreate is seam 2 for SQLite, which is seven fields
-// rather than eight.
-func TestSqliteConfig_CopiesSevenFieldsAndNotCreate(t *testing.T) {
-	c := sourceConfig()
-	got := sqliteConfig(c)
-
-	assertMapping(t, "sqlitedb", got, []fieldCase{
-		{"Type", got.Type, c.Type},
-		{"Username", got.Username, c.Username},
-		{"Password", got.Password, c.Password},
-		{"Host", got.Host, c.Host},
-		{"Port", got.Port, c.Port},
-		{"Name", got.Name, c.Name},
-		{"DSN", got.DSN, c.DSN},
-	})
-
-	// The absence of Create is a chosen leniency and not an oversight, so it is a case rather
-	// than a comment: SQLite has no create statement and no maintenance connection to issue one
-	// over, and mode=rw in the operator's DSN is the equivalent (#293). sourceConfig carries
-	// Create: true, so this says GOIABADA_DB_CREATE cannot reach the SQLite driver by any route.
-	_, declared := reflect.TypeOf(*got).FieldByName("Create")
-	assert.Falsef(t, declared,
-		"sqlitedb.DatabaseConfig declares a Create field: if the engine has grown one, sqliteConfig owes it a mapped case rather than silently dropping GOIABADA_DB_CREATE")
 }
 
 // unreachable is a configuration pointed at a port nothing listens on, which is how every server
@@ -257,7 +230,7 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 				return &config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "on.db"), Create: true}
 			},
 			wantType: data.SQLite,
-			why:      "GOIABADA_DB_CREATE changes nothing on SQLite because sqliteConfig does not carry it; what decides whether an absent file is created is mode=rw in the operator's own DSN (#293)",
+			why:      "GOIABADA_DB_CREATE changes nothing on SQLite because sqlitedb.New takes the DSN alone and has nowhere to receive it; what decides whether an absent file is created is mode=rw in the operator's own DSN (#293, #438 decision 4)",
 		},
 		{
 			name:     "a double-quoted type dispatches to its engine",
@@ -279,12 +252,18 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			capture := logtest.CaptureSlog(t)
 
-			database, err := OpenDatabase(tc.cfg(t), false)
+			cfg := tc.cfg(t)
+			database, err := OpenDatabase(context.Background(), cfg, false)
 
 			if tc.wantErr == "" {
 				require.NoErrorf(t, err, "the open must succeed: %s", tc.why)
-				assert.IsTypef(t, &sqlitedb.SQLiteDatabase{}, database,
+				assert.IsTypef(t, &sqlitedb.Database{}, database,
 					"the returned handle names the engine reached: %s", tc.why)
+				// The file the DSN names is there afterwards, which is what says the DSN, and
+				// nothing else, reached sqlitedb.New: dropped on the way, it would open the
+				// in-memory default and write no file at all (#438 decision 4).
+				_, statErr := os.Stat(cfg.DSN)
+				assert.NoErrorf(t, statErr, "SQLite opened the file its DSN names: %s", tc.why)
 			} else {
 				require.Errorf(t, err, "the open must fail: %s", tc.why)
 				// Compared against a nil interface rather than through assert.Nil, which reports
@@ -342,7 +321,7 @@ func TestNewDatabase_WritesTheNoMigrationRecordOnlyWhenNothingRan(t *testing.T) 
 		capture := logtest.CaptureSlog(t)
 		database, err := NewDatabase(context.Background(), cfg, aesKey, nil, false)
 		require.NoError(t, err)
-		concrete, ok := database.(*sqlitedb.SQLiteDatabase)
+		concrete, ok := database.(*sqlitedb.Database)
 		require.True(t, ok, "a sqlite type opens the sqlite engine")
 		require.NoError(t, concrete.DB.Close(), "released so the next start is a fresh open")
 
@@ -392,7 +371,7 @@ func TestOpenDatabase_PassesLogSQLToTheEngine(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			database, err := OpenDatabase(
+			database, err := OpenDatabase(context.Background(),
 				&config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "logsql.db")}, tc.logSQL)
 			require.NoError(t, err)
 

@@ -1,3 +1,7 @@
+// Package sqlitedb is the SQLite adapter: the constructor that opens the operator's file, or the
+// in-memory default, with the PRAGMAs Goiabada requires, the migration chain SQLite runs, and the
+// handful of Database methods whose SQL differs from commondb's. Everything else is promoted from
+// the embedded common implementation.
 package sqlitedb
 
 import (
@@ -10,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
@@ -19,38 +24,34 @@ import (
 //go:embed migrations/*.sql
 var sqliteMigrationsFs embed.FS
 
-// SQLiteDatabase declares only the methods SQLite needs its own SQL for; the rest are promoted
+// Database declares only the methods SQLite needs its own SQL for; the rest are promoted
 // from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
-type SQLiteDatabase struct {
+type Database struct {
 	*commondb.Database
 }
 
-type DatabaseConfig struct {
-	Type     string
-	Username string
-	Password string
-	Host     string
-	Port     int
-	Name     string
-	DSN      string
-}
+// The compiler holds the adapter to the whole interface here, in its own package, so an engine
+// missing a method fails where the method is missing rather than only where datafactory hands
+// the adapter out (#438).
+var _ data.Database = (*Database)(nil)
 
-// GOIABADA_DB_CREATE does not apply here, which is why DatabaseConfig has no Create field: there
-// is no create statement and no maintenance connection on SQLite, and what decides whether an
-// absent file is created is the operator's own DSN. The equivalent is mode=rw in it, which the
-// driver honours by refusing to create the file (#293).
-func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, error) {
-
-	dsn := dbConfig.DSN
+// New opens the SQLite database dsn names, or a shared in-memory one when dsn is empty.
+//
+// The DSN is all SQLite reads, so it is all New takes. GOIABADA_DB_CREATE does not apply here:
+// there is no create statement and no maintenance connection on SQLite, and what decides whether
+// an absent file is created is the operator's own DSN. The equivalent is mode=rw in it, which the
+// driver honours by refusing to create the file (#293, #438 decision 4).
+func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	if dsn == "" {
 		dsn = "file::memory:?cache=shared"
 	}
 
-	// The effective dsn rather than dbConfig.DSN, which is empty on the default above: the pair
-	// of records this replaces said "db dsn: " with nothing after it for every in-memory start,
-	// which is the one case where a reader most needs to know which database was opened (#320).
-	slog.Info("using database", "type", "sqlite", "dsn", dsn)
+	// The effective dsn rather than the one passed in, which is empty on the default above: the
+	// pair of records this replaces said "db dsn: " with nothing after it for every in-memory
+	// start, which is the one case where a reader most needs to know which database was opened
+	// (#320).
+	slog.InfoContext(ctx, "using database", "type", "sqlite", "dsn", dsn)
 
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -61,12 +62,20 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
 
-	// The constructor owns this root, because nothing is waiting on it: the process is starting
-	// and there is no request and no operator to cancel. What the context buys here is that the
-	// pragma statements below go through the *Context calls like every other statement this
-	// package issues, so the shape has no exception to remember and no exemption to maintain
-	// (#386).
-	ctx := context.Background()
+	// The ping comes before the PRAGMAs because the first statement on the pool is what opens
+	// the file, so it is what an unopenable file fails: behind the PRAGMAs, an operator read
+	// "failed to execute PRAGMA foreign_keys = ON" for a path that does not exist, and this
+	// branch was unreachable for that input. errors.As rather than a type assertion, and the
+	// driver's error kept in the chain with SQLite's own name for the code beside it, e.g.
+	// "Unable to open the database file (SQLITE_CANTOPEN)" (#438 decision 4).
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		var sqliteErr *sqlitedriver.Error
+		if errors.As(err, &sqliteErr) {
+			return nil, errs.Wrapf(err, "unable to connect to database: %s", sqlitedriver.ErrorCodeString[sqliteErr.Code()])
+		}
+		return nil, errs.Wrap(err, "unable to connect to database")
+	}
 
 	// Execute PRAGMA statements directly
 	pragmaStatements := []string{
@@ -91,7 +100,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	pragmaChecks := []struct {
 		name     string
 		query    string
-		expected interface{}
+		expected any
 	}{
 		{"foreign_keys", "PRAGMA foreign_keys;", 1},
 		{"busy_timeout", "PRAGMA busy_timeout;", 5000},
@@ -102,12 +111,12 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 		pragmaChecks = append(pragmaChecks, struct {
 			name     string
 			query    string
-			expected interface{}
+			expected any
 		}{"journal_mode", "PRAGMA journal_mode;", "wal"})
 	}
 
 	for _, check := range pragmaChecks {
-		var value interface{}
+		var value any
 		err = db.QueryRowContext(ctx, check.query).Scan(&value)
 		if err != nil {
 			return nil, errs.Wrapf(err, "unable to check %s status", check.name)
@@ -117,18 +126,11 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 		}
 	}
 
-	if err := db.PingContext(ctx); err != nil {
-		if errWithCode, ok := err.(*sqlitedriver.Error); ok {
-			err = errs.New(sqlitedriver.ErrorCodeString[errWithCode.Code()])
-		}
-		return nil, errs.Errorf("sqlite ping: %w", err)
-	}
-
-	slog.Info("connected to sqlite database with required PRAGMA settings")
+	slog.InfoContext(ctx, "connected to sqlite database with required PRAGMA settings")
 	commonDb := commondb.New(db, sqlbuilder.SQLite, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
-	sqliteDb := SQLiteDatabase{
+	sqliteDb := Database{
 		Database: commonDb,
 	}
 
@@ -220,7 +222,7 @@ const schemaMigrationsIndexDDL = `CREATE UNIQUE INDEX IF NOT EXISTS version_uniq
 // ensureSchemaMigrationsTable creates the version table at Goiabada's shape, and its index,
 // when they are not there yet. Both statements are idempotent, so two processes starting
 // against one empty database cannot make each other fail.
-func (d *SQLiteDatabase) ensureSchemaMigrationsTable(ctx context.Context) error {
+func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) error {
 	if _, err := d.DB.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
@@ -236,7 +238,7 @@ func (d *SQLiteDatabase) ensureSchemaMigrationsTable(ctx context.Context) error 
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *SQLiteDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+func (d *Database) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
 	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}

@@ -29,10 +29,7 @@ func newTestMigrator(t *testing.T) (data.Database, *migrator.Migrator, *sql.DB) 
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "migrate_test.db")
-	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{
-		Type: "sqlite",
-		DSN:  "file:" + path,
-	}, false)
+	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
 

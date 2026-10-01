@@ -9,7 +9,7 @@ import (
 
 // DropDatabase drops the database cfg names, if there is one, over the maintenance connection.
 //
-// The server never calls it. It is the inverse of the CREATE DATABASE NewMySQLDatabase issues,
+// The server never calls it. It is the inverse of the CREATE DATABASE New issues,
 // quoted the same way, and it sits beside that so the tools that discard a database spell the
 // drop once: schemadump's scratch databases, the data tier's fixtures, and droptestdb, which
 // run-tests.sh runs before each tier so every local run starts from an empty database (#433).

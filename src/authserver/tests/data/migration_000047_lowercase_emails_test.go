@@ -298,7 +298,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 
 	// A database sitting one below 000047 with a collision already in it, which is what a legacy
 	// deployment upgrading across this release looks like.
-	seed, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
+	seed, err := sqlitedb.New(context.Background(), dsn, false)
 	require.NoError(t, err, "open the throwaway database")
 	m, err := seed.NewMigrator(context.Background())
 	require.NoError(t, err)
@@ -322,7 +322,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 		"the refusal is the only message the operator gets, and it has to name the rows")
 
 	// And it refused BEFORE writing anything, which is the whole reason it is a pre-flight.
-	check, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
+	check, err := sqlitedb.New(context.Background(), dsn, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = check.DB.Close() })
 	checkMigrator, err := check.NewMigrator(context.Background())

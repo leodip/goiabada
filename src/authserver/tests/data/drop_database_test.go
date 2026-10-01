@@ -40,29 +40,29 @@ func TestDropDatabase_DropsTheDatabaseAndToleratesAnAbsentOne(t *testing.T) {
 	switch dbType() {
 	case data.MySQL:
 		engineCfg := &mysqldb.DatabaseConfig{
-			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}
-		db, err := mysqldb.NewMySQLDatabase(engineCfg, false)
-		require.NoErrorf(t, err, "NewMySQLDatabase at %s", name)
+		db, err := mysqldb.New(context.Background(), engineCfg, false)
+		require.NoErrorf(t, err, "mysqldb.New at %s", name)
 		handle = db.DB
 		drop = func() error { return mysqldb.DropDatabase(context.Background(), engineCfg) }
 	case data.Postgres:
 		engineCfg := &postgresdb.DatabaseConfig{
-			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}
-		db, err := postgresdb.NewPostgresDatabase(engineCfg, false)
-		require.NoErrorf(t, err, "NewPostgresDatabase at %s", name)
+		db, err := postgresdb.New(context.Background(), engineCfg, false)
+		require.NoErrorf(t, err, "postgresdb.New at %s", name)
 		handle = db.DB
 		drop = func() error { return postgresdb.DropDatabase(context.Background(), engineCfg) }
 	case data.MSSQL:
 		engineCfg := &mssqldb.DatabaseConfig{
-			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: true,
 		}
-		db, err := mssqldb.NewMsSQLDatabase(engineCfg, false)
-		require.NoErrorf(t, err, "NewMsSQLDatabase at %s", name)
+		db, err := mssqldb.New(context.Background(), engineCfg, false)
+		require.NoErrorf(t, err, "mssqldb.New at %s", name)
 		handle = db.DB
 		drop = func() error { return mssqldb.DropDatabase(context.Background(), engineCfg) }
 	default:

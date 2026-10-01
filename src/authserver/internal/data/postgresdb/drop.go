@@ -11,7 +11,7 @@ import (
 // WITH (FORCE) ends any session still attached to it (PostgreSQL 13 and later), which a plain
 // DROP DATABASE refuses to do.
 //
-// The server never calls it. It is the inverse of the CREATE DATABASE NewPostgresDatabase issues,
+// The server never calls it. It is the inverse of the CREATE DATABASE New issues,
 // quoted the same way, because unquoted the name folds to lower case and a mixed-case database
 // would silently survive its drop. It sits beside the create so the tools that discard a database
 // spell the drop once: schemadump's scratch databases, the data tier's fixtures, and droptestdb,
@@ -23,7 +23,7 @@ func DropDatabase(ctx context.Context, cfg *DatabaseConfig) error {
 	}
 	defer func() { _ = db.Close() }()
 
-	if _, err := db.ExecContext(ctx, "DROP DATABASE IF EXISTS "+QuoteIdentifier(cfg.Name)+" WITH (FORCE)"); err != nil {
+	if _, err := db.ExecContext(ctx, "DROP DATABASE IF EXISTS "+quoteIdentifier(cfg.Name)+" WITH (FORCE)"); err != nil {
 		return errs.Wrap(err, "unable to drop database")
 	}
 	return nil

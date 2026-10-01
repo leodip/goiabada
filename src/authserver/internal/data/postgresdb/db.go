@@ -17,6 +17,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
@@ -25,39 +26,42 @@ import (
 //go:embed migrations/*.sql
 var postgresMigrationsFs embed.FS
 
-// PostgresDatabase declares only the methods PostgreSQL needs its own SQL for; the rest are promoted
+// Database declares only the methods PostgreSQL needs its own SQL for; the rest are promoted
 // from the embedded common implementation. See commondb.Database for what embedding does
 // and does not buy (#416).
-type PostgresDatabase struct {
+type Database struct {
 	*commondb.Database
 	dbConfig *DatabaseConfig
 }
 
+// The compiler holds the adapter to the whole interface here, in its own package, so an engine
+// missing a method fails where the method is missing rather than only where datafactory hands
+// the adapter out (#438).
+var _ data.Database = (*Database)(nil)
+
+// DatabaseConfig is what PostgreSQL reads to connect: the credentials, the address, the database
+// name, and whether it may create that database (#438 decision 3).
 type DatabaseConfig struct {
-	Type     string
 	Username string
 	Password string
 	Host     string
 	Port     int
 	Name     string
-	DSN      string
 	// Create decides whether the constructor may create the database when it is absent. It is
 	// positive-sense, so the zero value does not create: every literal has to set it (#293).
 	Create bool
 }
 
-func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDatabase, error) {
+// New opens the PostgreSQL database dbConfig names, creating it first when dbConfig.Create says
+// so. Every statement it issues runs under ctx, the caller's, the creation lock's wait included,
+// so a start held behind that lock ends when the caller stops waiting (#438 decision 3).
+func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database, error) {
 
 	// One record where five used to be, and no password: the URL is assembled below from the
 	// same four values, so a startup problem is read off this line rather than off four
 	// consecutive ones that a collector had no way to join (#320 decision 6).
-	slog.Info("using database", "type", "postgres", "username", dbConfig.Username,
+	slog.InfoContext(ctx, "using database", "type", "postgres", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
-
-	// The constructor owns this root, because nothing is waiting on it: the process is starting
-	// and there is no request and no operator to cancel. It is here so the ping below goes through
-	// the *Context call like every other statement this package issues (#386, #424).
-	ctx := context.Background()
 
 	// Open with database/sql for commondb compatibility
 	db, err := sql.Open("pgx", DSN(dbConfig))
@@ -80,7 +84,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		}
 		defer func() { _ = defaultDB.Close() }()
 
-		if err := createDatabaseUnderAdvisoryLock(defaultDB, dbConfig.Name); err != nil {
+		if err := createDatabaseUnderAdvisoryLock(ctx, defaultDB, dbConfig.Name); err != nil {
 			return nil, err
 		}
 	} else {
@@ -89,7 +93,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		// application database and holding no CREATEDB is enough to start, which is what the
 		// production checklist's "don't use root/admin accounts" asks for and what this
 		// engine refused to allow before (#293).
-		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
+		slog.InfoContext(ctx, "database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 
 		// sql.Open only parses the URL, so without this an absent database would come back as
 		// a usable handle and a nil error, and the failure would surface inside the migrator
@@ -109,7 +113,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	commonDb.InsertReturningIdSQL = insertReturningIdSQL
 	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
 
-	postgresDb := PostgresDatabase{
+	postgresDb := Database{
 		Database: commonDb,
 		dbConfig: dbConfig,
 	}
@@ -181,9 +185,12 @@ func databaseExists(ctx context.Context, q rowQuerier, name string) (bool, error
 // Advisory locks live in a key space scoped to the database the session is connected to, and
 // every racer here is connected to `postgres`. That shared space is the whole reason this works.
 //
-// The lock is untimed, so a stuck holder blocks startup rather than failing it. Accepted in #293
-// decision 5, the same trade the migration lock one layer down already makes: what it spans is
-// one catalog read and one CREATE DATABASE.
+// The lock has no timeout of its own, so a stuck holder blocks startup rather than failing it.
+// Accepted in #293 decision 5, the same trade the migration lock one layer down already makes:
+// what it spans is one catalog read and one CREATE DATABASE. The wait is the caller's, though: it
+// runs under ctx, and pgx abandons it when ctx ends, leaving the pool usable (#438 decision 3).
+// The release below runs under the same ctx and may then fail, which leaves nothing held: the
+// lock belongs to a session of the maintenance pool, and New closes that pool on its way out.
 //
 // That trade is only affordable because the lock is reached ONLY when the database is absent.
 // An advisory lock taken in the `postgres` maintenance database shares one key space with every
@@ -199,9 +206,7 @@ func databaseExists(ctx context.Context, q rowQuerier, name string) (bool, error
 // the lock. Both ask pg_database the same question through databaseExists, deliberately: two
 // spellings of the same predicate could drift apart, and the outer one is only sound while it
 // is no weaker than the inner one.
-func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
-	ctx := context.Background()
-
+func createDatabaseUnderAdvisoryLock(ctx context.Context, maintenanceDB *sql.DB, name string) error {
 	exists, err := databaseExists(ctx, maintenanceDB, name)
 	if err != nil {
 		return err
@@ -235,14 +240,14 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 	// The "already exists" tolerance stays. Under the lock it no longer covers another Goiabada
 	// process, which cannot be in here at the same time, but it still covers an operator running
 	// createdb by hand inside the window, and it costs one condition.
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s;", QuoteIdentifier(name))); err != nil &&
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE %s;", quoteIdentifier(name))); err != nil &&
 		!isDuplicateDatabase(err) {
 		return errs.Wrap(err, "unable to create database")
 	}
 	return nil
 }
 
-// QuoteIdentifier wraps name in the double quotes PostgreSQL spells an identifier with, doubling
+// quoteIdentifier wraps name in the double quotes PostgreSQL spells an identifier with, doubling
 // any double quote inside it.
 //
 // It is here because the name is used two ways that have to agree, and unquoted they do not.
@@ -265,7 +270,7 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 // The doubling is the injection answer too. GOIABADA_DB_NAME is operator-supplied configuration
 // rather than user input, so this is hardening and not a live hole, but an identifier cannot be
 // passed as a bind parameter and this is the only thing that can be done about it.
-func QuoteIdentifier(name string) string {
+func quoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
@@ -333,7 +338,7 @@ const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations "
 
 // ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
 // there yet.
-func (d *PostgresDatabase) ensureSchemaMigrationsTable(ctx context.Context) error {
+func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) error {
 	if _, err := d.DB.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
@@ -346,7 +351,7 @@ func (d *PostgresDatabase) ensureSchemaMigrationsTable(ctx context.Context) erro
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *PostgresDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+func (d *Database) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
 	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}

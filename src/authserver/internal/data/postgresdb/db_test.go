@@ -67,8 +67,8 @@ func TestQuoteIdentifier(t *testing.T) {
 		{"empty, which the config default never produces but the function must not mangle", "", `""`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := QuoteIdentifier(tc.in); got != tc.want {
-				t.Errorf("QuoteIdentifier(%q) = %s, want %s", tc.in, got, tc.want)
+			if got := quoteIdentifier(tc.in); got != tc.want {
+				t.Errorf("quoteIdentifier(%q) = %s, want %s", tc.in, got, tc.want)
 			}
 		})
 	}
@@ -77,7 +77,7 @@ func TestQuoteIdentifier(t *testing.T) {
 	// in pg_database.datname, which is the string the connection URL carries. Stripping the
 	// quoting has to give the name back unchanged, case included.
 	const mixed = "Goiabada"
-	if unquoted := QuoteIdentifier(mixed); unquoted != `"`+mixed+`"` {
-		t.Errorf("QuoteIdentifier(%q) does not preserve the name verbatim: %s", mixed, unquoted)
+	if unquoted := quoteIdentifier(mixed); unquoted != `"`+mixed+`"` {
+		t.Errorf("quoteIdentifier(%q) does not preserve the name verbatim: %s", mixed, unquoted)
 	}
 }

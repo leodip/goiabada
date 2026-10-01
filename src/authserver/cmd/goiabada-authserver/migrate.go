@@ -75,7 +75,7 @@ func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io
 	// below takes a context rather than opening one where it lands (#386).
 	ctx := context.Background()
 
-	database, err := datafactory.OpenDatabase(&inv.database, false)
+	database, err := datafactory.OpenDatabase(ctx, &inv.database, false)
 	if err != nil {
 		outf(stderr, "unable to open the database: %+v\n", err)
 		return migrateExitError

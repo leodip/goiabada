@@ -203,7 +203,7 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails(t *te
 		}
 		t.Run(name, func(t *testing.T) {
 			h := newIsolatedDB(t)
-			db, ok := h.DB.(*mssqldb.MsSQLDatabase)
+			db, ok := h.DB.(*mssqldb.Database)
 			require.True(t, ok, "the mssql database must be the concrete type whose pool this swaps")
 
 			// newIsolatedDB already pre-created the table, so without this the CREATE would be a
@@ -415,8 +415,8 @@ func freshPoolTo(t *testing.T, name string) *sql.DB {
 
 	switch dbType() {
 	case data.MySQL:
-		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
-			Type: "mysql", Username: cfg.Username, Password: cfg.Password,
+		db, err := mysqldb.New(context.Background(), &mysqldb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		require.NoErrorf(t, err, "open a second pool to %s", name)
@@ -424,8 +424,8 @@ func freshPoolTo(t *testing.T, name string) *sql.DB {
 		return db.DB
 
 	case data.Postgres:
-		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-			Type: "postgres", Username: cfg.Username, Password: cfg.Password,
+		db, err := postgresdb.New(context.Background(), &postgresdb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		require.NoErrorf(t, err, "open a second pool to %s", name)
@@ -433,8 +433,8 @@ func freshPoolTo(t *testing.T, name string) *sql.DB {
 		return db.DB
 
 	case data.MSSQL:
-		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-			Type: "mssql", Username: cfg.Username, Password: cfg.Password,
+		db, err := mssqldb.New(context.Background(), &mssqldb.DatabaseConfig{
+			Username: cfg.Username, Password: cfg.Password,
 			Host: cfg.Host, Port: cfg.Port, Name: name, Create: false,
 		}, false)
 		require.NoErrorf(t, err, "open a second pool to %s", name)

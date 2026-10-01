@@ -37,15 +37,12 @@ var seededTables = []string{
 const seedWrites = 18
 
 type seedDB struct {
-	*sqlitedb.SQLiteDatabase
+	*sqlitedb.Database
 }
 
 func newSeedDB(t *testing.T) *seedDB {
 	t.Helper()
-	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{
-		Type: "sqlite",
-		DSN:  "file:" + filepath.Join(t.TempDir(), "bootstrap_test.db"),
-	}, false)
+	db, err := sqlitedb.New(context.Background(), "file:"+filepath.Join(t.TempDir(), "bootstrap_test.db"), false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
 

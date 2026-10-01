@@ -961,7 +961,7 @@ func checkMSSQLContent(files []migrationFile, cutoffs migrationCutoffs) []migrat
 							"string column here is NVARCHAR: " + shorten(decl.Text)})
 				}
 
-				// NewMsSQLDatabase creates the database at the pinned collation, but creates
+				// mssqldb.New creates the database at the pinned collation, but creates
 				// it IF NOT EXISTS, so a database an operator pre-created keeps their own
 				// default and an unpinned column silently lands case-insensitive there. RFC
 				// 6749 section 1.9 makes every protocol parameter value case-sensitive (#283).
@@ -2156,7 +2156,7 @@ func TestMigrationContentRules_BindToOneColumnOrOneTable(t *testing.T) {
 			// NTEXT is a string type that CANNOT carry the pin: a UTF-8 collation is only
 			// valid on char, varchar, nchar and nvarchar. A rule that only recognises those
 			// four reads NTEXT as a non-string column and lets it inherit the database
-			// default, which on a database created outside NewMsSQLDatabase folds case.
+			// default, which on a database created outside mssqldb.New folds case.
 			name: "an NTEXT column is refused by its type rather than asked for a COLLATE",
 			breaks: func(tr migrationTree) {
 				editUp(tr, data.MSSQL, 50,

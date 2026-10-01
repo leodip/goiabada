@@ -256,13 +256,13 @@ func identify(t *testing.T, tx *sql.Tx) blocker {
 // error rather than failing the test itself.
 func rawHandle() *sql.DB {
 	switch d := database.(type) {
-	case *sqlitedb.SQLiteDatabase:
+	case *sqlitedb.Database:
 		return d.DB
-	case *mysqldb.MySQLDatabase:
+	case *mysqldb.Database:
 		return d.DB
-	case *postgresdb.PostgresDatabase:
+	case *postgresdb.Database:
 		return d.DB
-	case *mssqldb.MsSQLDatabase:
+	case *mssqldb.Database:
 		return d.DB
 	}
 	return nil

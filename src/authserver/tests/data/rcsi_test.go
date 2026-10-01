@@ -72,8 +72,8 @@ type rcsiFixture struct {
 	// primary and secondary are two handles over the SAME database, because the interleavings
 	// need two connections and secondDatabase points at the shared one. Concrete rather than
 	// data.Database so the pools can be closed: the interface declares no Close.
-	primary   *mssqldb.MsSQLDatabase
-	secondary *mssqldb.MsSQLDatabase
+	primary   *mssqldb.Database
+	secondary *mssqldb.Database
 	name      string
 }
 
@@ -123,7 +123,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	//    that actually runs and is checked.
 	creating := rcsiConfig(cfg, name)
 	creating.Create = true
-	created, err := mssqldb.NewMsSQLDatabase(creating, false)
+	created, err := mssqldb.New(context.Background(), creating, false)
 	if err != nil {
 		return nil, fmt.Errorf("creating the RCSI database %s: %w", name, err)
 	}
@@ -178,7 +178,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	//
 	//    datafactory.NewDatabase cannot be used for either job. It always migrates and it runs the
 	//    startup data tasks, and step 5 wants neither on the handles the tests run on.
-	migrating, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
+	migrating, err := mssqldb.New(context.Background(), rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the handle that migrates %s: %w", name, err)
 	}
@@ -197,13 +197,13 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	//    Both are closed from the package teardown, registered AFTER the drop so they run before
 	//    it: a DROP DATABASE behind two live pools would have to evict them, and this way there
 	//    is nothing left to evict.
-	primary, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
+	primary, err := mssqldb.New(context.Background(), rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the RCSI fixture's first handle: %w", err)
 	}
 	deferPackageTeardown(func() { _ = primary.DB.Close() })
 
-	secondary, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
+	secondary, err := mssqldb.New(context.Background(), rcsiConfig(cfg, name), false)
 	if err != nil {
 		return nil, fmt.Errorf("opening the RCSI fixture's second handle: %w", err)
 	}
@@ -217,7 +217,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 //
 // The pool is closed on the failure path too, so a fixture that cannot migrate still does not
 // leave a connection behind for the drop to evict.
-func migrateRCSIDatabase(db *mssqldb.MsSQLDatabase) error {
+func migrateRCSIDatabase(db *mssqldb.Database) error {
 	m, err := db.NewMigrator(context.Background())
 	if err != nil {
 		_ = db.DB.Close()
@@ -240,7 +240,6 @@ func migrateRCSIDatabase(db *mssqldb.MsSQLDatabase) error {
 // step 1's job and has to be finished, and read back, before anything migrates it.
 func rcsiConfig(cfg *config.DatabaseConfig, name string) *mssqldb.DatabaseConfig {
 	return &mssqldb.DatabaseConfig{
-		Type:     "mssql",
 		Username: cfg.Username,
 		Password: cfg.Password,
 		Host:     cfg.Host,
