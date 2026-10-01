@@ -153,7 +153,7 @@ func TestErrorDetail_WithDescription(t *testing.T) {
 	}
 
 	// And the receiver is untouched, which is what makes it safe to call on the package-level
-	// comparison targets such as ErrUserDisabled.
+	// comparison targets such as ErrCodeRedirectURIDeregistered.
 	if original.GetDescription() != "Client authentication failed." {
 		t.Errorf("Expected the receiver to keep its description, got %s", original.GetDescription())
 	}
