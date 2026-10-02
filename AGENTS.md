@@ -434,19 +434,24 @@ module its vet, unparam and golangci-lint run.
 
 **Architecture guard**: `ARCHITECTURE.md` at the repository root records the allowed module edges,
 the intended final owner of every top-level `core` package, why each symbol left in `core/constants`
-is still there, the temporary exceptions to those rules, and the third-party modules the admin
-console must not compile. Its four tables are data, not prose: `AssertArchitecture` in
-`core/testutil/architecture.go` parses them and checks them against the real import graph, and the
-fourth against every production reference to `core/constants`; all three module unit tiers call it. The check runs in both directions,
+is still there, the temporary exceptions to those rules, the third-party modules the admin
+console must not compile, and the test frameworks no shipped binary may link. Its five tables are
+data, not prose: `AssertArchitecture` in `core/testutil/architecture.go` parses them and checks four
+against the real import graph and the constants table against every production reference to
+`core/constants`; all three module unit tiers call it. The check runs in both directions,
 which is what makes the document a burn-down list rather than a wish — an edge the tables do not
 allow is a failure, and so is an exception left standing for an edge that no longer exists, so the
 issue that removes an edge has to remove its row with it (#332). A new top-level `core` package
 fails the tier until the table says where it belongs, and so does a new symbol in `core/constants`,
 whose row has to name the strongest of `kernel`, `both-apps`, `moving` and `contract` that the
-reference graph backs (#351). A fifth table lives in `src/core/OWNERSHIP.md`, one row per exported
+reference graph backs (#351). A sixth table lives in `src/core/OWNERSHIP.md`, one row per exported
 symbol any `core` package declares: `core/testutil.AssertSymbolOwnership` reads it from the same
 three tiers, four justifications are computed from the reference graph and three are asserted with
-a note the guard requires (#385).
+a note the guard requires (#385). Rule 9 walks the production closure of the three shipped mains,
+the auth server, the admin console and the setup wizard, and refuses `testing` and everything under
+it, `net/http/httptest` and every testify package, so a production import of a test helper or mock
+fails the unit tier rather than reaching a release; the three mains are `shippedMains` in
+`architecture.go`, and the guard fails when one is not found (#331).
 
 **Dead-interface guard**: the auth server and admin console unit tiers each run
 `TestHandlers_NoDeadInterfaces` over their own `internal/handlers` package, holding every interface

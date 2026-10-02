@@ -385,10 +385,10 @@ func TestConstantsOwnership_ThePackageDoesNotJustifyItself(t *testing.T) {
 // TestConstantsOwnership_TheGuardFailsOnASymbolWithNoRow drives rule 7 through assertArchitecture,
 // which is the path the three module tiers take.
 func TestConstantsOwnership_TheGuardFailsOnASymbolWithNoRow(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
 		"core/api/api.go":             pkg("api"),
 		"core/constants/constants.go": constantsPkg("Shared", "Forgotten"),
-	}))
+	})))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
