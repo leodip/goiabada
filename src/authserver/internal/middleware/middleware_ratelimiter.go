@@ -495,7 +495,34 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 	})
 }
 
-func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
+// subjectFunc names whose credential a request is about to check. It returns the key of the
+// bucket the check spends, the details the audit event records if that bucket refuses, and
+// false when the request has no subject at all.
+//
+// The key and the recorded identifier are two values because they differ: the OTP bucket is
+// user_<id> while its event records the user id itself, the identifier its neighbours in the
+// audit log already carry for the same user. Details are a fresh map per call, since a refusal
+// adds the limiter's name to the map it is given.
+type subjectFunc func(r *http.Request) (key string, audited map[string]interface{}, ok bool)
+
+// limitFailuresPerSubject writes the body of a limiter only a failed credential check can
+// spend, keyed on whoever subject names, refusing in the shape class names. LimitOtp,
+// LimitEmailVerification and LimitAccountPassword are this over their own tier and subject
+// (#439).
+//
+// A request with no subject passes through to the handler. No subject means no bucket to key,
+// and each of the three handlers answers that request before reaching the credential: a
+// missing auth context the way every step of the auth flow does, a missing token with
+// ACCESS_TOKEN_REQUIRED. So the skipped limit costs nothing, where returning here instead
+// would write no response at all, which net/http turns into a blank 200 (#114).
+//
+// The reservation is taken before the handler runs and charged or dropped after it, which is
+// what ratelimit.FailureLimiter's in-flight count makes safe under concurrency; the handler
+// converts it by calling RecordCredentialFailure. A closure rather than a bare defer call,
+// since the verdict is not known until the handler has returned.
+func (m *RateLimiterMiddleware) limitFailuresPerSubject(next http.Handler, t *failureTier, class rejectClass,
+	subject subjectFunc) http.Handler {
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -503,37 +530,45 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 			return
 		}
 
-		authContext, err := m.ceremonyStore.GetAuthContext(r)
-		if err != nil {
-			// No readable auth context means there is no user to key a bucket on, so hand
-			// the request to the handler, which answers a missing auth context the same way
-			// every other step of the auth flow does. It rejects the request before reaching
-			// the OTP secret or the database, so the skipped limit costs nothing. Returning
-			// here instead writes no response at all, which net/http turns into a blank 200
-			// (#114).
+		key, audited, ok := subject(r)
+		if !ok {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// Use user ID as rate limit key since we already authenticated the user. Single
-		// tier, unlike the password gate: reaching this form at all requires having
-		// already passed the password, so a third party cannot spend this budget without
-		// already holding the account's password.
-		key := fmt.Sprintf("user_%d", authContext.UserId)
-
-		if !m.otp.limiter.Reserve(key) {
-			m.refuse(w, r, &m.otp.tier, key, rejectBrowser, map[string]interface{}{"userId": authContext.UserId})
+		if !t.limiter.Reserve(key) {
+			m.refuse(w, r, &t.tier, key, class, audited)
 			return
 		}
 
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.otp.limiter.Release(key, reservation.failed.Load())
+			t.limiter.Release(key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// LimitOtp rate limits the OTP check, on the user of the sign-in ceremony the browser is in.
+func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
+	return m.limitFailuresPerSubject(next, m.otp, rejectBrowser, m.ceremonyUserSubject)
+}
+
+// ceremonyUserSubject is LimitOtp's subject: the user the ceremony has already authenticated
+// with a password. Single tier, unlike the password gate: reaching the OTP form at all requires
+// having already passed the password, so a third party cannot spend this budget without already
+// holding the account's password.
+//
+// No readable auth context means no user to key a bucket on, and the handler rejects that
+// request before reaching the OTP secret or the database.
+func (m *RateLimiterMiddleware) ceremonyUserSubject(r *http.Request) (string, map[string]interface{}, bool) {
+	authContext, err := m.ceremonyStore.GetAuthContext(r)
+	if err != nil {
+		return "", nil, false
+	}
+	return fmt.Sprintf("user_%d", authContext.UserId), map[string]interface{}{"userId": authContext.UserId}, true
 }
 
 // LimitEmailVerification rate limits the account's own email verification check, on the
@@ -550,33 +585,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 // the handler, which answers ACCESS_TOKEN_REQUIRED before touching the code, so the skipped
 // limit costs nothing: LimitOtp's rule from #114, unchanged.
 func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		key, ok := tokenSubjectRateLimitKey(r)
-		if !ok {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if !m.emailVerification.limiter.Reserve(key) {
-			m.refuse(w, r, &m.emailVerification.tier, key, rejectAPI,
-				map[string]interface{}{"loggedInUser": key})
-			return
-		}
-
-		reservation := &credentialReservation{}
-		r = withCredentialReservation(r, reservation)
-		defer func() {
-			m.emailVerification.limiter.Release(key, reservation.failed.Load())
-		}()
-
-		next.ServeHTTP(w, r)
-	})
+	return m.limitFailuresPerSubject(next, m.emailVerification, rejectAPI, tokenSubject)
 }
 
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
@@ -598,33 +607,18 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 // for that account. A request with no readable token passes through to the handler, which
 // answers ACCESS_TOKEN_REQUIRED before touching the password.
 func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
+	return m.limitFailuresPerSubject(next, m.accountPassword, rejectAPI, tokenSubject)
+}
 
-		key, ok := tokenSubjectRateLimitKey(r)
-		if !ok {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if !m.accountPassword.limiter.Reserve(key) {
-			m.refuse(w, r, &m.accountPassword.tier, key, rejectAPI,
-				map[string]interface{}{"loggedInUser": key})
-			return
-		}
-
-		reservation := &credentialReservation{}
-		r = withCredentialReservation(r, reservation)
-		defer func() {
-			m.accountPassword.limiter.Release(key, reservation.failed.Load())
-		}()
-
-		next.ServeHTTP(w, r)
-	})
+// tokenSubject is the subject of the two account API limiters. The token's subject keys the
+// bucket and is what the event records, under loggedInUser, the name the account API's own
+// audit events give the caller.
+func tokenSubject(r *http.Request) (string, map[string]interface{}, bool) {
+	key, ok := tokenSubjectRateLimitKey(r)
+	if !ok {
+		return "", nil, false
+	}
+	return key, map[string]interface{}{"loggedInUser": key}, true
 }
 
 // tokenSubjectRateLimitKey buckets by the account a bearer token names. It reads the token
@@ -646,6 +640,27 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 	return subject, true
 }
 
+// limitPerIP writes the body of a limiter every request spends, keyed on the client block and
+// refusing in the shape class names. LimitActivate, LimitRegister, LimitResetPwd and LimitDCR
+// are this over their own tier (#439); the event a refusal audits records the block as ip.
+func (m *RateLimiterMiddleware) limitPerIP(next http.Handler, t *requestTier, class rejectClass) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting if disabled
+		if !m.enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		ipKey := clientIPRateLimitKey(r)
+		if m.tripped(w, r, t, ipKey, class, map[string]interface{}{"ip": ipKey}) {
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // LimitActivate rate limits the account activation endpoint, on the client IP.
 //
 // It used to key on ?email=, which the activation link no longer carries: the link holds the
@@ -658,21 +673,7 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 // credential at 193 bits of entropy, so blind guessing is infeasible; what is left to bound is
 // one host driving unauthenticated account creation, which an IP key does.
 func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.activate, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return m.limitPerIP(next, m.activate, rejectBrowser)
 }
 
 // LimitRegister rate limits self-registration, on the client IP.
@@ -686,21 +687,7 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 // The POST alone is limited. The GET renders a static form and reaches no probe, no mail and no
 // row, so limiting it would only refuse the page to a household behind one address.
 func (m *RateLimiterMiddleware) LimitRegister(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.register, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return m.limitPerIP(next, m.register, rejectBrowser)
 }
 
 // LimitResetPwd rate limits the password reset endpoint, on the client IP.
@@ -715,21 +702,7 @@ func (m *RateLimiterMiddleware) LimitRegister(next http.Handler) http.Handler {
 // it; what is left to bound is one host driving unauthenticated work, which an IP key does.
 // Matches the pwdIpLimiter and forgotPwdIpLimiter precedent.
 func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
-		ipKey := clientIPRateLimitKey(r)
-		if m.tripped(w, r, m.resetPwd, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return m.limitPerIP(next, m.resetPwd, rejectBrowser)
 }
 
 // LimitForgotPwd rate limits the forgot-password POST, which for a real user
@@ -771,22 +744,7 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 // Each registration is bounded whatever the switch says, by the redirect URI count and length and
 // by the request body limit (#219, #426, #428).
 func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip rate limiting if disabled
-		if !m.enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// Use IP address as rate limit key
-		ipKey := clientIPRateLimitKey(r)
-
-		if m.tripped(w, r, m.dcr, ipKey, rejectOAuth, map[string]interface{}{"ip": ipKey}) {
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return m.limitPerIP(next, m.dcr, rejectOAuth)
 }
 
 // clientIPRateLimitKey buckets a request by the block its client controls: the address

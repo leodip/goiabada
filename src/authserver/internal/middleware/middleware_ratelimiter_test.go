@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1692,6 +1693,244 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 			t.Errorf("the warning line should carry the limiter and the client block:\n%s", out)
 		}
 	})
+}
+
+// builtLimiter is one of the seven route-facing limiters whose body is written by a builder rather
+// than by hand (#439 decision 1): the four per-IP ones and the three failures-per-subject ones. It
+// holds what the route sends and everything its refusal is, as literals from the published budgets
+// and the refusal shapes #219 settled rather than read back off a tier, so a builder handed the
+// wrong tier, the wrong shape or the wrong audit identifier for one route fails here by name.
+type builtLimiter struct {
+	name    string
+	limit   func(m *RateLimiterMiddleware) func(http.Handler) http.Handler
+	request func() *http.Request
+	// failures is true for a failures-only tier, which only a credential failure the handler
+	// records can spend.
+	failures bool
+	budget   int
+	// contentType and retryAfter are the refusal's shape and the tier's window in seconds.
+	contentType string
+	retryAfter  string
+	// audited is the whole details map of the one event a trip audits, and warned the whole
+	// attribute set of the warning each refusal logs.
+	audited map[string]interface{}
+	warned  map[string]any
+	// noSubject, set on a failures-per-subject limiter, builds a request with no subject to
+	// key on and the ceremony store that goes with it. Such a request reaches the handler
+	// however often it is sent.
+	noSubject func() (authContextGetter, *http.Request)
+}
+
+func builtLimiters() []builtLimiter {
+	const ip = "203.0.113.7"
+	const subject = "11111111-1111-1111-1111-111111111111"
+	ipRequest := func(method, target string) func() *http.Request {
+		return func() *http.Request {
+			req := limiterRequest(method, target, nil)
+			req.RemoteAddr = ip + ":5000"
+			return req
+		}
+	}
+	ipWarned := func(limiter string) map[string]any {
+		return map[string]any{"limiter": limiter, "ip": ip, "request_id": limiterRequestId}
+	}
+	subjectWarned := func(limiter string) map[string]any {
+		return map[string]any{"limiter": limiter, "request_id": limiterRequestId}
+	}
+	noToken := func(target string) func() (authContextGetter, *http.Request) {
+		return func() (authContextGetter, *http.Request) {
+			return stubCeremonyStore{}, accountPasswordRequest(target, "")
+		}
+	}
+	return []builtLimiter{
+		{
+			name: "LimitActivate", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitActivate },
+			request: ipRequest(http.MethodGet, "/activate"), budget: 20,
+			contentType: "text/html; charset=UTF-8", retryAfter: "300",
+			audited: map[string]interface{}{"limiter": "activate", "ip": ip}, warned: ipWarned("activate"),
+		},
+		{
+			name: "LimitRegister", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitRegister },
+			request: ipRequest(http.MethodPost, "/register"), budget: 20,
+			contentType: "text/html; charset=UTF-8", retryAfter: "300",
+			audited: map[string]interface{}{"limiter": "register", "ip": ip}, warned: ipWarned("register"),
+		},
+		{
+			name: "LimitResetPwd", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitResetPwd },
+			request: ipRequest(http.MethodGet, "/reset-password"), budget: 30,
+			contentType: "text/html; charset=UTF-8", retryAfter: "300",
+			audited: map[string]interface{}{"limiter": "reset_pwd", "ip": ip}, warned: ipWarned("reset_pwd"),
+		},
+		{
+			name: "LimitDCR", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitDCR },
+			request: ipRequest(http.MethodPost, "/connect/register"), budget: 10,
+			contentType: "application/json", retryAfter: "60",
+			audited: map[string]interface{}{"limiter": "dcr", "ip": ip}, warned: ipWarned("dcr"),
+		},
+		{
+			// The bucket is user_7, and the event records the user id itself, as an int64: the
+			// identifier the audit records is not the bucket key, which is why the subject
+			// function returns both.
+			name: "LimitOtp", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitOtp },
+			request:  func() *http.Request { return limiterRequest(http.MethodPost, "/auth/otp?userId=7", nil) },
+			failures: true, budget: 5,
+			contentType: "text/html; charset=UTF-8", retryAfter: "900",
+			audited: map[string]interface{}{"limiter": "otp", "userId": int64(7)}, warned: subjectWarned("otp"),
+			noSubject: func() (authContextGetter, *http.Request) {
+				return stubCeremonyStore{err: ceremony.ErrNoAuthContext}, limiterRequest(http.MethodPost, "/auth/otp", nil)
+			},
+		},
+		{
+			name: "LimitEmailVerification", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitEmailVerification },
+			request:  func() *http.Request { return verificationRequest(subject) },
+			failures: true, budget: 5,
+			contentType: "application/json", retryAfter: "900",
+			audited:   map[string]interface{}{"limiter": "email_verification", "loggedInUser": subject},
+			warned:    subjectWarned("email_verification"),
+			noSubject: noToken("/api/v1/account/email/verification"),
+		},
+		{
+			name: "LimitAccountPassword", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitAccountPassword },
+			request:  func() *http.Request { return accountPasswordRequest(accountPasswordRoute, subject) },
+			failures: true, budget: 5,
+			contentType: "application/json", retryAfter: "900",
+			audited:   map[string]interface{}{"limiter": "account_password", "loggedInUser": subject},
+			warned:    subjectWarned("account_password"),
+			noSubject: noToken(accountOTPRoute),
+		},
+	}
+}
+
+// runBuilt drives one request through a built limiter, recording a credential failure from
+// inside the handler when failed is set, and reports whether the handler ran.
+func runBuilt(m *RateLimiterMiddleware, c builtLimiter, req *http.Request, failed bool) (*httptest.ResponseRecorder, bool) {
+	rr := httptest.NewRecorder()
+	reached := false
+	c.limit(m)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
+		}
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, req)
+	return rr, reached
+}
+
+// TestBuiltLimiters_EachKeepsItsOwnRefusal holds the seven limiters a builder writes to what each
+// of them answered when it was written by hand (#439 decisions 1 and 2): the budget on both sides,
+// the refusal shape its caller parses, Retry-After at its own window, the one audit event with
+// exactly the identifier that route records, and a warning on every refusal that names a client
+// block for a per-IP tier and nobody for a per-subject one. The per-route tests above cover the
+// keys; this is the whole refusal, for all seven at once, because a builder writes all seven and
+// one wrong argument at one call site is the defect it makes possible.
+func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
+	for _, c := range builtLimiters() {
+		t.Run(c.name, func(t *testing.T) {
+			t.Run("the budget, then one refusal in its route's shape", func(t *testing.T) {
+				logs := logtest.CaptureSlog(t)
+				m, auditLog := newAuditedTestMiddleware(stubCeremonyStore{}, true)
+
+				for i := 0; i < c.budget; i++ {
+					if rr, reached := runBuilt(m, c, c.request(), c.failures); rr.Code != http.StatusTeapot || !reached {
+						t.Fatalf("request %d of a budget of %d: got code %d, handler reached %v; want %d and true",
+							i+1, c.budget, rr.Code, reached, http.StatusTeapot)
+					}
+				}
+				for i := 0; i < 2; i++ {
+					rr, reached := runBuilt(m, c, c.request(), c.failures)
+					if rr.Code != http.StatusTooManyRequests || reached {
+						t.Fatalf("request %d: got code %d, handler reached %v; want %d and false",
+							c.budget+1+i, rr.Code, reached, http.StatusTooManyRequests)
+					}
+					if got := rr.Header().Get("Content-Type"); got != c.contentType {
+						t.Errorf("Content-Type = %q, want %q", got, c.contentType)
+					}
+					if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+						t.Errorf("Cache-Control = %q, want no-store", got)
+					}
+					if got := rr.Header().Get("Retry-After"); got != c.retryAfter {
+						t.Errorf("Retry-After = %q, want %q", got, c.retryAfter)
+					}
+					assertNoRateLimitHeaders(t, rr, c.name+" rejection")
+				}
+
+				auditLog.mu.Lock()
+				events := append([]auditEvent(nil), auditLog.events...)
+				auditLog.mu.Unlock()
+				if len(events) != 1 {
+					t.Fatalf("got %d audit events for two refusals on one key, want exactly 1: %v", len(events), events)
+				}
+				if events[0].name != audit.AuditRateLimitExceeded {
+					t.Errorf("event name = %q, want %q", events[0].name, audit.AuditRateLimitExceeded)
+				}
+				if !reflect.DeepEqual(events[0].details, c.audited) {
+					t.Errorf("event details = %#v, want %#v", events[0].details, c.audited)
+				}
+				if events[0].requestId != limiterRequestId {
+					t.Errorf("request id on the audited context = %q, want %q", events[0].requestId, limiterRequestId)
+				}
+
+				warnings := 0
+				for _, record := range logs.Records() {
+					if record.Message != "rate limit reached" {
+						continue
+					}
+					warnings++
+					if record.Level != slog.LevelWarn {
+						t.Errorf("the trip was logged at %v, want WARN", record.Level)
+					}
+					if !reflect.DeepEqual(record.Attrs, c.warned) {
+						t.Errorf("warning attributes = %#v, want %#v", record.Attrs, c.warned)
+					}
+				}
+				if warnings != 2 {
+					t.Errorf("got %d rate limit warnings for two refusals, want 2", warnings)
+				}
+			})
+
+			if c.failures {
+				t.Run("a handler that records no failure spends nothing", func(t *testing.T) {
+					m := newTestMiddleware(stubCeremonyStore{}, true)
+					for i := 0; i < 3*c.budget; i++ {
+						if rr, reached := runBuilt(m, c, c.request(), false); rr.Code != http.StatusTeapot || !reached {
+							t.Fatalf("request %d with no failure recorded: got code %d, handler reached %v; want %d and true",
+								i+1, rr.Code, reached, http.StatusTeapot)
+						}
+					}
+					// The slots the successes held were handed back, so the whole budget of
+					// failures is still there.
+					for i := 0; i < c.budget; i++ {
+						if rr, reached := runBuilt(m, c, c.request(), true); rr.Code != http.StatusTeapot || !reached {
+							t.Fatalf("failure %d after the successes: got code %d, handler reached %v; want %d and true",
+								i+1, rr.Code, reached, http.StatusTeapot)
+						}
+					}
+				})
+
+				t.Run("a request with no subject reaches the handler", func(t *testing.T) {
+					store, _ := c.noSubject()
+					m := newTestMiddleware(store, true)
+					for i := 0; i < 3*c.budget; i++ {
+						_, req := c.noSubject()
+						if rr, reached := runBuilt(m, c, req, true); rr.Code != http.StatusTeapot || !reached {
+							t.Fatalf("request %d with no subject: got code %d, handler reached %v; want %d and true",
+								i+1, rr.Code, reached, http.StatusTeapot)
+						}
+					}
+				})
+			}
+
+			t.Run("disabled limiter never blocks", func(t *testing.T) {
+				m := newTestMiddleware(stubCeremonyStore{}, false)
+				for i := 0; i < 3*c.budget; i++ {
+					if rr, reached := runBuilt(m, c, c.request(), c.failures); rr.Code != http.StatusTeapot || !reached {
+						t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and true",
+							i+1, rr.Code, reached, http.StatusTeapot)
+					}
+				}
+			})
+		})
+	}
 }
 
 // TestRateLimiter_EveryTierLogsUnderAConventionalKey holds the one attribute key in this tree
