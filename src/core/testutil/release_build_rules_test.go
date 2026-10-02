@@ -14,6 +14,7 @@ package testutil
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -435,4 +436,149 @@ func TestReleaseBuilds_Check(t *testing.T) {
 // releaseTargets.
 func TestReleaseBuilds_TheRealReleaseBuildsSetProduction(t *testing.T) {
 	assert.Empty(t, checkReleaseBuilds(SourceRoot(t), releaseBuilds, shippedMains, releaseTargets))
+}
+
+// ---- the wizard's Makefile ------------------------------------------------------------------
+
+// wizardMakefile is the setup wizard's Makefile, relative to the source root. It is not a release
+// build: its build target is a local dev build without the tag, as the servers' dev builds are. What
+// it must not be is a second cross-compile of the wizard, drifted from the release script's tag,
+// flags and version stamp, so its build-all runs that script and no go build in it picks a platform
+// (#463).
+const wizardMakefile = "cmd/goiabada-setup/Makefile"
+
+// makeRecipe returns the recipe of target in a Makefile as logical lines, and whether the target is
+// defined. A recipe is the tab-indented lines under the rule; a variable assignment is not a rule.
+func makeRecipe(text, target string) ([]logicalLine, bool) {
+	lines := strings.Split(text, "\n")
+	for i, l := range lines {
+		name, rest, ok := strings.Cut(l, ":")
+		if !ok || strings.HasPrefix(l, "\t") || strings.TrimSpace(name) != target || strings.HasPrefix(rest, "=") {
+			continue
+		}
+		var recipe []string
+		for _, r := range lines[i+1:] {
+			if !strings.HasPrefix(r, "\t") {
+				break
+			}
+			recipe = append(recipe, r)
+		}
+		return logicalLines(strings.Join(recipe, "\n")), true
+	}
+	return nil, false
+}
+
+// runsReleaseScript reports whether a recipe line runs the wizard's build-binaries.sh with
+// --version $(VERSION). make's @, - and + prefixes are not part of the command.
+func runsReleaseScript(l logicalLine) bool {
+	for i, w := range l.words {
+		if path.Base(strings.TrimLeft(w, "@-+")) != "build-binaries.sh" {
+			continue
+		}
+		args := l.words[i+1:]
+		for j := 0; j+1 < len(args); j++ {
+			if args[j] == "--version" && strings.Trim(args[j+1], `"'`) == "$(VERSION)" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkWizardMakefile holds the wizard's Makefile to delegating its cross-compile, and returns what
+// does not hold.
+func checkWizardMakefile(text string) []string {
+	var findings []string
+
+	recipe, ok := makeRecipe(text, "build-all")
+	if !ok {
+		findings = append(findings, "wizard makefile: no build-all target")
+	} else {
+		delegates := false
+		for _, l := range recipe {
+			delegates = delegates || runsReleaseScript(l)
+		}
+		if !delegates {
+			findings = append(findings, "wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)")
+		}
+	}
+
+	for _, l := range logicalLines(text) {
+		builds, picksPlatform := false, false
+		for i, w := range l.words {
+			builds = builds || (w == "go" && i+1 < len(l.words) && l.words[i+1] == "build")
+			picksPlatform = picksPlatform || strings.HasPrefix(w, "GOOS=") || strings.HasPrefix(w, "GOARCH=")
+		}
+		if builds && picksPlatform {
+			findings = append(findings, fmt.Sprintf("wizard makefile: line %d cross-compiles with its own go build", l.line))
+		}
+	}
+	return findings
+}
+
+func TestReleaseBuilds_WizardMakefile(t *testing.T) {
+	const delegating = "VERSION ?= $(or $(GOIABADA_VERSION),dev)\n" +
+		"BUILD_VAR := x:y\n" +
+		"all: build-all\n" +
+		"\n" +
+		"build:\n" +
+		"\tgo build -o build/goiabada-setup .\n" +
+		"\n" +
+		"# GOOS=linux go build in a comment is not a command.\n" +
+		"build-all:\n" +
+		"\t@./build-binaries.sh --version \"$(VERSION)\"\n"
+
+	cases := []struct {
+		name string
+		text string
+		want []string
+	}{
+		{"a build-all running the release script with the version passes", delegating, nil},
+		{
+			"a build-all not running the release script fails",
+			strings.Replace(delegating, "\t@./build-binaries.sh --version \"$(VERSION)\"\n", "\tGOOS=linux go build -o build/x .\n", 1),
+			[]string{
+				"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)",
+				"wizard makefile: line 10 cross-compiles with its own go build",
+			},
+		},
+		{
+			"running the release script without the version fails",
+			strings.Replace(delegating, ` --version "$(VERSION)"`, "", 1),
+			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+		},
+		{
+			"running the release script with a fixed version fails",
+			strings.Replace(delegating, `"$(VERSION)"`, "dev", 1),
+			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+		},
+		{
+			"the release script run by another target does not count",
+			strings.Replace(delegating, "build-all:\n", "build-all:\n\techo building\n\nother:\n", 1),
+			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+		},
+		{
+			"a Makefile with no build-all fails",
+			strings.Replace(delegating, "build-all:", "build-every:", 1),
+			[]string{"wizard makefile: no build-all target"},
+		},
+		{
+			"a cross-compiling go build in any target fails, continued lines read whole",
+			delegating + "\nbuild-linux-arm64:\n\tGOOS=linux GOARCH=arm64 \\\n\t\tgo build -o build/x .\n",
+			[]string{"wizard makefile: line 13 cross-compiles with its own go build"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.want, checkWizardMakefile(c.text))
+		})
+	}
+}
+
+// TestReleaseBuilds_TheRealWizardMakefileDelegates holds the wizard's real Makefile to delegating its
+// cross-compile to the release script.
+func TestReleaseBuilds_TheRealWizardMakefileDelegates(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(SourceRoot(t), filepath.FromSlash(wizardMakefile)))
+	require.NoError(t, err)
+	assert.Empty(t, checkWizardMakefile(string(src)))
 }
