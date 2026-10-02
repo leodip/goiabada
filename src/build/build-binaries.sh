@@ -37,7 +37,23 @@ echo "Build date: $BUILD_DATE"
 echo "Git commit: $GIT_COMMIT"
 echo "Current directory: $(pwd)"
 
-LDFLAGS='-X "github.com/leodip/goiabada/core/constants.Version='${VERSION}'" -X "github.com/leodip/goiabada/core/constants.BuildDate='${BUILD_DATE}'" -X "github.com/leodip/goiabada/core/constants.GitCommit='${GIT_COMMIT}'"'
+# -w drops the DWARF debug data, which nothing in a deployment reads and which
+# is over 40% of every zip (#331). It is -w and not -s: -s would drop the
+# symbol table too, which is what `govulncheck -mode=binary` matches at symbol
+# level; without it the scan falls back to module level and reports
+# vulnerabilities in packages the binary never calls. Panics and core/errs
+# stacks keep function, file and line either way, because they come from the
+# runtime's own tables, which -w leaves alone.
+#
+# No debuggable copy of a release is kept. To get one, run this script at the
+# release's tag with the release's --version and -w removed, on the same Go
+# version and at the same paths the release job compiled at: the runner's
+# checkout, /home/runner/work/goiabada/goiabada, its module cache,
+# /home/runner/go/pkg/mod, and the GOROOT setup-go installed, since every
+# standard-library frame carries it. A container can reproduce all three. The
+# same commit, toolchain and paths give byte-identical code at identical
+# addresses, so the rebuild's DWARF describes the shipped binary.
+LDFLAGS='-w -X "github.com/leodip/goiabada/core/constants.Version='${VERSION}'" -X "github.com/leodip/goiabada/core/constants.BuildDate='${BUILD_DATE}'" -X "github.com/leodip/goiabada/core/constants.GitCommit='${GIT_COMMIT}'"'
 
 # Function to build both applications for a specific platform
 build_platform() {

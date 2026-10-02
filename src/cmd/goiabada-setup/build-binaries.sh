@@ -34,8 +34,21 @@ build_platform() {
     # manifests for users, and the images it points them at must be the ones
     # that shipped in this release. Both derive from one tag, so they cannot
     # disagree.
+    #
+    # -w drops the DWARF debug data, as the servers' release builds do (#331).
+    # It is -w and not -s -w, which this script passed until then: -s drops
+    # the symbol table too, which is what `govulncheck -mode=binary` matches at
+    # symbol level, and without it the scan reported GO-2026-5932, in a package
+    # the wizard never calls, as affecting it. Panics keep function, file and
+    # line either way. For a debuggable copy of a release, run this script at
+    # the release's tag with the release's --version and -w removed, on the
+    # same Go version and at the same paths the release job compiled at (the
+    # runner's checkout, /home/runner/work/goiabada/goiabada, its module cache,
+    # /home/runner/go/pkg/mod, and the GOROOT setup-go installed): the
+    # rebuild's code is byte-identical at identical addresses, so its DWARF
+    # describes the shipped binary.
     GOOS=$os GOARCH=$arch go build -v \
-        -ldflags "-s -w -X main.version=${VERSION} -X main.imageTag=${VERSION}" \
+        -ldflags "-w -X main.version=${VERSION} -X main.imageTag=${VERSION}" \
         -o "${BUILD_DIR}/goiabada-setup-${os}-${arch}${extension}" \
         .
 }
