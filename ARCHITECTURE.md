@@ -396,10 +396,14 @@ too and ship in no release. A file belongs to a binary the way the rest of this 
 it: the `production` tag set and every other tag free, so a file in any of the five release targets
 counts.
 
-Like rule 5, the walk follows first-party edges and reads the imports first-party code writes. A
-third-party module whose own production code imported `testing` would be outside it; none does
-today, which `go list -deps` under the `production` tag showed for all three mains when the rule
-was written.
+The refusal does not stop at the edge of the four modules. Past it, the walk follows the imports
+the go command reports: `go list -deps` under the `production` tag, run over each shipped main for
+each of the five release targets, `releaseTargets` in the guard, supplies the imports of every
+third-party and standard-library package a main reaches, so a dependency whose own production code
+imports `testing` or testify is refused like a first-party helper that does. First-party packages
+are still read from source, with every tag but `production` free, because that covers all five
+targets at once. A package the go command cannot load is a finding, since the walk cannot see what
+it imports.
 
 ### Test frameworks
 
@@ -416,7 +420,9 @@ module unit tiers, so it fires whichever tier runs — the same arrangement as t
 slog and agent-document guards.
 
 It reads imports from the AST rather than matching text, so an import inside a comment or a string
-is not a finding and a renamed import alias still is one. It parses production and test files
+is not a finding and a renamed import alias still is one. Rule 9 is the one rule that also asks the
+go command, for what the packages outside the four modules import, since no source of theirs is
+under the source root. It parses production and test files
 separately because the rules above treat them differently. Rule 7 reads the same way, one level
 down: `src/core/testutil/constants_ownership.go` reads the exported declarations of
 `core/constants` and, from every production file that imports it, the symbols selected off whatever

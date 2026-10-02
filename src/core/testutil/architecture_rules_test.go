@@ -159,7 +159,7 @@ func checkTree(t *testing.T, files map[string]string, tables architectureTables)
 
 	graph, err := refgraph.BuildImportGraph(writeTree(t, files))
 	require.NoError(t, err)
-	findings := checkArchitecture(tables, graph)
+	findings := checkArchitecture(tables, graph, nil)
 	sort.Strings(findings)
 	return findings
 }
@@ -563,6 +563,29 @@ func TestArchitecture_TestCode(t *testing.T) {
 		assert.Empty(t, findings)
 	})
 
+	// The walk crosses the edge of the four modules through the imports the go command reports for
+	// the packages beyond it (#331, review R1-2).
+	t.Run("a framework behind a third-party package is reported with the path through it", func(t *testing.T) {
+		files := map[string]string{
+			authserverMain + "/main.go":  pkg("main", "example.test/authserver/internal/a"),
+			"authserver/internal/a/a.go": pkg("a", "example.net/helper"),
+			"core/testutil/testutil.go":  pkg("testutil"),
+		}
+		external := map[string][]string{
+			"example.net/helper":       {"example.net/helper/inner", "fmt"},
+			"example.net/helper/inner": {"github.com/stretchr/testify/require"},
+		}
+		stopped := check(t, files, tables)
+		assert.Empty(t, stopped, "without the go command's edges the walk stops at the edge of the four modules")
+
+		graph, err := refgraph.BuildImportGraph(writeTree(t, withShippedMains(files)))
+		require.NoError(t, err)
+		findings := checkArchitecture(tables, graph, external)
+		assert.Equal(t, []string{
+			"test code: authserver/cmd/goiabada-authserver links github.com/stretchr/testify/require, which ARCHITECTURE.md:3 refuses in a shipped binary: authserver/cmd/goiabada-authserver -> authserver/internal/a -> example.net/helper -> example.net/helper/inner -> github.com/stretchr/testify/require",
+		}, findings)
+	})
+
 	t.Run("a refused package is reported once per row and main, however many packages import it", func(t *testing.T) {
 		findings := check(t, map[string]string{
 			authserverMain + "/main.go":  pkg("main", "example.test/authserver/internal/a", "example.test/authserver/internal/b"),
@@ -941,7 +964,7 @@ func TestArchitecture_TheRealTreeIsHeldByItsExceptions(t *testing.T) {
 
 	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
-	require.Empty(t, checkArchitecture(tables, graph))
+	require.Empty(t, checkArchitecture(tables, graph, nil))
 
 	t.Run("an exception listed for an edge that no longer exists", func(t *testing.T) {
 		// The exact row #360 deleted when core/testutil/fake and core/uuidutil both moved to
@@ -952,7 +975,7 @@ func TestArchitecture_TheRealTreeIsHeldByItsExceptions(t *testing.T) {
 		kept := architectureTables{owners: tables.owners, foreign: tables.foreign}
 		kept.exceptions = append(append(kept.exceptions, tables.exceptions...), stale)
 
-		findings := checkArchitecture(kept, graph)
+		findings := checkArchitecture(kept, graph, nil)
 		require.Len(t, findings, 1)
 		assert.Contains(t, findings[0], "core/testutil/fake -> core/uuidutil")
 		assert.Contains(t, findings[0], "that edge no longer exists")
@@ -966,7 +989,7 @@ func TestArchitecture_TheRealTreeIsHeldByItsExceptions(t *testing.T) {
 					kept.exceptions = append(kept.exceptions, row)
 				}
 			}
-			findings := checkArchitecture(kept, graph)
+			findings := checkArchitecture(kept, graph, nil)
 			require.Len(t, findings, 1)
 			assert.Contains(t, findings[0], dropped.from+" imports "+dropped.to)
 		})
@@ -995,7 +1018,7 @@ func TestArchitecture_TheRealTreeReachesEveryForeignModuleItDeclares(t *testing.
 				flipped.foreign[i].clearedBy = "#360"
 			}
 
-			findings := checkArchitecture(flipped, graph)
+			findings := checkArchitecture(flipped, graph, nil)
 			require.Len(t, findings, 1)
 			assert.Contains(t, findings[0], row.module)
 		})
@@ -1004,7 +1027,9 @@ func TestArchitecture_TheRealTreeReachesEveryForeignModuleItDeclares(t *testing.
 
 // TestArchitecture_TheRealShippedMainsAreWalked connects rule 9 to this repository. The real tree
 // passes it, and would pass it just as well if the walk reached nothing, so the probe adds a row
-// for a package every shipped binary certainly links and expects one finding per binary.
+// for a package every shipped binary certainly links and expects one finding per binary: fmt, which
+// first-party code imports, and internal/abi, which no first-party code can import, so it is
+// reached only through the standard library's own edges, the ones the go command supplies.
 func TestArchitecture_TheRealShippedMainsAreWalked(t *testing.T) {
 	root := SourceRoot(t)
 
@@ -1024,14 +1049,22 @@ func TestArchitecture_TheRealShippedMainsAreWalked(t *testing.T) {
 	require.NoError(t, err)
 
 	probed := architectureTables{owners: tables.owners, foreign: tables.foreign, exceptions: tables.exceptions}
-	probed.testFrameworks = append(append(probed.testFrameworks, tables.testFrameworks...), testFrameworkRow{pkg: "fmt", line: 1})
+	probed.testFrameworks = append(append(probed.testFrameworks, tables.testFrameworks...),
+		testFrameworkRow{pkg: "fmt", line: 1}, testFrameworkRow{pkg: "internal/abi", line: 2})
 
-	findings = checkArchitecture(probed, graph)
+	external, loadFindings, err := compiledClosure(root, graph)
+	require.NoError(t, err)
+	require.Empty(t, loadFindings)
+
+	findings = checkArchitecture(probed, graph, external)
 	sort.Strings(findings)
 	assertFindings(t, findings,
 		"test code: adminconsole/cmd/goiabada-adminconsole links fmt",
+		"test code: adminconsole/cmd/goiabada-adminconsole links internal/abi",
 		"test code: authserver/cmd/goiabada-authserver links fmt",
-		"test code: cmd/goiabada-setup links fmt")
+		"test code: authserver/cmd/goiabada-authserver links internal/abi",
+		"test code: cmd/goiabada-setup links fmt",
+		"test code: cmd/goiabada-setup links internal/abi")
 }
 
 // ---- seam 3: the reporting half -------------------------------------------------------------
@@ -1172,6 +1205,48 @@ func TestArchitecture_TheGuardFailsOnTestCodeInAShippedBinary(t *testing.T) {
 	require.True(t, report.Failed(), "a shipped main linking testify passed the guard")
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
 	assert.Contains(t, report.Text(), "adminconsole/cmd/goiabada-adminconsole -> core/testutil -> github.com/stretchr/testify/mock")
+}
+
+// TestArchitecture_TheGuardFailsOnTestCodeBehindAThirdPartyModule is rule 9 through the reporting
+// half with the go command in the loop: the shipped auth server imports a third-party module, here
+// a local directory the auth server's go.mod replaces it with, whose own production code imports
+// testing. The source graph never reads that module, so only the go command's listing can show the
+// edge (#331, review R1-2).
+func TestArchitecture_TheGuardFailsOnTestCodeBehindAThirdPartyModule(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+		"core/api/api.go": pkg("api"),
+		"authserver/go.mod": "module example.test/authserver\n\ngo 1.21\n\n" +
+			"require example.net/helper v0.0.0\n\nreplace example.net/helper => ../../helper\n",
+		authserverMain + "/main.go":     pkg("main", "example.net/helper"),
+		"../helper/go.mod":              "module example.net/helper\n\ngo 1.21\n",
+		"../helper/helper.go":           pkg("helper", "example.net/helper/inner"),
+		"../helper/inner/inner.go":      pkg("inner", "testing"),
+		"../helper/inner/inner_test.go": pkg("inner"),
+	})))
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Failed(), "a shipped main linking testing through a third-party module passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	require.Len(t, report.Errors, 1, "findings:\n\t%s", strings.Join(report.Errors, "\n\t"))
+	assert.Contains(t, report.Errors[0], "test code: authserver/cmd/goiabada-authserver links testing, which ARCHITECTURE.md:")
+	assert.Contains(t, report.Errors[0], " refuses in a shipped binary: authserver/cmd/goiabada-authserver -> example.net/helper -> example.net/helper/inner -> testing")
+}
+
+// TestArchitecture_TheGuardReportsAPackageTheGoCommandCannotLoad is the compiled walk that reached
+// nothing: a dependency the go command cannot load lists no imports, so it must be a finding rather
+// than a package that silently imports nothing.
+func TestArchitecture_TheGuardReportsAPackageTheGoCommandCannotLoad(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+		"core/api/api.go":           pkg("api"),
+		authserverMain + "/main.go": pkg("main", "example.net/missing"),
+	})))
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Failed(), "a dependency the go command cannot load passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "test code: the go command cannot load example.net/missing for authserver/cmd/goiabada-authserver on linux/amd64, so rule 9 cannot see what it imports")
 }
 
 // TestArchitecture_TheGuardIsFatalWithNoShippedMain is rule 9's walk that reached nothing. Every

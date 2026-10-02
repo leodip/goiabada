@@ -23,8 +23,9 @@ import (
 // Install reads TZ the way Go's runtime does and installs the zone it names as time.Local, or
 // answers why it cannot.
 //
-//   - Unset, it leaves the local zone as the runtime read it from the host's /etc/localtime, and
-//     empty, or a lone colon, it leaves it at UTC, both as before.
+//   - Unset, it leaves the local zone as the runtime read it from the host, as before. Empty, or a
+//     lone colon, it installs UTC: the Unix runtime already reads it so, but the Windows one reads
+//     the zone from the operating system and never consults TZ.
 //   - One leading colon is dropped, the implementation-defined POSIX form (XBD 8.3) Go accepts.
 //   - A value starting with "/" is a zone file on the host's filesystem, never looked up in the
 //     embedded database, where it means nothing. One that does not load is refused, where Go's
@@ -41,6 +42,7 @@ func Install() error {
 	}
 	name := strings.TrimPrefix(tz, ":")
 	if name == "" {
+		time.Local = time.UTC
 		return nil
 	}
 
