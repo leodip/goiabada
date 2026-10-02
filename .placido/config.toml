@@ -1,0 +1,55 @@
+# placido's configuration for Goiabada. Every command runs inside the issue's own
+# Docker stack through .placido/stack.sh, so issues never share databases.
+
+[project]
+base     = "main"
+setup    = ".placido/stack.sh up"     # builds and starts the issue's stack: every database, no published ports
+teardown = ".placido/stack.sh down"   # `placido close`: removes its containers, volumes, network and image
+
+[commands.vet]
+run   = ".placido/stack.sh vet"
+about = "go vet in all four modules (core, authserver, adminconsole, setup); about 30 seconds."
+
+[commands.unit]
+run   = ".placido/stack.sh run --type modules --no-build"
+about = "Unit tests of authserver (internal and web), core, and adminconsole; also checks gofmt. Narrow with --type internal|core|adminconsole and --run '<regex>'."
+
+[commands.setup-wizard]
+run   = ".placido/stack.sh run --type setup"
+about = "Tests of the setup wizard module, src/cmd/goiabada-setup."
+
+[commands.data-sqlite]
+run   = ".placido/stack.sh run --type data --db sqlite --no-build"
+about = "The data-layer tier on SQLite, about 20 seconds. Narrow with --run '<regex>'. Use data for another engine."
+
+[commands.data]
+run   = ".placido/stack.sh run --type data --no-build --db"
+about = "The data-layer tier on one engine: append mysql, postgres, mssql, or sqlite (about 4, 0.5, 2 minutes, and 20 seconds). Narrow with --run '<regex>'."
+
+[commands.integration-sqlite]
+run   = ".placido/stack.sh run --type integration --db sqlite"
+about = "Builds the server and runs the end-to-end tier on SQLite, about a minute. Narrow with --run '<regex>'. Use integration for another engine."
+
+[commands.integration]
+run   = ".placido/stack.sh run --type integration --db"
+about = "Builds the server and runs the end-to-end tier on one engine: append mysql, postgres, mssql, or sqlite (about 1, 1.5, 2 minutes, and 45 seconds). Narrow with --run '<regex>'."
+
+[commands.lint]
+run   = ".placido/stack.sh run --type lint --no-build"
+about = "golangci-lint and unparam on every module, as CI's Lint job runs them, and checks that the Tailwind CSS, the mocks, and the core ownership table are committed up to date."
+
+[commands.mocks]
+run   = ".placido/stack.sh exec ./generate-mocks.sh"
+about = "Regenerate the mocks with the pinned mockery, after changing an interface."
+
+[commands.schema]
+run   = ".placido/stack.sh exec 'go run ./cmd/schemadump'"
+about = "Regenerate the four schema.golden files, after adding or changing a migration; commit them."
+
+[commands.ownership]
+run   = ".placido/stack.sh exec 'cd ../core && go run ./cmd/ownershipdump'"
+about = "Regenerate the core symbol ownership table, after adding or moving a core symbol; commit it."
+
+[gates]
+slice = ["vet", "unit"]
+final = ["lint", "setup-wizard", "data-sqlite", "integration-sqlite"]
