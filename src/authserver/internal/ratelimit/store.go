@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Store keeps the per-key counts of a limiter's current and previous window. The
-// window boundaries are computed by the Limiter and handed in, so a Store needs no
+// store keeps the per-key counts of a limiter's current and previous window. The
+// window boundaries are computed by the Limiter and handed in, so a store needs no
 // clock of its own.
 //
 // Errors exist so that a store which can fail has a way to say so. The in-process
@@ -14,9 +14,13 @@ import (
 // production; a Limiter treats any error as a refusal, so a store that cannot answer
 // makes the limiter fail closed rather than admit the request (#276).
 //
-// A Store is called under the mutex of the Limiter or Gate that owns it, and needs
-// no locking of its own.
-type Store interface {
+// A store is called under the mutex of the Limiter that owns it, and needs no locking of
+// its own.
+//
+// Unexported, with memStore its one production implementation and a failing store in this
+// package's tests the only other: a store shared between processes is #394's question, and
+// re-exporting this is the small change that would follow from it (#439).
+type store interface {
 	// Get reports the hits recorded for key in the current and the previous window.
 	// It never evicts.
 	Get(key string, current, previous time.Time) (curr, prev int, err error)
@@ -57,13 +61,13 @@ func newMemStore(window time.Duration) *memStore {
 	}
 }
 
-// Get implements Store. It never returns an error.
+// Get implements store. It never returns an error.
 func (s *memStore) Get(key string, current, previous time.Time) (int, int, error) {
 	curr, prev := s.get(key, current, previous)
 	return curr, prev, nil
 }
 
-// Add implements Store. It never returns an error.
+// Add implements store. It never returns an error.
 func (s *memStore) Add(key string, current time.Time) error {
 	s.add(key, current)
 	return nil

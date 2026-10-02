@@ -24,15 +24,16 @@ func (c *clock) advance(d time.Duration) { c.t = c.t.Add(d) }
 
 // newAt builds a limiter anchored at the fake clock's current instant and reading it
 // from then on, which is what New does with time.Now.
-func newAt(c *clock, limit int, window time.Duration, opts ...Option) *Limiter {
-	l := New(limit, window, opts...)
+func newAt(c *clock, limit int, window time.Duration) *Limiter {
+	l := New(limit, window)
 	l.now = c.now
 	l.anchor = c.t
 	return l
 }
 
 // erroringStore is the only way to reach the fail-closed paths: the in-process store
-// cannot produce an error.
+// cannot produce an error. A test assigns it to a limiter's store field, which is the
+// one place it can go: the field is unexported for the reason the clock is (#439).
 type erroringStore struct {
 	getErr error
 	addErr error
@@ -201,7 +202,8 @@ func TestLimiter_FailsClosedOnAStoreError(t *testing.T) {
 
 	t.Run("Get fails", func(t *testing.T) {
 		c := newClock()
-		l := newAt(c, 5, testWindow, WithStore(erroringStore{getErr: boom}))
+		l := newAt(c, 5, testWindow)
+		l.store = erroringStore{getErr: boom}
 
 		if l.Allow("k") {
 			t.Error("Allow admitted while the store could not be read, want refused")
@@ -213,7 +215,8 @@ func TestLimiter_FailsClosedOnAStoreError(t *testing.T) {
 
 	t.Run("Add fails", func(t *testing.T) {
 		c := newClock()
-		l := newAt(c, 5, testWindow, WithStore(erroringStore{addErr: boom}))
+		l := newAt(c, 5, testWindow)
+		l.store = erroringStore{addErr: boom}
 
 		if l.Allow("k") {
 			t.Error("Allow admitted a hit it could not charge, want refused")

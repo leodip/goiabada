@@ -2,9 +2,7 @@ package middleware
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,7 +23,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -173,129 +170,6 @@ func spellingsOf(local, domain string) []string {
 		"\t" + base + "\t",
 		"\n" + strings.ToUpper(local) + "@" + domain + "\n",
 	}
-}
-
-// TestAccountRateLimitKey_BoundsTheIdentifier pins the length bound on the account key.
-// The key is retained by the limiter's store for two windows and comes straight off an
-// unauthenticated form with no body cap, so what matters is that an arbitrarily long
-// submission cannot become an arbitrarily long map entry, and that bounding it does not
-// put two identifiers in one bucket: nothing caps an account identifier's length on the
-// way in, so a threshold that folded would fold real accounts (#276).
-func TestAccountRateLimitKey_BoundsTheIdentifier(t *testing.T) {
-	// The longest address there is: a 64-octet local-part and a 255-octet domain, the
-	// maxima RFC 5321 sections 4.5.3.1.1 and 4.5.3.1.2 state.
-	longestLocal := strings.Repeat("a", 64)
-	longestDomain := strings.Repeat("b", 251) + ".com"
-	longestAddress := longestLocal + "@" + longestDomain
-
-	if len(longestAddress) != maxAccountIdentifierLen {
-		t.Fatalf("setup: the longest address is %d octets, want %d",
-			len(longestAddress), maxAccountIdentifierLen)
-	}
-
-	tests := []struct {
-		name       string
-		identifier string
-		want       string
-	}{
-		{"an ordinary address is itself", "victim@example.com", "victim@example.com"},
-		{"case and whitespace still normalize", "  VICTIM@Example.COM\t", "victim@example.com"},
-		{"the longest possible address keeps its own bucket", longestAddress, longestAddress},
-		{
-			"whitespace is trimmed before the length is judged",
-			"   " + longestAddress + "   ",
-			longestAddress,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := accountRateLimitKey(tc.identifier); got != tc.want {
-				t.Errorf("accountRateLimitKey(%q) = %q, want %q", tc.identifier, got, tc.want)
-			}
-		})
-	}
-
-	// The identifier the store must never retain whole: net/http's form limit is the only
-	// ceiling on it, and the limiter holds a key for two windows.
-	huge := strings.Repeat("x", 10<<20) + "@example.com"
-
-	t.Run("a form value at net/http's limit is digested rather than retained", func(t *testing.T) {
-		got := accountRateLimitKey(huge)
-		if len(got) != len(oversizedAccountKeyPrefix)+2*sha256.Size {
-			// Truncated: an input of ten mebibytes has no place in a failure line.
-			t.Errorf("accountRateLimitKey(%.20q...) is %d octets: %.80q", huge, len(got), got)
-		}
-		if !strings.HasPrefix(got, oversizedAccountKeyPrefix) {
-			t.Errorf("key %.80q does not carry the digest prefix %q, so an audit reader "+
-				"cannot tell it from an address", got, oversizedAccountKeyPrefix)
-		}
-	})
-
-	t.Run("one octet past the bound is digested", func(t *testing.T) {
-		if got := accountRateLimitKey(longestAddress + "x"); !strings.HasPrefix(got, oversizedAccountKeyPrefix) {
-			t.Errorf("accountRateLimitKey(longestAddress+\"x\") = %.80q, want a digest", got)
-		}
-	})
-
-	// The property the digest exists for, and the one a shared bucket cost. Nothing bounds
-	// an account identifier's length on the way in: ValidateEmailAddress checks the shape
-	// without a length, self-registration and the setup program use it, and users.email is
-	// TEXT on sqlite. So an identifier past the bound can name a real account, and folding
-	// would spend that account's budget on strangers' submissions (#276).
-	t.Run("two distinct oversized identifiers keep distinct buckets", func(t *testing.T) {
-		a := accountRateLimitKey(strings.Repeat("a", maxAccountIdentifierLen) + "@example.com")
-		b := accountRateLimitKey(strings.Repeat("b", maxAccountIdentifierLen) + "@example.com")
-		if a == b {
-			t.Errorf("two distinct oversized identifiers both keyed as %.80q; want a bucket each", a)
-		}
-	})
-
-	t.Run("an oversized identifier normalizes before it is digested", func(t *testing.T) {
-		// Otherwise a long account has 2^n buckets from case alone, which is the whole
-		// reason this function exists (#219).
-		long := strings.Repeat("a", maxAccountIdentifierLen) + "@Example.COM"
-		if got, want := accountRateLimitKey("  "+strings.ToUpper(long)+"\t"), accountRateLimitKey(long); got != want {
-			t.Errorf("two spellings of one oversized identifier keyed as %.80q and %.80q; want one bucket",
-				got, want)
-		}
-	})
-
-	// The two branches have to be disjoint, or bounding the key reintroduces the shared
-	// bucket it was meant to remove. A digest key is the eight-octet prefix and sixty-four
-	// hex characters, seventy-two in all and far inside the bound, so it can be submitted
-	// as an ordinary identifier; and it is not a secret, since reportTrip writes it to the
-	// warning line and the audit event. Without the prefix test in accountRateLimitKey,
-	// submitting one back lands in the bucket of the long identifier it names, with no
-	// SHA-256 collision involved and without the sender ever knowing that identifier (#276).
-	t.Run("a submission spelled as a digest key cannot reach a digested bucket", func(t *testing.T) {
-		long := strings.Repeat("a", maxAccountIdentifierLen) + "@example.com"
-		digested := accountRateLimitKey(long)
-		if len(digested) > maxAccountIdentifierLen {
-			t.Fatalf("setup: the digest key is %d octets, past the bound, so it could not be "+
-				"submitted as an exact key in the first place", len(digested))
-		}
-		if got := accountRateLimitKey(digested); got == digested {
-			t.Errorf("submitting %q back keyed as itself, so it shares the bucket of the "+
-				"oversized identifier it names", digested)
-		}
-	})
-
-	t.Run("the exact branch never emits a key carrying the digest prefix", func(t *testing.T) {
-		// The last spelling also pins the order: normalizing before the prefix is tested
-		// is what stops "<SHA256>" reaching the exact branch.
-		for _, spelling := range []string{
-			oversizedAccountKeyPrefix,
-			oversizedAccountKeyPrefix + "victim@example.com",
-			"  " + strings.ToUpper(oversizedAccountKeyPrefix) + "abc\t",
-		} {
-			got := accountRateLimitKey(spelling)
-			if len(got) != len(oversizedAccountKeyPrefix)+2*sha256.Size {
-				t.Errorf("accountRateLimitKey(%q) = %q, want a digest: an exact key carrying "+
-					"the prefix shares a namespace with the digested ones", spelling, got)
-			}
-		}
-	})
 }
 
 // runPwd drives one request through LimitPwd and reports the status, whether the handler
@@ -479,7 +353,7 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 	t.Run("ten case and whitespace variants of one address share the bucket", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
-		// Refused by accountRateLimitKey lowercasing and trimming, not by the limiter
+		// Refused by ratelimit.AccountKey lowercasing and trimming, not by the limiter
 		// merely working: without it each spelling is its own bucket and all 11 pass.
 		for i := 0; i < tightBudget; i++ {
 			if code, reached, _ := runPwd(m, spellings[i%len(spellings)], attacker, true); code != http.StatusTeapot || !reached {
@@ -639,31 +513,6 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 	})
 }
 
-// TestFailureTier_FailsClosedOnACounterError is the one case that reaches failureTier
-// directly, and the reason for the exception is that nothing else can reach this branch:
-// the in-process store the limiter is built with cannot fail, so no request through the
-// middleware can produce an error here. An implementation that returned true on a counter
-// error would leave every other case in this file green while the gate failed open for the
-// duration of a storage fault (#219).
-func TestFailureTier_FailsClosedOnACounterError(t *testing.T) {
-	f := newFailureTier("test", 5, time.Minute)
-	f.rl = ratelimit.New(5, time.Minute, ratelimit.WithStore(&erroringStore{}))
-
-	if f.Reserve("anyone@example.com") {
-		t.Error("Reserve returned true with the counter erroring; the gate must fail closed")
-	}
-}
-
-// erroringStore is a ratelimit.Store whose reads fail, standing in for a store
-// implementation that can (unlike the in-process one).
-type erroringStore struct{}
-
-func (s *erroringStore) Get(key string, current, previous time.Time) (int, int, error) {
-	return 0, 0, errors.New("counter unavailable")
-}
-
-func (s *erroringStore) Add(key string, current time.Time) error { return nil }
-
 // TestLimitForgotPwd_PerEmailAndPerIP verifies the forgot-password limiter bounds
 // both a single address (mail-bombing) and a single source IP, and that neither
 // budget can be escaped by respelling the address or by moving inside one's own
@@ -707,7 +556,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
-		// Refused by accountRateLimitKey lowercasing and trimming: without it each
+		// Refused by ratelimit.AccountKey lowercasing and trimming: without it each
 		// spelling buys a fresh mail-bombing budget for the same mailbox.
 		for i := 0; i < emailBudget; i++ {
 			if code, reached := run(m, spellings[i%len(spellings)], freshIP(i)); code != http.StatusTeapot || !reached {
@@ -737,9 +586,10 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		// Nothing caps an account identifier's length on the way in, so any of these
 		// can name a real account. Folding them into one bucket would let the flood
-		// below spend the budget of whichever one does (#276).
+		// below spend the budget of whichever one does (#276). 320 octets of local part
+		// alone is past the longest address RFC 5321 allows, so each is digested.
 		oversized := func(i int) string {
-			return fmt.Sprintf("%s%d@example.com", strings.Repeat("a", maxAccountIdentifierLen), i)
+			return fmt.Sprintf("%s%d@example.com", strings.Repeat("a", 64+1+255), i)
 		}
 		for i := 0; i < emailBudget+1; i++ {
 			if code, reached := run(m, oversized(i), freshIP(i)); code != http.StatusTeapot || !reached {
@@ -1854,7 +1704,9 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
 // test can reach today are two of thirteen tiers, and the next tier is what this exists for (#320
-// decision 3).
+// decision 3). The thirteen are eight request tiers and three failures-only ones, plus the two
+// failures-only tiers of the password gate, which ratelimit.AccountLimiter counts and accountTiers
+// names (#439).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// Decision 3's vocabulary. Spelled out rather than imported: the lint's copy is unexported,
 	// and this is deliberately the same rule applied to the one value the lint cannot see.
@@ -2015,8 +1867,11 @@ type visitedValue struct {
 
 // collectTierKeyFields walks a value for the tier structs inside it and records each one's name
 // against the attribute key it logs its bucket under. Reading an unexported field through reflect
-// is allowed; only Interface and Set are not, and this needs neither. The walk stops at a tier
-// rather than descending into its limiter, which is what bounds the interesting half of it.
+// is allowed; only Interface and Set are not, and this needs neither. The walk stops at a tier,
+// which since #439 holds only the HTTP half: the limiter a tier reports for sits beside it, in
+// requestTier or failureTier, and the password gate's ratelimit.AccountLimiter beside its two
+// tiers in accountTiers. The walk descends into those as it does into anything else and finds no
+// tier there, since ratelimit cannot import this package.
 //
 // Every kind that can hold a tier is traversed, not the pointer and struct fields the constructor
 // happens to use today: a tier behind a slice, an array, a map or an interface is as reachable
