@@ -14,9 +14,9 @@ import (
 )
 
 // AssertArchitecture holds the repository's module and package ownership rules to the tree they
-// describe. The rules themselves are not written here: they are the four tables in
+// describe. The rules themselves are not written here: they are the five tables in
 // ARCHITECTURE.md at the repository root, which this function parses and then checks against the
-// real tree — three against the import graph, and the fourth against the production references to
+// real tree — four against the import graph, and the fifth against the production references to
 // core/constants. That file names each rule and carries the reasoning; this one decides.
 //
 // Putting the data in the document rather than in Go is the same choice AssertAgentDocs made for
@@ -79,6 +79,25 @@ func assertArchitecture(r Reporter, root string) {
 		r.Fatalf("found no production reference to any %s symbol under %s", coreConstantsPkg, root)
 	}
 
+	// Rule 9's walk that reached nothing. A tree in which no shipped main is found links no test
+	// framework into any of them, so a source root resolved somewhere else, or all three mains
+	// renamed, would read as a clean tree. One missing of three is a finding instead: the other two
+	// are still walked, and the reader is owed what they say too.
+	var missing []string
+	for _, dir := range shippedMains {
+		if _, ok := shippedMainPackage(graph, dir); !ok {
+			missing = append(missing, dir)
+		}
+	}
+	if len(missing) == len(shippedMains) {
+		r.Fatalf("found none of the shipped mains %s under %s", strings.Join(shippedMains, ", "), root)
+	}
+	for _, dir := range missing {
+		findings = append(findings, fmt.Sprintf(
+			"test code: the shipped main %s holds no production Go file, so rule 9 walks nothing for it; if it moved, shippedMains in core/testutil/architecture.go moves with it",
+			dir))
+	}
+
 	findings = append(findings, checkArchitecture(tables, graph)...)
 	findings = append(findings, checkConstantsOwnership(tables, graph, census)...)
 
@@ -92,13 +111,25 @@ func assertArchitecture(r Reporter, root string) {
 const architectureDoc = "ARCHITECTURE.md"
 
 // The headings whose tables are data. Each is the deepest heading of its section, so the
-// prose above it is free to change without touching the parser. The fourth, constantsHeading,
+// prose above it is free to change without touching the parser. The fifth, constantsHeading,
 // is declared beside the checks that read it in constants_ownership.go.
 const (
-	ownershipHeading = "### Package ownership"
-	exceptionHeading = "### Temporary exceptions"
-	foreignHeading   = "### Foreign modules"
+	ownershipHeading     = "### Package ownership"
+	exceptionHeading     = "### Temporary exceptions"
+	foreignHeading       = "### Foreign modules"
+	testFrameworkHeading = "### Test frameworks"
 )
+
+// shippedMains are the binaries a release ships, as directories relative to the source root: the
+// auth server, the admin console and the setup wizard, the three release.yml builds and nothing
+// else. Rule 9 walks the production closure of each. They are listed here rather than found by
+// looking for package main, because schemadump, droptestdb, ownershipdump and the two generators
+// are main packages too, ship in no release, and may link what they like.
+var shippedMains = []string{
+	"authserver/cmd/goiabada-authserver",
+	"adminconsole/cmd/goiabada-adminconsole",
+	"cmd/goiabada-setup",
+}
 
 // The owner values a package row may carry. Their meanings are in ARCHITECTURE.md; what matters
 // here is that kernel is the only one that may not name an issue, and delete is the only one whose
@@ -132,14 +163,22 @@ type foreignRow struct {
 	line      int
 }
 
-type architectureTables struct {
-	owners     []ownerRow
-	exceptions []exceptionRow
-	foreign    []foreignRow
-	constants  []constantsRow
+// testFrameworkRow names a package rule 9 refuses in a shipped binary, together with every package
+// under it.
+type testFrameworkRow struct {
+	pkg  string
+	line int
 }
 
-// parseArchitectureDoc reads the three data tables. A malformed row is a finding rather than a
+type architectureTables struct {
+	owners         []ownerRow
+	exceptions     []exceptionRow
+	foreign        []foreignRow
+	testFrameworks []testFrameworkRow
+	constants      []constantsRow
+}
+
+// parseArchitectureDoc reads the five data tables. A malformed row is a finding rather than a
 // parse failure, so one bad cell reports itself instead of silently shortening a table and turning
 // every edge it covered into a violation.
 func parseArchitectureDoc(doc string) (architectureTables, []string) {
@@ -187,6 +226,23 @@ func parseArchitectureDoc(doc string) (architectureTables, []string) {
 			continue
 		}
 		tables.foreign = append(tables.foreign, foreignRow{module: row.Cells[0], reachable: reachable, clearedBy: row.Cells[3], line: row.Line})
+	}
+
+	frameworks, ok := refgraph.TableUnder(lines, testFrameworkHeading)
+	if !ok {
+		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, testFrameworkHeading))
+	}
+	// The exception table may be empty, since an empty burn-down list is where it is meant to end.
+	// This one empty is rule 9 refusing nothing, which passes every tree.
+	if ok && len(frameworks) == 0 {
+		findings = append(findings, fmt.Sprintf("%s has an empty %q table, so rule 9 refuses nothing", architectureDoc, testFrameworkHeading))
+	}
+	for _, row := range frameworks {
+		if len(row.Cells) != 2 {
+			findings = append(findings, fmt.Sprintf("%s:%d: a test-framework row needs 2 cells, found %d", architectureDoc, row.Line, len(row.Cells)))
+			continue
+		}
+		tables.testFrameworks = append(tables.testFrameworks, testFrameworkRow{pkg: row.Cells[0], line: row.Line})
 	}
 
 	constants, ok := refgraph.TableUnder(lines, constantsHeading)
@@ -255,6 +311,7 @@ func checkArchitecture(tables architectureTables, graph *refgraph.ImportGraph) [
 	findings = append(findings, checkModuleDirection(graph)...)
 	findings = append(findings, checkDeadPackages(tables, graph)...)
 	findings = append(findings, checkForeignClosure(tables, graph)...)
+	findings = append(findings, checkTestCode(tables, graph)...)
 	findings = append(findings, reconcileExceptions(tables, violations)...)
 
 	return findings
@@ -464,6 +521,102 @@ func isStdlib(importPath string) bool {
 	return !strings.Contains(first, ".")
 }
 
+// checkTestCode is rule 9: no shipped main links a package the test-framework table refuses. Test
+// code is defined by the frameworks rather than by where a helper lives or what it is called, so the
+// rule needs no list of first-party helpers: a helper reaching testing or testify is caught through
+// the framework behind it, the moment it gains one (#331).
+//
+// The walk starts at each shipped main rather than at every production package of its module, which
+// is the difference from rule 5. The graph counts core/testutil's untagged files as production, so a
+// module-wide walk would find testing in core itself; what ships is what a main reaches.
+func checkTestCode(tables architectureTables, graph *refgraph.ImportGraph) []string {
+	var findings []string
+	for _, dir := range shippedMains {
+		main, ok := shippedMainPackage(graph, dir)
+		if !ok {
+			// Reported by the reporting half, which knows whether any main was found at all.
+			continue
+		}
+		reached := testFrameworksReached(graph, main, tables.testFrameworks)
+		for i, row := range tables.testFrameworks {
+			chain, hit := reached[i]
+			if !hit {
+				continue
+			}
+			rel := make([]string, 0, len(chain))
+			for _, pkg := range chain {
+				rel = append(rel, graph.RelPath(pkg))
+			}
+			findings = append(findings, fmt.Sprintf(
+				"test code: %s links %s, which %s:%d refuses in a shipped binary: %s",
+				dir, chain[len(chain)-1], architectureDoc, row.line, strings.Join(rel, " -> ")))
+		}
+	}
+	return findings
+}
+
+// shippedMainPackage returns the import path of the shipped main at dir, and whether any production
+// Go file sits there.
+func shippedMainPackage(graph *refgraph.ImportGraph, dir string) (string, bool) {
+	main, ok := graph.ImportPath(dir)
+	if !ok {
+		return "", false
+	}
+	_, ok = graph.Prod[main]
+	return main, ok
+}
+
+// testFrameworksReached walks main's production closure breadth first over first-party edges and
+// returns, per row of the test-framework table, the chain of packages from main to the first
+// refused import the walk met: the main, each first-party package between, and the refused path
+// itself. Breadth first makes that chain a shortest one, which is the edge a reader has to cut, and
+// the graph's sorted import lists make it the same chain on every run.
+func testFrameworksReached(graph *refgraph.ImportGraph, main string, rows []testFrameworkRow) map[int][]string {
+	parent := map[string]string{main: ""}
+	queue := []string{main}
+	found := map[int][]string{}
+
+	for len(queue) > 0 {
+		pkg := queue[0]
+		queue = queue[1:]
+		for _, imported := range graph.Prod[pkg] {
+			for i, row := range rows {
+				if _, done := found[i]; done || !underPath(imported, row.pkg) {
+					continue
+				}
+				found[i] = append(chainTo(parent, pkg), imported)
+			}
+			if graph.ModuleDir(imported) == "" {
+				continue
+			}
+			if _, seen := parent[imported]; seen {
+				continue
+			}
+			parent[imported] = pkg
+			queue = append(queue, imported)
+		}
+	}
+	return found
+}
+
+// chainTo follows parent links from pkg back to the walk's start and returns them in walk order.
+func chainTo(parent map[string]string, pkg string) []string {
+	var chain []string
+	for p := pkg; p != ""; p = parent[p] {
+		chain = append(chain, p)
+	}
+	for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
+		chain[i], chain[j] = chain[j], chain[i]
+	}
+	return chain
+}
+
+// underPath reports whether importPath is root or a package under it. The boundary is a slash, so
+// testing covers testing/fstest and not a package called testingx.
+func underPath(importPath, root string) bool {
+	return importPath == root || strings.HasPrefix(importPath, root+"/")
+}
+
 // reconcileExceptions is the burn-down. Every violation must be listed, and every listed exception
 // must still be a violation: an exception that stopped matching anything is the signal that the
 // issue which removed the edge forgot to remove its row.
@@ -560,6 +713,17 @@ func checkTableHygiene(tables architectureTables, graph *refgraph.ImportGraph) [
 				"table hygiene: %s:%d records ownership for %s, which holds no production Go file; delete the row",
 				architectureDoc, line, pkg))
 		}
+	}
+
+	frameworks := map[string]int{}
+	for _, row := range tables.testFrameworks {
+		if first, duplicate := frameworks[row.pkg]; duplicate {
+			findings = append(findings, fmt.Sprintf(
+				"table hygiene: %s:%d lists the test framework %s twice; the first is at line %d",
+				architectureDoc, row.line, row.pkg, first))
+			continue
+		}
+		frameworks[row.pkg] = row.line
 	}
 
 	for _, row := range tables.foreign {

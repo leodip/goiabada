@@ -89,6 +89,38 @@ func foreignRows(rows ...string) []foreignRow {
 	return out
 }
 
+// testFrameworkRows builds the test-framework table from package paths, numbered from line 1.
+func testFrameworkRows(pkgs ...string) []testFrameworkRow {
+	out := make([]testFrameworkRow, 0, len(pkgs))
+	for i, p := range pkgs {
+		out = append(out, testFrameworkRow{pkg: p, line: i + 1})
+	}
+	return out
+}
+
+// The three shipped mains, as directories relative to the source root. Spelled out here rather
+// than read from shippedMains, so that a list edited in the guard is not also edited in its tests.
+const (
+	authserverMain   = "authserver/cmd/goiabada-authserver"
+	adminconsoleMain = "adminconsole/cmd/goiabada-adminconsole"
+	setupMain        = "cmd/goiabada-setup"
+)
+
+// withShippedMains adds an empty main package at each of the three shipped mains the fixture did
+// not write itself. The reporting half is fatal on a tree holding none of them, so every fixture
+// driving it past that point carries them.
+func withShippedMains(files map[string]string) map[string]string {
+	out := map[string]string{
+		authserverMain + "/main.go":   pkg("main"),
+		adminconsoleMain + "/main.go": pkg("main"),
+		setupMain + "/main.go":        pkg("main"),
+	}
+	for rel, src := range files {
+		out[rel] = src
+	}
+	return out
+}
+
 // check runs the whole pipeline over a fixture tree and returns the findings, sorted the way
 // AssertArchitecture sorts them.
 //
@@ -417,6 +449,130 @@ func TestArchitecture_ForeignClosure(t *testing.T) {
 	})
 }
 
+// ---- rule 9: test code ---------------------------------------------------------------------
+
+func TestArchitecture_TestCode(t *testing.T) {
+	tables := architectureTables{
+		owners:         ownerRows("core/testutil kernel -"),
+		testFrameworks: testFrameworkRows("testing", "net/http/httptest", "github.com/stretchr/testify"),
+	}
+
+	// The defect rule 9 exists for (#331): a production import of a test helper links the helper,
+	// and the framework behind it, into a binary nobody tests.
+	t.Run("a shipped main reaching the frameworks through first-party packages is reported with the path", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go":       pkg("main", "example.test/authserver/internal/a"),
+			"authserver/internal/a/a.go":      pkg("a", "example.test/core/testutil"),
+			"core/testutil/testutil.go":       pkg("testutil", "testing", "github.com/stretchr/testify/require", "github.com/stretchr/testify/assert"),
+			"authserver/internal/a/a_test.go": pkg("a"),
+		}, tables)
+		assert.Equal(t, []string{
+			"test code: authserver/cmd/goiabada-authserver links github.com/stretchr/testify/assert, which ARCHITECTURE.md:3 refuses in a shipped binary: authserver/cmd/goiabada-authserver -> authserver/internal/a -> core/testutil -> github.com/stretchr/testify/assert",
+			"test code: authserver/cmd/goiabada-authserver links testing, which ARCHITECTURE.md:1 refuses in a shipped binary: authserver/cmd/goiabada-authserver -> authserver/internal/a -> core/testutil -> testing",
+		}, findings)
+	})
+
+	t.Run("each of the three shipped mains is walked", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go":   pkg("main", "example.test/core/testutil"),
+			adminconsoleMain + "/main.go": pkg("main", "example.test/core/testutil"),
+			setupMain + "/main.go":        pkg("main", "example.test/core/testutil"),
+			"core/testutil/testutil.go":   pkg("testutil", "testing"),
+		}, tables)
+		assertFindings(t, findings,
+			"test code: adminconsole/cmd/goiabada-adminconsole links testing",
+			"test code: authserver/cmd/goiabada-authserver links testing",
+			"test code: cmd/goiabada-setup links testing")
+	})
+
+	t.Run("a row refuses the packages under it: testing's subpackages", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			adminconsoleMain + "/main.go":  pkg("main", "example.test/adminconsole/internal/b"),
+			"adminconsole/internal/b/b.go": pkg("b", "testing/fstest"),
+		}, tables)
+		assertFindings(t, findings,
+			"test code: adminconsole/cmd/goiabada-adminconsole links testing/fstest, which ARCHITECTURE.md:1 refuses in a shipped binary: adminconsole/cmd/goiabada-adminconsole -> adminconsole/internal/b -> testing/fstest")
+	})
+
+	t.Run("a refused package imported by the main itself", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			setupMain + "/main.go": pkg("main", "net/http/httptest"),
+		}, tables)
+		assertFindings(t, findings,
+			"test code: cmd/goiabada-setup links net/http/httptest, which ARCHITECTURE.md:2 refuses in a shipped binary: cmd/goiabada-setup -> net/http/httptest")
+	})
+
+	// A row is a path and the packages under it, never a spelling: testingx is no more testing
+	// than github.com/stretchr/testifyx is testify.
+	t.Run("a path that merely begins with a row's spelling is not refused", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go": pkg("main", "testingx", "github.com/stretchr/testifyx", "net/http/httptestx"),
+		}, tables)
+		assert.Empty(t, findings)
+	})
+
+	t.Run("the path reported is the shortest", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go":  pkg("main", "example.test/authserver/internal/a", "example.test/authserver/internal/b"),
+			"authserver/internal/a/a.go": pkg("a", "example.test/authserver/internal/c"),
+			"authserver/internal/c/c.go": pkg("c", "example.test/core/testutil"),
+			"authserver/internal/b/b.go": pkg("b", "example.test/core/testutil"),
+			"core/testutil/testutil.go":  pkg("testutil", "testing"),
+		}, tables)
+		assertFindings(t, findings,
+			": authserver/cmd/goiabada-authserver -> authserver/internal/b -> core/testutil -> testing")
+	})
+
+	// The same tree with the long route sorted last, so a walk that happened to pop its newest
+	// package first would report it here.
+	t.Run("the path reported is the shortest whichever route sorts first", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go":  pkg("main", "example.test/authserver/internal/a", "example.test/authserver/internal/b"),
+			"authserver/internal/a/a.go": pkg("a", "example.test/core/testutil"),
+			"authserver/internal/b/b.go": pkg("b", "example.test/authserver/internal/c"),
+			"authserver/internal/c/c.go": pkg("c", "example.test/core/testutil"),
+			"core/testutil/testutil.go":  pkg("testutil", "testing"),
+		}, tables)
+		assertFindings(t, findings,
+			": authserver/cmd/goiabada-authserver -> authserver/internal/a -> core/testutil -> testing")
+	})
+
+	// The passing direction. Tests may import whatever they need, a helper nothing shipped reaches
+	// is not in a binary, and a main that is not released ships nothing.
+	t.Run("test files, unreached packages and unshipped mains may import the frameworks", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go":          pkg("main", "example.test/authserver/internal/a"),
+			authserverMain + "/main_test.go":     pkg("main", "testing", "net/http/httptest"),
+			"authserver/internal/a/a.go":         pkg("a"),
+			"authserver/internal/a/a_test.go":    pkg("a", "example.test/core/testutil", "github.com/stretchr/testify/mock"),
+			"core/testutil/testutil.go":          pkg("testutil", "testing", "github.com/stretchr/testify/assert"),
+			"authserver/cmd/schemadump/main.go":  pkg("main", "example.test/core/testutil"),
+			adminconsoleMain + "/main.go":        pkg("main"),
+			adminconsoleMain + "/helper_test.go": pkg("main", "github.com/stretchr/testify/require"),
+		}, tables)
+		assert.Empty(t, findings)
+	})
+
+	// Every generated mock carries this constraint, so a production import of one breaks the
+	// release build rather than linking it; the graph reads the tree the way that build does.
+	t.Run("a file excluded from production builds is not in the binary", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go":      pkg("main", "example.test/authserver/internal/mocks"),
+			"authserver/internal/mocks/m.go": "//go:build !production\n\n" + pkg("mocks", "github.com/stretchr/testify/mock"),
+		}, tables)
+		assert.Empty(t, findings)
+	})
+
+	t.Run("a refused package is reported once per row and main, however many packages import it", func(t *testing.T) {
+		findings := check(t, map[string]string{
+			authserverMain + "/main.go":  pkg("main", "example.test/authserver/internal/a", "example.test/authserver/internal/b"),
+			"authserver/internal/a/a.go": pkg("a", "testing"),
+			"authserver/internal/b/b.go": pkg("b", "testing", "testing/quick"),
+		}, tables)
+		assertFindings(t, findings, "authserver/cmd/goiabada-authserver -> authserver/internal/a -> testing")
+	})
+}
+
 // ---- rule 6: table hygiene -----------------------------------------------------------------
 
 func TestArchitecture_TableHygiene(t *testing.T) {
@@ -482,6 +638,14 @@ func TestArchitecture_TableHygiene(t *testing.T) {
 			foreign: foreignRows("modernc.org/sqlite yes -"),
 		})
 		assertFindings(t, findings, "is reachable from the admin console but names \"-\" where the issue that clears it belongs")
+	})
+
+	t.Run("a test framework listed twice", func(t *testing.T) {
+		findings := checkTree(t, tree, architectureTables{
+			owners:         ownerRows("core/errs kernel -", "core/models authserver #359"),
+			testFrameworks: testFrameworkRows("testing", "net/http/httptest", "testing"),
+		})
+		assertFindings(t, findings, "table hygiene: ARCHITECTURE.md:3 lists the test framework testing twice; the first is at line 1")
 	})
 }
 
@@ -671,6 +835,13 @@ More prose.
 | ` + "`modernc.org/sqlite`" + ` | SQLite driver | yes | #359 |
 | ` + "`github.com/pquerna/otp`" + ` | TOTP | no | — |
 
+### Test frameworks
+
+| package | what it is |
+|---|---|
+| ` + "`testing`" + ` | the standard test framework |
+| ` + "`github.com/stretchr/testify`" + ` | assertions and mocks |
+
 ### Core constants ownership
 
 | symbol | justification | issue |
@@ -693,18 +864,35 @@ More prose.
 		{module: "modernc.org/sqlite", reachable: true, clearedBy: "#359", line: 24},
 		{module: "github.com/pquerna/otp", reachable: false, clearedBy: "—", line: 25},
 	}, tables.foreign)
+	assert.Equal(t, []testFrameworkRow{
+		{pkg: "testing", line: 31},
+		{pkg: "github.com/stretchr/testify", line: 32},
+	}, tables.testFrameworks)
 	assert.Equal(t, []constantsRow{
-		{symbol: "Version", justification: "kernel", issue: "—", line: 31},
-		{symbol: "ManageUsersPermissionIdentifier", justification: "moving", issue: "#359", line: 32},
+		{symbol: "Version", justification: "kernel", issue: "—", line: 38},
+		{symbol: "ManageUsersPermissionIdentifier", justification: "moving", issue: "#359", line: 39},
 	}, tables.constants)
 }
 
 func TestArchitecture_DocParsingRejects(t *testing.T) {
 	t.Run("a missing table", func(t *testing.T) {
 		_, findings := parseArchitectureDoc("# Architecture\n")
-		assert.Len(t, findings, 4)
+		require.Len(t, findings, 5)
 		assert.Contains(t, findings[0], `has no "### Package ownership" table`)
-		assert.Contains(t, findings[3], `has no "### Core constants ownership" table`)
+		assert.Contains(t, findings[3], `has no "### Test frameworks" table`)
+		assert.Contains(t, findings[4], `has no "### Core constants ownership" table`)
+	})
+
+	t.Run("a test-framework row with the wrong number of cells", func(t *testing.T) {
+		_, findings := parseArchitectureDoc("### Test frameworks\n\n| a | b |\n|---|---|\n| testing | x | y |\n")
+		assert.Contains(t, findings, "ARCHITECTURE.md:5: a test-framework row needs 2 cells, found 3")
+	})
+
+	// An empty table refuses nothing, so rule 9 would pass every tree. The exception table may be
+	// empty because an empty burn-down list is the goal; this one being empty is the guard gone.
+	t.Run("a test-framework table with no rows", func(t *testing.T) {
+		_, findings := parseArchitectureDoc("### Test frameworks\n\n| a | b |\n|---|---|\n")
+		assert.Contains(t, findings, `ARCHITECTURE.md has an empty "### Test frameworks" table, so rule 9 refuses nothing`)
 	})
 
 	t.Run("a row with the wrong number of cells", func(t *testing.T) {
@@ -814,6 +1002,38 @@ func TestArchitecture_TheRealTreeReachesEveryForeignModuleItDeclares(t *testing.
 	}
 }
 
+// TestArchitecture_TheRealShippedMainsAreWalked connects rule 9 to this repository. The real tree
+// passes it, and would pass it just as well if the walk reached nothing, so the probe adds a row
+// for a package every shipped binary certainly links and expects one finding per binary.
+func TestArchitecture_TheRealShippedMainsAreWalked(t *testing.T) {
+	root := SourceRoot(t)
+
+	doc, err := os.ReadFile(filepath.Join(filepath.Dir(root), architectureDoc))
+	require.NoError(t, err)
+	tables, findings := parseArchitectureDoc(string(doc))
+	require.Empty(t, findings)
+
+	pkgs := make([]string, 0, len(tables.testFrameworks))
+	for _, row := range tables.testFrameworks {
+		pkgs = append(pkgs, row.pkg)
+	}
+	assert.Equal(t, []string{"testing", "net/http/httptest", "github.com/stretchr/testify"}, pkgs,
+		"rule 9 refuses testing, net/http/httptest and testify, and nothing else (#331)")
+
+	graph, err := refgraph.BuildImportGraph(root)
+	require.NoError(t, err)
+
+	probed := architectureTables{owners: tables.owners, foreign: tables.foreign, exceptions: tables.exceptions}
+	probed.testFrameworks = append(append(probed.testFrameworks, tables.testFrameworks...), testFrameworkRow{pkg: "fmt", line: 1})
+
+	findings = checkArchitecture(probed, graph)
+	sort.Strings(findings)
+	assertFindings(t, findings,
+		"test code: adminconsole/cmd/goiabada-adminconsole links fmt",
+		"test code: authserver/cmd/goiabada-authserver links fmt",
+		"test code: cmd/goiabada-setup links fmt")
+}
+
 // ---- seam 3: the reporting half -------------------------------------------------------------
 //
 // Everything above runs checkArchitecture and asserts on the findings it returned. The lines that
@@ -847,9 +1067,9 @@ func architectureFixture(t *testing.T, doc string, files map[string]string) stri
 	return root
 }
 
-// architectureDocWith renders a document carrying the four headings the parser needs, with only the
-// ownership and core-constants tables populated. The other two are left as a header and a
-// separator, which is what an empty table looks like to refgraph.TableUnder.
+// architectureDocWith renders a document carrying the five headings the parser needs, with the
+// ownership, test-framework and core-constants tables populated. The other two are left as a header
+// and a separator, which is what an empty table looks like to refgraph.TableUnder.
 //
 // The two ownership rows and the one constants row it always writes are the baseline rule 7 needs:
 // the guard is fatal on a tree declaring no core constant or referencing none, so every fixture
@@ -865,6 +1085,9 @@ func architectureDocWith(ownership ...string) string {
 	}
 	b.WriteString("\n### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n")
 	b.WriteString("\n### Foreign modules\n\n| module | why | reachable today | cleared by |\n|---|---|---|---|\n")
+	b.WriteString("\n### Test frameworks\n\n| package | what it is |\n|---|---|\n")
+	b.WriteString("| `testing` | the standard test framework |\n")
+	b.WriteString("| `github.com/stretchr/testify` | assertions and mocks |\n")
 	b.WriteString("\n### Core constants ownership\n\n| symbol | justification | issue |\n|---|---|---|\n")
 	b.WriteString("| `Shared` | kernel | — |\n")
 	return b.String()
@@ -873,9 +1096,9 @@ func architectureDocWith(ownership ...string) string {
 // TestArchitecture_TheGuardPassesATreeItsTablesDescribe is the clean direction, and it is what keeps
 // every case below from passing for the wrong reason.
 func TestArchitecture_TheGuardPassesATreeItsTablesDescribe(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
 		"core/api/api.go": pkg("api"),
-	}))
+	})))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
@@ -886,10 +1109,10 @@ func TestArchitecture_TheGuardPassesATreeItsTablesDescribe(t *testing.T) {
 // rule that makes the document a burn-down list rather than a wish: a new top-level core package
 // fails the tier until the table says where it belongs.
 func TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
 		"core/api/api.go":      pkg("api"),
 		"core/newcomer/new.go": pkg("newcomer"),
-	}))
+	})))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
@@ -902,9 +1125,9 @@ func TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName(t *testing.T) {
 // TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge is the rule with no exceptions, and the one
 // a reader is likeliest to meet: core depends on neither process.
 func TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
 		"core/api/api.go": pkg("api", "example.test/authserver/internal/handlers"),
-	}))
+	})))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
@@ -923,16 +1146,65 @@ func TestArchitecture_TheGuardFailsOnAStaleExceptionRow(t *testing.T) {
 		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n",
 		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n| `core/api` | `core/models` | #350 |\n",
 		1)
-	root := architectureFixture(t, doc, withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, doc, withShippedMains(withConstantsBaseline(map[string]string{
 		"core/api/api.go":       pkg("api"),
 		"core/models/models.go": pkg("models"),
-	}))
+	})))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
 	require.True(t, report.Failed(), "an exception for an edge nothing carries passed the guard")
 	assert.Contains(t, report.Text(), "core/api")
 	assert.Contains(t, report.Text(), "core/models")
+}
+
+// TestArchitecture_TheGuardFailsOnTestCodeInAShippedBinary is rule 9 through the path the three
+// module tiers take: a shipped main reaching testify through a first-party helper.
+func TestArchitecture_TheGuardFailsOnTestCodeInAShippedBinary(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |", "| `core/testutil` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+		"core/api/api.go":             pkg("api"),
+		adminconsoleMain + "/main.go": pkg("main", "example.test/core/testutil"),
+		"core/testutil/testutil.go":   pkg("testutil", "github.com/stretchr/testify/mock"),
+	})))
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Failed(), "a shipped main linking testify passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "adminconsole/cmd/goiabada-adminconsole -> core/testutil -> github.com/stretchr/testify/mock")
+}
+
+// TestArchitecture_TheGuardIsFatalWithNoShippedMain is rule 9's walk that reached nothing. Every
+// tree satisfies "no shipped main links a test framework" when no shipped main is found, so a
+// rename of all three, or a source root resolved somewhere else, would otherwise read as a clean
+// tree.
+func TestArchitecture_TheGuardIsFatalWithNoShippedMain(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
+		"core/api/api.go":                   pkg("api"),
+		"authserver/cmd/schemadump/main.go": pkg("main"),
+	}))
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Stopped, "a tree with no shipped main must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "found none of the shipped mains authserver/cmd/goiabada-authserver, adminconsole/cmd/goiabada-adminconsole, cmd/goiabada-setup under")
+}
+
+// TestArchitecture_TheGuardFailsWithOneShippedMainMissing is the same failure one binary at a time:
+// a renamed main would leave rule 9 walking two binaries of three with nothing going red.
+func TestArchitecture_TheGuardFailsWithOneShippedMainMissing(t *testing.T) {
+	files := withShippedMains(withConstantsBaseline(map[string]string{
+		"core/api/api.go": pkg("api"),
+	}))
+	delete(files, setupMain+"/main.go")
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), files)
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Failed(), "a missing shipped main passed the guard")
+	assert.False(t, report.Stopped, "two mains are still walked, so this is a finding, not a stop")
+	assert.Contains(t, report.Text(), "test code: the shipped main cmd/goiabada-setup holds no production Go file, so rule 9 walks nothing for it")
+	assert.NotContains(t, report.Text(), "authserver/cmd/goiabada-authserver holds")
 }
 
 // TestArchitecture_TheGuardIsFatalWithNoArchitectureDoc pins the first of this guard's two seams.

@@ -1,12 +1,13 @@
 # Architecture
 
-This file records which module owns what, and it is executable. The four tables below —
+This file records which module owns what, and it is executable. The five tables below —
 [package ownership](#package-ownership), [core constants ownership](#core-constants-ownership),
-[temporary exceptions](#temporary-exceptions) and
-[foreign modules](#foreign-modules-the-admin-console-must-not-compile) — are parsed by
+[temporary exceptions](#temporary-exceptions),
+[foreign modules](#foreign-modules-the-admin-console-must-not-compile) and
+[test frameworks](#test-code-no-shipped-binary-may-link) — are parsed by
 `AssertArchitecture` in `src/core/testutil/architecture.go`, which every module's unit tier calls.
 A row that stops describing the tree fails the tier, in both directions: an edge the tables do not
-allow is a finding, and so is an exception listed for an edge that no longer exists. A fifth table,
+allow is a finding, and so is an exception listed for an edge that no longer exists. A sixth table,
 one row per exported symbol every `core` package declares, is data in the same sense and lives in
 [`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md); rule 8 below is its rule, and
 `AssertSymbolOwnership` reads it from the same three tiers.
@@ -262,12 +263,17 @@ The guard reports findings by these names.
    `contract` and `moving`. Same both directions as rule 7, and the same reason: `core/constants`
    reached 139 symbols, 108 named by a single process, with every rule above green throughout. That
    file's own header carries the definitions and the ceilings (#385).
+9. **test code** — no shipped binary links a package the
+   [Test frameworks](#test-code-no-shipped-binary-may-link) table refuses, or any package under one.
+   The shipped binaries are the three a release ships: the auth server, the admin console and the
+   setup wizard. Each is walked from its `main` package, and the guard fails when one of the three is
+   not where it looks, so a renamed main cannot drop out of the rule unnoticed (#331).
 
 Rules 2, 3, 4, 7 and 8 read production files only. A test may import a mock, a fixture or a helper from
 anywhere; that is what test code is for, and holding it to the production graph would make
 `core/testutil` unusable from the tiers that call it. Rule 1 is the exception, for the reason given
 above. Rule 5 reads production files because it is about what lands in a shipped binary, and rule
-8's `test-support` half reads them the same way, for the same reason.
+8's `test-support` half and rule 9 read them the same way, for the same reason.
 
 ## Temporary exceptions
 
@@ -362,6 +368,47 @@ module the admin console legitimately compiles, churned on every dependency chan
 rule than #332 asks for. #360 checked off the categories in its point 5 — database drivers,
 sqlbuilder, OTP and image libraries, provider-only crypto — and each is a row above, asserted `no`.
 
+## Test code no shipped binary may link
+
+A shipped binary carries no test code: no assertion library, no mock, no test helper, and none of
+the test frameworks they are written with. Both servers and the setup wizard are clean, and before
+#331 nothing kept them so. The generated mocks carry `//go:build !production`, so a production
+import of one breaks only the release build, which no pull-request job compiles; every other helper
+carries no tag at all, so a production import of one would link it, and `testing` or testify behind
+it, and fail nowhere.
+
+Test code is defined here by the frameworks, not by where a helper lives or what it is called. A
+row refuses its package and every package under it, and the refusal is transitive, so a first-party
+helper is caught through the framework it imports, the moment it imports one, with no list of
+helpers to keep. That covers 16 of the 18 test-support packages in the tree when it was written,
+every mock among them. The two it does not cover import no framework:
+`authserver/internal/testutil/fake`, a random-string source over `crypto/rand`, and
+`core/internal/refgraph`, which is tooling rather than test code. Linking either would be odd, not
+harmful. Keying on a path instead — `testutil`, `mocks`, a name ending in `test` — would be a rule
+about spelling, which no guard in this repository is.
+
+The walk starts from each shipped `main` package rather than from every production package of a
+module, which is where it differs from rule 5: the graph counts `core/testutil`'s untagged files as
+production, so a module-wide walk would find `testing` in `core` itself. The three mains are listed
+in the guard, as `shippedMains`, rather than found by looking for `package main`, because
+`schemadump`, `droptestdb`, `ownershipdump` and the two reference-data generators are main packages
+too and ship in no release. A file belongs to a binary the way the rest of this document decides
+it: the `production` tag set and every other tag free, so a file in any of the five release targets
+counts.
+
+Like rule 5, the walk follows first-party edges and reads the imports first-party code writes. A
+third-party module whose own production code imported `testing` would be outside it; none does
+today, which `go list -deps` under the `production` tag showed for all three mains when the rule
+was written.
+
+### Test frameworks
+
+| package | what it is |
+|---|---|
+| `testing` | the standard library's test framework, and `testing/fstest`, `testing/iotest`, `testing/quick` and the rest under it |
+| `net/http/httptest` | the standard library's test server and response recorder |
+| `github.com/stretchr/testify` | the assertions, `require`, `mock` and `suite` the tests and the generated mocks are written with |
+
 ## The guard
 
 `AssertArchitecture` lives in `src/core/testutil/architecture.go` and is called from all three
@@ -391,7 +438,8 @@ justify its namesake.
 `src/core/internal/refgraph/symbol_ownership_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate
 leniency, and then take the real tables apart one row at a time — dropping each exception and
-flipping each declared reachability — because the tree satisfies this document by construction, so
+flipping each declared reachability, and adding a test-framework row for a package every shipped
+binary links — because the tree satisfies this document by construction, so
 passing proves nothing on its own. A guard that has quietly stopped matching anything passes a clean
 tree exactly the way it passes a correct one; `errors_lint_test.go` sets out the same reasoning for
 the same problem (#279).
