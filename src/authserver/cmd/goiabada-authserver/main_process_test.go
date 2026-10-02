@@ -294,3 +294,114 @@ func TestMain_RefusesAMalformedPreviousSessionKeyAfterBootstrap(t *testing.T) {
 	assert.Contains(t, stderr, "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
 	assert.NotContains(t, stderr, "no listener is enabled")
 }
+
+// TestMain_RefusesATimeZoneItCannotLoadBeforeOpeningAnything is decisions 10 and 14 of #331 at
+// the process: a TZ naming no zone, the name Local, which the time package accepts but which names
+// no zone, and an absolute path to a zone file that does not load, with or without POSIX's leading
+// colon, each stop main with one line on stderr and exit 2, the channel and code of a malformed
+// variable, before the log handler exists and before anything is opened. Each used to give UTC in
+// silence.
+//
+// The exit code alone proves little under `migrate version`, which would also exit on the decoy
+// database; the exact stderr and the decoy never being created are what fail.
+func TestMain_RefusesATimeZoneItCannotLoadBeforeOpeningAnything(t *testing.T) {
+	cases := []struct {
+		name string
+		tz   string
+		want string
+	}{
+		{"a name that is no zone", "Mars/Olympus",
+			`TZ is "Mars/Olympus", which names no time zone` + "\n"},
+		{"Local", "Local",
+			`TZ is "Local", which names no time zone` + "\n"},
+		{"a name with the leading colon", ":Mars/Olympus",
+			`TZ is ":Mars/Olympus", which names no time zone` + "\n"},
+		{"an absolute path that does not exist", "/nonexistent/Asia/Kolkata",
+			`TZ is "/nonexistent/Asia/Kolkata", a zone file that does not load: ` +
+				`open /nonexistent/Asia/Kolkata: no such file or directory` + "\n"},
+		{"an absolute path with the leading colon", ":/nonexistent/Asia/Kolkata",
+			`TZ is ":/nonexistent/Asia/Kolkata", a zone file that does not load: ` +
+				`open /nonexistent/Asia/Kolkata: no such file or directory` + "\n"},
+	}
+	for _, tc := range cases {
+		for _, command := range []struct {
+			name string
+			args []string
+		}{
+			{"the server", nil},
+			{"migrate version", []string{"migrate", "version"}},
+		} {
+			t.Run(tc.name+", "+command.name, func(t *testing.T) {
+				decoy := filepath.Join(t.TempDir(), "d.db")
+
+				code, stderr := runMainProcessWith(t, decoy, []string{
+					"TZ=" + tc.tz,
+					// Present, so a child that got past the check would go on to open the decoy.
+					"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
+					"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=0",
+				}, command.args...)
+
+				require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
+				assert.Equal(t, tc.want, stderr)
+				assert.NoFileExists(t, decoy)
+			})
+		}
+	}
+}
+
+// TestMain_HonorsATimeZoneFromTheFirstRecord: a zone name, the same name behind POSIX's leading
+// colon, and an absolute path to a zone file all pass the check, and the first record the child
+// writes already carries that zone's offset. Asia/Kolkata has had no daylight saving since 1945,
+// so +05:30 holds whatever the date.
+//
+// The child stops, 1, at the data-encryption key this harness never sets, which is what shows it
+// got past the check. On this host the zone database is present, so these cases hold with the
+// re-resolution reverted too; what they pin is that every honored form stays honored.
+func TestMain_HonorsATimeZoneFromTheFirstRecord(t *testing.T) {
+	for _, tz := range []string{
+		"Asia/Kolkata",
+		":Asia/Kolkata",
+		"/usr/share/zoneinfo/Asia/Kolkata",
+		":/usr/share/zoneinfo/Asia/Kolkata",
+	} {
+		t.Run(tz, func(t *testing.T) {
+			if strings.Contains(tz, "/usr/share/zoneinfo/") {
+				require.FileExists(t, strings.TrimPrefix(tz, ":"), "the case reads the host's own zone file")
+			}
+			decoy := filepath.Join(t.TempDir(), "d.db")
+
+			code, stderr := runMainProcessWith(t, decoy, []string{"TZ=" + tz})
+
+			require.Equal(t, 1, code, "stderr: %s", stderr)
+			assert.Contains(t, stderr, "the data encryption key is missing or malformed")
+			first, _, _ := strings.Cut(stderr, "\n")
+			assert.Contains(t, first, "+05:30 level=INFO msg=\"auth server started\"")
+			assert.NoFileExists(t, decoy)
+		})
+	}
+}
+
+// TestMain_LeavesAnUnsetOrEmptyTimeZoneAsItWas: TZ unset reads the host's /etc/localtime and TZ
+// empty means UTC, as they did before #331, so neither is refused. An empty TZ is the one form
+// whose result is fixed whatever the host, and its first record is in UTC.
+func TestMain_LeavesAnUnsetOrEmptyTimeZoneAsItWas(t *testing.T) {
+	t.Run("unset", func(t *testing.T) {
+		decoy := filepath.Join(t.TempDir(), "d.db")
+
+		code, stderr := runMainProcessWith(t, decoy, nil)
+
+		require.Equal(t, 1, code, "stderr: %s", stderr)
+		assert.Contains(t, stderr, "the data encryption key is missing or malformed")
+	})
+	for _, tz := range []string{"", ":"} {
+		t.Run("TZ="+tz, func(t *testing.T) {
+			decoy := filepath.Join(t.TempDir(), "d.db")
+
+			code, stderr := runMainProcessWith(t, decoy, []string{"TZ=" + tz})
+
+			require.Equal(t, 1, code, "stderr: %s", stderr)
+			first, _, _ := strings.Cut(stderr, "\n")
+			assert.Regexp(t, `^time=\S+Z level=INFO msg="auth server started"`, first)
+		})
+	}
+}
