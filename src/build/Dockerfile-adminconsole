@@ -13,18 +13,12 @@ RUN mkdir -p /app/src/core /app/src/adminconsole
 COPY ./core/go.mod /app/src/core/
 COPY ./adminconsole/go.mod /app/src/adminconsole/
 
-# Debug: List contents
-RUN ls -la /app/src/core
-RUN ls -la /app/src/adminconsole
-
 # Download dependencies for core
 WORKDIR /app/src/core
-RUN cat go.mod
 RUN go mod download
 
 # Download dependencies for adminconsole
 WORKDIR /app/src/adminconsole
-RUN cat go.mod
 RUN go mod download
 
 # Copy the rest of the source code
@@ -35,7 +29,20 @@ COPY ./core ./core
 RUN mkdir -p /app/bin
 
 WORKDIR /app/src/adminconsole
-RUN go build -buildvcs=false -tags=production -ldflags="-X 'github.com/leodip/goiabada/core/constants.Version=${version}' -X 'github.com/leodip/goiabada/core/constants.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/constants.GitCommit=${gitCommit}'" -o ../../bin/goiabada-adminconsole ./cmd/goiabada-adminconsole
+# -w drops the DWARF debug data, which nothing in a deployment reads and which
+# is about a third of this image compressed (#331). It is -w and not -s: -s
+# would drop the symbol table too, which is what `govulncheck -mode=binary`
+# matches at symbol level; without it the scan falls back to module level and
+# reports vulnerabilities in packages the binary never calls. Panics and
+# core/errs stacks keep function, file and line either way, because they come
+# from the runtime's own tables, which -w leaves alone.
+#
+# No debuggable copy of a release is kept. To get one, build the release's tag
+# with this file and the release's build arguments, after removing -w: the same
+# commit, Go image and source path (/app/src, fixed above) give byte-identical
+# code at identical addresses, so the rebuild's DWARF describes the shipped
+# binary.
+RUN go build -buildvcs=false -tags=production -ldflags="-w -X 'github.com/leodip/goiabada/core/constants.Version=${version}' -X 'github.com/leodip/goiabada/core/constants.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/constants.GitCommit=${gitCommit}'" -o ../../bin/goiabada-adminconsole ./cmd/goiabada-adminconsole
 
 # ------------------------------------------------------------------------------
 
