@@ -1,8 +1,13 @@
 package testutil
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -98,7 +103,13 @@ func assertArchitecture(r Reporter, root string) {
 			dir))
 	}
 
-	findings = append(findings, checkArchitecture(tables, graph)...)
+	external, loadFindings, err := compiledClosure(root, graph)
+	if err != nil {
+		r.Fatalf("listing the shipped mains' dependencies under %s: %v", root, err)
+	}
+	findings = append(findings, loadFindings...)
+
+	findings = append(findings, checkArchitecture(tables, graph, external)...)
 	findings = append(findings, checkConstantsOwnership(tables, graph, census)...)
 
 	sort.Strings(findings)
@@ -129,6 +140,18 @@ var shippedMains = []string{
 	"authserver/cmd/goiabada-authserver",
 	"adminconsole/cmd/goiabada-adminconsole",
 	"cmd/goiabada-setup",
+}
+
+// releaseTargets are the platforms every shipped main is built for: the five build_platform calls
+// in src/build/build-binaries.sh and in the setup tool's build-binaries.sh, the Docker images being
+// the first of them. Rule 9 asks the go command for each main's dependencies on every one, because
+// a package outside the four modules may import differently on each.
+var releaseTargets = []struct{ goos, goarch string }{
+	{"linux", "amd64"},
+	{"linux", "arm64"},
+	{"darwin", "amd64"},
+	{"darwin", "arm64"},
+	{"windows", "amd64"},
 }
 
 // The owner values a package row may carry. Their meanings are in ARCHITECTURE.md; what matters
@@ -292,7 +315,10 @@ type edge struct {
 	to   string
 }
 
-func checkArchitecture(tables architectureTables, graph *refgraph.ImportGraph) []string {
+// checkArchitecture runs rules 1 to 6 and 9 over the graph and returns their findings. external holds the imports of the packages outside the four modules that the shipped
+// mains reach, as compiledClosure reads them; rule 9 walks through them, and nil stops its walk at
+// the edge of the four modules.
+func checkArchitecture(tables architectureTables, graph *refgraph.ImportGraph, external map[string][]string) []string {
 	findings := checkTableHygiene(tables, graph)
 
 	owners := map[string]string{}
@@ -311,7 +337,7 @@ func checkArchitecture(tables architectureTables, graph *refgraph.ImportGraph) [
 	findings = append(findings, checkModuleDirection(graph)...)
 	findings = append(findings, checkDeadPackages(tables, graph)...)
 	findings = append(findings, checkForeignClosure(tables, graph)...)
-	findings = append(findings, checkTestCode(tables, graph)...)
+	findings = append(findings, checkTestCode(tables, graph, external)...)
 	findings = append(findings, reconcileExceptions(tables, violations)...)
 
 	return findings
@@ -529,7 +555,11 @@ func isStdlib(importPath string) bool {
 // The walk starts at each shipped main rather than at every production package of its module, which
 // is the difference from rule 5. The graph counts core/testutil's untagged files as production, so a
 // module-wide walk would find testing in core itself; what ships is what a main reaches.
-func checkTestCode(tables architectureTables, graph *refgraph.ImportGraph) []string {
+//
+// The walk does not stop at the edge of the four modules: past it, it follows external, the
+// imports the go command reports for every third-party and standard package a shipped main
+// reaches, so a framework that a dependency imports is refused like one a first-party helper does.
+func checkTestCode(tables architectureTables, graph *refgraph.ImportGraph, external map[string][]string) []string {
 	var findings []string
 	for _, dir := range shippedMains {
 		main, ok := shippedMainPackage(graph, dir)
@@ -537,7 +567,7 @@ func checkTestCode(tables architectureTables, graph *refgraph.ImportGraph) []str
 			// Reported by the reporting half, which knows whether any main was found at all.
 			continue
 		}
-		reached := testFrameworksReached(graph, main, tables.testFrameworks)
+		reached := testFrameworksReached(graph, external, main, tables.testFrameworks)
 		for i, row := range tables.testFrameworks {
 			chain, hit := reached[i]
 			if !hit {
@@ -566,12 +596,13 @@ func shippedMainPackage(graph *refgraph.ImportGraph, dir string) (string, bool) 
 	return main, ok
 }
 
-// testFrameworksReached walks main's production closure breadth first over first-party edges and
-// returns, per row of the test-framework table, the chain of packages from main to the first
-// refused import the walk met: the main, each first-party package between, and the refused path
-// itself. Breadth first makes that chain a shortest one, which is the edge a reader has to cut, and
-// the graph's sorted import lists make it the same chain on every run.
-func testFrameworksReached(graph *refgraph.ImportGraph, main string, rows []testFrameworkRow) map[int][]string {
+// testFrameworksReached walks main's production closure breadth first and returns, per row of the
+// test-framework table, the chain of packages from main to the first refused import the walk met:
+// the main, each package between, and the refused path itself. A first-party package's imports are
+// the graph's, read from source with every tag but production free; any other package's are
+// external's. Breadth first makes that chain a shortest one, which is the edge a reader has to cut,
+// and sorted import lists make it the same chain on every run.
+func testFrameworksReached(graph *refgraph.ImportGraph, external map[string][]string, main string, rows []testFrameworkRow) map[int][]string {
 	parent := map[string]string{main: ""}
 	queue := []string{main}
 	found := map[int][]string{}
@@ -579,15 +610,16 @@ func testFrameworksReached(graph *refgraph.ImportGraph, main string, rows []test
 	for len(queue) > 0 {
 		pkg := queue[0]
 		queue = queue[1:]
-		for _, imported := range graph.Prod[pkg] {
+		imports := graph.Prod[pkg]
+		if graph.ModuleDir(pkg) == "" {
+			imports = external[pkg]
+		}
+		for _, imported := range imports {
 			for i, row := range rows {
 				if _, done := found[i]; done || !underPath(imported, row.pkg) {
 					continue
 				}
 				found[i] = append(chainTo(parent, pkg), imported)
-			}
-			if graph.ModuleDir(imported) == "" {
-				continue
 			}
 			if _, seen := parent[imported]; seen {
 				continue
@@ -597,6 +629,94 @@ func testFrameworksReached(graph *refgraph.ImportGraph, main string, rows []test
 		}
 	}
 	return found
+}
+
+// compiledClosure asks the go command for the production dependencies of every shipped main on
+// every release target, and returns the imports of each package outside the four modules, merged
+// across mains and targets. The source graph cannot supply those: it reads the four modules and
+// nothing else, so without this a test framework that a third-party dependency imports would be
+// linked into a release with nothing going red. First-party packages are left to the graph, which
+// reads them with every tag but production free rather than one target at a time.
+//
+// A package the go command cannot load is a finding rather than a skipped package, since rule 9
+// cannot see what it imports; on this tree that is a dependency missing from the module cache or a
+// build broken for one target, either of which the release would meet too. A main missing from
+// the graph is skipped here, because the reporting half already accounts for it.
+func compiledClosure(root string, graph *refgraph.ImportGraph) (map[string][]string, []string, error) {
+	edges := map[string]map[string]bool{}
+	reported := map[string]bool{}
+	var findings []string
+
+	for _, dir := range shippedMains {
+		if _, ok := shippedMainPackage(graph, dir); !ok {
+			continue
+		}
+		for _, target := range releaseTargets {
+			pkgs, err := goListDeps(filepath.Join(root, filepath.FromSlash(dir)), target.goos, target.goarch)
+			if err != nil {
+				return nil, nil, errs.Wrapf(err, "%s on %s/%s", dir, target.goos, target.goarch)
+			}
+			for _, p := range pkgs {
+				if p.Error != nil {
+					key := dir + " " + p.ImportPath
+					if !reported[key] {
+						reported[key] = true
+						findings = append(findings, fmt.Sprintf(
+							"test code: the go command cannot load %s for %s on %s/%s, so rule 9 cannot see what it imports: %s",
+							p.ImportPath, dir, target.goos, target.goarch, strings.TrimSpace(p.Error.Err)))
+					}
+					continue
+				}
+				if graph.ModuleDir(p.ImportPath) != "" {
+					continue
+				}
+				if edges[p.ImportPath] == nil {
+					edges[p.ImportPath] = map[string]bool{}
+				}
+				for _, imported := range p.Imports {
+					edges[p.ImportPath][imported] = true
+				}
+			}
+		}
+	}
+	return refgraph.Flatten(edges), findings, nil
+}
+
+// listedPackage is the part of `go list -json` output compiledClosure reads.
+type listedPackage struct {
+	ImportPath string
+	Imports    []string
+	Error      *struct{ Err string }
+}
+
+// goListDeps runs `go list -e -deps` over the main package in dir with the release builds' tag and
+// cgo setting, for one target. -e makes a package that fails to load a record carrying its error
+// rather than the end of the listing; -mod=readonly keeps the listing from editing a go.mod.
+func goListDeps(dir, goos, goarch string) ([]listedPackage, error) {
+	cmd := exec.Command("go", "list", "-e", "-deps", "-tags", "production", "-json=ImportPath,Imports,Error", ".")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0", "GOFLAGS=-mod=readonly", "GOWORK=off")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, errs.Wrapf(err, "go list: %s", strings.TrimSpace(stderr.String()))
+	}
+
+	var pkgs []listedPackage
+	dec := json.NewDecoder(&stdout)
+	for {
+		var p listedPackage
+		err := dec.Decode(&p)
+		if errors.Is(err, io.EOF) {
+			return pkgs, nil
+		}
+		if err != nil {
+			return nil, errs.Wrap(err, "decoding go list output")
+		}
+		pkgs = append(pkgs, p)
+	}
 }
 
 // chainTo follows parent links from pkg back to the walk's start and returns them in walk order.
