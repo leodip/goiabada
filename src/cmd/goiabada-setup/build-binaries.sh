@@ -47,7 +47,16 @@ build_platform() {
     # /home/runner/go/pkg/mod, and the GOROOT setup-go installed): the
     # rebuild's code is byte-identical at identical addresses, so its DWARF
     # describes the shipped binary.
-    GOOS=$os GOARCH=$arch go build -v \
+    #
+    # -tags=production is what both servers' release builds set, so the tag
+    # means one thing, release build, for all three shipped binaries: rule 9 in
+    # ARCHITECTURE.md reads the wizard with it set, and a test helper tagged
+    # //go:build !production stays out of the wizard as the generated mocks stay
+    # out of the servers. TestReleaseBuilds_TheRealReleaseBuildsSetProduction,
+    # in core's unit tier, fails when a go build here loses the tag or when the
+    # build_platform calls below stop matching the guard's release targets
+    # (#463).
+    GOOS=$os GOARCH=$arch go build -v -tags=production \
         -ldflags "-w -X main.version=${VERSION} -X main.imageTag=${VERSION}" \
         -o "${BUILD_DIR}/goiabada-setup-${os}-${arch}${extension}" \
         .
