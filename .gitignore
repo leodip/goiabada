@@ -454,3 +454,6 @@ src/todo.txt
 # Release archives from src/build/build-binaries.sh, which writes them beside
 # the script itself rather than into a build directory of its own.
 /src/build/goiabada-*.zip
+
+# placido's local workflow files: config, scripts, and notes for its agents
+/.placido/
