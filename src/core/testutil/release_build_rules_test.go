@@ -16,6 +16,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -44,131 +46,406 @@ var releaseBuilds = []releaseBuild{
 	{file: "cmd/goiabada-setup/build-binaries.sh", mains: []string{setupMain}, platforms: true},
 }
 
-// goBuild is one go build command found in a release-build file: the line it starts on, and whether
-// it sets the production tag.
+// The reader below reads a release-build file the way the shell would run it, as far as it goes:
+// quoting, expansions, comments, continued lines and the operators that end one command and begin
+// the next, wherever they are spaced. Only what it reads as a command counts, so a go build or a
+// build_platform call is one only where it is the command's name; and a form it cannot read, from
+// an unclosed quote to a mention of go build in a string or behind echo, is reported rather than
+// passed over, since reading less than the shell would is how an untagged build slips through.
+
+// shellWord is one word of a command: its text as written, its text with the quotes removed and every
+// expansion left as written, the line it begins on, whether it holds an expansion, and whether one
+// stands outside quotes, where the shell would split its result into more words.
+type shellWord struct {
+	raw, value      string
+	line            int
+	expands, splits bool
+}
+
+// shellCommand is one simple command: the assignments before it, then its words, the first being its
+// name. logical counts the logical lines before it, and defines marks a function definition, name().
+type shellCommand struct {
+	line, logical int
+	assigns       []shellWord
+	words         []shellWord
+	defines       bool
+}
+
+// shellProblem is a form the reader cannot read, at the line it begins on.
+type shellProblem struct {
+	line int
+	what string
+}
+
+// shellScript is a script or Dockerfile read into its commands, and its text without the comments,
+// where a mention no command accounts for is looked for. When problems holds anything, the reading
+// stopped there and the rest is empty.
+type shellScript struct {
+	commands []shellCommand
+	bare     string
+	problems []shellProblem
+}
+
+var (
+	// assignment is a word assigning a variable, and arrayAssignment one about to assign an array.
+	assignment      = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\+?=`)
+	arrayAssignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\+?=$`)
+
+	// commandPrefixes are the reserved words a command may follow: in if go build ...; then, the
+	// command is go build.
+	commandPrefixes = wordSet("!", "{", "if", "then", "elif", "else", "while", "until", "do")
+
+	doubleQuoteEscapes = strings.NewReplacer("\\\n", "", `\"`, `"`, `\\`, `\`, `\$`, `$`, "\\`", "`")
+
+	// goBuildMention and buildPlatformMention find the two names wherever they are written, a JSON
+	// RUN ["go", "build"] included, for the reader to compare with the commands it read.
+	goBuildMention       = regexp.MustCompile(`\bgo["'\s\\,]+build\b`)
+	buildPlatformMention = regexp.MustCompile(`\bbuild_platform\b`)
+)
+
+type shellReader struct {
+	src      string
+	i, line  int
+	logical  int
+	words    []shellWord
+	commands []shellCommand
+	problems []shellProblem
+}
+
+// readShell reads a script into its commands. A Dockerfile's RUN hands the rest of its line to the
+// shell, so the one reading serves both.
+func readShell(src string) shellScript {
+	r := &shellReader{src: src, line: 1}
+	var bare strings.Builder
+	last := 0
+	for r.i < len(src) {
+		c := src[r.i]
+		switch {
+		case strings.HasPrefix(src[r.i:], "\\\n"):
+			r.advance(r.i + 2)
+		case c == ' ' || c == '\t' || c == '\r':
+			r.i++
+		case c == '\n':
+			r.end(false)
+			r.logical++
+			r.advance(r.i + 1)
+		case c == '#':
+			end := strings.IndexByte(src[r.i:], '\n')
+			if end < 0 {
+				end = len(src) - r.i
+			}
+			bare.WriteString(src[last:r.i])
+			last = r.i + end
+			r.i += end
+		case c == '(':
+			r.i++
+			rest := strings.TrimLeft(src[r.i:], " \t")
+			defines := len(r.words) == 1 && strings.HasPrefix(rest, ")")
+			if defines {
+				r.i = len(src) - len(rest) + 1
+			}
+			r.end(defines)
+		case strings.IndexByte(";&|)", c) >= 0:
+			r.i++
+			r.end(false)
+		default:
+			if !r.word() {
+				return shellScript{problems: r.problems}
+			}
+		}
+	}
+	r.end(false)
+	bare.WriteString(src[last:])
+	return shellScript{commands: r.commands, bare: bare.String()}
+}
+
+func (r *shellReader) advance(to int) {
+	r.line += strings.Count(r.src[r.i:to], "\n")
+	r.i = to
+}
+
+// word reads one word, and reports false when it holds a form the reader cannot read.
+func (r *shellReader) word() bool {
+	w := shellWord{line: r.line}
+	start := r.i
+	var value strings.Builder
+read:
+	for r.i < len(r.src) {
+		c := r.src[r.i]
+		switch {
+		case c == '\\' && r.i+1 < len(r.src):
+			if r.src[r.i+1] != '\n' {
+				value.WriteByte(r.src[r.i+1])
+			}
+			r.advance(r.i + 2)
+			continue
+		case c == '\'' || c == '"' || isExpansionStart(r.src, r.i) || c == '(' && arrayAssignment.MatchString(r.src[start:r.i]):
+			end, ok := skipConstruct(r.src, r.i)
+			if !ok {
+				opening := r.src[r.i : r.i+1]
+				if c == '$' {
+					opening = r.src[r.i : r.i+2]
+				}
+				r.problems = append(r.problems, shellProblem{r.line, fmt.Sprintf("opens a %s that never closes", opening)})
+				return false
+			}
+			content := r.src[r.i:end]
+			switch c {
+			case '\'':
+				value.WriteString(content[1 : len(content)-1])
+			case '"':
+				value.WriteString(doubleQuoteEscapes.Replace(content[1 : len(content)-1]))
+			default:
+				value.WriteString(content)
+			}
+			w.expands = w.expands || c == '$' || c == '`' || c != '\'' && strings.ContainsAny(content, "$`")
+			w.splits = w.splits || c == '$' || c == '`'
+			r.advance(end)
+			continue
+		case c == '$':
+			w.expands, w.splits = true, true
+		case c == '&' && r.i > start && (r.src[r.i-1] == '>' || r.src[r.i-1] == '<'):
+			// a redirection, >&2, and not an operator
+		case strings.IndexByte(" \t\r\n;&|()", c) >= 0:
+			break read
+		}
+		value.WriteByte(c)
+		r.i++
+	}
+	w.raw, w.value = r.src[start:r.i], value.String()
+	if strings.HasPrefix(w.raw, "<<") && !strings.HasPrefix(w.raw, "<<<") {
+		r.problems = append(r.problems, shellProblem{w.line, "opens a heredoc, whose lines this reader cannot tell from commands"})
+		return false
+	}
+	r.words = append(r.words, w)
+	return true
+}
+
+// end closes the command being read, if there is one.
+func (r *shellReader) end(defines bool) {
+	words := r.words
+	r.words = nil
+	if len(words) > 0 && words[0].raw == "RUN" {
+		words = words[1:]
+	}
+	for len(words) > 0 && commandPrefixes[words[0].raw] {
+		words = words[1:]
+	}
+	if len(words) == 0 {
+		return
+	}
+	c := shellCommand{line: words[0].line, logical: r.logical, defines: defines}
+	for len(words) > 0 && assignment.MatchString(words[0].raw) {
+		c.assigns = append(c.assigns, words[0])
+		words = words[1:]
+	}
+	c.words = words
+	r.commands = append(r.commands, c)
+}
+
+func isExpansionStart(src string, i int) bool {
+	return src[i] == '`' || src[i] == '$' && i+1 < len(src) && (src[i+1] == '(' || src[i+1] == '{')
+}
+
+// skipConstruct returns the index just past the quoted string, expansion or array that begins at i,
+// '…', "…", `…`, $(…), ${…} or (…), stepping over whatever nests inside it, and false when it never
+// closes.
+func skipConstruct(src string, i int) (int, bool) {
+	switch src[i] {
+	case '\'', '`':
+		end := strings.IndexByte(src[i+1:], src[i])
+		return i + end + 2, end >= 0
+	case '"':
+		for j := i + 1; j < len(src); {
+			switch {
+			case src[j] == '\\':
+				j += 2
+			case src[j] == '"':
+				return j + 1, true
+			case isExpansionStart(src, j):
+				end, ok := skipConstruct(src, j)
+				if !ok {
+					return 0, false
+				}
+				j = end
+			default:
+				j++
+			}
+		}
+		return 0, false
+	}
+	b := i
+	if src[i] == '$' {
+		b = i + 1
+	}
+	open, closer := src[b], byte(')')
+	if open == '{' {
+		closer = '}'
+	}
+	depth := 0
+	for j := b; j < len(src); {
+		switch c := src[j]; {
+		case c == '\\':
+			j += 2
+		case c == '\'' || c == '"' || isExpansionStart(src, j):
+			end, ok := skipConstruct(src, j)
+			if !ok {
+				return 0, false
+			}
+			j = end
+		case c == open:
+			depth++
+			j++
+		case c == closer:
+			depth--
+			j++
+			if depth == 0 {
+				return j, true
+			}
+		default:
+			j++
+		}
+	}
+	return 0, false
+}
+
+// unaccounted returns the line of every match of pattern in the script's text that no command
+// accounts for, given the lines of the names of the commands that do.
+func (s shellScript) unaccounted(pattern *regexp.Regexp, accounted []int) []int {
+	left := map[int]int{}
+	for _, l := range accounted {
+		left[l]++
+	}
+	var out []int
+	for _, m := range pattern.FindAllStringIndex(s.bare, -1) {
+		line := 1 + strings.Count(s.bare[:m[0]], "\n")
+		if left[line] > 0 {
+			left[line]--
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
+func isGoBuild(c shellCommand) bool {
+	return len(c.words) >= 2 && c.words[0].value == "go" && c.words[1].value == "build"
+}
+
+// goBuild is one go build command found in a release-build file: the line it starts on, whether it
+// sets the production tag, and why its flags cannot be read, when they cannot.
 type goBuild struct {
 	line       int
 	production bool
+	unreadable string
 }
 
-// logicalLine is a command line as the shell reads it: physical lines joined at a trailing
-// backslash, with comments removed, split into words.
-type logicalLine struct {
-	line  int
-	words []string
-}
-
-// logicalLines splits a script or Dockerfile into logical lines. A Dockerfile's RUN hands its line to
-// the shell, so the one reading serves both.
-func logicalLines(text string) []logicalLine {
-	var out []logicalLine
-	var words []string
-	open := false
-	start := 0
-	for i, raw := range strings.Split(text, "\n") {
-		content := strings.TrimRight(stripShellComment(raw), " \t\r")
-		continued := strings.HasSuffix(content, `\`)
-		content = strings.TrimSuffix(content, `\`)
-		if !open {
-			start = i + 1
-			open = true
-		}
-		words = append(words, strings.Fields(content)...)
-		if continued {
+// readReleaseText reads a release-build file: its go build commands in order, the "goos/goarch"
+// pairs its build_platform calls name, sorted and without repeats, and every form in it the reader
+// cannot read. The function's own definition is not a call, however it is spaced.
+func readReleaseText(text string) ([]goBuild, []string, []shellProblem) {
+	s := readShell(text)
+	if len(s.problems) > 0 {
+		return nil, nil, s.problems
+	}
+	var builds []goBuild
+	var problems []shellProblem
+	var buildLines, platformLines []int
+	platforms := map[string]bool{}
+	for _, c := range s.commands {
+		if len(c.words) == 0 {
 			continue
 		}
-		if len(words) > 0 {
-			out = append(out, logicalLine{line: start, words: words})
-		}
-		words = nil
-		open = false
-	}
-	if len(words) > 0 {
-		out = append(out, logicalLine{line: start, words: words})
-	}
-	return out
-}
-
-// stripShellComment drops a comment from one physical line: a # beginning a word starts one, and it
-// runs to the end of the line. Both cross-compile scripts mention go build in their comments, which a
-// reader matching them would report as builds.
-func stripShellComment(line string) string {
-	wordStart := true
-	for i, r := range line {
-		if r == '#' && wordStart {
-			return line[:i]
-		}
-		wordStart = r == ' ' || r == '\t'
-	}
-	return line
-}
-
-// commandSeparators end the words of one command on a logical line.
-var commandSeparators = map[string]bool{"&&": true, "||": true, ";": true, "|": true, "&": true, ")": true}
-
-// goBuilds returns every go build command in a release-build file, in order.
-func goBuilds(text string) []goBuild {
-	var out []goBuild
-	for _, l := range logicalLines(text) {
-		for i := 0; i+1 < len(l.words); i++ {
-			if l.words[i] != "go" || l.words[i+1] != "build" {
+		name := c.words[0]
+		switch {
+		case name.expands || name.value == "go" && len(c.words) > 1 && c.words[1].expands:
+			problems = append(problems, shellProblem{c.line, "runs a command named through an expansion"})
+		case isGoBuild(c):
+			buildLines = append(buildLines, name.line)
+			production, unreadable := readBuildFlags(c.words[2:])
+			builds = append(builds, goBuild{line: c.line, production: production, unreadable: unreadable})
+		case name.value == "build_platform":
+			platformLines = append(platformLines, name.line)
+			if c.defines {
 				continue
 			}
-			var args []string
-			for _, w := range l.words[i+2:] {
-				if commandSeparators[w] {
-					break
-				}
-				if trimmed := strings.TrimRight(w, ";)"); trimmed != w {
-					args = append(args, trimmed)
-					break
-				}
-				args = append(args, w)
+			args := c.words[1:]
+			if len(args) != 3 || args[0].expands || args[1].expands || args[2].expands {
+				problems = append(problems, shellProblem{c.line, "calls build_platform with arguments other than three literal words"})
+				continue
 			}
-			out = append(out, goBuild{line: l.line, production: setsProductionTag(args)})
+			platforms[args[0].value+"/"+args[1].value] = true
 		}
 	}
-	return out
+	for _, l := range s.unaccounted(goBuildMention, buildLines) {
+		problems = append(problems, shellProblem{l, "mentions go build where no go build command runs"})
+	}
+	for _, l := range s.unaccounted(buildPlatformMention, platformLines) {
+		problems = append(problems, shellProblem{l, "mentions build_platform where it is neither called nor defined"})
+	}
+	sort.SliceStable(problems, func(i, j int) bool { return problems[i].line < problems[j].line })
+	return builds, sortedKeys(platforms), problems
 }
 
-// setsProductionTag reports whether a go build's arguments set the production tag. The go command
-// keeps the last -tags it is given, so the last one is the one read.
-func setsProductionTag(args []string) bool {
-	value := ""
+// goBuildValueFlags are the go build flags taking a value, which may be the next argument, and
+// goBuildBoolFlags the ones taking none. A flag in neither cannot be read: whether it takes the next
+// argument decides what that argument is.
+var (
+	goBuildValueFlags = wordSet("C", "o", "p", "asmflags", "buildmode", "compiler", "covermode", "coverpkg",
+		"debug-actiongraph", "debug-runtime-trace", "debug-trace", "gccgoflags", "gcflags", "installsuffix",
+		"ldflags", "mod", "modfile", "overlay", "pgo", "pkgdir", "tags", "toolexec")
+	goBuildBoolFlags = wordSet("a", "asan", "buildvcs", "cover", "json", "linkshared", "modcacherw", "msan",
+		"n", "race", "trimpath", "v", "work", "x")
+)
+
+func wordSet(words ...string) map[string]bool {
+	set := map[string]bool{}
+	for _, w := range words {
+		set[w] = true
+	}
+	return set
+}
+
+// readBuildFlags reads a go build's flags, which end at its first argument that is not one, and
+// reports whether they set the production tag, or why they cannot be read. The go command keeps the
+// last -tags it is given, so the last one is the one read.
+func readBuildFlags(args []shellWord) (bool, string) {
+	tags := ""
 	for i := 0; i < len(args); i++ {
 		a := args[i]
+		if a.splits {
+			return false, a.raw + " is an unquoted expansion"
+		}
+		if a.value == "--" || !strings.HasPrefix(a.value, "-") {
+			break
+		}
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(a.value[1:], "-"), "=")
 		switch {
-		case a == "-tags" || a == "--tags":
-			if i+1 < len(args) {
-				value = args[i+1]
-				i++
+		case goBuildValueFlags[name] && !hasValue:
+			if i+1 == len(args) {
+				return false, a.raw + " has no value"
 			}
-		case strings.HasPrefix(a, "-tags="):
-			value = strings.TrimPrefix(a, "-tags=")
-		case strings.HasPrefix(a, "--tags="):
-			value = strings.TrimPrefix(a, "--tags=")
+			i++
+			if args[i].splits {
+				return false, args[i].raw + " is an unquoted expansion"
+			}
+			value = args[i].value
+		case !hasValue && !goBuildBoolFlags[name]:
+			return false, a.raw + " is a flag it does not know"
+		}
+		if name == "tags" {
+			if strings.ContainsAny(value, "$`") {
+				return false, "-tags takes its value from an expansion"
+			}
+			tags = value
 		}
 	}
-	for _, tag := range strings.Split(strings.Trim(value, `"'`), ",") {
+	for _, tag := range strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ' ' }) {
 		if tag == "production" {
-			return true
+			return true, ""
 		}
 	}
-	return false
-}
-
-// buildPlatforms returns the "goos/goarch" pairs a cross-compile script's build_platform calls name,
-// sorted and without repeats. The function's own definition is not a call, however it is spaced:
-// build_platform() is not the name, and in build_platform () the parentheses are not a platform.
-func buildPlatforms(text string) []string {
-	seen := map[string]bool{}
-	for _, l := range logicalLines(text) {
-		if len(l.words) < 3 || l.words[0] != "build_platform" || strings.HasPrefix(l.words[1], "(") {
-			continue
-		}
-		seen[strings.Trim(l.words[1], `"'`)+"/"+strings.Trim(l.words[2], `"'`)] = true
-	}
-	return sortedKeys(seen)
+	return false, ""
 }
 
 func sortedKeys(set map[string]bool) []string {
@@ -215,14 +492,19 @@ func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targ
 			findings = append(findings, fmt.Sprintf("release builds: %s cannot be read: %v", b.file, err))
 			continue
 		}
-		text := string(src)
 
-		cmds := goBuilds(text)
-		if len(cmds) == 0 {
+		builds, platforms, problems := readReleaseText(string(src))
+		for _, p := range problems {
+			findings = append(findings, fmt.Sprintf("release builds: %s:%d %s", b.file, p.line, p.what))
+		}
+		if len(builds) == 0 {
 			findings = append(findings, fmt.Sprintf("release builds: %s holds no go build", b.file))
 		}
-		for _, c := range cmds {
-			if !c.production {
+		for _, c := range builds {
+			switch {
+			case c.unreadable != "":
+				findings = append(findings, fmt.Sprintf("release builds: %s:%d runs go build with flags this reader cannot read: %s", b.file, c.line, c.unreadable))
+			case !c.production:
 				findings = append(findings, fmt.Sprintf("release builds: %s:%d runs go build without the production tag", b.file, c.line))
 			}
 		}
@@ -231,7 +513,7 @@ func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targ
 			continue
 		}
 		got := map[string]bool{}
-		for _, p := range buildPlatforms(text) {
+		for _, p := range platforms {
 			got[p] = true
 			if !want[p] {
 				findings = append(findings, fmt.Sprintf("release builds: %s builds for %s, which releaseTargets does not list", b.file, p))
@@ -252,43 +534,80 @@ func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targ
 
 func TestReleaseBuilds_GoBuildCommands(t *testing.T) {
 	cases := []struct {
-		name string
-		text string
-		want []goBuild
+		name     string
+		text     string
+		want     []goBuild
+		problems []shellProblem
 	}{
-		{"a go build without the tag is reported", "GOOS=linux go build -o x ./cmd/a\n", []goBuild{{1, false}}},
-		{"one with -tags=production passes", "GOOS=linux go build -tags=production -o x ./cmd/a\n", []goBuild{{1, true}}},
-		{"the tag may be its own word", "go build -tags production .\n", []goBuild{{1, true}}},
-		{"the tag may be one of a list", "go build -tags=netgo,production .\n", []goBuild{{1, true}}},
-		{"a tag that only begins with production is not it", "go build -tags=productionish .\n", []goBuild{{1, false}}},
-		{"the last -tags is the one the go command keeps", "go build -tags=production -tags=dev .\n", []goBuild{{1, false}}},
-		{"a Dockerfile's RUN is read like a script line", "FROM golang AS build\nRUN go build -buildvcs=false -tags=production -o ../../bin/a ./cmd/a\n", []goBuild{{2, true}}},
+		{"a go build without the tag is reported", "GOOS=linux go build -o x ./cmd/a\n", []goBuild{{1, false, ""}}, nil},
+		{"one with -tags=production passes", "GOOS=linux go build -tags=production -o x ./cmd/a\n", []goBuild{{1, true, ""}}, nil},
+		{"the tag may be its own word", "go build -tags production .\n", []goBuild{{1, true, ""}}, nil},
+		{"the tag may be one of a list", "go build -tags=netgo,production .\n", []goBuild{{1, true, ""}}, nil},
+		{"the tag may be quoted, and the flag spelled with two dashes", `go build --tags "netgo production" .` + "\n", []goBuild{{1, true, ""}}, nil},
+		{"a tag that only begins with production is not it", "go build -tags=productionish .\n", []goBuild{{1, false, ""}}, nil},
+		{"the last -tags is the one the go command keeps", "go build -tags=production -tags=dev .\n", []goBuild{{1, false, ""}}, nil},
+		{"a -tags after the package is not a flag", "go build . -tags=production\n", []goBuild{{1, false, ""}}, nil},
+		{
+			"a -tags inside another flag's quoted value is not the tag",
+			`go build -ldflags "-X 'main.note=keep -tags=production inside a string'" -o out .` + "\n",
+			[]goBuild{{1, false, ""}}, nil,
+		},
+		{"another flag's value is not read as a flag", "go build -ldflags -tags=production .\n", []goBuild{{1, false, ""}}, nil},
+		{"a separator attached to a word ends the command", "go build ./cmd/a&& echo -tags=production\n", []goBuild{{1, false, ""}}, nil},
+		{"a separator attached to a word before it too", "go build -o out .;echo -tags=production\n", []goBuild{{1, false, ""}}, nil},
+		{"a Dockerfile's RUN is read like a script line", "FROM golang AS build\nRUN go build -buildvcs=false -tags=production -o ../../bin/a ./cmd/a\n", []goBuild{{2, true, ""}}, nil},
 		{
 			"a command split across backslash-continued lines is read whole",
 			"    GOOS=$os go build -v \\\n        -tags=production \\\n        -o out \\\n        .\n",
-			[]goBuild{{1, true}},
+			[]goBuild{{1, true, ""}}, nil,
 		},
 		{
 			"the continued lines without the tag are reported at the line the command starts",
 			"echo building\n    GOOS=$os go build -v \\\n        -o out \\\n        .\n",
-			[]goBuild{{2, false}},
+			[]goBuild{{2, false, ""}}, nil,
 		},
 		{
 			"a go build mentioned in a comment is not a command",
 			"# without set -e, a failed go build exited 0\n    # catches a failing go build\ngo build -tags=production .\n",
-			[]goBuild{{3, true}},
+			[]goBuild{{3, true, ""}}, nil,
 		},
-		{"a comment after the command is not part of it", "go build . # -tags=production\n", []goBuild{{1, false}}},
+		{"a comment after the command is not part of it", "go build . # -tags=production\n", []goBuild{{1, false, ""}}, nil},
+		{"a # inside quotes begins no comment", `echo "a # b"; go build -tags=production .` + "\n", []goBuild{{1, true, ""}}, nil},
 		{
 			"a separator ends one command and the next is read on its own",
 			"( cd a && go build -tags=production ./x ) && go build ./y\n",
-			[]goBuild{{1, true}, {1, false}},
+			[]goBuild{{1, true, ""}, {1, false, ""}}, nil,
 		},
-		{"a file holding no go build yields nothing", "#!/bin/bash\n# go build\necho go-build\n", nil},
+		{"a command behind a reserved word is read", "if go build -o x .; then echo ok; fi\n", []goBuild{{1, false, ""}}, nil},
+		{"a file holding no go build yields nothing", "#!/bin/bash\n# go build\necho go-build\n", nil, nil},
+		{
+			"a go build behind echo is a mention, not a command",
+			"FROM golang AS build\nRUN echo go build -tags=production .\n",
+			nil, []shellProblem{{2, "mentions go build where no go build command runs"}},
+		},
+		{
+			"a go build inside a string handed to another shell is not read",
+			`go build -tags=production . && sh -c "go build ./cmd/b"` + "\n",
+			[]goBuild{{1, true, ""}}, []shellProblem{{1, "mentions go build where no go build command runs"}},
+		},
+		{
+			"a go build in a Dockerfile's exec form is not read",
+			`RUN ["go", "build", "-tags=production", "."]` + "\n",
+			nil, []shellProblem{{1, "mentions go build where no go build command runs"}},
+		},
+		{"an unquoted expansion among the flags cannot be read", "go build $FLAGS -tags=production .\n", []goBuild{{1, false, "$FLAGS is an unquoted expansion"}}, nil},
+		{"a -tags set through an expansion cannot be read", `go build -tags="$TAGS" .` + "\n", []goBuild{{1, false, "-tags takes its value from an expansion"}}, nil},
+		{"a flag the reader does not know cannot be read", "go build -frobnicate -tags=production .\n", []goBuild{{1, false, "-frobnicate is a flag it does not know"}}, nil},
+		{"a quoted expansion in another flag's value is read", `go build -tags=production -ldflags "-X main.v=$V" -o "$OUT" .` + "\n", []goBuild{{1, true, ""}}, nil},
+		{"a command named through an expansion cannot be read", "$GO build -o x .\n", nil, []shellProblem{{1, "runs a command named through an expansion"}}},
+		{"a quote that never closes stops the reading", "go build -tags=production .\necho \"unclosed\n", nil, []shellProblem{{2, `opens a " that never closes`}}},
+		{"a heredoc stops the reading", "cat <<EOF\ngo build -tags=production .\nEOF\n", nil, []shellProblem{{1, "opens a heredoc, whose lines this reader cannot tell from commands"}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.want, goBuilds(c.text))
+			builds, _, problems := readReleaseText(c.text)
+			assert.Equal(t, c.want, builds)
+			assert.Equal(t, c.problems, problems)
 		})
 	}
 }
@@ -304,9 +623,30 @@ build_platform () {
 # build_platform "plan9" "386" ""
 build_platform "linux" "amd64" ""
 build_platform darwin arm64 ""
-build_platform "linux" "amd64" ""
+build_platform "linux" "amd64" ""; build_platform "freebsd" "amd64" ""
+build_platform "windows" "amd64" ".exe"&&build_platform "openbsd" "amd64" ""
 `
-	assert.Equal(t, []string{"darwin/arm64", "linux/amd64"}, buildPlatforms(script))
+	_, platforms, problems := readReleaseText(script)
+	assert.Equal(t, []string{"darwin/arm64", "freebsd/amd64", "linux/amd64", "openbsd/amd64", "windows/amd64"}, platforms)
+	assert.Empty(t, problems)
+
+	t.Run("a call it cannot read is reported", func(t *testing.T) {
+		_, platforms, problems := readReleaseText("build_platform \"$os\" amd64 \"\"\nbuild_platform linux\nfor p in a; do build_platform $p; done\n")
+		assert.Empty(t, platforms)
+		assert.Equal(t, []shellProblem{
+			{1, "calls build_platform with arguments other than three literal words"},
+			{2, "calls build_platform with arguments other than three literal words"},
+			{3, "calls build_platform with arguments other than three literal words"},
+		}, problems)
+	})
+
+	t.Run("a build_platform no call or definition accounts for is reported", func(t *testing.T) {
+		_, _, problems := readReleaseText("echo build_platform linux amd64\nxargs -n2 build_platform < platforms\n")
+		assert.Equal(t, []shellProblem{
+			{1, "mentions build_platform where it is neither called nor defined"},
+			{2, "mentions build_platform where it is neither called nor defined"},
+		}, problems)
+	})
 }
 
 // ---- the check, over fixture trees ----------------------------------------------------------
@@ -399,9 +739,59 @@ func TestReleaseBuilds_Check(t *testing.T) {
 			"release builds: build/Dockerfile-one holds no go build")
 	})
 
+	t.Run("a go build whose tag sits inside another flag's quoted value fails", func(t *testing.T) {
+		root := writeReleaseFixture(t, map[string]string{
+			"build/Dockerfile-one": "FROM golang AS build\nRUN go build -ldflags \"-X 'main.note=keep -tags=production inside a string'\" -o bin/one ./cmd/one\n",
+		})
+		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
+			"release builds: build/Dockerfile-one:2 runs go build without the production tag")
+	})
+
+	t.Run("a go build whose tag belongs to the next command fails", func(t *testing.T) {
+		root := writeReleaseFixture(t, map[string]string{
+			"build/Dockerfile-one": "FROM golang AS build\nRUN go build -o bin/one ./cmd/one&& echo -tags=production\n",
+		})
+		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
+			"release builds: build/Dockerfile-one:2 runs go build without the production tag")
+	})
+
+	t.Run("a go build whose flags cannot be read fails", func(t *testing.T) {
+		root := writeReleaseFixture(t, map[string]string{
+			"build/Dockerfile-one": "FROM golang AS build\nRUN go build $FLAGS -tags=production -o bin/one ./cmd/one\n",
+		})
+		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
+			"release builds: build/Dockerfile-one:2 runs go build with flags this reader cannot read: $FLAGS is an unquoted expansion")
+	})
+
+	t.Run("a file whose only go build is echoed holds no go build", func(t *testing.T) {
+		root := writeReleaseFixture(t, map[string]string{
+			"build/Dockerfile-one": "FROM golang AS build\nRUN echo go build -tags=production .\n",
+		})
+		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
+			"release builds: build/Dockerfile-one holds no go build",
+			"release builds: build/Dockerfile-one:2 mentions go build where no go build command runs")
+	})
+
+	t.Run("a file the reader cannot read fails", func(t *testing.T) {
+		root := writeReleaseFixture(t, map[string]string{
+			"build/Dockerfile-one": "FROM golang AS build\nRUN go build -tags=production -o 'bin/one ./cmd/one\n",
+		})
+		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
+			"release builds: build/Dockerfile-one holds no go build",
+			"release builds: build/Dockerfile-one:2 opens a ' that never closes")
+	})
+
 	t.Run("a script building for a platform the release targets lack fails", func(t *testing.T) {
 		root := writeReleaseFixture(t, map[string]string{
 			"build/build.sh": cleanReleaseScript + "build_platform \"freebsd\" \"amd64\" \"\"\n",
+		})
+		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
+			"release builds: build/build.sh builds for freebsd/amd64, which releaseTargets does not list")
+	})
+
+	t.Run("a second build_platform call on one line is read", func(t *testing.T) {
+		root := writeReleaseFixture(t, map[string]string{
+			"build/build.sh": strings.Replace(cleanReleaseScript, `build_platform "linux" "amd64" ""`, `build_platform "linux" "amd64" ""; build_platform "freebsd" "amd64" ""`, 1),
 		})
 		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
 			"release builds: build/build.sh builds for freebsd/amd64, which releaseTargets does not list")
@@ -447,71 +837,87 @@ func TestReleaseBuilds_TheRealReleaseBuildsSetProduction(t *testing.T) {
 // (#463).
 const wizardMakefile = "cmd/goiabada-setup/Makefile"
 
-// makeRecipe returns the recipe of target in a Makefile as logical lines, and whether the target is
-// defined. A recipe is the tab-indented lines under the rule; a variable assignment is not a rule.
-func makeRecipe(text, target string) ([]logicalLine, bool) {
+// makeRecipes returns a Makefile's text with every line blanked but the recipe lines of target, or of
+// every target when target is empty, each as make hands it to the shell: its leading tab removed,
+// and make's @, - and + prefixes too where it begins a command. It reports whether target is defined.
+// A recipe is the tab-indented lines under a rule; a variable assignment is not a rule.
+func makeRecipes(text, target string) (string, bool) {
 	lines := strings.Split(text, "\n")
+	out := make([]string, len(lines))
+	in, defined, continued := false, false, false
 	for i, l := range lines {
-		name, rest, ok := strings.Cut(l, ":")
-		if !ok || strings.HasPrefix(l, "\t") || strings.TrimSpace(name) != target || strings.HasPrefix(rest, "=") {
+		if strings.HasPrefix(l, "\t") {
+			if in {
+				l = strings.TrimPrefix(l, "\t")
+				if !continued {
+					l = strings.TrimLeft(l, "@-+")
+				}
+				out[i] = l
+				continued = strings.HasSuffix(l, `\`)
+			}
 			continue
 		}
-		var recipe []string
-		for _, r := range lines[i+1:] {
-			if !strings.HasPrefix(r, "\t") {
-				break
-			}
-			recipe = append(recipe, r)
-		}
-		return logicalLines(strings.Join(recipe, "\n")), true
+		names, rest, ok := strings.Cut(l, ":")
+		in = ok && !strings.HasPrefix(rest, "=") && !strings.HasPrefix(strings.TrimSpace(l), "#") &&
+			(target == "" || slices.Contains(strings.Fields(names), target))
+		defined = defined || in
+		continued = false
 	}
-	return nil, false
+	return strings.Join(out, "\n"), defined
 }
 
-// runsReleaseScript reports whether a recipe line runs the wizard's build-binaries.sh with
-// --version $(VERSION). make's @, - and + prefixes are not part of the command.
-func runsReleaseScript(l logicalLine) bool {
-	for i, w := range l.words {
-		if path.Base(strings.TrimLeft(w, "@-+")) != "build-binaries.sh" {
-			continue
-		}
-		args := l.words[i+1:]
-		for j := 0; j+1 < len(args); j++ {
-			if args[j] == "--version" && strings.Trim(args[j+1], `"'`) == "$(VERSION)" {
-				return true
-			}
+// runsReleaseScript reports whether a command runs the wizard's build-binaries.sh with
+// --version $(VERSION).
+func runsReleaseScript(c shellCommand) bool {
+	if len(c.words) == 0 || path.Base(c.words[0].value) != "build-binaries.sh" {
+		return false
+	}
+	args := c.words[1:]
+	for j := 0; j+1 < len(args); j++ {
+		if args[j].value == "--version" && args[j+1].value == "$(VERSION)" {
+			return true
 		}
 	}
 	return false
 }
 
 // checkWizardMakefile holds the wizard's Makefile to delegating its cross-compile, and returns what
-// does not hold.
+// does not hold. make runs each logical line of a recipe in a shell of its own, so a go build picks a
+// platform when a GOOS or GOARCH is set on its logical line.
 func checkWizardMakefile(text string) []string {
 	var findings []string
 
-	recipe, ok := makeRecipe(text, "build-all")
-	if !ok {
+	if recipe, ok := makeRecipes(text, "build-all"); !ok {
 		findings = append(findings, "wizard makefile: no build-all target")
-	} else {
-		delegates := false
-		for _, l := range recipe {
-			delegates = delegates || runsReleaseScript(l)
-		}
-		if !delegates {
-			findings = append(findings, "wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)")
-		}
+	} else if !slices.ContainsFunc(readShell(recipe).commands, runsReleaseScript) {
+		findings = append(findings, "wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)")
 	}
 
-	for _, l := range logicalLines(text) {
-		builds, picksPlatform := false, false
-		for i, w := range l.words {
-			builds = builds || (w == "go" && i+1 < len(l.words) && l.words[i+1] == "build")
-			picksPlatform = picksPlatform || strings.HasPrefix(w, "GOOS=") || strings.HasPrefix(w, "GOARCH=")
+	recipes, _ := makeRecipes(text, "")
+	s := readShell(recipes)
+	for _, p := range s.problems {
+		findings = append(findings, fmt.Sprintf("wizard makefile: line %d %s", p.line, p.what))
+	}
+	picksPlatform := map[int]bool{}
+	for _, c := range s.commands {
+		for _, w := range slices.Concat(c.assigns, c.words) {
+			if strings.HasPrefix(w.value, "GOOS=") || strings.HasPrefix(w.value, "GOARCH=") {
+				picksPlatform[c.logical] = true
+			}
 		}
-		if builds && picksPlatform {
-			findings = append(findings, fmt.Sprintf("wizard makefile: line %d cross-compiles with its own go build", l.line))
+	}
+	var buildLines []int
+	for _, c := range s.commands {
+		if !isGoBuild(c) {
+			continue
 		}
+		buildLines = append(buildLines, c.words[0].line)
+		if picksPlatform[c.logical] {
+			findings = append(findings, fmt.Sprintf("wizard makefile: line %d cross-compiles with its own go build", c.line))
+		}
+	}
+	for _, l := range s.unaccounted(goBuildMention, buildLines) {
+		findings = append(findings, fmt.Sprintf("wizard makefile: line %d mentions go build where no go build command runs", l))
 	}
 	return findings
 }
@@ -558,6 +964,16 @@ func TestReleaseBuilds_WizardMakefile(t *testing.T) {
 			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
 		},
 		{
+			"a build-all that only echoes the release script fails",
+			strings.Replace(delegating, "\t@./build-binaries.sh", "\t@echo ./build-binaries.sh", 1),
+			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+		},
+		{
+			"the release script run after a separator is read",
+			strings.Replace(delegating, "\t@./build-binaries.sh", "\t@mkdir -p build&&./build-binaries.sh", 1),
+			nil,
+		},
+		{
 			"a Makefile with no build-all fails",
 			strings.Replace(delegating, "build-all:", "build-every:", 1),
 			[]string{"wizard makefile: no build-all target"},
@@ -566,6 +982,16 @@ func TestReleaseBuilds_WizardMakefile(t *testing.T) {
 			"a cross-compiling go build in any target fails, continued lines read whole",
 			delegating + "\nbuild-linux-arm64:\n\tGOOS=linux GOARCH=arm64 \\\n\t\tgo build -o build/x .\n",
 			[]string{"wizard makefile: line 13 cross-compiles with its own go build"},
+		},
+		{
+			"a go build the reader cannot see run fails",
+			delegating + "\nbuild-linux:\n\tsh -c \"GOOS=linux go build -o build/x .\"\n",
+			[]string{"wizard makefile: line 13 mentions go build where no go build command runs"},
+		},
+		{
+			"a GOOS set by another recipe line picks no platform for this one",
+			delegating + "\nbuild-local:\n\texport GOOS=linux\n\tgo build -o build/x .\n",
+			nil,
 		},
 	}
 	for _, c := range cases {
