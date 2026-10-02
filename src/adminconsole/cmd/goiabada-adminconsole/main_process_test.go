@@ -135,3 +135,102 @@ func TestMain_RefusesAMalformedPreviousSessionKey(t *testing.T) {
 	require.Equal(t, 1, code, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got 32 bytes")
 }
+
+// TestMain_RefusesATimeZoneItCannotLoad is decisions 10 and 14 of #331 at the process: a TZ naming
+// no zone, the name Local, which the time package accepts but which names no zone, and an absolute
+// path to a zone file that does not load, with or without POSIX's leading colon, each stop main
+// with one line on stderr and exit 2, the channel and code of a malformed variable, before
+// anything is logged. Each used to give UTC in silence.
+//
+// The exit code is what a main ignoring the check cannot fake: it would go on and stop, 1, at the
+// listener this harness disables. stderr holding the refusal line and nothing else is what shows
+// the refusal came before anything was logged.
+func TestMain_RefusesATimeZoneItCannotLoad(t *testing.T) {
+	cases := []struct {
+		name string
+		tz   string
+		want string
+	}{
+		{"a name that is no zone", "Mars/Olympus",
+			`TZ is "Mars/Olympus", which names no time zone` + "\n"},
+		{"Local", "Local",
+			`TZ is "Local", which names no time zone` + "\n"},
+		{"a name with the leading colon", ":Mars/Olympus",
+			`TZ is ":Mars/Olympus", which names no time zone` + "\n"},
+		{"an absolute path that does not exist", "/nonexistent/Asia/Kolkata",
+			`TZ is "/nonexistent/Asia/Kolkata", a zone file that does not load: ` +
+				`open /nonexistent/Asia/Kolkata: no such file or directory` + "\n"},
+		{"an absolute path with the leading colon", ":/nonexistent/Asia/Kolkata",
+			`TZ is ":/nonexistent/Asia/Kolkata", a zone file that does not load: ` +
+				`open /nonexistent/Asia/Kolkata: no such file or directory` + "\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			code, stderr := runMainProcess(t, []string{
+				"TZ=" + tc.tz,
+				// Neither listener, so a child that got past the refusal stops rather than serves.
+				"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
+			})
+
+			require.Equal(t, 2, code, "stderr: %s", stderr)
+			assert.Equal(t, tc.want, stderr)
+		})
+	}
+}
+
+// TestMain_HonorsATimeZoneFromTheFirstRecord: a zone name, the same name behind POSIX's leading
+// colon, and an absolute path to a zone file all pass the check, and the first record the child
+// writes already carries that zone's offset. Asia/Kolkata has had no daylight saving since 1945,
+// so +05:30 holds whatever the date.
+//
+// The child stops, 1, at the listener this harness disables, which is what shows it got past the
+// check. On this host the zone database is present, so these cases hold with the re-resolution
+// reverted too; what they pin is that every honored form stays honored.
+func TestMain_HonorsATimeZoneFromTheFirstRecord(t *testing.T) {
+	for _, tz := range []string{
+		"Asia/Kolkata",
+		":Asia/Kolkata",
+		"/usr/share/zoneinfo/Asia/Kolkata",
+		":/usr/share/zoneinfo/Asia/Kolkata",
+	} {
+		t.Run(tz, func(t *testing.T) {
+			if strings.Contains(tz, "/usr/share/zoneinfo/") {
+				require.FileExists(t, strings.TrimPrefix(tz, ":"), "the case reads the host's own zone file")
+			}
+
+			code, stderr := runMainProcess(t, []string{
+				"TZ=" + tz,
+				"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
+			})
+
+			require.Equal(t, 1, code, "stderr: %s", stderr)
+			first, _, _ := strings.Cut(stderr, "\n")
+			assert.Contains(t, first, "+05:30 level=INFO msg=\"admin console started\"")
+		})
+	}
+}
+
+// TestMain_LeavesAnUnsetOrEmptyTimeZoneAsItWas: TZ unset reads the host's /etc/localtime and TZ
+// empty means UTC, as they did before #331, so neither is refused. An empty TZ is the one form
+// whose result is fixed whatever the host, and its first record is in UTC.
+func TestMain_LeavesAnUnsetOrEmptyTimeZoneAsItWas(t *testing.T) {
+	t.Run("unset", func(t *testing.T) {
+		code, stderr := runMainProcess(t, []string{"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0"})
+
+		require.Equal(t, 1, code, "stderr: %s", stderr)
+		first, _, _ := strings.Cut(stderr, "\n")
+		assert.Contains(t, first, `level=INFO msg="admin console started"`)
+	})
+	for _, tz := range []string{"", ":"} {
+		t.Run("TZ="+tz, func(t *testing.T) {
+			code, stderr := runMainProcess(t, []string{
+				"TZ=" + tz,
+				"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
+			})
+
+			require.Equal(t, 1, code, "stderr: %s", stderr)
+			first, _, _ := strings.Cut(stderr, "\n")
+			assert.Regexp(t, `^time=\S+Z level=INFO msg="admin console started"`, first)
+		})
+	}
+}

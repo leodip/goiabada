@@ -104,6 +104,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/i18n` | kernel | — |
 | `core/internal` | kernel | — |
 | `core/locales` | kernel | — |
+| `core/localzone` | kernel | — |
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
 | `core/oauth` | kernel | — |

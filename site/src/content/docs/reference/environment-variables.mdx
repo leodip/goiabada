@@ -334,6 +334,11 @@ See [Customizations](/reference/customizations/) for details on how to customize
       <td><code>false</code></td>
       <td>Verbose API logging, one record per exchange carrying the method, target, status, duration and both bodies. Credential fields in the bodies and the <code>Authorization</code> header are redacted. See <a href="/reference/security/">Security</a>.</td>
     </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>TZ</code></td>
+      <td>unset</td>
+      <td>Time zone of the log timestamps and of the times the auth server formats: an IANA name such as <code>Europe/Lisbon</code>, or an absolute path to a zone file such as <code>/usr/share/zoneinfo/Europe/Lisbon</code>, either one optionally after a leading <code>:</code>. The binary carries its own zone database, so the host needs none, and <code>TZ</code> is honored on Windows too. A name that is no zone, <code>Local</code>, or a zone file that does not load refuses startup. Unset, the host's local zone is used; empty, UTC. It is the standard variable, with no <code>GOIABADA_</code> prefix and no flag.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -577,6 +582,11 @@ See [Customizations](/reference/customizations/) for details on how to customize
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LOG_FORMAT</code><br/><code>--adminconsole-log-format</code></td>
       <td><code>text</code></td>
       <td>Shape of each log record: <code>text</code> for one <code>key=value</code> line, or <code>json</code> for one JSON document. Anything else refuses startup.</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;"><code>TZ</code></td>
+      <td>unset</td>
+      <td>Time zone of the log timestamps and of the times the admin console formats: an IANA name such as <code>Europe/Lisbon</code>, or an absolute path to a zone file such as <code>/usr/share/zoneinfo/Europe/Lisbon</code>, either one optionally after a leading <code>:</code>. The binary carries its own zone database, so the host needs none, and <code>TZ</code> is honored on Windows too. A name that is no zone, <code>Local</code>, or a zone file that does not load refuses startup. Unset, the host's local zone is used; empty, UTC. It is the standard variable, with no <code>GOIABADA_</code> prefix and no flag.</td>
     </tr>
   </tbody>
 </table>

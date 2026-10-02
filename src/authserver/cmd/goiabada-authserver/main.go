@@ -17,7 +17,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	_ "time/tzdata" // embeds the zone database, so TZ resolves on a host without one (#49, #432)
+	_ "time/tzdata" // embeds the zone database localzone.Install resolves TZ against (#49, #331, #432)
 
 	"github.com/go-chi/chi/v5"
 
@@ -33,11 +33,21 @@ import (
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 func main() {
+	// TZ is resolved again before anything else, so the first record is already in the zone the
+	// deployment chose. The zone database this binary embeds is reachable only from here: a
+	// dependency fixes the local zone during package initialization, before it registers, so on a
+	// host with no zone database TZ was ignored. A TZ that names no zone, or a zone file that does
+	// not load, takes a malformed variable's channel and code, one line on stderr and exit 2 (#331).
+	if err := localzone.Install(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(migrateExitUsage)
+	}
 
 	// The configuration and the log handler come before the first record. The
 	// level and the format are per-server settings, so anything written ahead of
