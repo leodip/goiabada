@@ -390,7 +390,7 @@ here, folded into #387 (PR #422).
 `go test -race`, and CI's `Unit / race` job does the same beside the plain unit jobs. The
 detector needs cgo, so the dev container ships gcc and pins `CGO_ENABLED=0` for everything
 except that leg, which sets it to 1 for itself. Code whose correctness is a locking argument
-(`authserver/internal/ratelimit`, the middleware's in-flight count, the concurrent transactions of #301) is
+(`authserver/internal/ratelimit`, whose failures-only limiter holds the in-flight count since #439, the concurrent transactions of #301) is
 covered there and nowhere else; the data and integration tiers do not run under it.
 
 **Guard shape**: every tree-wide guard splits in two, and a new one is written the same way. A

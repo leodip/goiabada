@@ -2,16 +2,12 @@ package middleware
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -63,7 +59,8 @@ const (
 	rejectAPI
 )
 
-// tier is one rate-limit bucket plus everything a rejection has to say about it.
+// tier is the HTTP half of one rate-limit bucket: everything a rejection has to say about
+// it. The counting half is ratelimit's, and sits beside this in requestTier or failureTier.
 //
 // The pairing is the point. A counter answers only "over budget or not", so a rejection
 // written from inside one learns neither which limiter tripped nor which bucket; the audit
@@ -71,12 +68,11 @@ const (
 // lets the refusal path have them.
 //
 // The reject class is deliberately NOT here, and it used to be. A bucket can serve two
-// routes whose callers parse different things: accountFailureGate is shared by the browser
+// routes whose callers parse different things: accountTiers is shared by the browser
 // password form and the ROPC grant, so a class held on the tier would answer the token
 // endpoint with an HTML error page. The shape of a refusal belongs to the caller being
 // refused, so every refusal names it (#219).
 type tier struct {
-	rl   *ratelimit.Limiter
 	name string
 	// keyField is the slog attribute the bucket key is logged under, empty when the key
 	// names a person. The request logger in this package establishes that identifiers are
@@ -86,15 +82,23 @@ type tier struct {
 	// one (#219).
 	keyField string
 	// auditGate bounds the audit writes to exactly one event per key per window. It is taken
-	// from rl, so it rolls at the same instant rl does and its First answers true once per
-	// key per that window; that first call is the report. Per limiter rather than one shared
-	// gate: windows here are 1, 5 and 15 minutes, and a single shared duration would either
-	// under-report the short windows by up to 15x or over-report the long ones.
+	// from the tier's limiter, so it rolls at the same instant the limiter does and its First
+	// answers true once per key per that window; that first call is the report. Per limiter
+	// rather than one shared gate: windows here are 1, 5 and 15 minutes, and a single shared
+	// duration would either under-report the short windows by up to 15x or over-report the
+	// long ones.
 	auditGate *ratelimit.Gate
 	// window is what Retry-After carries. Kept here because a failures-only tier refuses
-	// without consulting the limiter at all, so nothing else on that path knows the window
-	// (#219).
+	// without consulting a request limiter at all, so nothing else on that path knows the
+	// window (#219).
 	window time.Duration
+}
+
+// requestTier is a tier every request spends, admitted or refused by Allow before the
+// handler runs.
+type requestTier struct {
+	tier
+	limiter *ratelimit.Limiter
 }
 
 // newTier builds the limiter and takes its gate from it, which is the only way the two share
@@ -108,39 +112,25 @@ type tier struct {
 // limiter the second write overwrote the first, so /auth/pwd reported the per-email budget as
 // though it were the per-IP one (#219). Retry-After is written by refuse and stays, because
 // RFC 6585 Section 4 names it as what a 429 MAY carry.
-func newTier(name string, keyField string, limit int, window time.Duration) *tier {
-	rl := ratelimit.New(limit, window)
-	return &tier{
-		rl:        rl,
-		name:      name,
-		keyField:  keyField,
-		auditGate: rl.Gate(),
-		window:    window,
+func newTier(name string, keyField string, limit int, window time.Duration) *requestTier {
+	limiter := ratelimit.New(limit, window)
+	return &requestTier{
+		tier: tier{
+			name:      name,
+			keyField:  keyField,
+			auditGate: limiter.Gate(),
+			window:    window,
+		},
+		limiter: limiter,
 	}
 }
 
-// failureTier is a tier only a failed credential check can spend.
-//
-// Every other tier increments in middleware, before the handler knows whether the
-// credential was right, which costs a legitimate sign-in from the same allowance an
-// attacker spends and is what makes a tight budget unsafe. Counting failures only is what
-// lets the budgets here sit one to two orders of magnitude below the request budgets they
-// replace: a user who signs in, verifies a code or changes a password successfully never
-// touches the counter (#219).
-//
-// The mutex and inFlight are not bookkeeping. The limiter serializes check-and-charge inside
-// Allow, but this tier cannot use Allow: it must decide before the credential is checked and
-// charge only afterwards. Rate only reads, so a gate written as read, check credential,
-// charge admits every caller that reads before anyone charges: measured at 141 of 1000
-// overlapping callers against a budget of 10, and the sample varies between runs because it
-// is scheduler-dependent, which is the finding. The attacker picks the concurrency.
+// failureTier is a tier only a failed credential check can spend: ratelimit.FailureLimiter,
+// which holds the locking argument that makes reserving before the check and charging after
+// it safe, under the name and gate a rejection reports.
 type failureTier struct {
 	tier
-	limit int
-	mu    sync.Mutex
-	// inFlight counts the reservations currently held per key. It self-cleans: the entry
-	// is deleted at zero, so it holds only what is genuinely in flight.
-	inFlight map[string]int
+	limiter *ratelimit.FailureLimiter
 }
 
 // newFailureTier takes no keyField, unlike newTier, because a failures-only tier is by
@@ -148,103 +138,54 @@ type failureTier struct {
 // spend one, and the credential names the account. That is exactly the case tier.keyField
 // must be empty for, so the empty value is passed here rather than at each call site,
 // which makes the invariant structural instead of something every caller has to remember
-// (#219).
+// (#219). The gate is taken from the limiter for newTier's reason.
 func newFailureTier(name string, limit int, window time.Duration) *failureTier {
+	limiter := ratelimit.NewFailureLimiter(limit, window)
 	return &failureTier{
-		tier:     *newTier(name, "", limit, window),
-		limit:    limit,
-		inFlight: map[string]int{},
+		tier: tier{
+			name:      name,
+			auditGate: limiter.Gate(),
+			window:    window,
+		},
+		limiter: limiter,
 	}
 }
 
-// Reserve claims one slot against key's budget, atomically with reading what is already
-// recorded, and reports whether another credential check may proceed.
-//
-// The predicate is the limiter's own, round(rate)+1 > limit, plus the in-flight count. It is
-// applied here rather than by calling Allow because Allow charges what it admits, and this
-// tier charges only once the credential has been found wrong.
-//
-// Returns false when Rate errors, so the gate fails closed. That branch is unreachable
-// through the middleware, since the in-process store cannot fail, but the direction has to
-// be stated because it is the one an error path gets wrong.
-func (f *failureTier) Reserve(key string) bool {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	rate, err := f.rl.Rate(key)
-	if err != nil {
-		return false
-	}
-	if int(math.Round(rate))+f.inFlight[key]+1 > f.limit {
-		return false
-	}
-	f.inFlight[key]++
-	return true
-}
-
-// Release hands the slot back, charging it first when the credential was wrong.
-//
-// Add charges without checking, which is what this path wants: the decision was taken at
-// Reserve. Its error is dropped for the same reason the slot is handed back regardless --
-// the in-process store cannot fail, and a failed charge here has no caller left to answer.
-// Charging before dropping the slot keeps recorded plus in-flight from ever dipping below
-// what has been spent; the transient double-count that produces refuses one extra caller
-// rather than admitting one, which is the safe direction.
-func (f *failureTier) Release(key string, failed bool) {
-	if failed {
-		_ = f.rl.Add(key)
-	}
-
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if n := f.inFlight[key]; n <= 1 {
-		delete(f.inFlight, key)
-	} else {
-		f.inFlight[key] = n - 1
-	}
-}
-
-// accountFailureGate is the two-tier account gate a password check passes through: a tight
-// budget per (account, client block) and a loose account-wide backstop, charged from the
-// same failure event. Shared by the browser password form and the ROPC grant, because both
-// are the same event, a password guessed against one account.
-//
-// One tier alone cannot do this. A gate consulted before the credential is checked cannot
-// know the incoming password is the right one, so a single account-wide budget lets anyone
-// who knows an address refuse its owner by spending it, and tightening that budget makes
-// the denial cheaper rather than dearer. Splitting it means an ordinary single-source
-// attacker burns only their own network's bucket while the owner signs in normally, and the
-// account-wide ceiling RFC 6749 Section 4.3.2 makes a MUST still exists.
-//
-// Residual, accepted: an attacker producing failures from ten or more distinct blocks still
-// exhausts the backstop and denies the owner for the rest of the hour. That is the price of
-// having an account-wide ceiling at all, and 100 an hour is where NIST SP 800-63B section
-// 3.2.2 puts its own "no more than 100" figure (#219).
-type accountFailureGate struct {
+// accountTiers is the two-tier account limit a password check passes through, the
+// ratelimit.AccountLimiter that counts it beside the two tiers a refusal reports against.
+// Shared by the browser password form and the ROPC grant, because both are the same event,
+// a password guessed against one account.
+type accountTiers struct {
+	limiter  *ratelimit.AccountLimiter
 	tight    *failureTier
 	backstop *failureTier
 }
 
-// reserve claims a slot on both tiers, or on neither. It returns the tier that refused and
-// the key it refused, so the caller can report the trip and answer in that tier's class;
-// nil means the request may proceed. The tight slot is handed back when the backstop
-// refuses, so a refusal never strands one.
-func (g *accountFailureGate) reserve(networkKey, accountKey string) (*failureTier, string) {
-	if !g.tight.Reserve(networkKey) {
-		return g.tight, networkKey
+func newAccountTiers(tight, backstop *failureTier) *accountTiers {
+	return &accountTiers{
+		limiter:  ratelimit.NewAccountLimiter(tight.limiter, backstop.limiter),
+		tight:    tight,
+		backstop: backstop,
 	}
-	if !g.backstop.Reserve(accountKey) {
-		g.tight.Release(networkKey, false)
-		return g.backstop, accountKey
-	}
-	return nil, ""
 }
 
-// release charges or drops both tiers together, which is what keeps them counting the same
-// events.
-func (g *accountFailureGate) release(networkKey, accountKey string, failed bool) {
-	g.backstop.Release(accountKey, failed)
-	g.tight.Release(networkKey, failed)
+// reserve claims a slot on both tiers, or on neither. It returns the tier that refused and
+// the key it refused, so the caller can report the trip and answer with that tier's window;
+// nil means the request may proceed and release is owed.
+func (a *accountTiers) reserve(networkKey, accountKey string) (*tier, string) {
+	switch a.limiter.Reserve(networkKey, accountKey) {
+	case ratelimit.RefusedTight:
+		return &a.tight.tier, networkKey
+	case ratelimit.RefusedBackstop:
+		return &a.backstop.tier, accountKey
+	default:
+		return nil, ""
+	}
+}
+
+// release charges or drops both tiers together.
+func (a *accountTiers) release(networkKey, accountKey string, failed bool) {
+	a.limiter.Release(networkKey, accountKey, failed)
 }
 
 // credentialReservation is the slot a failures-only tier holds for the life of one request.
@@ -288,21 +229,21 @@ type RateLimiterMiddleware struct {
 	enabled     bool
 	// pwdAccount is shared with the ROPC grant: both are a password guessed against one
 	// account, so one budget covers them.
-	pwdAccount *accountFailureGate
-	pwdIp      *tier
+	pwdAccount *accountTiers
+	pwdIp      *requestTier
 	otp        *failureTier
 	// emailVerification bounds guessing at the account's own email verification code.
 	emailVerification *failureTier
 	// accountPassword bounds guessing at the account's own password, at the two account API
 	// routes that verify it. One tier rather than two because it is one secret.
 	accountPassword *failureTier
-	activate        *tier
-	register        *tier
-	resetPwd        *tier
-	forgotPwd       *tier
-	forgotPwdIp     *tier
-	dcr             *tier
-	ropcIp          *tier // RFC 6749 §4.3.2 MUST protect against brute force
+	activate        *requestTier
+	register        *requestTier
+	resetPwd        *requestTier
+	forgotPwd       *requestTier
+	forgotPwdIp     *requestTier
+	dcr             *requestTier
+	ropcIp          *requestTier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
 func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRenderer, jsonWriter jsonErrorWriter,
@@ -321,10 +262,10 @@ func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRen
 		// account-wide ceiling RFC 6749 §4.3.2 makes a MUST, at the figure NIST SP
 		// 800-63B §3.2.2 names. Both count failures only, so a user who signs in spends
 		// nothing (#219).
-		pwdAccount: &accountFailureGate{
-			tight:    newFailureTier("pwd_account_net", 10, 15*time.Minute),
-			backstop: newFailureTier("pwd_account", 100, 60*time.Minute),
-		},
+		pwdAccount: newAccountTiers(
+			newFailureTier("pwd_account_net", 10, 15*time.Minute),
+			newFailureTier("pwd_account", 100, 60*time.Minute),
+		),
 		// per-IP: stops one host hammering many accounts
 		pwdIp: newTier("pwd_ip", "ip", 30, 1*time.Minute),
 		// per-user OTP failures. 5 per 15 minutes is 480 guesses a day against the 14,400
@@ -406,13 +347,13 @@ func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRen
 // details carries the identifier the audit event records, which is the one this limiter's
 // neighbours in the audit log already carry for the same event: the email for account
 // tiers, the user id for the OTP tier, the client block for IP tiers.
-func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, t *tier, key string,
+func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, t *requestTier, key string,
 	class rejectClass, details map[string]interface{}) bool {
 
-	if t.rl.Allow(key) {
+	if t.limiter.Allow(key) {
 		return false
 	}
-	m.refuse(w, r, t, key, class, details)
+	m.refuse(w, r, &t.tier, key, class, details)
 	return true
 }
 
@@ -532,12 +473,12 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		}
 
 		// Per-account limit: bounds password guessing against a single account, in the
-		// two tiers accountFailureGate documents. Only a wrong password spends it, so a
+		// two tiers ratelimit.AccountLimiter documents. Only a wrong password spends it, so a
 		// user signing in normally is never refused by it however often they do.
-		accountKey := accountRateLimitKey(r.FormValue("email"))
+		accountKey := ratelimit.AccountKey(r.FormValue("email"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
 		if t, key := m.pwdAccount.reserve(networkKey, accountKey); t != nil {
-			m.refuse(w, r, &t.tier, key, rejectBrowser, map[string]interface{}{"email": accountKey, "ip": ipKey})
+			m.refuse(w, r, t, key, rejectBrowser, map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
 		}
 
@@ -580,7 +521,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 		// already holding the account's password.
 		key := fmt.Sprintf("user_%d", authContext.UserId)
 
-		if !m.otp.Reserve(key) {
+		if !m.otp.limiter.Reserve(key) {
 			m.refuse(w, r, &m.otp.tier, key, rejectBrowser, map[string]interface{}{"userId": authContext.UserId})
 			return
 		}
@@ -588,7 +529,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.otp.Release(key, reservation.failed.Load())
+			m.otp.limiter.Release(key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -622,7 +563,7 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 			return
 		}
 
-		if !m.emailVerification.Reserve(key) {
+		if !m.emailVerification.limiter.Reserve(key) {
 			m.refuse(w, r, &m.emailVerification.tier, key, rejectAPI,
 				map[string]interface{}{"loggedInUser": key})
 			return
@@ -631,7 +572,7 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.emailVerification.Release(key, reservation.failed.Load())
+			m.emailVerification.limiter.Release(key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -670,7 +611,7 @@ func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Han
 			return
 		}
 
-		if !m.accountPassword.Reserve(key) {
+		if !m.accountPassword.limiter.Reserve(key) {
 			m.refuse(w, r, &m.accountPassword.tier, key, rejectAPI,
 				map[string]interface{}{"loggedInUser": key})
 			return
@@ -679,7 +620,7 @@ func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Han
 		reservation := &credentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.accountPassword.Release(key, reservation.failed.Load())
+			m.accountPassword.limiter.Release(key, reservation.failed.Load())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -811,7 +752,7 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 		}
 
 		// Per-email limit: prevents mail-bombing a specific address.
-		emailKey := accountRateLimitKey(r.FormValue("email"))
+		emailKey := ratelimit.AccountKey(r.FormValue("email"))
 		if m.tripped(w, r, m.forgotPwd, emailKey, rejectBrowser, map[string]interface{}{"email": emailKey}) {
 			return
 		}
@@ -872,76 +813,6 @@ func clientIPRateLimitKey(r *http.Request) string {
 	return ratelimit.CanonicalizeIP(GetClientIPFromRequest(r))
 }
 
-// accountRateLimitKey buckets by the account an identifier names rather than by the
-// spelling submitted. Deliberately stricter than the strictest engine: mysql and mssql
-// compare email case-insensitively and postgres and sqlite do not, so without this the
-// same account has one bucket on two engines and 2^18 on the other two (#219).
-//
-// The handlers that look the account up normalize identically, so the limiter and the
-// account it protects cannot disagree about who the request is.
-//
-// The result is bounded in length, because it becomes a map key the limiter's store
-// retains for two windows and it is read straight off an unauthenticated form. None of
-// these routes caps its body, so without the bound net/http's 10 MiB form limit is the
-// only ceiling on what one accepted request can make the process hold, and LimitForgotPwd
-// accepts twenty per client block per window. httprate retained 8 bytes whatever arrived
-// because it hashed every key to a uint64; this package stores exact keys, which is what
-// stops two accounts sharing a bucket, and digesting the overlong tail here is what that
-// costs (#276). It also bounds the key reportTrip puts in the warning line and the audit
-// event.
-//
-// A long identifier is digested rather than folded into one shared bucket. Two accounts
-// landing on one key is the cross-account leak this function exists to prevent, and
-// nothing bounds an account identifier's length on the way in: self-registration and the
-// setup program validate the shape without a length and users.email is TEXT on sqlite,
-// so a real account can sit past any threshold chosen here, and a shared bucket would
-// then spend that account's budget on strangers' submissions (#276).
-//
-// A bounded key over an unbounded set of identifiers cannot be injective, so what the
-// digest buys is not injectivity but unreachability. The exact branch is injective, the
-// prefix test above keeps the two branches disjoint, and putting two accounts in one
-// bucket through the digest branch means producing a SHA-256 collision. The width is the
-// reason that holds: a 64-bit hash collides at around 2^32 attempts, which is constructible
-// and is the shared-bucket defect again in a different shape, while SHA-256 puts a collision
-// between two identifiers an attacker is free to choose at around 2^128. Aiming at one
-// particular account is harder still, and it is the case that would matter: making some
-// other submission land in that account's bucket is a second preimage of its digest, around
-// 2^256, not any colliding pair (#276).
-func accountRateLimitKey(identifier string) string {
-	normalized := strings.ToLower(strings.TrimSpace(identifier))
-	// The prefix test is what keeps the two branches from sharing a namespace. Without
-	// it a short submission can be spelled as a digest key -- "<sha256>" and sixty-four
-	// hex characters is seventy-two octets, well inside the bound -- and lands in the
-	// bucket of whichever long identifier digests to it, no SHA-256 collision required.
-	// Digesting such a submission instead means the exact branch never emits a key
-	// carrying the prefix, so the two branches cannot meet (#276).
-	if len(normalized) > maxAccountIdentifierLen || strings.HasPrefix(normalized, oversizedAccountKeyPrefix) {
-		// Over a 10 MiB form value this copies and digests what net/http has already
-		// parsed and allocated; what matters is that nothing of that size is retained.
-		sum := sha256.Sum256([]byte(normalized))
-		return oversizedAccountKeyPrefix + hex.EncodeToString(sum[:])
-	}
-	return normalized
-}
-
-// maxAccountIdentifierLen is where exact keying stops and the digest begins. It is a
-// legibility threshold rather than a security boundary: correctness does not depend on
-// its value, because wherever it sits the exact branch stays injective, the two branches
-// stay disjoint, and a collision inside the digest branch stays out of reach, so two
-// accounts cannot be made to share a bucket. It is set at the longest address RFC
-// 5321 sections 4.5.3.1.1 and 4.5.3.1.2 allow for a local-part and a domain, plus the
-// '@', so every address a deployment could plausibly hold stays readable in the warning
-// line and the audit event rather than arriving there as 64 hex characters.
-const maxAccountIdentifierLen = 64 + 1 + 255
-
-// oversizedAccountKeyPrefix marks a digested key, so a reader of an audit event can tell
-// one from an address. It is also reserved: accountRateLimitKey digests any submission
-// spelled to start with it, however short. The digest keys it marks are written to the
-// warning line and to the audit event, so without that a reader of either could spend a
-// long account's rate-limit budget by submitting its key straight back, never having
-// known the identifier behind it (#276).
-const oversizedAccountKeyPrefix = "<sha256>"
-
 // accountNetworkRateLimitKey buckets by an account as seen from one client block, which is
 // the tight half of the password gate: an attacker in another network spends their own
 // bucket instead of the owner's.
@@ -950,7 +821,7 @@ const oversizedAccountKeyPrefix = "<sha256>"
 // unambiguous however exotic the address is. Account-first would let a local part carrying
 // '|' collide with a different (network, account) pair (#219).
 //
-// identifier is expected to have been through accountRateLimitKey already, so the two tiers
+// identifier is expected to have been through ratelimit.AccountKey already, so the two tiers
 // of the gate name the same account.
 func accountNetworkRateLimitKey(r *http.Request, identifier string) string {
 	return clientIPRateLimitKey(r) + "|" + identifier
@@ -1005,14 +876,14 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 			return
 		}
 
-		// Per-account limit, in the two tiers accountFailureGate documents. Only a wrong
+		// Per-account limit, in the two tiers ratelimit.AccountLimiter documents. Only a wrong
 		// credential spends it, so a machine-driven integration authenticating one account
 		// over and over is never refused by it. client_id is deliberately absent from the
 		// key: a ceiling an attacker escapes by registering a second client is not a ceiling.
-		accountKey := accountRateLimitKey(r.PostFormValue("username"))
+		accountKey := ratelimit.AccountKey(r.PostFormValue("username"))
 		networkKey := accountNetworkRateLimitKey(r, accountKey)
 		if t, key := m.pwdAccount.reserve(networkKey, accountKey); t != nil {
-			m.refuse(w, r, &t.tier, key, rejectOAuth,
+			m.refuse(w, r, t, key, rejectOAuth,
 				map[string]interface{}{"email": accountKey, "ip": ipKey})
 			return
 		}
