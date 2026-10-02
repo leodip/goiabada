@@ -135,7 +135,10 @@ const (
 // auth server, the admin console and the setup wizard, the three release.yml builds and nothing
 // else. Rule 9 walks the production closure of each. They are listed here rather than found by
 // looking for package main, because schemadump, droptestdb, ownershipdump and the two generators
-// are main packages too, ship in no release, and may link what they like.
+// are main packages too, ship in no release, and may link what they like. Every release build of
+// all three sets the production tag, which is what lets rule 9 read each with production set;
+// TestReleaseBuilds_TheRealReleaseBuildsSetProduction holds the release scripts and Dockerfiles to
+// that, and fails while a main listed here has no release build listed there (#463).
 var shippedMains = []string{
 	"authserver/cmd/goiabada-authserver",
 	"adminconsole/cmd/goiabada-adminconsole",
@@ -146,6 +149,8 @@ var shippedMains = []string{
 // in src/build/build-binaries.sh and in the setup tool's build-binaries.sh, the Docker images being
 // the first of them. Rule 9 asks the go command for each main's dependencies on every one, because
 // a package outside the four modules may import differently on each.
+// TestReleaseBuilds_TheRealReleaseBuildsSetProduction fails when either script's build_platform
+// calls differ from this list as a set (#463).
 var releaseTargets = []struct{ goos, goarch string }{
 	{"linux", "amd64"},
 	{"linux", "arm64"},

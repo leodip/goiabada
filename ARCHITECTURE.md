@@ -394,7 +394,14 @@ in the guard, as `shippedMains`, rather than found by looking for `package main`
 `schemadump`, `droptestdb`, `ownershipdump` and the two reference-data generators are main packages
 too and ship in no release. A file belongs to a binary the way the rest of this document decides
 it: the `production` tag set and every other tag free, so a file in any of the five release targets
-counts.
+counts. That is exact because every release build of all three sets `production`: the servers'
+cross-compile script, the two server Dockerfiles and the setup wizard's cross-compile script, so a
+`//go:build !production` helper anywhere in the wizard's closure stays out of the wizard as the
+generated mocks stay out of the servers. A rule test in core's unit tier,
+`TestReleaseBuilds_TheRealReleaseBuildsSetProduction`, reads those four files and fails when a
+`go build` in them does not set the tag, when one of them is missing or holds no `go build`, when the
+mains they build stop being exactly `shippedMains`, or when either script's `build_platform` calls
+differ as a set from `releaseTargets` (#463).
 
 The refusal does not stop at the edge of the four modules. Past it, the walk follows the imports
 the go command reports: `go list -deps` under the `production` tag, run over each shipped main for
