@@ -702,9 +702,27 @@ jobs:
       - name: Cross-compile the setup tool
         working-directory: src/cmd/goiabada-setup
         run: ./build-binaries.sh
+      # With the build arguments a release passes, so the smoke run below reads
+      # back a version this job chose rather than the "development" default.
       - name: Build both images
         working-directory: src/build
+        env:
+          SMOKE_VERSION: 0.0.0-ci.${{ github.run_number }}
         run: |
           set -euo pipefail
-          docker buildx build --load -f Dockerfile-authserver   -t goiabada-authserver:ci   ..
-          docker buildx build --load -f Dockerfile-adminconsole -t goiabada-adminconsole:ci ..
+          args=(
+            --build-arg "version=$SMOKE_VERSION"
+            --build-arg "buildDate=$(date +%Y-%m-%d)"
+            --build-arg "gitCommit=$(git rev-parse --short HEAD)"
+          )
+          docker buildx build --load "${args[@]}" -f Dockerfile-authserver   -t goiabada-authserver:ci   ..
+          docker buildx build --load "${args[@]}" -f Dockerfile-adminconsole -t goiabada-adminconsole:ci ..
+      # The images carry no zone database, so they are the one host where the
+      # servers' own TZ resolution is observable (#331). Inside a release this
+      # job is part of Checks, which the images job needs, so an image that
+      # fails here is never pushed.
+      - name: Smoke-run both images
+        working-directory: src/build
+        env:
+          SMOKE_VERSION: 0.0.0-ci.${{ github.run_number }}
+        run: ./smoke-test-images.sh --version "$SMOKE_VERSION" goiabada-authserver:ci goiabada-adminconsole:ci

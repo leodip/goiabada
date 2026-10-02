@@ -50,7 +50,9 @@ FROM alpine:latest AS final
 
 WORKDIR /app
 
-RUN apk add --no-cache tzdata
+# No zone database is installed: the binary embeds one (time/tzdata) and resolves
+# TZ against it before its first record, so the base image needs no tzdata. CI's
+# build validation starts this image with TZ set to prove it (#331).
 
 COPY --from=build /app/bin/goiabada-adminconsole ./
 
