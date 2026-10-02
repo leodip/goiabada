@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
@@ -188,21 +187,10 @@ func (a *accountTiers) release(networkKey, accountKey string, failed bool) {
 	a.limiter.Release(networkKey, accountKey, failed)
 }
 
-// credentialReservation is the slot a failures-only tier holds for the life of one request.
-//
-// It is what the handler marks instead of naming a bucket. The middleware chooses the key,
-// reserves against it and puts the reservation on the request; a handler that finds the
-// credential wrong calls RecordCredentialFailure and nothing else. A middleware and a
-// handler deriving the account separately and disagreeing about it is precisely the defect
-// that voided the per-account tiers in the first place (#219).
-type credentialReservation struct {
-	failed atomic.Bool
-}
-
-type reservationCtxKey struct{}
-
-func withCredentialReservation(r *http.Request, res *credentialReservation) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), reservationCtxKey{}, res))
+// withCredentialReservation puts a failures-only tier's reservation on the request, through
+// reqctx like every other request-scoped value (#439).
+func withCredentialReservation(r *http.Request, res *reqctx.CredentialReservation) *http.Request {
+	return r.WithContext(reqctx.WithCredentialReservation(r.Context(), res))
 }
 
 // RecordCredentialFailure marks this request's credential check as failed, so the
@@ -214,8 +202,8 @@ func withCredentialReservation(r *http.Request, res *credentialReservation) *htt
 // function so a handler can take it as a one-method dependency, the way it takes its audit
 // logger.
 func (m *RateLimiterMiddleware) RecordCredentialFailure(r *http.Request) {
-	if res, ok := r.Context().Value(reservationCtxKey{}).(*credentialReservation); ok {
-		res.failed.Store(true)
+	if res, ok := reqctx.CredentialReservationFrom(r.Context()); ok {
+		res.MarkFailed()
 	}
 }
 
@@ -485,10 +473,10 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		// The handler converts this reservation by calling RecordCredentialFailure; the
 		// defer charges it or drops it. A closure rather than a bare defer call, since the
 		// verdict is not known until the handler has returned.
-		reservation := &credentialReservation{}
+		reservation := &reqctx.CredentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.pwdAccount.release(networkKey, accountKey, reservation.failed.Load())
+			m.pwdAccount.release(networkKey, accountKey, reservation.Failed())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -541,10 +529,10 @@ func (m *RateLimiterMiddleware) limitFailuresPerSubject(next http.Handler, t *fa
 			return
 		}
 
-		reservation := &credentialReservation{}
+		reservation := &reqctx.CredentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			t.limiter.Release(key, reservation.failed.Load())
+			t.limiter.Release(key, reservation.Failed())
 		}()
 
 		next.ServeHTTP(w, r)
@@ -849,10 +837,10 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		// HandleTokenPost converts this reservation by calling RecordCredentialFailure, and
 		// only where the validator answered invalid_grant for a password grant. The defer
 		// charges it or drops it.
-		reservation := &credentialReservation{}
+		reservation := &reqctx.CredentialReservation{}
 		r = withCredentialReservation(r, reservation)
 		defer func() {
-			m.pwdAccount.release(networkKey, accountKey, reservation.failed.Load())
+			m.pwdAccount.release(networkKey, accountKey, reservation.Failed())
 		}()
 
 		next.ServeHTTP(w, r)

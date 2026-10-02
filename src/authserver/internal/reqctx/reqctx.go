@@ -1,13 +1,14 @@
-// Package reqctx holds the auth server's request-scoped values: the settings, the browser's
-// session identifier, the bearer token read off the request, and the token a scope guard
-// validated. Each is written by one middleware and read back through a typed accessor, over
-// an unexported key, so nothing outside this package can write one or read it under the
-// wrong type (#433).
+// Package reqctx holds the auth server's five request-scoped values: the settings, the browser's
+// session identifier, the bearer token read off the request, the token a scope guard validated,
+// and the credential reservation a failures-only rate-limit tier holds (#439). Each is written by
+// one middleware and read back through a typed accessor, over an unexported key, so nothing
+// outside this package can write one or read it under the wrong type (#433).
 package reqctx
 
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/oauth"
@@ -20,6 +21,7 @@ const (
 	sessionIdentifierKey
 	bearerTokenKey
 	validatedTokenKey
+	credentialReservationKey
 )
 
 // ErrNoSettings is what a reader answers its request with when the settings middleware did
@@ -67,4 +69,42 @@ func WithValidatedToken(ctx context.Context, t oauth.JwtToken) context.Context {
 func ValidatedTokenFrom(ctx context.Context) (oauth.JwtToken, bool) {
 	t, ok := ctx.Value(validatedTokenKey).(oauth.JwtToken)
 	return t, ok
+}
+
+// CredentialReservation is the slot a failures-only rate-limit tier holds for the life of one
+// request.
+//
+// It is what a handler marks instead of naming a bucket. The rate limiter chooses the key,
+// reserves against it and writes the reservation here; a handler that finds the credential
+// wrong marks it and nothing else, and the limiter reads the verdict off the reservation it
+// kept once the handler has returned. A limiter and a handler deriving the account separately
+// and disagreeing about it is precisely the defect that voided the per-account tiers in the
+// first place (#219). The flag is atomic because the handler that marks it and the limiter
+// that reads it need not share a goroutine.
+type CredentialReservation struct {
+	failed atomic.Bool
+}
+
+// MarkFailed records that the credential check this reservation covers failed, so the limiter
+// charges the slot rather than dropping it.
+func (c *CredentialReservation) MarkFailed() {
+	c.failed.Store(true)
+}
+
+// Failed answers whether MarkFailed was called.
+func (c *CredentialReservation) Failed() bool {
+	return c.failed.Load()
+}
+
+func WithCredentialReservation(ctx context.Context, res *CredentialReservation) context.Context {
+	return context.WithValue(ctx, credentialReservationKey, res)
+}
+
+// CredentialReservationFrom answers false when no failures-only tier reserved for this request,
+// which is the disabled limiter, a route with no such tier, and a handler invoked outside its
+// middleware. Like SettingsFrom it answers false for a nil pointer, so a caller that sees true
+// can mark the reservation.
+func CredentialReservationFrom(ctx context.Context) (*CredentialReservation, bool) {
+	res, ok := ctx.Value(credentialReservationKey).(*CredentialReservation)
+	return res, ok && res != nil
 }
