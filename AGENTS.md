@@ -542,8 +542,3 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 - `/connect/register` - Dynamic Client Registration
 - `/api/v1/admin/*` - Admin API (requires `authserver:manage` permission)
 - `/api/v1/account/*` - User self-service API (requires `authserver:manage-account` permission)
-
-## Important Note
-When you work with a person, do not make any changes until you have 95% confidence that you know what to build. Ask follow-up questions until you have that confidence.
-
-When you run unattended inside a workflow that settled what to build beforehand, such as an agreed specification, that agreement is your confidence: build what it says, and stop to ask only through the workflow's own way of asking, when the agreement cannot be followed.
