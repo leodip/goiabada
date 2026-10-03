@@ -108,7 +108,7 @@ func HandleAPISettingsKeysRotatePost(
 		case err == nil:
 			// Audited here and only here, so the log carries exactly one entry per rotation
 			// that actually happened.
-			auditLogger.Log(r.Context(), audit.AuditRotatedKeys, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventRotatedKeys, map[string]interface{}{
 				"loggedInUser": callerSubject(r),
 			})
 
@@ -176,7 +176,7 @@ func HandleAPISettingsKeyDelete(
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.AuditRevokedKey, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventRevokedKey, map[string]interface{}{
 			"loggedInUser": callerSubject(r),
 			"keyId":        kp.KeyIdentifier,
 		})

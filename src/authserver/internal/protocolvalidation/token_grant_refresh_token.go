@@ -160,7 +160,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// wording. A check on the grant's user placed above ownership reopens that.
 	//
 	// A disabled user's token gets the wording that says nothing about why (#137), and
-	// UserDisabledError is what still tells the handler to write AuditUserDisabled.
+	// UserDisabledError is what still tells the handler to write EventUserDisabled.
 	if !tokenUser.Enabled {
 		return nil, userDisabled(invalidRefreshTokenMessage)
 	}

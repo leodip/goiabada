@@ -36,13 +36,13 @@ type switchesSource interface {
 // this repository's request path rather than introducing a value nobody chose against the others.
 const auditWriteTimeout = 10 * time.Second
 
-type AuditLogger struct {
+type Logger struct {
 	database auditDatabase
 	switches switchesSource
 }
 
-func NewAuditLogger(database auditDatabase, switches switchesSource) *AuditLogger {
-	return &AuditLogger{
+func NewLogger(database auditDatabase, switches switchesSource) *Logger {
+	return &Logger{
 		database: database,
 		switches: switches,
 	}
@@ -58,7 +58,7 @@ func NewAuditLogger(database auditDatabase, switches switchesSource) *AuditLogge
 //
 // It never fails a request. Every failure path below logs and returns, as it did before, and a
 // context with no request id yields the empty string.
-func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[string]interface{}) {
+func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string]interface{}) {
 	if al.database == nil || al.switches == nil {
 		return
 	}

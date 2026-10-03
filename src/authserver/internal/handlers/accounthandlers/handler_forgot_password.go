@@ -115,7 +115,7 @@ func auditRequestedPasswordReset(ctx context.Context, auditLogger AuditLogger, c
 	if userId != 0 {
 		details["userId"] = userId
 	}
-	auditLogger.Log(ctx, audit.AuditRequestedPasswordReset, details)
+	auditLogger.Log(ctx, audit.EventRequestedPasswordReset, details)
 }
 
 // HandleForgotPasswordPost answers every well-formed request after the format check and the

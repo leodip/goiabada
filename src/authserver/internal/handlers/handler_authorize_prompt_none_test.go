@@ -228,7 +228,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 						return
 					}
 					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", models.AcrLevel1, mock.Anything).Return(userSession, nil)
-					auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.Anything).Return()
+					auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 				}},
 				{"SaveAuthContext", func(fail bool) {
 					ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(fault)

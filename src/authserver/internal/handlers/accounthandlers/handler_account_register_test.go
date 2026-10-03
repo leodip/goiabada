@@ -593,7 +593,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 				"the stored hash must be the hash of the code that was issued")
 		})
 
-		auditLogger.On("Log", mock.Anything, audit.AuditCreatedPreRegistration, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventCreatedPreRegistration, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
 		})).Return()
 
@@ -665,7 +665,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
 		})).Return()
 
@@ -733,7 +733,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
 		})).Return()
 

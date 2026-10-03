@@ -261,7 +261,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	return result, nil
 }
 
-// Reasons for AuditRevokedUserAuthState, one per credential site (#106 decision 7). Constants
+// Reasons for EventRevokedUserAuthState, one per credential site (#106 decision 7). Constants
 // rather than inline strings so the four sites cannot drift and a log consumer has something to
 // match against.
 //
@@ -694,7 +694,7 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 	}, nil
 }
 
-// RevocationReasonClientBecamePublic is the reason recorded on AuditRevokedClientGrants. A
+// RevocationReasonClientBecamePublic is the reason recorded on EventRevokedClientGrants. A
 // constant beside the RevocationReason* group above, for the same reason those are constants: a
 // log consumer needs something to match against, and there is one place to add the next site. It
 // is also the reason a family's revocation record carries when RevokeClientGrants wrote it.
@@ -795,13 +795,13 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 // audit event raised while serving a request is correlated to that request, so the console record
 // joins the request's own log line and the persisted row carries the same id, which is why
 // guard.AssertAuditLogContext refuses a context.Background() here (#328). The shape is kept
-// identical to handlers.AuditLogger, which the same concrete *audit.AuditLogger satisfies, exactly
+// identical to handlers.AuditLogger, which the same concrete *audit.Logger satisfies, exactly
 // as middleware's own copy already does (#387).
 type AuditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
-// LogRevokedClientGrants emits AuditRevokedClientGrants. One function rather than a literal at the
+// LogRevokedClientGrants emits EventRevokedClientGrants. One function rather than a literal at the
 // call site, following LogRevokedUserAuthState and LogTerminatedUserSession: the payload cannot
 // then differ between sites, and there is a single place to assert its shape field by field.
 //
@@ -813,7 +813,7 @@ type AuditLogger interface {
 func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, clientId int64, reason string,
 	loggedInUser string, result ClientGrantRevocationResult) {
 
-	auditLogger.Log(ctx, audit.AuditRevokedClientGrants, map[string]interface{}{
+	auditLogger.Log(ctx, audit.EventRevokedClientGrants, map[string]interface{}{
 		"clientId":     clientId,
 		"reason":       reason,
 		"loggedInUser": loggedInUser,
@@ -826,7 +826,7 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 	})
 }
 
-// LogRevokedUserAuthState emits AuditRevokedUserAuthState. One function rather than four
+// LogRevokedUserAuthState emits EventRevokedUserAuthState. One function rather than four
 // literals, so the payload cannot differ between sites and there is a single place to assert
 // its shape field by field.
 //
@@ -836,7 +836,7 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
 	loggedInUser string, result RevocationResult) {
 
-	auditLogger.Log(ctx, audit.AuditRevokedUserAuthState, map[string]interface{}{
+	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, map[string]interface{}{
 		"userId":       userId,
 		"reason":       reason,
 		"loggedInUser": loggedInUser,
@@ -851,7 +851,7 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 	})
 }
 
-// LogAuthCodeReuse emits AuditAuthCodeReuseDetected, the security record of the RFC 6749 section
+// LogAuthCodeReuse emits EventAuthCodeReuseDetected, the security record of the RFC 6749 section
 // 10.5 response to a replayed authorization code. One function beside the other Log* helpers, so
 // the payload has one place to be asserted field by field.
 //
@@ -860,7 +860,7 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
 func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *models.Code, result AuthCodeReuseResult) {
-	auditLogger.Log(ctx, audit.AuditAuthCodeReuseDetected, map[string]interface{}{
+	auditLogger.Log(ctx, audit.EventAuthCodeReuseDetected, map[string]interface{}{
 		"clientId":          code.ClientId,
 		"userId":            code.UserId,
 		"codeId":            code.Id,
@@ -870,7 +870,7 @@ func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *models
 	})
 }
 
-// LogTerminatedUserSession emits AuditTerminatedUserSession, the security record of an explicit
+// LogTerminatedUserSession emits EventTerminatedUserSession, the security record of an explicit
 // "end this session" action (#129 decision 9). One function rather than a literal at each of the
 // two endpoints, following LogRevokedUserAuthState: the payload cannot then differ between sites,
 // and there is a single place to assert its shape field by field.
@@ -881,13 +881,13 @@ func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *models
 // ownership checks.
 //
 // Call this only after TerminateUserSessionTx returned without error, and beside rather than
-// instead of AuditDeletedUserSession, whose payload decision 9 leaves untouched.
+// instead of EventDeletedUserSession, whose payload decision 9 leaves untouched.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
 func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, userSession *models.UserSession,
 	loggedInUser string, result TerminationResult) {
 
-	auditLogger.Log(ctx, audit.AuditTerminatedUserSession, map[string]interface{}{
+	auditLogger.Log(ctx, audit.EventTerminatedUserSession, map[string]interface{}{
 		"userId":            userSession.UserId,
 		"userSessionId":     userSession.Id,
 		"sessionIdentifier": userSession.SessionIdentifier,

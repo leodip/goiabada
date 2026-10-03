@@ -87,7 +87,7 @@ func HandleAPIAccountAddressPut(
 		}
 
 		// Audit (self-service)
-		auditLogger.Log(r.Context(), audit.AuditUpdatedOwnAddress, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedOwnAddress, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

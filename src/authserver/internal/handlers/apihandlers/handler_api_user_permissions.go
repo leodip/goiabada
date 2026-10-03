@@ -191,14 +191,14 @@ func HandleAPIUserPermissionsPut(
 		// Audit, once the save has committed: one event per grant made and per grant withdrawn,
 		// from the plan of the attempt that committed (#428).
 		for _, permissionId := range granted {
-			auditLogger.Log(r.Context(), audit.AuditAddedUserPermission, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventAddedUserPermission, map[string]interface{}{
 				"userId":       user.Id,
 				"permissionId": permissionId,
 				"loggedInUser": callerSubject(r),
 			})
 		}
 		for _, permissionId := range revoked {
-			auditLogger.Log(r.Context(), audit.AuditDeletedUserPermission, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventDeletedUserPermission, map[string]interface{}{
 				"userId":       user.Id,
 				"permissionId": permissionId,
 				"loggedInUser": callerSubject(r),

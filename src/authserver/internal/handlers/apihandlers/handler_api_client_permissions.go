@@ -187,7 +187,7 @@ func HandleAPIClientPermissionsPut(
 		}
 
 		// Audit consolidated update, once the save has committed (#428).
-		auditLogger.Log(r.Context(), audit.AuditUpdatedClientPermissions, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientPermissions, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
 		})

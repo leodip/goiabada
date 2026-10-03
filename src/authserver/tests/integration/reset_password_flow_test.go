@@ -664,7 +664,7 @@ func failedResetReasonsFor(t *testing.T, userId int64) []string {
 	t.Helper()
 
 	adminToken, _ := createAdminClientWithToken(t)
-	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.AuditFailedResetPasswordCode+"&size=200")
+	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventFailedResetPasswordCode+"&size=200")
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -765,7 +765,7 @@ func requestedPasswordResetRecordsFor(t *testing.T, adminToken string, address s
 	sum := sha256.Sum256([]byte(address))
 	digest := hex.EncodeToString(sum[:])
 
-	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.AuditRequestedPasswordReset+"&size=200")
+	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventRequestedPasswordReset+"&size=200")
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 

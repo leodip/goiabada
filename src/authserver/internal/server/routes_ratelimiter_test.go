@@ -104,7 +104,7 @@ const (
 
 // routesTestSettings is what middleware.Settings would put in the context. Self-registration
 // and SMTP are on, or two of the handlers below refuse before reaching their credential
-// check. Both audit sinks are off, which keeps the real AuditLogger from writing rows the
+// check. Both audit sinks are off, which keeps the real audit.Logger from writing rows the
 // database mock was never asked for; that it reads settings at all is #212's finding, not
 // this test's business.
 func routesTestSettings() *models.Settings {

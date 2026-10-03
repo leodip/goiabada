@@ -145,7 +145,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), audit.AuditSentEmailVerificationMessage, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventSentEmailVerificationMessage, map[string]interface{}{
 			"userId":           user.Id,
 			"emailDestination": user.Email,
 			"loggedInUser":     subject,
@@ -267,7 +267,7 @@ func HandleAPIAccountEmailVerificationPost(
 			// attempting the credential.
 			credentialFailures.RecordCredentialFailure(r)
 
-			auditLogger.Log(r.Context(), audit.AuditFailedEmailVerificationCode, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventFailedEmailVerificationCode, map[string]interface{}{
 				"userId":       user.Id,
 				"loggedInUser": subject,
 			})
@@ -309,7 +309,7 @@ func HandleAPIAccountEmailVerificationPost(
 		user.EmailVerificationCodeEncrypted = nil
 		user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-		auditLogger.Log(r.Context(), audit.AuditVerifiedEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventVerifiedEmail, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

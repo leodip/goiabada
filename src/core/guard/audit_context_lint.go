@@ -19,7 +19,7 @@ import (
 // context.TODO(), in a request-path package: any package outside the directories
 // slogNoRequestDirs lists.
 //
-// The compiler already forces every one of AuditLogger.Log's 126 call sites to pass a context,
+// The compiler already forces every one of audit.Logger.Log's 126 call sites to pass a context,
 // which is what #328 replaced the signature for. What no compiler forces is that the context is
 // the request's, and that is the whole value of the change: a site written
 // auditLogger.Log(context.Background(), ...) compiles, satisfies every other guard in this

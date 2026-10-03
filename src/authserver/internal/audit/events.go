@@ -1,18 +1,20 @@
-// Package audit records the auth server's security events. AuditLogger writes each one to the
+// Package audit records the auth server's security events. Logger writes each one to the
 // console, the audit_logs table or both, as the settings' two switches say, and never fails the
 // request that raised it. This file declares every event name and the catalog of them the admin
 // console's filter dropdown is built from.
 //
 // The names live in the auth server because it is the only process that emits one: every call to
-// AuditLogger.Log in this tree is made from this module, and the admin console names no event
+// Logger.Log in this tree is made from this module, and the admin console names no event
 // at all. It reaches the catalog over GET /api/v1/admin/audit-logs/event-types instead of
 // compiling it in, so an event added here reaches the dropdown without that binary being
 // rebuilt (#351).
 //
 // The value is what is persisted in the audit_logs table's audit_event column and what the
 // admin API's auditEvent filter matches, so a string here is stored data and changing one
-// orphans every row already carrying it. The names keep the Audit prefix they had in
-// core/constants: #351 moves them and renames nothing.
+// orphans every row already carrying it. Each name carries the Event prefix, the standard
+// library's shape for a family of named values (http.MethodGet, http.StatusOK): it keeps the
+// events together in godoc and is what the catalog check tells an event from any other
+// constant by. A name can change without its value; a value cannot change at all.
 //
 // Adding an event means two edits in this file, the declaration and the catalog entry, and
 // TestAuditCatalog_MatchesTheDeclarations in events_catalog_lint_test.go fails the auth
@@ -24,26 +26,26 @@ package audit
 import "slices"
 
 const (
-	AuditAuthFailedPwd                        = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	AuditAuthFailedOtp                        = "auth_failed_otp"
-	AuditAuthSuccessPwd                       = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	AuditAuthSuccessOtp                       = "auth_success_otp"
-	AuditUserDisabled                         = "user_disabled"
-	AuditStartedNewUserSesson                 = "started_new_user_session"
-	AuditBumpedUserSession                    = "bumped_user_session"
-	AuditCreatedAuthCode                      = "created_auth_code"
-	AuditSavedConsent                         = "saved_consent"
-	AuditTokenIssuedAuthorizationCodeResponse = "token_issued_authorization_code_response"
-	AuditTokenIssuedClientCredentialsResponse = "token_issued_client_credentials_response"
-	AuditTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response" //nolint:gosec // G101: an audit event name, not a credential
-	// AuditTokenIssuedImplicitResponse is logged when tokens are issued via implicit flow.
+	EventAuthFailedPwd                        = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
+	EventAuthFailedOtp                        = "auth_failed_otp"
+	EventAuthSuccessPwd                       = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
+	EventAuthSuccessOtp                       = "auth_success_otp"
+	EventUserDisabled                         = "user_disabled"
+	EventStartedNewUserSession                = "started_new_user_session"
+	EventBumpedUserSession                    = "bumped_user_session"
+	EventCreatedAuthCode                      = "created_auth_code"
+	EventSavedConsent                         = "saved_consent"
+	EventTokenIssuedAuthorizationCodeResponse = "token_issued_authorization_code_response"
+	EventTokenIssuedClientCredentialsResponse = "token_issued_client_credentials_response"
+	EventTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response" //nolint:gosec // G101: an audit event name, not a credential
+	// EventTokenIssuedImplicitResponse is logged when tokens are issued via implicit flow.
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
-	AuditTokenIssuedImplicitResponse = "token_issued_implicit_response"
-	// AuditTokenIssuedROPCResponse is logged when tokens are issued via ROPC flow.
+	EventTokenIssuedImplicitResponse = "token_issued_implicit_response"
+	// EventTokenIssuedROPCResponse is logged when tokens are issued via ROPC flow.
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
-	AuditTokenIssuedROPCResponse = "token_issued_ropc_response" //nolint:gosec // G101: an audit event name, not a credential
-	// AuditTokenScopeDenied is logged when a token request fails scope validation, on any grant
+	EventTokenIssuedROPCResponse = "token_issued_ropc_response" //nolint:gosec // G101: an audit event name, not a credential
+	// EventTokenScopeDenied is logged when a token request fails scope validation, on any grant
 	// type. Emitted from a single call site in HandleTokenPost, after ValidateTokenRequest has
 	// failed with an invalid_scope error, so every row follows a successful authentication of
 	// whichever principal that grant authenticates.
@@ -69,17 +71,17 @@ const (
 	// did authenticate. A refresh authenticates a confidential client, and for a public one the
 	// row follows the presentation of a refresh token issued to the named client, because the
 	// refresh arm checks the token's owner before it compares scopes.
-	AuditTokenScopeDenied = "token_scope_denied"
-	// AuditROPCAuthFailed is logged when ROPC authentication fails.
+	EventTokenScopeDenied = "token_scope_denied"
+	// EventROPCAuthFailed is logged when ROPC authentication fails.
 	// This includes invalid credentials, disabled users, and 2FA-blocked users.
-	AuditROPCAuthFailed = "ropc_auth_failed"
-	// AuditAuthCodeReuseDetected is logged when an authorization code is replayed
+	EventROPCAuthFailed = "ropc_auth_failed"
+	// EventAuthCodeReuseDetected is logged when an authorization code is replayed
 	// at the token endpoint by an authenticated requester (correct client_id,
 	// redirect_uri, client_secret/PKCE). Per RFC 6749 Section 4.1.2 the server
 	// then revokes refresh tokens issued from that code and terminates the
 	// associated user session.
-	AuditAuthCodeReuseDetected = "auth_code_reuse_detected"
-	// AuditRefreshTokenReplayDetected records an authenticated presentation of an
+	EventAuthCodeReuseDetected = "auth_code_reuse_detected"
+	// EventRefreshTokenReplayDetected records an authenticated presentation of an
 	// already-revoked refresh token that caused at least one live member of the
 	// same rotation family to be revoked. Per RFC 9700 Section 4.14.2, rotation
 	// responds to an invalidated refresh token by revoking the active one, since
@@ -92,10 +94,10 @@ const (
 	// A presentation that revokes nothing emits no event, so an idempotent no-op
 	// (a family already fully revoked, or a repeated replay) cannot amplify the
 	// audit log.
-	AuditRefreshTokenReplayDetected = "refresh_token_replay_detected"
-	// AuditOTPCodeReplayDetected records a TOTP code that validated against the user's
+	EventRefreshTokenReplayDetected = "refresh_token_replay_detected"
+	// EventOTPCodeReplayDetected records a TOTP code that validated against the user's
 	// secret but whose time step could not be claimed, which per RFC 6238 Section 5.2
-	// means the code had already been used. Emitted alongside AuditAuthFailedOtp rather
+	// means the code had already been used. Emitted alongside EventAuthFailedOtp rather
 	// than instead of it: a replayed code is a far stronger signal than a mistyped one,
 	// usually a real-time phishing proxy, and it deserves to be alertable on its own
 	// (#111 decision 5).
@@ -109,8 +111,8 @@ const (
 	// Payload: userId and the matched time step, so an operator can see which code was
 	// replayed. Never the code itself. The caller learns nothing either way: a replay
 	// renders the same generic incorrect-code response as a wrong code.
-	AuditOTPCodeReplayDetected = "otp_code_replay_detected"
-	// AuditRateLimitExceeded records that a rate limiter refused a request. It exists
+	EventOTPCodeReplayDetected = "otp_code_replay_detected"
+	// EventRateLimitExceeded records that a rate limiter refused a request. It exists
 	// because a rejected request never reaches the handler, so a sustained guessing run
 	// shows N audited credential failures and then silence, and nothing in the log
 	// distinguishes "they stopped" from "we are throttling them". RFC 6749 Section 4.3.2
@@ -127,82 +129,82 @@ const (
 	// Payload: the limiter name, plus the identifier that limiter's neighbours already
 	// carry, which is the email for account tiers, the user id for the OTP tier and the
 	// client block for IP tiers.
-	AuditRateLimitExceeded = "rate_limit_exceeded"
+	EventRateLimitExceeded = "rate_limit_exceeded"
 
-	AuditCreatedUser              = "created_user"
-	AuditActivatedAccount         = "activated_account"
-	AuditCreatedPreRegistration   = "created_pre_registration"
-	AuditDeletedUserSessionClient = "deleted_user_session_client"
-	AuditLogout                   = "logout"
+	EventCreatedUser              = "created_user"
+	EventActivatedAccount         = "activated_account"
+	EventCreatedPreRegistration   = "created_pre_registration"
+	EventDeletedUserSessionClient = "deleted_user_session_client"
+	EventLogout                   = "logout"
 
-	AuditRotatedKeys                  = "rotated_keys"
-	AuditRevokedKey                   = "revoked_key"
-	AuditDeletedUserSession           = "deleted_user_session"
-	AuditUpdatedRedirectURIs          = "updated_redirect_uris"
-	AuditUpdatedClientPermissions     = "updated_client_permissions"
-	AuditDeletedClient                = "deleted_client"
-	AuditCreatedClient                = "created_client"
-	AuditDynamicClientRegistration    = "dynamic_client_registration"
-	AuditUpdatedResourcePermissions   = "updated_resource_permissions"
-	AuditDeletedResource              = "deleted_resource"
-	AuditUpdatedResource              = "updated_resource"
-	AuditCreatedResource              = "created_resource"
-	AuditUserAddedToGroup             = "user_added_to_group"
-	AuditUserRemovedFromGroup         = "user_removed_from_group"
-	AuditCreatedGroup                 = "created_group"
-	AuditUpdatedGroup                 = "updated_group"
-	AuditDeletedGroup                 = "deleted_group"
-	AuditDeleteGroupAttribute         = "deleted_group_attribute"
-	AuditAddedGroupAttribute          = "added_group_attribute"
-	AuditUpdatedGroupAttribute        = "updated_group_attribute"
-	AuditAddedGroupPermission         = "added_group_permission"
-	AuditDeletedGroupPermission       = "deleted_group_permission"
-	AuditAddedUserPermission          = "added_user_permission"
-	AuditDeletedUserPermission        = "deleted_user_permission"
-	AuditDeleteUserAttribute          = "deleted_user_attribute"
-	AuditAddedUserAttribute           = "added_user_attribute"
-	AuditUpdatedUserAttribute         = "updated_user_attribute"
-	AuditDeletedUser                  = "deleted_user"
-	AuditUpdatedSMTPSettings          = "updated_smtp_settings"
-	AuditUpdatedGeneralSettings       = "updated_general_settings"
-	AuditUpdatedSessionsSettings      = "updated_sessions_settings"
-	AuditUpdatedTokensSettings        = "updated_tokens_settings"
-	AuditUpdatedUIThemeSettings       = "updated_ui_theme_settings"
-	AuditUpdatedAuditLogsSettings     = "updated_audit_logs_settings"
-	AuditUpdatedWebOrigins            = "updated_web_origins"
-	AuditUpdatedClientSettings        = "updated_client_settings"
-	AuditUpdatedClientTokens          = "updated_client_tokens"
-	AuditUpdatedClientAuthentication  = "updated_client_authentication"
-	AuditUpdatedClientOAuth2Flows     = "updated_client_oauth2_flows"
-	AuditUpdatedUserDetails           = "updated_user_details"
-	AuditUpdatedUserProfile           = "updated_user_profile"
-	AuditUpdatedOwnProfile            = "updated_own_profile"
-	AuditUpdatedOwnEmail              = "updated_own_email"
-	AuditUpdatedOwnPhone              = "updated_own_phone"
-	AuditUpdatedOwnAddress            = "updated_own_address"
-	AuditUpdatedUserEmail             = "updated_user_email"
-	AuditUpdatedUserPhone             = "updated_user_phone"
-	AuditUpdatedUserAddress           = "updated_user_address"
-	AuditUpdatedUserAuthentication    = "updated_user_authentication"
-	AuditDeletedUserConsent           = "deleted_user_consent"
-	AuditDeletedOwnUserConsent        = "deleted_own_user_consent"
-	AuditVerifiedEmail                = "verified_email"
-	AuditSentEmailVerificationMessage = "sent_email_verification_message"
-	AuditFailedEmailVerificationCode  = "failed_email_verification_code"
-	AuditFailedResetPasswordCode      = "failed_reset_password_code"
-	// AuditFailedAccountActivationCode records a refused self-registration activation link, the
-	// twin of AuditFailedResetPasswordCode: both emailed-link flows answer every refusal with one
+	EventRotatedKeys                  = "rotated_keys"
+	EventRevokedKey                   = "revoked_key"
+	EventDeletedUserSession           = "deleted_user_session"
+	EventUpdatedRedirectURIs          = "updated_redirect_uris"
+	EventUpdatedClientPermissions     = "updated_client_permissions"
+	EventDeletedClient                = "deleted_client"
+	EventCreatedClient                = "created_client"
+	EventDynamicClientRegistration    = "dynamic_client_registration"
+	EventUpdatedResourcePermissions   = "updated_resource_permissions"
+	EventDeletedResource              = "deleted_resource"
+	EventUpdatedResource              = "updated_resource"
+	EventCreatedResource              = "created_resource"
+	EventUserAddedToGroup             = "user_added_to_group"
+	EventUserRemovedFromGroup         = "user_removed_from_group"
+	EventCreatedGroup                 = "created_group"
+	EventUpdatedGroup                 = "updated_group"
+	EventDeletedGroup                 = "deleted_group"
+	EventDeleteGroupAttribute         = "deleted_group_attribute"
+	EventAddedGroupAttribute          = "added_group_attribute"
+	EventUpdatedGroupAttribute        = "updated_group_attribute"
+	EventAddedGroupPermission         = "added_group_permission"
+	EventDeletedGroupPermission       = "deleted_group_permission"
+	EventAddedUserPermission          = "added_user_permission"
+	EventDeletedUserPermission        = "deleted_user_permission"
+	EventDeleteUserAttribute          = "deleted_user_attribute"
+	EventAddedUserAttribute           = "added_user_attribute"
+	EventUpdatedUserAttribute         = "updated_user_attribute"
+	EventDeletedUser                  = "deleted_user"
+	EventUpdatedSMTPSettings          = "updated_smtp_settings"
+	EventUpdatedGeneralSettings       = "updated_general_settings"
+	EventUpdatedSessionsSettings      = "updated_sessions_settings"
+	EventUpdatedTokensSettings        = "updated_tokens_settings"
+	EventUpdatedUIThemeSettings       = "updated_ui_theme_settings"
+	EventUpdatedAuditLogsSettings     = "updated_audit_logs_settings"
+	EventUpdatedWebOrigins            = "updated_web_origins"
+	EventUpdatedClientSettings        = "updated_client_settings"
+	EventUpdatedClientTokens          = "updated_client_tokens"
+	EventUpdatedClientAuthentication  = "updated_client_authentication"
+	EventUpdatedClientOAuth2Flows     = "updated_client_oauth2_flows"
+	EventUpdatedUserDetails           = "updated_user_details"
+	EventUpdatedUserProfile           = "updated_user_profile"
+	EventUpdatedOwnProfile            = "updated_own_profile"
+	EventUpdatedOwnEmail              = "updated_own_email"
+	EventUpdatedOwnPhone              = "updated_own_phone"
+	EventUpdatedOwnAddress            = "updated_own_address"
+	EventUpdatedUserEmail             = "updated_user_email"
+	EventUpdatedUserPhone             = "updated_user_phone"
+	EventUpdatedUserAddress           = "updated_user_address"
+	EventUpdatedUserAuthentication    = "updated_user_authentication"
+	EventDeletedUserConsent           = "deleted_user_consent"
+	EventDeletedOwnUserConsent        = "deleted_own_user_consent"
+	EventVerifiedEmail                = "verified_email"
+	EventSentEmailVerificationMessage = "sent_email_verification_message"
+	EventFailedEmailVerificationCode  = "failed_email_verification_code"
+	EventFailedResetPasswordCode      = "failed_reset_password_code"
+	// EventFailedAccountActivationCode records a refused self-registration activation link, the
+	// twin of EventFailedResetPasswordCode: both emailed-link flows answer every refusal with one
 	// page, so this entry is the only place the cause is visible, and a burst of them is what
 	// probing activation links looks like. It replaced a Warn record in #435.
 	//
 	// Payload: reason (the reset flow's names for the same states), the client IP, and
 	// preRegistrationId only when the lookup resolved a pre-registration the link's code matched.
-	AuditFailedAccountActivationCode = "failed_account_activation_code"
-	// AuditRequestedPasswordReset records one forgot-password request, written exactly once for
+	EventFailedAccountActivationCode = "failed_account_activation_code"
+	// EventRequestedPasswordReset records one forgot-password request, written exactly once for
 	// every POST that reaches the handler, a malformed address included. Every well-formed
 	// request is answered with the same "link sent" page whatever became of it, so this entry is
 	// the only place an administrator can see why a user was sent nothing (#404 decision 6). A
-	// request the rate limiter refuses never reaches the handler and is AuditRateLimitExceeded's.
+	// request the rate limiter refuses never reaches the handler and is EventRateLimitExceeded's.
 	//
 	// Written once the outcome is decided and before any mail is sent, so code_issued says a code
 	// was stored, not that the mail went out: a send failure is an Error log line carrying the
@@ -216,9 +218,9 @@ const (
 	// or server_error, the last a request the server failed before deciding it (the lookup, or
 	// the code's encryption or store), whose cause is the Error log line on the same request id.
 	// The digest is a pseudonym, not a secret: anyone holding a candidate address can test it.
-	AuditRequestedPasswordReset = "requested_password_reset"
-	AuditChangedPassword        = "changed_password"
-	// AuditRevokedUserAuthState records that a credential change invalidated a user's live
+	EventRequestedPasswordReset = "requested_password_reset"
+	EventChangedPassword        = "changed_password"
+	// EventRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
 	// refresh tokens revoked. Emitted by the four sites that perform that action AFTER their
 	// transaction commits, on success only, and emitted even when nothing was found to revoke,
@@ -228,17 +230,17 @@ const (
 	// existed until #351 replaced the startup pass that emitted it with migration 000047 and a
 	// pre-flight that refuses to migrate rather than disabling an account nobody asked about.
 	//
-	// Deliberately NOT AuditUserDisabled, which already means "a disabled user was rejected"
+	// Deliberately NOT EventUserDisabled, which already means "a disabled user was rejected"
 	// and is emitted from six auth paths; overloading it would make that event ambiguous.
-	AuditRevokedUserAuthState = "revoked_user_auth_state"
-	// AuditTerminatedUserSession records that an explicit "end this session" action durably cut
+	EventRevokedUserAuthState = "revoked_user_auth_state"
+	// EventTerminatedUserSession records that an explicit "end this session" action durably cut
 	// off the grants that session authorized: the authorization codes issued through it are
 	// marked revoked, its refresh tokens including offline ones are revoked, and the session row
 	// is deleted. Emitted by the two session-termination endpoints AFTER their transaction
 	// commits, on success only, and emitted even when nothing was found to revoke, so the event
 	// attests that the action happened (#129 decision 9).
 	//
-	// It accompanies AuditDeletedUserSession rather than replacing it. The two carry different
+	// It accompanies EventDeletedUserSession rather than replacing it. The two carry different
 	// meanings, one a session-lifecycle fact and one a security action, and leaving the older
 	// event's payload untouched keeps any external consumer parsing it strictly working. The
 	// consequence is that both are emitted per action, so THIS is the event to count for
@@ -248,8 +250,8 @@ const (
 	// revokedCodeCount, plus loggedInUser. Codes get a count rather than a list of ids because no
 	// event here lists code ids, and a count answers the only question an auditor has, whether
 	// anything was revoked.
-	AuditTerminatedUserSession = "terminated_user_session"
-	// AuditRevokedClientGrants records that a client-scoped security action cut off every grant
+	EventTerminatedUserSession = "terminated_user_session"
+	// EventRevokedClientGrants records that a client-scoped security action cut off every grant
 	// one client holds: its not-yet-revoked authorization codes are marked revoked and its
 	// refresh tokens, through both linkage shapes, are revoked. Emitted by the
 	// confidential-to-public flip AFTER its transaction commits, on success only, and emitted
@@ -257,7 +259,7 @@ const (
 	// rather than that something was there to sweep (#245 decision 4). Its `reason` field
 	// distinguishes future sites; today the only value is client_became_public.
 	//
-	// Deliberately NOT AuditRevokedUserAuthState, whose payload asserts a generation bracket and
+	// Deliberately NOT EventRevokedUserAuthState, whose payload asserts a generation bracket and
 	// a list of terminated sessions. This action advances no generation and ends no session: it
 	// is scoped to one client, so the users of that client stay signed in everywhere else and
 	// their access tokens keep working until they expire.
@@ -266,8 +268,8 @@ const (
 	// loggedInUser. Codes get a count rather than a list of ids, following
 	// terminated_user_session, because no event here lists code ids and a count answers the only
 	// question an auditor has, whether anything was revoked.
-	AuditRevokedClientGrants = "revoked_client_grants"
-	// AuditCrossUserSessionReplaced records that a different user signed in on a browser that was
+	EventRevokedClientGrants = "revoked_client_grants"
+	// EventCrossUserSessionReplaced records that a different user signed in on a browser that was
 	// still carrying someone else's session cookie, so that session was ended. The browser reaches
 	// that state through prompt=login, through an id_token_hint naming another user, or simply by
 	// arriving with a session row that has stopped being valid; in each case the cookie survives
@@ -291,19 +293,19 @@ const (
 	// cannot tell a browser changing hands from an administrator ending a session, which is why
 	// reusing that pair was rejected. Nothing links them, and they are emitted in that same order
 	// by ordinary session housekeeping.
-	AuditCrossUserSessionReplaced = "cross_user_session_replaced"
+	EventCrossUserSessionReplaced = "cross_user_session_replaced"
 
-	AuditEnabledOTP                     = "enabled_otp"
-	AuditDisabledOTP                    = "disabled_otp"
-	AuditSentTestEmail                  = "sent_test_email"
-	AuditUpdatedUserProfilePicture      = "updated_user_profile_picture"
-	AuditDeletedUserProfilePicture      = "deleted_user_profile_picture"
-	AuditUpdatedOwnProfilePicture       = "updated_own_profile_picture"
-	AuditDeletedOwnProfilePicture       = "deleted_own_profile_picture"
-	AuditUpdatedClientLogo              = "updated_client_logo"
-	AuditDeletedClientLogo              = "deleted_client_logo"
-	AuditGeneratedEmailVerificationCode = "generated_email_verification_code"
-	// AuditAuthCeremonyMismatch records a form in the authorization flow submitted with a
+	EventEnabledOTP                     = "enabled_otp"
+	EventDisabledOTP                    = "disabled_otp"
+	EventSentTestEmail                  = "sent_test_email"
+	EventUpdatedUserProfilePicture      = "updated_user_profile_picture"
+	EventDeletedUserProfilePicture      = "deleted_user_profile_picture"
+	EventUpdatedOwnProfilePicture       = "updated_own_profile_picture"
+	EventDeletedOwnProfilePicture       = "deleted_own_profile_picture"
+	EventUpdatedClientLogo              = "updated_client_logo"
+	EventDeletedClientLogo              = "deleted_client_logo"
+	EventGeneratedEmailVerificationCode = "generated_email_verification_code"
+	// EventAuthCeremonyMismatch records a form in the authorization flow submitted with a
 	// ceremony id the browser's auth context no longer holds, which means a second
 	// /auth/authorize replaced the ceremony the page was rendered for. The submission is
 	// refused with a 400 and the current ceremony is left alone (#79).
@@ -311,7 +313,7 @@ const (
 	// Ordinary in a browser the user runs two authorizations in, so a row on its own is not an
 	// attack. A run of them against one client is worth looking at: this is the event that
 	// fires when a page tries to act on an authorization request its user never saw.
-	AuditAuthCeremonyMismatch = "auth_ceremony_mismatch"
+	EventAuthCeremonyMismatch = "auth_ceremony_mismatch"
 
 	// The three refusals at /auth/issue, one per fact the last step re-establishes before it
 	// mints anything. Each is the proof that an administrator's action reached a ceremony
@@ -319,28 +321,28 @@ const (
 	// permission can be revoked and a callback can be deregistered while it is on screen, and
 	// without these the operator has no way to ask whether the removal stopped anything (#241).
 
-	// AuditIssuanceRefusedSessionInvalid records a ceremony refused at /auth/issue because the
+	// EventIssuanceRefusedSessionInvalid records a ceremony refused at /auth/issue because the
 	// session it authenticated under is no longer within its idle timeout or its maximum
 	// lifetime. It attests that check alone: a session that resolves to another user, or that
 	// is gone from the database entirely, is refused by the older ownership and liveness tests
 	// beside it and writes no audit row.
-	AuditIssuanceRefusedSessionInvalid = "issuance_refused_session_invalid"
+	EventIssuanceRefusedSessionInvalid = "issuance_refused_session_invalid"
 
-	// AuditIssuanceRefusedScopeDenied records a ceremony refused at /auth/issue because
+	// EventIssuanceRefusedScopeDenied records a ceremony refused at /auth/issue because
 	// re-filtering the scope against the user's live permissions left nothing to grant. A
 	// filter that merely narrows the set issues the narrowed grant and writes no row: the
 	// client is told what it got through the response's scope parameter.
-	AuditIssuanceRefusedScopeDenied = "issuance_refused_scope_denied"
+	EventIssuanceRefusedScopeDenied = "issuance_refused_scope_denied"
 
-	// AuditIssuanceRefusedRedirectURI records a ceremony refused at /auth/issue because the
+	// EventIssuanceRefusedRedirectURI records a ceremony refused at /auth/issue because the
 	// redirect URI it would answer at is no longer registered on the client. It is the one of
 	// the three whose refusal reaches the client with nothing at all, not even an error: the
 	// destination is exactly what this server may no longer navigate a browser to.
-	AuditIssuanceRefusedRedirectURI = "issuance_refused_redirect_uri"
+	EventIssuanceRefusedRedirectURI = "issuance_refused_redirect_uri"
 
-	// AuditRedemptionRefusedRedirectURI records an authorization code exchange refused at the
+	// EventRedemptionRefusedRedirectURI records an authorization code exchange refused at the
 	// token endpoint because the redirect URI recorded on the code is no longer registered on
-	// the client. It is the same fact as AuditIssuanceRefusedRedirectURI arriving one step
+	// the client. It is the same fact as EventIssuanceRefusedRedirectURI arriving one step
 	// later, and it exists because a code minted a second before the deregistration would
 	// otherwise stay redeemable for the rest of its 60 second life (#241 decision 5).
 	//
@@ -353,118 +355,118 @@ const (
 	// whoever produced it had proved possession, which makes it either an administrator
 	// rotating a callback inside the window or a grant being redeemed after its destination
 	// was deliberately pulled.
-	AuditRedemptionRefusedRedirectURI = "redemption_refused_redirect_uri"
+	EventRedemptionRefusedRedirectURI = "redemption_refused_redirect_uri"
 )
 
-// AuditEventTypes returns the canonical list of audit event names, which the admin console's
+// EventTypes returns the canonical list of audit event names, which the admin console's
 // filter dropdown is built from. It returns a copy, so a caller changing the slice it got changes
 // no later answer (#433).
-func AuditEventTypes() []string {
+func EventTypes() []string {
 	return slices.Clone(auditEventTypes)
 }
 
-// auditEventTypes is the catalog AuditEventTypes copies.
+// auditEventTypes is the catalog EventTypes copies.
 var auditEventTypes = []string{
-	AuditActivatedAccount,
-	AuditAddedGroupAttribute,
-	AuditAddedGroupPermission,
-	AuditAddedUserAttribute,
-	AuditAddedUserPermission,
-	AuditAuthCeremonyMismatch,
-	AuditAuthCodeReuseDetected,
-	AuditAuthFailedOtp,
-	AuditAuthFailedPwd,
-	AuditAuthSuccessOtp,
-	AuditAuthSuccessPwd,
-	AuditBumpedUserSession,
-	AuditChangedPassword,
-	AuditCreatedAuthCode,
-	AuditCreatedClient,
-	AuditCreatedGroup,
-	AuditCreatedPreRegistration,
-	AuditCreatedResource,
-	AuditCreatedUser,
-	AuditCrossUserSessionReplaced,
-	AuditDeletedClient,
-	AuditDeletedClientLogo,
-	AuditDeletedGroup,
-	AuditDeleteGroupAttribute,
-	AuditDeletedGroupPermission,
-	AuditDeletedOwnProfilePicture,
-	AuditDeletedOwnUserConsent,
-	AuditDeletedResource,
-	AuditDeletedUser,
-	AuditDeleteUserAttribute,
-	AuditDeletedUserConsent,
-	AuditDeletedUserPermission,
-	AuditDeletedUserProfilePicture,
-	AuditDeletedUserSession,
-	AuditDeletedUserSessionClient,
-	AuditDisabledOTP,
-	AuditDynamicClientRegistration,
-	AuditEnabledOTP,
-	AuditFailedAccountActivationCode,
-	AuditFailedEmailVerificationCode,
-	AuditFailedResetPasswordCode,
-	AuditGeneratedEmailVerificationCode,
-	AuditIssuanceRefusedRedirectURI,
-	AuditIssuanceRefusedScopeDenied,
-	AuditIssuanceRefusedSessionInvalid,
-	AuditLogout,
-	AuditOTPCodeReplayDetected,
-	AuditRateLimitExceeded,
-	AuditRedemptionRefusedRedirectURI,
-	AuditRefreshTokenReplayDetected,
-	AuditRequestedPasswordReset,
-	AuditRevokedClientGrants,
-	AuditRevokedKey,
-	AuditRevokedUserAuthState,
-	AuditROPCAuthFailed,
-	AuditRotatedKeys,
-	AuditSavedConsent,
-	AuditSentEmailVerificationMessage,
-	AuditSentTestEmail,
-	AuditStartedNewUserSesson,
-	AuditTerminatedUserSession,
-	AuditTokenIssuedAuthorizationCodeResponse,
-	AuditTokenIssuedClientCredentialsResponse,
-	AuditTokenIssuedImplicitResponse,
-	AuditTokenIssuedRefreshTokenResponse,
-	AuditTokenIssuedROPCResponse,
-	AuditTokenScopeDenied,
-	AuditUpdatedAuditLogsSettings,
-	AuditUpdatedClientAuthentication,
-	AuditUpdatedClientLogo,
-	AuditUpdatedClientOAuth2Flows,
-	AuditUpdatedClientPermissions,
-	AuditUpdatedClientSettings,
-	AuditUpdatedClientTokens,
-	AuditUpdatedGeneralSettings,
-	AuditUpdatedGroup,
-	AuditUpdatedGroupAttribute,
-	AuditUpdatedOwnAddress,
-	AuditUpdatedOwnEmail,
-	AuditUpdatedOwnPhone,
-	AuditUpdatedOwnProfile,
-	AuditUpdatedOwnProfilePicture,
-	AuditUpdatedRedirectURIs,
-	AuditUpdatedResource,
-	AuditUpdatedResourcePermissions,
-	AuditUpdatedSessionsSettings,
-	AuditUpdatedSMTPSettings,
-	AuditUpdatedTokensSettings,
-	AuditUpdatedUIThemeSettings,
-	AuditUpdatedUserAddress,
-	AuditUpdatedUserAttribute,
-	AuditUpdatedUserAuthentication,
-	AuditUpdatedUserDetails,
-	AuditUpdatedUserEmail,
-	AuditUpdatedUserPhone,
-	AuditUpdatedUserProfile,
-	AuditUpdatedUserProfilePicture,
-	AuditUpdatedWebOrigins,
-	AuditUserAddedToGroup,
-	AuditUserDisabled,
-	AuditUserRemovedFromGroup,
-	AuditVerifiedEmail,
+	EventActivatedAccount,
+	EventAddedGroupAttribute,
+	EventAddedGroupPermission,
+	EventAddedUserAttribute,
+	EventAddedUserPermission,
+	EventAuthCeremonyMismatch,
+	EventAuthCodeReuseDetected,
+	EventAuthFailedOtp,
+	EventAuthFailedPwd,
+	EventAuthSuccessOtp,
+	EventAuthSuccessPwd,
+	EventBumpedUserSession,
+	EventChangedPassword,
+	EventCreatedAuthCode,
+	EventCreatedClient,
+	EventCreatedGroup,
+	EventCreatedPreRegistration,
+	EventCreatedResource,
+	EventCreatedUser,
+	EventCrossUserSessionReplaced,
+	EventDeletedClient,
+	EventDeletedClientLogo,
+	EventDeletedGroup,
+	EventDeleteGroupAttribute,
+	EventDeletedGroupPermission,
+	EventDeletedOwnProfilePicture,
+	EventDeletedOwnUserConsent,
+	EventDeletedResource,
+	EventDeletedUser,
+	EventDeleteUserAttribute,
+	EventDeletedUserConsent,
+	EventDeletedUserPermission,
+	EventDeletedUserProfilePicture,
+	EventDeletedUserSession,
+	EventDeletedUserSessionClient,
+	EventDisabledOTP,
+	EventDynamicClientRegistration,
+	EventEnabledOTP,
+	EventFailedAccountActivationCode,
+	EventFailedEmailVerificationCode,
+	EventFailedResetPasswordCode,
+	EventGeneratedEmailVerificationCode,
+	EventIssuanceRefusedRedirectURI,
+	EventIssuanceRefusedScopeDenied,
+	EventIssuanceRefusedSessionInvalid,
+	EventLogout,
+	EventOTPCodeReplayDetected,
+	EventRateLimitExceeded,
+	EventRedemptionRefusedRedirectURI,
+	EventRefreshTokenReplayDetected,
+	EventRequestedPasswordReset,
+	EventRevokedClientGrants,
+	EventRevokedKey,
+	EventRevokedUserAuthState,
+	EventROPCAuthFailed,
+	EventRotatedKeys,
+	EventSavedConsent,
+	EventSentEmailVerificationMessage,
+	EventSentTestEmail,
+	EventStartedNewUserSession,
+	EventTerminatedUserSession,
+	EventTokenIssuedAuthorizationCodeResponse,
+	EventTokenIssuedClientCredentialsResponse,
+	EventTokenIssuedImplicitResponse,
+	EventTokenIssuedRefreshTokenResponse,
+	EventTokenIssuedROPCResponse,
+	EventTokenScopeDenied,
+	EventUpdatedAuditLogsSettings,
+	EventUpdatedClientAuthentication,
+	EventUpdatedClientLogo,
+	EventUpdatedClientOAuth2Flows,
+	EventUpdatedClientPermissions,
+	EventUpdatedClientSettings,
+	EventUpdatedClientTokens,
+	EventUpdatedGeneralSettings,
+	EventUpdatedGroup,
+	EventUpdatedGroupAttribute,
+	EventUpdatedOwnAddress,
+	EventUpdatedOwnEmail,
+	EventUpdatedOwnPhone,
+	EventUpdatedOwnProfile,
+	EventUpdatedOwnProfilePicture,
+	EventUpdatedRedirectURIs,
+	EventUpdatedResource,
+	EventUpdatedResourcePermissions,
+	EventUpdatedSessionsSettings,
+	EventUpdatedSMTPSettings,
+	EventUpdatedTokensSettings,
+	EventUpdatedUIThemeSettings,
+	EventUpdatedUserAddress,
+	EventUpdatedUserAttribute,
+	EventUpdatedUserAuthentication,
+	EventUpdatedUserDetails,
+	EventUpdatedUserEmail,
+	EventUpdatedUserPhone,
+	EventUpdatedUserProfile,
+	EventUpdatedUserProfilePicture,
+	EventUpdatedWebOrigins,
+	EventUserAddedToGroup,
+	EventUserDisabled,
+	EventUserRemovedFromGroup,
+	EventVerifiedEmail,
 }

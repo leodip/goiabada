@@ -21,7 +21,7 @@ import (
 // whereas a details value slog's JSON encoder cannot render makes the handler
 // return an error the slog.Logger discards, so the record is dropped in silence.
 // Nothing reaches here with such a value today (every site sends strings, numbers,
-// bools and slices of them), and the database half of AuditLogger still marshals
+// bools and slices of them), and the database half of Logger still marshals
 // and still reports the failure, so an unrenderable value is caught there.
 //
 // It takes a context so the installed handler can append request_id, which ties
@@ -31,7 +31,7 @@ import (
 // carries are about the subject, not about the request.
 //
 // It is a function of this package rather than of its own because there is one caller left,
-// AuditLogger.Log in audit.go. It was a core package while a backfill in the data layer wrote this
+// Logger.Log in audit.go. It was a core package while a backfill in the data layer wrote this
 // record from the other side of the module boundary; #351 deleted that backfill, and #359 folded
 // what was left of the package in here. It stays exported and separate from Log because the record
 // it writes is one of the two halves Log chooses between, and the settings row decides which.

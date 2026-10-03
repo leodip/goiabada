@@ -370,7 +370,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		// The flat wording, never one naming the account (#137); the type is what the handler
-		// writes AuditUserDisabled from.
+		// writes EventUserDisabled from.
 		var disabled *UserDisabledError
 		require.ErrorAs(t, err, &disabled)
 		var customErr *oauth.ErrorDetail

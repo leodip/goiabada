@@ -562,7 +562,7 @@ func handleExistingSessionOnLogout(
 			// nowhere else -- so there is no caller identity to read here, and "" is what
 			// this row has always carried. The actor is this event's own userId, which is
 			// where an auditor reads it (#385).
-			auditLogger.Log(r.Context(), audit.AuditDeletedUserSessionClient, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventDeletedUserSessionClient, map[string]interface{}{
 				"userId":        userSession.UserId,
 				"userSessionId": userSession.Id,
 				"clientId":      sessionClient.Client.Id,
@@ -577,7 +577,7 @@ func handleExistingSessionOnLogout(
 
 				// "" for the reason given above: no bearer token reaches /auth/logout, and
 				// the actor is this event's own userId.
-				auditLogger.Log(r.Context(), audit.AuditLogout, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
 					"userId":            userSession.UserId,
 					"sessionIdentifier": sessionIdentifier,
 					"loggedInUser":      "",
@@ -704,7 +704,7 @@ func doLogout(
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		// AuditLogout is emitted inside, and only when the session row itself goes, which is what this
+		// EventLogout is emitted inside, and only when the session row itself goes, which is what this
 		// path did before the rewrite and what decision 3 keeps.
 	} else {
 		// No client to scope to, so the whole session goes (#109 decision 2).
@@ -726,7 +726,7 @@ func doLogout(
 		// "" rather than a subject, and the key stays: /auth/logout carries no bearer token,
 		// so there is no caller identity to read, and "" is what this row has always
 		// carried. The actor is this event's own userId (#385).
-		auditLogger.Log(r.Context(), audit.AuditLogout, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
 			"userId":            userId,
 			"sessionIdentifier": sessionIdentifier,
 			"loggedInUser":      "",
@@ -826,7 +826,7 @@ func deleteWholeUserSession(
 	// "" rather than a subject, and the key stays: /auth/logout carries no bearer token, so
 	// there is no caller identity to read, and "" is what this row has always carried. The
 	// actor is this event's own userSessionId (#385).
-	auditLogger.Log(r.Context(), audit.AuditDeletedUserSession, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 		"userSessionId": userSession.Id,
 		"loggedInUser":  "",
 	})

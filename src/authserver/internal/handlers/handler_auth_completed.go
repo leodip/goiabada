@@ -184,7 +184,7 @@ func HandleAuthCompletedGet(
 
 		switch answer {
 		case afterBindingUserDisabled:
-			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
@@ -402,7 +402,7 @@ func bindReusedSession(
 		bumpedSession.OtpConfigGeneration = *authContext.OtpConfigGeneration
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditBumpedUserSession, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
 		"userId":   authContext.UserId,
 		"clientId": client.Id,
 	})
@@ -458,7 +458,7 @@ func bindNewSession(
 		// token, and the only identity in scope is the cookie's, which at this instant still names
 		// the user being terminated -- recording it would name the party losing the session as the
 		// actor who ended it. The actor is this event's userId, which is where an auditor reads it.
-		auditLogger.Log(r.Context(), audit.AuditCrossUserSessionReplaced, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventCrossUserSessionReplaced, map[string]interface{}{
 			"userId":                    authContext.UserId,
 			"previousUserId":            userSession.UserId,
 			"previousSessionIdentifier": userSession.SessionIdentifier,
@@ -471,7 +471,7 @@ func bindNewSession(
 		// Emitting one without the other would make a browser handover the only termination that
 		// never reaches a consumer watching the lifecycle stream, and it would falsify the promise
 		// that ending a session always writes both.
-		auditLogger.Log(r.Context(), audit.AuditDeletedUserSession, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 			"userSessionId": userSession.Id,
 			"loggedInUser":  "",
 		})
@@ -505,7 +505,7 @@ func bindNewSession(
 	// the handover's above: this is a browser ceremony with no bearer token, so there is no actor
 	// to name beyond the user the new session is for.
 	for _, removedSession := range removedSessions {
-		auditLogger.Log(r.Context(), audit.AuditDeletedUserSession, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 			"userSessionId": removedSession.Id,
 			"loggedInUser":  "",
 		})
@@ -523,7 +523,7 @@ func bindNewSession(
 		authContext.AuthenticatedAt = &newSession.AuthTime
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditStartedNewUserSesson, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventStartedNewUserSession, map[string]interface{}{
 		"userId":   authContext.UserId,
 		"clientId": client.Id,
 	})

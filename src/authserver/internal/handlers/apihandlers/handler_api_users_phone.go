@@ -146,7 +146,7 @@ func HandleAPIUserPhonePut(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditUpdatedUserPhone, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedUserPhone, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})

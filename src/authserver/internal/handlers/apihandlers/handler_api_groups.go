@@ -130,7 +130,7 @@ func HandleAPIGroupCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), audit.AuditCreatedGroup, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventCreatedGroup, map[string]interface{}{
 			"groupId":         group.Id,
 			"groupIdentifier": group.GroupIdentifier,
 			"loggedInUser":    callerSubject(r),
@@ -273,7 +273,7 @@ func HandleAPIGroupUpdatePut(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), audit.AuditUpdatedGroup, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedGroup, map[string]interface{}{
 			"groupId":         group.Id,
 			"groupIdentifier": group.GroupIdentifier,
 			"loggedInUser":    callerSubject(r),
@@ -332,7 +332,7 @@ func HandleAPIGroupDelete(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), audit.AuditDeletedGroup, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeletedGroup, map[string]interface{}{
 			"groupId":         group.Id,
 			"groupIdentifier": group.GroupIdentifier,
 			"loggedInUser":    callerSubject(r),

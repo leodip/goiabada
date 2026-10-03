@@ -80,8 +80,8 @@ var grantSaves = []grantSave{
 			up := arg.(*models.UserPermission)
 			return up.UserId, up.PermissionId
 		},
-		addedEvent:   audit.AuditAddedUserPermission,
-		deletedEvent: audit.AuditDeletedUserPermission,
+		addedEvent:   audit.EventAddedUserPermission,
+		deletedEvent: audit.EventDeletedUserPermission,
 		ownerKey:     "userId",
 		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
 			return HandleAPIUserPermissionsPut(database, auditLogger)
@@ -112,8 +112,8 @@ var grantSaves = []grantSave{
 			gp := arg.(*models.GroupPermission)
 			return gp.GroupId, gp.PermissionId
 		},
-		addedEvent:   audit.AuditAddedGroupPermission,
-		deletedEvent: audit.AuditDeletedGroupPermission,
+		addedEvent:   audit.EventAddedGroupPermission,
+		deletedEvent: audit.EventDeletedGroupPermission,
 		ownerKey:     "groupId",
 		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
 			return HandleAPIGroupPermissionsPut(database, auditLogger)
@@ -146,7 +146,7 @@ var grantSaves = []grantSave{
 			cp := arg.(*models.ClientPermission)
 			return cp.ClientId, cp.PermissionId
 		},
-		consolidatedEvent: audit.AuditUpdatedClientPermissions,
+		consolidatedEvent: audit.EventUpdatedClientPermissions,
 		ownerKey:          "clientId",
 		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
 			return HandleAPIClientPermissionsPut(database, auditLogger)

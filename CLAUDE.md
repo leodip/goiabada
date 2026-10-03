@@ -127,7 +127,7 @@ Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in 
 Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to credential exposure.
 - Endpoint: `POST /auth/token` (grant_type=password, username, password)
 - Disabled by default. Enable via `Settings.ResourceOwnerPasswordCredentialsEnabled` or per-client
-- Rate limited. Blocks users with 2FA enabled. Logs `AuditROPCAuthFailed` on failure
+- Rate limited. Blocks users with 2FA enabled. Logs `audit.EventROPCAuthFailed` on failure
 - Implementation: `handler_token_password.go`, `protocolvalidation/token_grant_password.go`, `issuance/grant_password.go`
 
 ### Dynamic Client Registration (RFC 7591)

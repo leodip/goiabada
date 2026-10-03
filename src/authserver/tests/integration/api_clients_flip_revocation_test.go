@@ -142,7 +142,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 
 	// The audit record of the action, which is what tells an administrator afterwards that the
 	// flip did this rather than that the grants failed for some other reason.
-	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.AuditRevokedClientGrants)
+	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventRevokedClientGrants)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -162,7 +162,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 		assert.NotEmpty(t, details["revokedRefreshTokenJtis"],
 			"the sweep is what gives the event actual JTIs rather than a count")
 	}
-	assert.True(t, found, "the flip must emit %v for this client", audit.AuditRevokedClientGrants)
+	assert.True(t, found, "the flip must emit %v for this client", audit.EventRevokedClientGrants)
 }
 
 // D2. The action is client-scoped, and this is the assertion that says so. The same user holds a

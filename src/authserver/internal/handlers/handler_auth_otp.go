@@ -286,7 +286,7 @@ func HandleAuthOtpPost(
 
 		// i18n surface: A — browser-flow form rerender.
 		if !user.Enabled {
-			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError(i18n.NewLocalizedError(i18n.ErrCodeOtpAccountDisabled, nil).Localize(r.Context()))
@@ -332,11 +332,11 @@ func HandleAuthOtpPost(
 			// A replayed step is refused exactly as a wrong code is, so it counts as
 			// one: a code already spent proves nothing about who is submitting it.
 			credentialFailures.RecordCredentialFailure(r)
-			auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
 				"userId": user.Id,
 				"step":   verified.Step,
 			})
-			auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError(incorrectOtpError)
@@ -345,7 +345,7 @@ func HandleAuthOtpPost(
 			// Every wrong code is a guess at three of a million, so this is the
 			// counter the whole OTP budget exists to move (#219).
 			credentialFailures.RecordCredentialFailure(r)
-			auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError(incorrectOtpError)
@@ -366,14 +366,14 @@ func HandleAuthOtpPost(
 			}
 			enrolledGeneration = &generation
 
-			auditLogger.Log(r.Context(), audit.AuditEnabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		}
 
 		// from this point the user is considered authenticated with otp
 
-		auditLogger.Log(r.Context(), audit.AuditAuthSuccessOtp, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventAuthSuccessOtp, map[string]interface{}{
 			"userId": user.Id,
 		})
 

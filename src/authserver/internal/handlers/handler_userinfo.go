@@ -67,7 +67,7 @@ func HandleUserInfoGetPost(
 		}
 
 		if !user.Enabled {
-			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 

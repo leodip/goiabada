@@ -43,14 +43,14 @@ func aLiveContext() interface{} {
 // The accept arm: the switches read and the audit insert both go out on the caller's context. The
 // switches read is the one worth naming -- it is what finds the request's settings, and on a
 // context of Log's own the adapter would read the settings row for every event.
-func TestAuditLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
+func TestLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	switches := databaseOnly()
 
 	mockDB.On("CreateAuditLog", theCallersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
-	NewAuditLogger(mockDB, switches).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, switches).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertExpectations(t)
 	require.Len(t, switches.asked, 1)
@@ -68,7 +68,7 @@ func TestAuditLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
 // wanted an event unrecorded had only to hang up. What survives cancellation is the deadline: a
 // detached context with no bound at all is how a stuck dependency holds the handler's goroutine
 // for ever, which is what the request's context used to prevent by accident.
-func TestAuditLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) {
+func TestLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	switches := databaseOnly()
 
@@ -78,7 +78,7 @@ func TestAuditLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) 
 	ctx, cancel := context.WithCancel(auditCallersContext())
 	cancel()
 
-	NewAuditLogger(mockDB, switches).Log(ctx, AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, switches).Log(ctx, EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertExpectations(t)
 	require.Len(t, switches.asked, 1)
@@ -88,7 +88,7 @@ func TestAuditLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) 
 
 // And the detached context is bounded rather than open-ended, asserted at both ports because the
 // bound is the whole reason the detachment is safe.
-func TestAuditLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
+func TestLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	switches := databaseOnly()
 
@@ -98,7 +98,7 @@ func TestAuditLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 	})
 	mockDB.On("CreateAuditLog", bounded, mock.Anything, mock.Anything).Return(nil).Once()
 
-	NewAuditLogger(mockDB, switches).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, switches).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertExpectations(t)
 	require.Len(t, switches.asked, 1)
@@ -109,10 +109,10 @@ func TestAuditLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 // The reject arm: with database persistence off, the insert is never reached and there is no
 // context to get wrong. Without it the accept arm would also pass on a logger that wrote
 // unconditionally.
-func TestAuditLogger_Log_DatabasePersistenceOffReachesNoInsertPort(t *testing.T) {
+func TestLogger_Log_DatabasePersistenceOffReachesNoInsertPort(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 
-	NewAuditLogger(mockDB, noTarget()).Log(auditCallersContext(), AuditAuthSuccessPwd, map[string]interface{}{"userId": 1})
+	NewLogger(mockDB, noTarget()).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
 
 	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }

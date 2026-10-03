@@ -69,7 +69,7 @@ func expectRenderedCodeInvalid(pageRenderer *mocks_handlers.PageRenderer, wantSt
 // lookup actually resolved a user. Pass wantUserId 0 to require the key is ABSENT rather
 // than zero, since a payload naming user 0 asserts a row that does not exist.
 func expectAuditFailedCode(auditLogger *mocks_handlers.AuditLogger, wantReason string, wantUserId int64) {
-	auditLogger.On("Log", mock.Anything, audit.AuditFailedResetPasswordCode,
+	auditLogger.On("Log", mock.Anything, audit.EventFailedResetPasswordCode,
 		mock.MatchedBy(func(details map[string]interface{}) bool {
 			if details["reason"] != wantReason || details["ip"] != testClientIP {
 				return false
@@ -955,7 +955,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 		}).Return(true, nil).Once()
 	stubRevocationSweepTx(database, 1, 4)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).Return().Once()
 
 	pageRenderer.On("RenderTemplate",
 		mock.Anything,
@@ -1749,7 +1749,7 @@ func TestAuditFailedResetPasswordCode(t *testing.T) {
 		t.Helper()
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		var captured map[string]interface{}
-		auditLogger.On("Log", mock.Anything, audit.AuditFailedResetPasswordCode, mock.Anything).
+		auditLogger.On("Log", mock.Anything, audit.EventFailedResetPasswordCode, mock.Anything).
 			Run(func(args mock.Arguments) {
 				captured = args.Get(2).(map[string]interface{})
 			}).Return().Once()

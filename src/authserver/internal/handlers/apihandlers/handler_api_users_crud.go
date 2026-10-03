@@ -179,7 +179,7 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Both events, after commit. The pre-existing one is unchanged (decision 7).
-		auditLogger.Log(r.Context(), audit.AuditUpdatedUserAuthentication, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedUserAuthentication, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
@@ -264,7 +264,7 @@ func HandleAPIUserOTPPut(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditDisabledOTP, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
 			"userId": user.Id,
 		})
 
@@ -455,7 +455,7 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditCreatedUser, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
 			"email":        createdUser.Email,
 			"loggedInUser": loggedInUser,
 		})
@@ -641,7 +641,7 @@ func HandleAPIUserEnabledPut(
 
 		// Unchanged in both directions, per decision 7: the endpoint's existing event still
 		// fires for every successful request, including the ones that revoke nothing.
-		auditLogger.Log(r.Context(), audit.AuditUpdatedUserDetails, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedUserDetails, map[string]interface{}{
 			"userId":       userId,
 			"loggedInUser": loggedInUser,
 		})
@@ -717,7 +717,7 @@ func HandleAPIUserDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditDeletedUser, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeletedUser, map[string]interface{}{
 			"userId":       userId,
 			"loggedInUser": loggedInUser,
 		})

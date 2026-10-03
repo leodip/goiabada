@@ -889,7 +889,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventSavedConsent, mock.Anything).Return()
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
@@ -958,7 +958,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventSavedConsent, mock.Anything).Return()
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
@@ -1029,7 +1029,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return true
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventSavedConsent, mock.Anything).Return()
 
 		var saved *ceremony.AuthContext
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1888,7 +1888,7 @@ func TestHandleConsentPost(t *testing.T) {
 						return true
 					})).Return(nil)
 
-					auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
+					auditLogger.On("Log", mock.Anything, audit.EventSavedConsent, mock.Anything).Return()
 
 					var saved *ceremony.AuthContext
 					ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1962,7 +1962,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.Scope == "email"
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventSavedConsent, mock.Anything).Return()
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.ConsentedScope == "email"

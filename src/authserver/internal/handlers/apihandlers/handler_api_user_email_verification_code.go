@@ -76,7 +76,7 @@ func HandleAPIUserEmailVerificationCodePost(
 			loggedInUser = jwtToken.StringClaim("sub")
 		}
 
-		auditLogger.Log(r.Context(), audit.AuditGeneratedEmailVerificationCode, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventGeneratedEmailVerificationCode, map[string]interface{}{
 			"userId":       user.Id,
 			"email":        user.Email,
 			"loggedInUser": loggedInUser,

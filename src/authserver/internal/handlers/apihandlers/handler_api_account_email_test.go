@@ -155,7 +155,7 @@ func TestHandleAPIAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 	// Conditional on the address and the verified flag the request read.
 	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "old@example.com", true, "new@example.com").
 		Return(true, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedOwnEmail, map[string]interface{}{
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnEmail, map[string]interface{}{
 		"userId":       emailTestUserId,
 		"loggedInUser": emailTestSubject,
 	}).Return().Once()
@@ -348,7 +348,7 @@ func stubSuccessfulChange(t *testing.T, database *mocks_data.Database, auditLogg
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
 	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, user.Email, user.EmailVerified, "new@example.com").
 		Return(true, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedOwnEmail, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnEmail, mock.Anything).Return().Once()
 }
 
 func changeToNewAddress(t *testing.T) *http.Request {

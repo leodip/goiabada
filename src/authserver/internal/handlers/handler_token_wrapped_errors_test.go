@@ -84,7 +84,7 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 				errs.Wrap(disabled, "unable to validate the token request"))
 
-			auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, map[string]interface{}{
+			auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 				"clientId": "test_client",
 			}).Return().Once()
 			captured := expectJsonErrorWithDetail(jsonWriter)
@@ -119,7 +119,7 @@ func TestHandleTokenPost_GenericRefusalWritesNoUserDisabledRow(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditUserDisabled, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventUserDisabled, mock.Anything)
 			assert.Same(t, refusal, *captured)
 		})
 	}
@@ -137,7 +137,7 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 	jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(refusal, "unable to validate the token request"))
 
-	auditLogger.On("Log", mock.Anything, audit.AuditRedemptionRefusedRedirectURI, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventRedemptionRefusedRedirectURI, mock.Anything).Return().Once()
 	captured := expectJsonErrorWithDetail(jsonWriter)
 
 	handler.ServeHTTP(rr, req)
@@ -167,7 +167,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 		Return(nil, nil).Once()
 
 	var auditedCodeId int64
-	auditLogger.On("Log", mock.Anything, audit.AuditAuthCodeReuseDetected, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventAuthCodeReuseDetected, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details, _ := args.Get(2).(map[string]interface{})
 			auditedCodeId, _ = details["codeId"].(int64)

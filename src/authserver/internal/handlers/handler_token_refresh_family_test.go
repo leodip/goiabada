@@ -42,7 +42,7 @@ func TestHandleTokenPost_Refresh_Replay_ARecordWrittenWithNothingLiveIsAudited(t
 				Return(nil, nil, &issuance.RefreshTokenReplayedError{FamilyRevokedCount: 0, FamilyRecorded: true}).Once()
 
 			var logged []map[string]interface{}
-			endpoint.auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+			endpoint.auditLogger.On("Log", mock.Anything, audit.EventRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
 				Run(func(args mock.Arguments) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()

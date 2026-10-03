@@ -99,7 +99,7 @@ func expectRenderedLinkExpired(pageRenderer *mocks_handlers.PageRenderer) {
 func expectAuditFailedActivationCode(auditLogger *mocks_handlers.AuditLogger, wantReason string,
 	wantPreRegistrationId int64) {
 
-	auditLogger.On("Log", mock.Anything, audit.AuditFailedAccountActivationCode,
+	auditLogger.On("Log", mock.Anything, audit.EventFailedAccountActivationCode,
 		mock.MatchedBy(func(details map[string]interface{}) bool {
 			if details["reason"] != wantReason || details["ip"] != testClientIP {
 				return false
@@ -445,10 +445,10 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		}).Return(createdUser, nil).Once()
 
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
-		auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
-		auditLogger.On("Log", mock.Anything, audit.AuditActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
 		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
@@ -614,7 +614,7 @@ func TestRefuseActivationLink_AuditPayload(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		expectRenderedLinkExpired(pageRenderer)
 		var captured map[string]interface{}
-		auditLogger.On("Log", mock.Anything, audit.AuditFailedAccountActivationCode, mock.Anything).
+		auditLogger.On("Log", mock.Anything, audit.EventFailedAccountActivationCode, mock.Anything).
 			Run(func(args mock.Arguments) {
 				captured = args.Get(2).(map[string]interface{})
 			}).Return().Once()

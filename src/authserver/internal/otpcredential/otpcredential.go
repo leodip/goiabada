@@ -13,9 +13,9 @@
 //
 // **The audit call stays at the caller**, as revocation requires of its own callers and for the
 // same reason: the three verification sites raise deliberately different event sets. The browser
-// raises AuditAuthFailedOtp on a wrong code and AuditAuthSuccessOtp on a good one; the account
+// raises EventAuthFailedOtp on a wrong code and EventAuthSuccessOtp on a good one; the account
 // API raises neither, because enabling an authenticator is not an authentication ceremony; all
-// three raise AuditOTPCodeReplayDetected. That is what VerifyResult reports an outcome for
+// three raise EventOTPCodeReplayDetected. That is what VerifyResult reports an outcome for
 // instead of deciding anything itself.
 //
 // Deliberately outside it, both from decision 4. The account API's pending-enrolment mint, its

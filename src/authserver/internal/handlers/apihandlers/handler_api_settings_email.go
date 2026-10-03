@@ -86,7 +86,7 @@ func HandleAPISettingsEmailPut(
 				return
 			}
 
-			auditLogger.Log(r.Context(), audit.AuditUpdatedSMTPSettings, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUpdatedSMTPSettings, map[string]interface{}{
 				"loggedInUser": callerSubject(r),
 			})
 
@@ -209,7 +209,7 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.AuditUpdatedSMTPSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedSMTPSettings, map[string]interface{}{
 			"loggedInUser": callerSubject(r),
 		})
 
@@ -270,7 +270,7 @@ func HandleAPISettingsEmailSendTestPost(
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.AuditSentTestEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventSentTestEmail, map[string]interface{}{
 			"loggedInUser": callerSubject(r),
 			"to":           req.To,
 		})
