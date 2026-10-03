@@ -45,7 +45,7 @@ func HandleIndexGet(
 		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 			isAuthenticated = authHelper.IsAuthenticated(jwtInfo)
 			if isAuthenticated {
-				loggedInUser = jwtInfo.IdToken.GetStringClaim("email")
+				loggedInUser = jwtInfo.IdToken.StringClaim("email")
 				logoutLink = "/auth/logout"
 			}
 		}

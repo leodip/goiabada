@@ -39,7 +39,7 @@ func HandleAPIAccountProfilePicturePost(
 			return
 		}
 
-		sub := jwtToken.GetStringClaim("sub")
+		sub := jwtToken.StringClaim("sub")
 		if len(sub) == 0 {
 			writeJSONError(w, "Invalid token", "INVALID_TOKEN", http.StatusUnauthorized)
 			return
@@ -122,7 +122,7 @@ func HandleAPIAccountProfilePictureDelete(
 			return
 		}
 
-		sub := jwtToken.GetStringClaim("sub")
+		sub := jwtToken.StringClaim("sub")
 		if len(sub) == 0 {
 			writeJSONError(w, "Invalid token", "INVALID_TOKEN", http.StatusUnauthorized)
 			return
@@ -171,7 +171,7 @@ func HandleAPIAccountProfilePictureGet(
 			return
 		}
 
-		sub := jwtToken.GetStringClaim("sub")
+		sub := jwtToken.StringClaim("sub")
 		if len(sub) == 0 {
 			writeJSONError(w, "Invalid token", "INVALID_TOKEN", http.StatusUnauthorized)
 			return

@@ -101,7 +101,7 @@ func (m *MiddlewareBearerToken) RequireUserBoundToken() func(http.Handler) http.
 
 			if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime {
 				slog.WarnContext(r.Context(), "rejecting bearer token on a user-context endpoint: no auth_time claim, so the token was not issued for a user",
-					"sub", jwtToken.GetStringClaim("sub"))
+					"sub", jwtToken.StringClaim("sub"))
 				// RFC 6750 §3.1 defines only invalid_request, invalid_token and
 				// insufficient_scope, none of which means "wrong token type". forbidden
 				// maps every bearer 403 to insufficient_scope, which keeps the
@@ -155,7 +155,7 @@ type apiAuthDatabase interface {
 // A token with no generation claim at all reads as generation 0, which is what keeps access
 // tokens issued before this feature shipped working until their user's generation first
 // advances (#106 decision 15). Presence is tested against the raw claim map rather than
-// through GetIntClaim, because that accessor cannot distinguish absent from malformed and
+// through IntClaim, because that accessor cannot distinguish absent from malformed and
 // conflating the two would reject every legacy token.
 //
 // Tokens with no `auth_time` claim pass through untouched: that is the client_credentials
@@ -184,7 +184,7 @@ func (m *MiddlewareBearerToken) RequireValidSession(database apiAuthDatabase) fu
 				return
 			}
 
-			sub := strings.TrimSpace(jwtToken.GetStringClaim("sub"))
+			sub := strings.TrimSpace(jwtToken.StringClaim("sub"))
 			if sub == "" {
 				slog.WarnContext(r.Context(), "rejecting bearer token: user token has no sub claim")
 				m.refusals.invalidToken(w, r, "Invalid token subject")
@@ -208,7 +208,7 @@ func (m *MiddlewareBearerToken) RequireValidSession(database apiAuthDatabase) fu
 				return
 			}
 
-			sid := jwtToken.GetStringClaim("sid")
+			sid := jwtToken.StringClaim("sid")
 			if sid == "" {
 				// Offline grant or ROPC: no session to defer to, so the token's own
 				// generation claim decides. A malformed claim is rejected on !wellFormed, before
@@ -293,7 +293,7 @@ func (m *MiddlewareBearerToken) RequireValidSession(database apiAuthDatabase) fu
 //
 // An ABSENT claim is generation 0, and valid. That is what keeps access tokens issued before
 // this feature shipped working until their user's generation first advances (#106 decision
-// 15). Presence is tested against the raw claim map because GetIntClaim reports only whether
+// 15). Presence is tested against the raw claim map because IntClaim reports only whether
 // a PRESENT claim parsed, so it returns (0, false) for both absent and malformed; conflating
 // them would reject every legacy token.
 //
@@ -306,5 +306,5 @@ func tokenGeneration(jwtToken oauth.JwtToken) (int64, bool) {
 	if _, present := jwtToken.Claims["auth_state_generation"]; !present {
 		return 0, true
 	}
-	return jwtToken.GetIntClaim("auth_state_generation")
+	return jwtToken.IntClaim("auth_state_generation")
 }

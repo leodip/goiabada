@@ -39,5 +39,5 @@ func localeClaimFromJwt(ctx context.Context) string {
 	if !ok || jwtInfo.IdToken == nil {
 		return ""
 	}
-	return strings.TrimSpace(jwtInfo.IdToken.GetStringClaim("locale"))
+	return strings.TrimSpace(jwtInfo.IdToken.StringClaim("locale"))
 }

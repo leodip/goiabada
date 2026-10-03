@@ -35,7 +35,7 @@ func HandleAPIAccountAddressPut(
 			return
 		}
 
-		subject := jwtToken.GetStringClaim("sub")
+		subject := jwtToken.StringClaim("sub")
 		if strings.TrimSpace(subject) == "" {
 			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return

@@ -43,7 +43,7 @@ func HandleAPIAccountPasswordPut(
 			return
 		}
 
-		subject := jwtToken.GetStringClaim("sub")
+		subject := jwtToken.StringClaim("sub")
 		if strings.TrimSpace(subject) == "" {
 			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
@@ -116,7 +116,7 @@ func HandleAPIAccountPasswordPut(
 		// offline or ROPC access token. That is correct rather than a gap: such a token proves
 		// no live session to preserve, so the change revokes everything, which is the
 		// conservative direction.
-		exceptSid := strings.TrimSpace(jwtToken.GetStringClaim("sid"))
+		exceptSid := strings.TrimSpace(jwtToken.StringClaim("sid"))
 
 		// Narrow write, not a full-row UpdateUser: the user model was loaded before the
 		// password was validated, so writing every column back would undo a concurrent admin

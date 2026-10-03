@@ -661,7 +661,7 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	subject := strings.TrimSpace(token.GetStringClaim("sub"))
+	subject := strings.TrimSpace(token.StringClaim("sub"))
 	if subject == "" {
 		return "", false
 	}

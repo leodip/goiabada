@@ -49,7 +49,7 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	// say which kind of token this is: access and refresh tokens are signed with the same key and
 	// carry iss and sub too. The typ denylist is the one logout applies; a refused kind is
 	// answered as a hint that does not parse, so the answer says nothing about which it was (#401).
-	if err != nil || nonIdTokenTypValues[jwtToken.GetStringClaim("typ")] {
+	if err != nil || nonIdTokenTypValues[jwtToken.StringClaim("typ")] {
 		return "", oauth.NewErrorDetailWithHTTPStatus(
 			"invalid_request",
 			"The id_token_hint is invalid.",

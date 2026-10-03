@@ -208,7 +208,7 @@ func bearerTokenFromForm(r *http.Request) (token string, present bool, repeated 
 // A refused token is answered exactly as a token that does not parse, which is what #401 asks for:
 // 401 invalid_token since #435, where both used to read as a missing token.
 func isAccessTokenForAuthServer(ctx context.Context, token *oauth.JwtToken) bool {
-	if typ := token.GetStringClaim("typ"); typ != issuance.TokenTypeBearer.String() {
+	if typ := token.StringClaim("typ"); typ != issuance.TokenTypeBearer.String() {
 		slog.WarnContext(ctx, "rejecting bearer token: not an access token", "typ", typ)
 		return false
 	}

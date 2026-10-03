@@ -729,7 +729,7 @@ const (
 )
 
 // hintedClaims is the claim set of a hint that validates. Every numeric claim is a float64 because
-// claims arrive through encoding/json inside jwt.MapClaims, and GetIntClaim refuses anything else, so
+// claims arrive through encoding/json inside jwt.MapClaims, and IntClaim refuses anything else, so
 // writing them as int would make the fixture unlike any real token.
 func hintedClaims() map[string]interface{} {
 	now := time.Now().UTC()
@@ -1934,7 +1934,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Claims arrive through encoding/json inside jwt.MapClaims, so every numeric claim is a float64.
-	// Writing these as int would make GetIntClaim reject values a real token presents perfectly well,
+	// Writing these as int would make IntClaim reject values a real token presents perfectly well,
 	// and the table would then pass for the wrong reason on every numeric gate.
 	confirmedClaims := func() map[string]interface{} {
 		return map[string]interface{}{
@@ -2162,7 +2162,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		},
 		{
 			// An ID Token this server issues has exactly one audience, so an array is not a hint
-			// shape and GetStringClaim reads it as absent. Pinned because the array form is what a
+			// shape and StringClaim reads it as absent. Pinned because the array form is what a
 			// multi-audience access token carries.
 			name: "aud arrived as an array", gate: "aud",
 			mutate: func(claims map[string]interface{}) {

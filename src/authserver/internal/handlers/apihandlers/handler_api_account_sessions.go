@@ -43,7 +43,7 @@ func HandleAPIAccountSessionsGet(
 			return
 		}
 
-		subject := jwtToken.GetStringClaim("sub")
+		subject := jwtToken.StringClaim("sub")
 		if subject == "" {
 			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
@@ -81,7 +81,7 @@ func HandleAPIAccountSessionsGet(
 
 		// This endpoint is the one that always had isCurrent; the two admin ones now read the
 		// same claim through the same mapper (#373 decision 1).
-		currentSid := jwtToken.GetStringClaim("sid")
+		currentSid := jwtToken.StringClaim("sid")
 
 		sessions, err := buildSessionDetails(r.Context(), database, userSessions, settings, currentSid)
 		if err != nil {
@@ -108,7 +108,7 @@ func HandleAPIAccountSessionDelete(
 			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
 			return
 		}
-		subject := jwtToken.GetStringClaim("sub")
+		subject := jwtToken.StringClaim("sub")
 		if subject == "" {
 			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return

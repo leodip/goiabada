@@ -37,7 +37,7 @@ func HandleAPIAccountConsentsGet(
 			return
 		}
 
-		subject := jwtToken.GetStringClaim("sub")
+		subject := jwtToken.StringClaim("sub")
 		if strings.TrimSpace(subject) == "" {
 			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
@@ -80,7 +80,7 @@ func HandleAPIAccountConsentDelete(
 			writeJSONError(w, "Access token required", "ACCESS_TOKEN_REQUIRED", http.StatusUnauthorized)
 			return
 		}
-		subject := jwtToken.GetStringClaim("sub")
+		subject := jwtToken.StringClaim("sub")
 		if strings.TrimSpace(subject) == "" {
 			writeJSONError(w, "Invalid token subject", "INVALID_SUBJECT", http.StatusUnauthorized)
 			return
