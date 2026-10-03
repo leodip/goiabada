@@ -35,7 +35,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -120,14 +120,14 @@ func findUnboundedIdLists(root string) ([]unboundedIdList, int, error) {
 
 // TestIdListsAreBoundedByOneStatement holds the real tree to the rule.
 func TestIdListsAreBoundedByOneStatement(t *testing.T) {
-	assertIdListsAreBounded(t, filepath.Join(testutil.SourceRoot(t), "authserver", "internal", "data", "commondb"))
+	assertIdListsAreBounded(t, filepath.Join(guard.SourceRoot(t), "authserver", "internal", "data", "commondb"))
 }
 
 // assertIdListsAreBounded is the reporting half, taking the root as a parameter and failing
-// through a testutil.Reporter so a rule test can drive it against a fixture tree. Without that
+// through a guard.Reporter so a rule test can drive it against a fixture tree. Without that
 // seam these lines are reached only by the call above, which walks a tree that is clean, so a
 // defect in them disables the guard with nothing going red.
-func assertIdListsAreBounded(r testutil.Reporter, root string) {
+func assertIdListsAreBounded(r guard.Reporter, root string) {
 	r.Helper()
 
 	findings, builders, err := findUnboundedIdLists(root)
@@ -223,7 +223,7 @@ func TestIdListsAreBounded_TheGuardFailsOnAnUnboundedLookup(t *testing.T) {
 		"\tsb.In(\"id\", ids)\n"+
 		"}\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertIdListsAreBounded(r, root)
 	})
 
@@ -248,7 +248,7 @@ func TestIdListsAreBounded_TheGuardPassesABatchedLookup(t *testing.T) {
 		"\t})\n"+
 		"}\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertIdListsAreBounded(r, root)
 	})
 
@@ -259,7 +259,7 @@ func TestIdListsAreBounded_TheGuardPassesABatchedLookup(t *testing.T) {
 // comment names. A root holding no IN list reports nothing, which is indistinguishable from a
 // package whose every lookup is batched.
 func TestIdListsAreBounded_TheGuardIsFatalOnAWalkThatFoundNoInList(t *testing.T) {
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertIdListsAreBounded(r, t.TempDir())
 	})
 

@@ -392,7 +392,7 @@ jobs:
           exit $rc
 
   # No services: TestSendEmail left with core/communication in #346, and it was
-  # the only test here that reached one -- no mailpit helper in core/testutil
+  # the only test here that reached one -- no mailpit helper in core/guard
   # has a caller inside core any more.
   unit-core:
     name: Unit / core

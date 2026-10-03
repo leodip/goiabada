@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // TestDatabase_NoSelfCallToAnOverriddenMethod is the structural half of the defect the
@@ -75,7 +75,7 @@ func TestDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	// survives neither, and worse, it never writes the path a move sweeps for, so the sweep
 	// that repointed the other five constants could not have found it. This one was found by
 	// running the tier.
-	root := testutil.SourceRoot(t)
+	root := guard.SourceRoot(t)
 	divergent := map[string][]string{}
 	// All four, not just the two #283 cost. Before #416 sqlitedb and mysqldb declared every
 	// method, so "declares it" said nothing about them and the guard could only read the two

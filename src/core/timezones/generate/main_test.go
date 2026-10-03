@@ -19,8 +19,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/boundedread"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/internal/pinnedfetch"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // fakeDoer serves canned responses keyed by request URL, so tests never touch
@@ -243,7 +243,7 @@ func TestGenerate(t *testing.T) {
 		if got := readBack(t, out); !reflect.DeepEqual(got, fixtureRows) {
 			t.Errorf("rows read back:\n%v\nwant:\n%v", got, fixtureRows)
 		}
-		testutil.AssertGeneratedSourceTypeChecks(t, "..", "data_generated.go", out)
+		guard.AssertGeneratedSourceTypeChecks(t, "..", "data_generated.go", out)
 	})
 
 	// The old template escaped quotes and backslashes and then %q escaped them

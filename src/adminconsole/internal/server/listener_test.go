@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/hostport/hostporttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ func TestNewHTTPServer_ServesOnEachLoopbackSpelling(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.host, func(t *testing.T) {
 			if test.want.To4() == nil {
-				testutil.SkipWithoutIPv6Loopback(t)
+				hostporttest.SkipWithoutIPv6Loopback(t)
 			}
 
 			srv := newHTTPServer(test.host, 0, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

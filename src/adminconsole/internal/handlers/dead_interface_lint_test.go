@@ -3,12 +3,12 @@ package handlers
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // TestHandlers_NoDeadInterfaces fails the admin console unit tier when any interface declared under
 // internal/handlers has no reference anywhere in this module, production or test.
-// testutil.AssertNoDeadInterfaces carries the rule and the reasoning for each shape it refuses.
+// guard.AssertNoDeadInterfaces carries the rule and the reasoning for each shape it refuses.
 //
 // This is the package the rule was written for. interfaces.go declared fourteen interfaces and nine
 // of them had no consumer at all: ProfileValidator, EmailValidator, EmailSender, AddressValidator,
@@ -27,5 +27,5 @@ import (
 // from outside the module that declares it, and the auth server's half of this guard sits beside
 // its own interfaces.go for the same reason.
 func TestHandlers_NoDeadInterfaces(t *testing.T) {
-	testutil.AssertNoDeadInterfaces(t, "adminconsole/internal/handlers")
+	guard.AssertNoDeadInterfaces(t, "adminconsole/internal/handlers")
 }

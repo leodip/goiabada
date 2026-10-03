@@ -2034,7 +2034,7 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 // TestRateLimiter_EveryTierLogsUnderAConventionalKey holds the one attribute key in this tree
 // that no lint reads. reportTrip appends t.keyField, so the key at that slog call is a field
 // value rather than a string literal, and sloglint's key-naming-case reads literals: it cannot
-// resolve a runtime value, and reportTrip is listed in testutil's slogSpreadSites for exactly this
+// resolve a runtime value, and reportTrip is listed in core/guard's slogSpreadSites for exactly this
 // reason. The key is held here instead, which is the same answer decision 5 gives for a level --
 // what the text cannot decide, a test pins at the site.
 //

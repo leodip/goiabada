@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
-// The three rules below run in both servers and live once, in core/testutil/template_lint.go, which
+// The three rules below run in both servers and live once, in core/guard/template_lint.go, which
 // carries each one's reasoning and the shared walk (#333). What stays here is this module's own
 // evidence for them, the FS they are held against -- templateFS, the //go:embed set this binary
 // renders from -- and TestTemplates_RedirectURIAndWebOriginCellsAreText, which is a rule about two
@@ -16,7 +16,7 @@ import (
 // TestTemplates_NoHTMLInTitle guards the admin_users_* bug: markup in the {{define "title"}} block
 // renders literally in the browser tab.
 func TestTemplates_NoHTMLInTitle(t *testing.T) {
-	testutil.AssertTemplatesNoHTMLInTitle(t, templateFS, "template")
+	guard.AssertTemplatesNoHTMLInTitle(t, templateFS, "template")
 }
 
 // TestTemplates_RedirectURIAndWebOriginCellsAreText guards the issue #105 sink: the
@@ -46,7 +46,7 @@ func TestTemplates_RedirectURIAndWebOriginCellsAreText(t *testing.T) {
 	}
 
 	seen := 0
-	testutil.WalkHTMLTemplates(t, templateFS, "template", func(path, content string) {
+	guard.WalkHTMLTemplates(t, templateFS, "template", func(path, content string) {
 		if !guarded[path] {
 			return
 		}
@@ -73,12 +73,12 @@ func TestTemplates_RedirectURIAndWebOriginCellsAreText(t *testing.T) {
 // of the same deletion is guarded by internal/handlers/csrf_lint_test.go, which draws the same
 // lexical boundary.
 func TestTemplates_NoCsrfField(t *testing.T) {
-	testutil.AssertTemplatesNoCsrfField(t, templateFS, "template")
+	guard.AssertTemplatesNoCsrfField(t, templateFS, "template")
 }
 
 // TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
 // lang attribute from the active locale. This module's email layouts are exempt, being per-locale
 // sibling files.
 func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
-	testutil.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
+	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
 }

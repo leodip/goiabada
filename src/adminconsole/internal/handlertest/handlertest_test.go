@@ -18,8 +18,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // An option not given leaves its value off the request rather than putting an empty one there.
@@ -119,7 +119,7 @@ func TestRequest_WithContentTypeCarriesTheCallersOwnEncoding(t *testing.T) {
 func TestRefuseInternalServerError_SaysNothingWhenTheHandlerDoesNotFault(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 
-	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+	report := guard.Run(func(reporter guard.Reporter) {
 		RefuseInternalServerError(reporter, httpHelper)
 	})
 
@@ -129,7 +129,7 @@ func TestRefuseInternalServerError_SaysNothingWhenTheHandlerDoesNotFault(t *test
 func TestRefuseInternalServerError_NamesTheErrorTheHandlerAnsweredWith(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 
-	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+	report := guard.Run(func(reporter guard.Reporter) {
 		RefuseInternalServerError(reporter, httpHelper)
 		httpHelper.InternalServerError(httptest.NewRecorder(),
 			Request(http.MethodGet, "/admin/users"), errs.New("the api client is unreachable"))
@@ -173,7 +173,7 @@ func TestBind_ReturnsTheMapTheHandlerRenderedWith(t *testing.T) {
 func TestBind_StopsTheTestWhenTheHandlerRenderedNothing(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 
-	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+	report := guard.Run(func(reporter guard.Reporter) {
 		Bind(reporter, httpHelper)
 	})
 
@@ -216,7 +216,7 @@ func TestEncoded_ReturnsTheLastAnswerAsTheBrowserReadsIt(t *testing.T) {
 func TestEncoded_StopsTheTestWhenTheHandlerAnsweredNothing(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 
-	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+	report := guard.Run(func(reporter guard.Reporter) {
 		Encoded(reporter, httpHelper)
 	})
 
@@ -233,7 +233,7 @@ func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
 	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
 		struct{ Ch chan int }{Ch: make(chan int)})
 
-	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+	report := guard.Run(func(reporter guard.Reporter) {
 		Encoded(reporter, httpHelper)
 	})
 
@@ -251,7 +251,7 @@ func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
 
 	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"), nil)
 
-	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+	report := guard.Run(func(reporter guard.Reporter) {
 		Encoded(reporter, httpHelper)
 	})
 
@@ -268,7 +268,7 @@ func TestEncoded_StopsTheTestWhenTheAnswerIsNotAnObject(t *testing.T) {
 	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
 		[]int{1, 2, 3})
 
-	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+	report := guard.Run(func(reporter guard.Reporter) {
 		Encoded(reporter, httpHelper)
 	})
 

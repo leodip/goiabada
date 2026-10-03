@@ -53,7 +53,7 @@ var jsBootstrapKeys = []string{
 
 // addUrlParam is the template function that appends one query parameter to a URL. It is one of two
 // closures of templateFuncMap lifted to a name, because html/template calls a function with no
-// context and its record therefore carries no request_id: testutil's slogPlainSites lists it by
+// context and its record therefore carries no request_id: core/guard's slogPlainSites lists it by
 // this name as the reason a plain slog call stands in a request-path package (#320).
 //
 // convertToString below is the other, and it is why the pair is here rather than in core. It was

@@ -3,13 +3,13 @@ package middleware
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // TestMiddleware_NoCredentialQueryFallback is the kernel's caller of the guard #202 asked for. Its
 // two application twins live at src/adminconsole/internal/handlers/credential_read_lint_test.go and
 // src/authserver/internal/handlers/credential_read_lint_test.go, each with its own name list.
-// testutil.AssertNoCredentialQueryFallback carries the walk, the four accessor shapes it refuses and
+// guard.AssertNoCredentialQueryFallback carries the walk, the four accessor shapes it refuses and
 // the reasoning for each; what stays here is this tree's policy.
 //
 // Why the kernel still needs a caller of its own, now that the read has left: both application
@@ -48,7 +48,7 @@ func TestMiddleware_NoCredentialQueryFallback(t *testing.T) {
 		`"access_token"`,
 	}
 
-	testutil.AssertNoCredentialQueryFallback(t, forbidden,
+	guard.AssertNoCredentialQueryFallback(t, forbidden,
 		"core",
 		"core/middleware")
 }

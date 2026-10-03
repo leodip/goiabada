@@ -57,9 +57,9 @@ note names an issue; the reviewer does the rest.
   place a test reference decides anything is the second half of a `test-support` row.
 - **`test-support` asks a different question from the other six**, and deliberately: not "who names
   it" but "does a binary ship it", which is what `ARCHITECTURE.md`'s package table already says about
-  `core/testutil`. Test support here is written in files with no `_test.go` suffix — that package
+  `core/guard`. Test support here is written in files with no `_test.go` suffix — that package
   and the admin console's `handlertest` among them — so
-  `adminconsole/internal/handlertest/json.go` naming `testutil.Reporter` in a production file is not
+  `adminconsole/internal/handlertest/json.go` naming `guard.Reporter` in a production file is not
   a reason to refuse `Reporter` the word. A reference from a package a binary links is.
 - **A method is not a row.** It rides with its receiver type, which has one. `guard/constants-table`
   treats a method the same way.
@@ -91,7 +91,7 @@ cd src/core && go run ./cmd/ownershipdump
 
 It rewrites the table below and nothing else: the prose above it is the document's own. It writes the
 computed rows, preserves the asserted ones and every note, and refuses — naming each offender — to
-invent a justification for a symbol that has none. `testutil.AssertSymbolOwnership` compares the
+invent a justification for a symbol that has none. `guard.AssertSymbolOwnership` compares the
 result against the tree from all three module unit tiers, and `./run-tests.sh --type lint` runs the
 command itself and fails on a tree it changed.
 
@@ -259,9 +259,36 @@ command itself and fails on a tree it changed.
 | `core/gender` | `IsValid` | contract | The `Gender` type's own bound, and the only statement of which of its values are legal, which is why a caller holding an int asks here rather than comparing against `Other` itself. The admin console names only `Gender`, so the tree justifies the type and not this (#385 decision 17). |
 | `core/gender` | `Male` | reachable | — |
 | `core/gender` | `Other` | own-package | — |
+| `core/guard` | `AssertAgentDocs` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertArchitecture` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertAuditLogContext` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertContextValuesThroughAccessors` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertErrorCodeDoc` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertGeneratedMocksArePinned` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertGeneratedSourceTypeChecks` | test-support | Type-checks a generator's rendered output against its package; named only by the generators' render tests. |
+| `core/guard` | `AssertGofmted` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoAgreementPointers` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoCredentialQueryFallback` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoDeadInterfaces` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoLegacyErrors` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoParentImport` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertRequestPathContext` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertTemplatesNoCsrfField` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertTemplatesNoHTMLInTitle` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `ContextValueExemption` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `Report` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `Reporter` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `Run` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `SourceRoot` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `WalkHTMLTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/hashutil` | `HashString` | both-apps | — |
 | `core/hostport` | `Join` | both-apps | — |
 | `core/hostport` | `Unbracket` | own-package | — |
+| `core/hostport/hostporttest` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/hostport/hostporttest` names it in production. |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressLine1TooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
@@ -433,33 +460,6 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
 | `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
-| `core/testutil` | `AssertAgentDocs` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertArchitecture` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertAuditLogContext` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertContextValuesThroughAccessors` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertErrorCodeDoc` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertGeneratedMocksArePinned` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertGeneratedSourceTypeChecks` | test-support | Type-checks a generator's rendered output against its package; named only by the generators' render tests. |
-| `core/testutil` | `AssertGofmted` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertNoAgreementPointers` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertNoCredentialQueryFallback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertNoDeadInterfaces` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertNoLegacyErrors` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertNoParentImport` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertRequestPathContext` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertTemplatesNoCsrfField` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertTemplatesNoHTMLInTitle` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `ContextValueExemption` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `GuardReport` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `Reporter` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `RunGuard` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `SourceRoot` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `WalkHTMLTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/timezones` | `All` | contract | The list half of the time zone table whose lookup the auth server validates against. Moving it would put one zone table in two places. |
 | `core/timezones` | `ByZone` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
 | `core/timezones` | `Zone` | contract | The row type both halves of the table share. |

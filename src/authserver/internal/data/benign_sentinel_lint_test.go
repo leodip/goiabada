@@ -32,7 +32,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -164,14 +164,14 @@ func benignSentinelName(arg ast.Expr) (string, bool) {
 
 // TestNoErrorsIsOnABenignMigratorSentinel holds the real tree to the rule.
 func TestNoErrorsIsOnABenignMigratorSentinel(t *testing.T) {
-	assertNoErrorsIsOnBenignSentinels(t, testutil.SourceRoot(t))
+	assertNoErrorsIsOnBenignSentinels(t, guard.SourceRoot(t))
 }
 
 // assertNoErrorsIsOnBenignSentinels is the reporting half, taking the root as a parameter and
-// failing through a testutil.Reporter so a rule test can drive it against a fixture tree. Without
+// failing through a guard.Reporter so a rule test can drive it against a fixture tree. Without
 // that seam these lines are reached only by the call above, which walks a tree that has been clean
 // since #268.
-func assertNoErrorsIsOnBenignSentinels(r testutil.Reporter, root string) {
+func assertNoErrorsIsOnBenignSentinels(r guard.Reporter, root string) {
 	r.Helper()
 
 	found, files, err := findErrorsIsOnBenignSentinels(root)
@@ -370,7 +370,7 @@ func migrate(m *migrator.Migrator) error {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoErrorsIsOnBenignSentinels(r, root)
 	})
 
@@ -398,7 +398,7 @@ func migrate(m *migrator.Migrator) error {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoErrorsIsOnBenignSentinels(r, root)
 	})
 
@@ -407,7 +407,7 @@ func migrate(m *migrator.Migrator) error {
 
 // TestNoErrorsIsOnABenignMigratorSentinel_TheGuardIsFatalOnAnEmptyWalk pins the seam.
 func TestNoErrorsIsOnABenignMigratorSentinel_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoErrorsIsOnBenignSentinels(r, t.TempDir())
 	})
 

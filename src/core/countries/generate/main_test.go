@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // fakeDoer serves canned responses keyed by request URL, so tests never touch
@@ -275,7 +275,7 @@ func TestRender(t *testing.T) {
 		}
 	}
 
-	testutil.AssertGeneratedSourceTypeChecks(t, "..", "data_generated.go", out)
+	guard.AssertGeneratedSourceTypeChecks(t, "..", "data_generated.go", out)
 }
 
 // fixtureCSV is what the fake serves at a pin's URL; fixturePin is a pin whose

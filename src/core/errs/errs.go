@@ -4,7 +4,7 @@
 //
 //  1. Construct through this package. New, Errorf, Wrap, Wrapf, WithStack and Join are the whole
 //     surface; stdlib errors.New and fmt.Errorf are refused in production code by
-//     testutil.AssertNoLegacyErrors, except for a package-level sentinel, which must stay plain
+//     guard.AssertNoLegacyErrors, except for a package-level sentinel, which must stay plain
 //     because a stack captured at init would masquerade as the origin of every error wrapping it.
 //  2. Match with errors.Is and errors.As. Every value built here unwraps, so a sentinel and a
 //     typed error stay reachable however many layers wrapped them. A bare type assertion does not

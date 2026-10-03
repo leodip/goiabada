@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Seam 6. The client against an httptest.Server that answers the three endpoints the way Mailpit
 // does, so every failure path the dev container's Mailpit never takes is reached here, and
-// AssertEmailSent's is driven under testutil.RunGuard, which reproduces what Fatalf means (#431).
+// AssertEmailSent's is driven under guard.Run, which reproduces what Fatalf means (#431).
 
 // fakeMailpit serves a fixed set of messages and records what it was asked for.
 type fakeMailpit struct {
@@ -118,7 +118,7 @@ func TestAssertEmailSent_Match(t *testing.T) {
 	client := f.start(t)
 
 	var got Message
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		got = client.AssertEmailSent(r, "rcpt@example.com", "the text")
 	})
 
@@ -139,7 +139,7 @@ func TestAssertEmailSent_TextBodyMatches(t *testing.T) {
 	client := f.start(t)
 
 	var got Message
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		got = client.AssertEmailSent(r, "rcpt@example.com", "the text")
 	})
 
@@ -152,7 +152,7 @@ func TestAssertEmailSent_RecipientMismatch(t *testing.T) {
 	client := f.start(t)
 
 	reachedEnd := false
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		client.AssertEmailSent(r, "rcpt@example.com", "the text")
 		reachedEnd = true
 	})
@@ -172,7 +172,7 @@ func TestAssertEmailSent_BodyMismatch(t *testing.T) {
 	}}
 	client := f.start(t)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		client.AssertEmailSent(r, "rcpt@example.com", "the text")
 	})
 
@@ -191,7 +191,7 @@ func TestClient_NonSuccessStatus(t *testing.T) {
 	assert.Contains(t, err.Error(), "unable to list the messages Mailpit holds")
 	assert.Contains(t, err.Error(), "503 Service Unavailable")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		client.AssertEmailSent(r, "rcpt@example.com", "the text")
 	})
 	assert.True(t, report.Stopped)
@@ -219,7 +219,7 @@ func TestClient_MalformedJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "unable to read message m from Mailpit")
 	assert.Contains(t, err.Error(), "unable to decode the answer from")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		client.AssertEmailSent(r, "rcpt@example.com", "x")
 	})
 	assert.True(t, report.Stopped, "a message that cannot be read is fatal, not skipped")
@@ -234,7 +234,7 @@ func TestAssertEmailSent_FailedDeleteIsReported(t *testing.T) {
 	client := f.start(t)
 
 	var got Message
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		got = client.AssertEmailSent(r, "rcpt@example.com", "the text")
 	})
 

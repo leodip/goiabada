@@ -18,7 +18,7 @@ import (
 )
 
 // The justifications a row of ARCHITECTURE.md's core constants table may carry, strongest first,
-// which core/testutil's constants guard checks. A row states the strongest claim the tree backs,
+// which core/guard's constants guard checks. A row states the strongest claim the tree backs,
 // which is what keeps contract honest: it is reachable only when none of the other three holds, so
 // writing it is a claim a reviewer can argue with rather than a shrug.
 const (
@@ -78,9 +78,9 @@ const (
 	// "A binary links it" rather than "a production file names it", which is how the other six are
 	// read, because this is the one word that is about being compiled into nothing rather than
 	// about who the consumer is. Test support in this tree is written in files without the
-	// _test.go suffix -- core/testutil itself, and the admin console's handlertest -- so a plain
+	// _test.go suffix -- core/guard itself, and the admin console's handlertest -- so a plain
 	// production reading has adminconsole/internal/handlertest/json.go contradicting
-	// a test-support row for testutil.Reporter, which is the harness every rule test in the
+	// a test-support row for guard.Reporter, which is the harness every rule test in the
 	// repository drives a guard through.
 	justificationTestSupport = "test-support"
 )
@@ -204,7 +204,7 @@ type OwnershipCheck struct {
 // CheckOwnership holds src/core/OWNERSHIP.md to the tree at root, in both directions: every
 // exported symbol a core package declares has exactly one row, every row names a symbol that still
 // exists, and every row states the strongest justification the reference graph backs. It is the
-// finder behind core/testutil.AssertSymbolOwnership, and it reads the tree with the same census
+// finder behind core/guard.AssertSymbolOwnership, and it reads the tree with the same census
 // RenderSymbolOwnership writes from.
 func CheckOwnership(root string) (OwnershipCheck, error) {
 	doc, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(ownershipDoc)))
@@ -562,7 +562,7 @@ func (c *symbolCensus) spread(dir string, pkg *packageSymbols, names map[string]
 // then every production and test reference to them from anywhere in the tree.
 //
 // ceiling: a reference from outside the declaring package is a selector on the identifier the
-// import binds, resolved by name within the file, exactly as core/testutil's constants census reads
+// import binds, resolved by name within the file, exactly as core/guard's constants census reads
 // one. A package-level declaration shadowing that name is caught, because the parser resolves it; a local
 // variable inside a function shadowing it would be read as the package. Nothing in this tree does
 // that, and closing it means type-checking every package in four modules rather than parsing them.
@@ -571,7 +571,7 @@ func (c *symbolCensus) spread(dir string, pkg *packageSymbols, names map[string]
 // References from inside the declaring package are not read that way, because there they carry no
 // selector and an unqualified identifier matched by spelling is the over-count that matters: a
 // local, a parameter, a struct field, a struct-literal key or a label sharing an exported symbol's
-// name would justify it, and this tree already has that shape -- core/testutil declares a type
+// name would justify it, and this tree already has that shape -- core/guard declares a type
 // Address and a field named Address. Those are resolved with go/types over each package's own
 // syntax instead, production files and internal test files alike, so an identifier counts only
 // when it resolves to the declared object.
@@ -1250,7 +1250,7 @@ func (c *symbolCensus) recordSelectors(dir string, isTest bool, byImportPath map
 // imports reach transitively.
 //
 // Only a test-support row reads this, and it is what lets the word mean what ARCHITECTURE.md's
-// package table already says about core/testutil -- "test support compiled into no binary". Test
+// package table already says about core/guard -- "test support compiled into no binary". Test
 // support in this tree is written in files with no _test.go suffix, so "a production file names it" and "a binary ships it" are genuinely different questions, and
 // only the second one is the one test-support asks.
 func linkedPackages(root string, graph *ImportGraph) (map[string]bool, error) {

@@ -434,7 +434,7 @@ func guardReachesClassifier(body *ast.BlockStmt) bool {
 // today, so the walk above would pass whether or not the rule could see them.
 //
 // The brackets matter because they are free to add and silent to the reader. The constructor lint
-// in core/testutil lost exactly this bypass twice -- rounds 2 and 3 of #279's final review -- once
+// in core/guard lost exactly this bypass twice -- rounds 2 and 3 of #279's final review -- once
 // on the callee and once on the value, so the third report of it is a rule rather than a
 // coincidence.
 func TestHandlers_BlindCatchRuleTable(t *testing.T) {

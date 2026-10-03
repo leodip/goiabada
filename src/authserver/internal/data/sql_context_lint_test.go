@@ -38,7 +38,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -148,14 +148,14 @@ func withinLintScope(rel, scope string) bool {
 
 // TestSQLCallsTakeAContext holds the real tree to both rules.
 func TestSQLCallsTakeAContext(t *testing.T) {
-	assertSQLCallsTakeAContext(t, testutil.SourceRoot(t))
+	assertSQLCallsTakeAContext(t, guard.SourceRoot(t))
 }
 
 // assertSQLCallsTakeAContext is the reporting half, taking the root as a parameter and failing
-// through a testutil.Reporter so a rule test can drive it against a fixture tree. Without that
+// through a guard.Reporter so a rule test can drive it against a fixture tree. Without that
 // seam these lines are reached only by the call above, which walks a tree #386 left clean, so a
 // defect in them disables the guard with nothing going red.
-func assertSQLCallsTakeAContext(r testutil.Reporter, root string) {
+func assertSQLCallsTakeAContext(r guard.Reporter, root string) {
 	r.Helper()
 
 	found, files, err := findSQLContextViolations(root)
@@ -304,7 +304,7 @@ func ddl(db *sql.DB) error {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertSQLCallsTakeAContext(r, root)
 	})
 
@@ -341,7 +341,7 @@ func startup(db *sql.DB) error {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertSQLCallsTakeAContext(r, root)
 	})
 
@@ -352,7 +352,7 @@ func startup(db *sql.DB) error {
 // guard names. A root holding no Go file under either scope reports nothing, which is
 // indistinguishable from a tree whose every database call takes a context.
 func TestSQLCallsTakeAContext_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertSQLCallsTakeAContext(r, t.TempDir())
 	})
 

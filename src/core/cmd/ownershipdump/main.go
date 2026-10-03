@@ -15,8 +15,8 @@
 // exists to ask.
 //
 // The census it writes from is refgraph.RenderSymbolOwnership, which is the census
-// testutil.AssertSymbolOwnership checks with. There is one implementation of it on purpose, and it
-// lives in core/internal/refgraph rather than core/testutil so that this binary links neither
+// guard.AssertSymbolOwnership checks with. There is one implementation of it on purpose, and it
+// lives in core/internal/refgraph rather than core/guard so that this binary links neither
 // testing nor testify (#431).
 package main
 

@@ -1,10 +1,10 @@
 package refgraph
 
 // Seam 1: the fifth table, src/core/OWNERSHIP.md, over fixture trees written into a temp directory
-// and read through the same census core/testutil.AssertSymbolOwnership and ownershipdump use. The
-// guard's reporting half is tested beside it, in core/testutil/symbol_ownership_rules_test.go.
+// and read through the same census core/guard.AssertSymbolOwnership and ownershipdump use. The
+// guard's reporting half is tested beside it, in core/guard/symbol_ownership_rules_test.go.
 //
-// The synthetic half exists for the reason core/testutil/architecture_rules_test.go sets out, and
+// The synthetic half exists for the reason core/guard/architecture_rules_test.go sets out, and
 // this rule needs it more than any of the other seven. The table was generated from the tree, so the real tree
 // satisfies it by construction and a passing run against it proves only that nothing crashed. Every
 // direction the rule refuses therefore gets a fixture that must be caught, and every deliberate
@@ -732,7 +732,7 @@ var (
 // ---- a name is not a reference ---------------------------------------------------------------
 
 // TestSymbolOwnership_ASameSpelledNameIsNotAReference is why the own-package arm resolves objects
-// rather than matching spellings. This tree already has the shape: core/testutil declares a type
+// rather than matching spellings. This tree already has the shape: core/guard declares a type
 // Address and a field named Address, and addr.Address matches the type's spelling without
 // referring to it.
 func TestSymbolOwnership_ASameSpelledNameIsNotAReference(t *testing.T) {
@@ -1737,7 +1737,7 @@ func TestNothingNamesUnused(t *testing.T) {
 
 // TestSymbolOwnership_AnInternalTestNamingASymbolIsEvidence is that rule's leniency: the arm still
 // has to see a real unqualified reference from the declaring package's own test, which is how
-// core/testutil earns the word at all.
+// core/guard earns the word at all.
 func TestSymbolOwnership_AnInternalTestNamingASymbolIsEvidence(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{
 		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",

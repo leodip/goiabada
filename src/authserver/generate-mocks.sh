@@ -35,7 +35,7 @@ SRC_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 # change that regenerated mocks for its own reasons collected sixteen files of
 # unrelated churn, and the drift was discovered by whoever happened to regenerate
 # rather than by anything that checks. It is now checked in three places -- here,
-# every module's unit tier through testutil.AssertGeneratedMocksArePinned, and the
+# every module's unit tier through guard.AssertGeneratedMocksArePinned, and the
 # Lint job in .github/workflows/check.yml, which runs this script and fails on a
 # dirty tree.
 echo ""

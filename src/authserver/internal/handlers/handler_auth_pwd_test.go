@@ -596,7 +596,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// A handler closure is one of the four call shapes #328 has to reach, and this is that
 		// shape pinned: the context has to be the request's, not one the handler reached for.
 		// The other 122 handler sites are held by the compiler, which requires a context, and by
-		// testutil.AssertAuditLogContext, which refuses a Background one here.
+		// guard.AssertAuditLogContext, which refuses a Background one here.
 		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
 			return chimiddleware.GetReqID(ctx) == "goiabada/req-pwd-1"
 		}), audit.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {

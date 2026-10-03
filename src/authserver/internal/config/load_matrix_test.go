@@ -823,7 +823,7 @@ var (
 // row fails, and so does a row for one that is gone: without it the matrix locks whatever it
 // happened to be written against, and a setting added later is simply not covered.
 //
-// It is a plain test reading one file in its own package rather than a core/testutil guard,
+// It is a plain test reading one file in its own package rather than a guard in core/guard,
 // which is the shape for a walk over the whole tree; this one never leaves the directory.
 func TestConfigSource_EveryVariableAndFlagHasARow(t *testing.T) {
 	source, err := os.ReadFile("config.go")

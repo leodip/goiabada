@@ -4,7 +4,7 @@
 // It takes its base URL from the caller rather than hard-coding the dev container's, and every
 // request is bounded by the client's timeout, so a Mailpit that stops answering fails the test that
 // asked instead of hanging the tier. The query methods return errors; AssertEmailSent fails through
-// testutil.Reporter rather than testify, so its failure paths are driven under testutil.RunGuard
+// guard.Reporter rather than testify, so its failure paths are driven under guard.Run
 // the way the guards' are (#431). No binary imports it.
 package mailpit
 
@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // defaultTimeout bounds each request New's client makes, connect through the last body byte.
@@ -122,7 +122,7 @@ func (c *Client) Delete(id string) error {
 // A miss is fatal rather than an error: the message is returned, and a caller continuing past a
 // miss would assert on a zero value and report a second, misleading failure about its headers. A
 // delete that fails is an error, since the message was found but the next test would read it too.
-func (c *Client) AssertEmailSent(r testutil.Reporter, to string, containing string) Message {
+func (c *Client) AssertEmailSent(r guard.Reporter, to string, containing string) Message {
 	r.Helper()
 
 	summaries, err := c.List()

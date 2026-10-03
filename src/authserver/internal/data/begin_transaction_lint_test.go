@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,14 +101,14 @@ func findBareBeginTransactionCalls(root string, exempt map[string]bool) ([]bareB
 
 // TestNoBareBeginTransaction holds the real tree to the rule.
 func TestNoBareBeginTransaction(t *testing.T) {
-	assertNoBareBeginTransaction(t, testutil.SourceRoot(t), runInTransactionOwners)
+	assertNoBareBeginTransaction(t, guard.SourceRoot(t), runInTransactionOwners)
 }
 
 // assertNoBareBeginTransaction is the reporting half, taking the root as a parameter and failing
-// through a testutil.Reporter so a rule test can drive it against a fixture tree. Without that
+// through a guard.Reporter so a rule test can drive it against a fixture tree. Without that
 // seam these lines are reached only by the call above, which walks a tree that has been clean
 // since #301, so a defect in them disables the guard with nothing going red.
-func assertNoBareBeginTransaction(r testutil.Reporter, root string, exempt map[string]bool) {
+func assertNoBareBeginTransaction(r guard.Reporter, root string, exempt map[string]bool) {
 	r.Helper()
 
 	calls, files, err := findBareBeginTransactionCalls(root, exempt)
@@ -249,7 +249,7 @@ func owner(d db) error {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoBareBeginTransaction(r, root, runInTransactionOwners)
 	})
 
@@ -277,7 +277,7 @@ func owner(d db) error {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoBareBeginTransaction(r, root, runInTransactionOwners)
 	})
 
@@ -288,7 +288,7 @@ func owner(d db) error {
 // guard names. A root holding no Go file reports nothing, which is indistinguishable from a tree
 // that opens every transaction through the helper.
 func TestNoBareBeginTransaction_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoBareBeginTransaction(r, t.TempDir(), runInTransactionOwners)
 	})
 

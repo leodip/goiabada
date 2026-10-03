@@ -247,7 +247,7 @@ var nonIdTokenTypValues = map[string]bool{
 // A package function rather than a closure in classifyIdTokenHint, which it was until the review
 // of #320: sloglint reads the attribute keys at a call site only for a function it can name, and a
 // closure has no name to give it. It is registered under custom-funcs in .golangci.yml and in
-// slogSpreadSites in core/testutil, which together are what let it spread record below.
+// slogSpreadSites in core/guard, which together are what let it spread record below.
 func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClassification, error) {
 	record := make([]any, 0, len(args)+2)
 	record = append(record, "gate", gate)

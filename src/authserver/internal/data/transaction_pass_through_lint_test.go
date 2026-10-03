@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -233,14 +233,14 @@ func leftmostIdent(expr ast.Expr) string {
 
 // TestNoEscapedTransactions holds the real tree to the rule.
 func TestNoEscapedTransactions(t *testing.T) {
-	assertNoEscapedTransactions(t, testutil.SourceRoot(t))
+	assertNoEscapedTransactions(t, guard.SourceRoot(t))
 }
 
 // assertNoEscapedTransactions is the reporting half, taking the root as a parameter and failing
-// through a testutil.Reporter so a rule test can drive it against a fixture tree. Without that
+// through a guard.Reporter so a rule test can drive it against a fixture tree. Without that
 // seam these lines are reached only by the call above, which walks a tree that is clean, so a
 // defect in them disables the guard with nothing going red.
-func assertNoEscapedTransactions(r testutil.Reporter, root string) {
+func assertNoEscapedTransactions(r guard.Reporter, root string) {
 	r.Helper()
 
 	findings, files, err := findEscapedTransactions(root)
@@ -330,7 +330,7 @@ func (d *PostgresDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, query str
 		{file: "authserver/internal/data/postgresdb/user.go", line: 10, callee: "QuerySQL"},
 	}, findings)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoEscapedTransactions(r, root)
 	})
 	require.True(t, report.Failed(), "a dropped transaction passed the guard")
@@ -419,7 +419,7 @@ func (d *Database) SearchUsersPaginated(tx *sql.Tx, query string) error {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoEscapedTransactions(r, root)
 	})
 
@@ -430,7 +430,7 @@ func (d *Database) SearchUsersPaginated(tx *sql.Tx, query string) error {
 // names. A root holding no data package reports nothing, which is indistinguishable from a tree
 // that hands every transaction on.
 func TestNoEscapedTransactions_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoEscapedTransactions(r, t.TempDir())
 	})
 

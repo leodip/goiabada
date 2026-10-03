@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/hostport/hostporttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -105,7 +105,7 @@ func TestJoin_ListensOnLoopback(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.host, func(t *testing.T) {
 			if test.want.To4() == nil {
-				testutil.SkipWithoutIPv6Loopback(t)
+				hostporttest.SkipWithoutIPv6Loopback(t)
 			}
 
 			ln, err := net.Listen("tcp", Join(test.host, 0))

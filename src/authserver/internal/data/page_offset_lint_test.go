@@ -34,7 +34,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,7 +70,7 @@ type handRolledOffset struct {
 // findHandRolledOffsets walks root for non-test Go files under each of dirs and
 // reports every expression of the shape "(x - 1) * y", which is the page offset
 // written out by hand. An empty dirs walks root itself, the same signature the
-// five core/testutil guards carry.
+// five guards in core/guard carry.
 //
 // Both operands of the multiplication are examined, not just the left one:
 // multiplication commutes, so "pageSize * (page - 1)" is the same offset and
@@ -201,14 +201,14 @@ func identText(e ast.Expr) string {
 
 // TestNoHandRolledPageOffset holds the real tree to the rule.
 func TestNoHandRolledPageOffset(t *testing.T) {
-	assertNoHandRolledPageOffset(t, testutil.SourceRoot(t), pageOffsetRoots, pageOffsetOwner)
+	assertNoHandRolledPageOffset(t, guard.SourceRoot(t), pageOffsetRoots, pageOffsetOwner)
 }
 
 // assertNoHandRolledPageOffset is the reporting half, taking the root and the scope as parameters
-// and failing through a testutil.Reporter so a rule test can drive it against a fixture tree.
+// and failing through a guard.Reporter so a rule test can drive it against a fixture tree.
 // Without that seam these lines are reached only by the call above, which walks a tree that has
 // been clean since #305.
-func assertNoHandRolledPageOffset(r testutil.Reporter, root string, dirs []string, owner string) {
+func assertNoHandRolledPageOffset(r guard.Reporter, root string, dirs []string, owner string) {
 	r.Helper()
 
 	found, files, err := findHandRolledOffsets(root, dirs, owner)
@@ -392,7 +392,7 @@ func window(page, pageSize int) int {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
@@ -421,7 +421,7 @@ func window(page, pageSize int) int {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
@@ -439,7 +439,7 @@ func TestNoHandRolledPageOffset_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	writeLintFixture(t, root, "authserver/internal/data/notes.md", "the queries moved out of here\n")
 	writeLintFixture(t, root, "core/elsewhere/users.go", "package elsewhere\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
@@ -459,7 +459,7 @@ func TestNoHandRolledPageOffset_AScopeThatIsNotThereIsFatalToo(t *testing.T) {
 	root := t.TempDir()
 	writeLintFixture(t, root, "core/elsewhere/users.go", "package elsewhere\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
@@ -470,7 +470,7 @@ func TestNoHandRolledPageOffset_AScopeThatIsNotThereIsFatalToo(t *testing.T) {
 
 // writeLintFixture writes one file into a fixture tree, creating its directories. The three lint
 // guards in this package share it, and each of their reporting halves is driven through
-// testutil.RunGuard against trees it builds.
+// guard.Run against trees it builds.
 func writeLintFixture(t *testing.T, root, rel, src string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))

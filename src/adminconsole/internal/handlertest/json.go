@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // ExpectEncodeJson admits EncodeJson and hands the call back so the caller can bound it. It is the
@@ -34,7 +34,7 @@ func ExpectEncodeJson(httpHelper *mocks_handlers.HttpHelper) *mock.Call {
 //
 // context is an optional printf-style clause appended to the failure, for the table helpers whose
 // rows a bare message could not tell apart.
-func Encoded(reporter testutil.Reporter, httpHelper *mocks_handlers.HttpHelper,
+func Encoded(reporter guard.Reporter, httpHelper *mocks_handlers.HttpHelper,
 	context ...any) map[string]any {
 	reporter.Helper()
 
