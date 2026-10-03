@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"io"
 	"log/slog"
@@ -25,17 +26,16 @@ import (
 // server endpoints it talks to. The same assertions passing on both sides of the move is what
 // makes it a lock on the behaviour rather than a description of it (#351).
 
-// configVar is one live GOIABADA_* setting: its flag if it has one, what loadFrom lands
+// configVar is one live GOIABADA_* setting: its flag if it has one, what Load lands
 // when nothing is set, and what it lands from the environment and from the command line.
 //
-// read takes the landed value through the exported accessor rather than off the package-global
-// cfg. The accessors are what every call site in the tree uses, so a matrix reading cfg
-// directly would keep passing with all of them broken, and would lock nothing a move of this
-// package could break (#351).
+// read takes the landed value off the configuration Load returned, which is what main hands to
+// the server and the server to every handler, so the matrix reads what every consumer reads
+// (#351, #441).
 type configVar struct {
 	env  string // the GOIABADA_* name
 	flag string // the flag name, or "" when the variable has none
-	def  any    // what loadFrom lands with nothing set
+	def  any    // what Load lands with nothing set
 
 	// envValue differs from the default, so no environment case can pass by the default
 	// happening to agree. flagValue differs from envValue, so no flag case can pass by the
@@ -47,11 +47,11 @@ type configVar struct {
 	flagValue string // ignored when flag is ""
 	flagWant  any
 
-	read func() any
+	read func(*Config) any
 }
 
 // strVar is a row whose landed value is the string as supplied.
-func strVar(name, flagName, def, fromEnv, fromFlag string, read func() any) configVar {
+func strVar(name, flagName, def, fromEnv, fromFlag string, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: def,
 		envValue: fromEnv, envWant: fromEnv,
@@ -61,11 +61,11 @@ func strVar(name, flagName, def, fromEnv, fromFlag string, read func() any) conf
 }
 
 // strVarNoFlag is strVar for a variable with no flag of its own.
-func strVarNoFlag(name, def, fromEnv string, read func() any) configVar {
+func strVarNoFlag(name, def, fromEnv string, read func(*Config) any) configVar {
 	return configVar{env: name, def: def, envValue: fromEnv, envWant: fromEnv, read: read}
 }
 
-func intVar(name, flagName string, def, fromEnv, fromFlag int, read func() any) configVar {
+func intVar(name, flagName string, def, fromEnv, fromFlag int, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: def,
 		envValue: strconv.Itoa(fromEnv), envWant: fromEnv,
@@ -74,7 +74,7 @@ func intVar(name, flagName string, def, fromEnv, fromFlag int, read func() any) 
 	}
 }
 
-func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func() any) configVar {
+func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: def,
 		envValue: strconv.FormatBool(fromEnv), envWant: fromEnv,
@@ -85,7 +85,7 @@ func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func() any
 
 // csvVar is a comma-separated row. Its default is a nil []string rather than an empty one,
 // which is what splitCSV answers for an absent value and which reflect.DeepEqual tells apart.
-func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, wantFlag []string, read func() any) configVar {
+func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, wantFlag []string, read func(*Config) any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: []string(nil),
 		envValue: fromEnv, envWant: wantEnv,
@@ -95,70 +95,70 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 }
 
 // configVariables is every live GOIABADA_* variable this process loads: the admin console's own
-// 20 and the 2 auth server endpoints it talks to, of which 17 have a flag. The names loadFrom
+// 20 and the 2 auth server endpoints it talks to, of which 17 have a flag. The names Load
 // mentions that are not live configuration are in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Admin console
 	strVar("GOIABADA_ADMINCONSOLE_BASEURL", "adminconsole-baseurl", "http://localhost:9091",
 		"https://admin.env.example.com", "https://admin.flag.example.com",
-		func() any { return GetAdminConsole().BaseURL }),
+		func(c *Config) any { return c.AdminConsole.BaseURL }),
 	strVar("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "adminconsole-listen-host-https", "0.0.0.0",
 		"10.0.0.1", "10.0.0.2",
-		func() any { return GetAdminConsole().ListenHostHttps }),
+		func(c *Config) any { return c.AdminConsole.ListenHostHttps }),
 	intVar("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", "adminconsole-listen-port-https", 9444,
 		19444, 29444,
-		func() any { return GetAdminConsole().ListenPortHttps }),
+		func(c *Config) any { return c.AdminConsole.ListenPortHttps }),
 	strVar("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "adminconsole-listen-host-http", "0.0.0.0",
 		"10.0.1.1", "10.0.1.2",
-		func() any { return GetAdminConsole().ListenHostHttp }),
+		func(c *Config) any { return c.AdminConsole.ListenHostHttp }),
 	intVar("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", "adminconsole-listen-port-http", 9091,
 		19091, 29091,
-		func() any { return GetAdminConsole().ListenPortHttp }),
+		func(c *Config) any { return c.AdminConsole.ListenPortHttp }),
 	boolVar("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS", "adminconsole-trust-proxy-headers", false,
 		true, false,
-		func() any { return GetAdminConsole().TrustProxyHeaders }),
+		func(c *Config) any { return c.AdminConsole.TrustProxyHeaders }),
 	csvVar("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES", "adminconsole-trusted-proxies",
 		" 10.0.0.0/8 , 172.16.0.0/12 ", []string{"10.0.0.0/8", "172.16.0.0/12"},
 		"192.168.0.1,, ,203.0.113.0/24", []string{"192.168.0.1", "203.0.113.0/24"},
-		func() any { return GetAdminConsole().TrustedProxies }),
+		func(c *Config) any { return c.AdminConsole.TrustedProxies }),
 	boolVar("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", "adminconsole-log-http-requests", false,
 		true, false,
-		func() any { return GetAdminConsole().LogHttpRequests }),
+		func(c *Config) any { return c.AdminConsole.LogHttpRequests }),
 	strVar("GOIABADA_ADMINCONSOLE_LOG_LEVEL", "adminconsole-log-level", "info",
 		"debug", "warn",
-		func() any { return GetAdminConsole().LogLevel }),
+		func(c *Config) any { return c.AdminConsole.LogLevel }),
 	strVar("GOIABADA_ADMINCONSOLE_LOG_FORMAT", "adminconsole-log-format", "text",
 		"json", "text",
-		func() any { return GetAdminConsole().LogFormat }),
+		func(c *Config) any { return c.AdminConsole.LogFormat }),
 	strVar("GOIABADA_ADMINCONSOLE_CERTFILE", "adminconsole-certfile", "",
 		"/env/admin-cert.pem", "/flag/admin-cert.pem",
-		func() any { return GetAdminConsole().CertFile }),
+		func(c *Config) any { return c.AdminConsole.CertFile }),
 	strVar("GOIABADA_ADMINCONSOLE_KEYFILE", "adminconsole-keyfile", "",
 		"/env/admin-key.pem", "/flag/admin-key.pem",
-		func() any { return GetAdminConsole().KeyFile }),
+		func(c *Config) any { return c.AdminConsole.KeyFile }),
 	strVar("GOIABADA_ADMINCONSOLE_STATICDIR", "adminconsole-staticdir", "",
 		"/env/admin-static", "/flag/admin-static",
-		func() any { return GetAdminConsole().StaticDir }),
+		func(c *Config) any { return c.AdminConsole.StaticDir }),
 	strVar("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", "adminconsole-templatedir", "",
 		"/env/admin-templates", "/flag/admin-templates",
-		func() any { return GetAdminConsole().TemplateDir }),
+		func(c *Config) any { return c.AdminConsole.TemplateDir }),
 	strVar("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", "adminconsole-oauth-client-secret", "",
 		"env-client-secret", "flag-client-secret",
-		func() any { return GetAdminConsole().OAuthClientSecret }),
+		func(c *Config) any { return c.AdminConsole.OAuthClientSecret }),
 	strVarNoFlag("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", "", strings.Repeat("b1", 64),
-		func() any { return GetAdminConsole().SessionAuthenticationKey }),
+		func(c *Config) any { return c.AdminConsole.SessionAuthenticationKey }),
 	strVarNoFlag("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", "", strings.Repeat("b2", 32),
-		func() any { return GetAdminConsole().SessionEncryptionKey }),
+		func(c *Config) any { return c.AdminConsole.SessionEncryptionKey }),
 	strVarNoFlag("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS", "", strings.Repeat("b3", 64),
-		func() any { return GetAdminConsole().SessionAuthenticationKeyPrevious }),
+		func(c *Config) any { return c.AdminConsole.SessionAuthenticationKeyPrevious }),
 	strVarNoFlag("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", "", strings.Repeat("b4", 32),
-		func() any { return GetAdminConsole().SessionEncryptionKeyPrevious }),
+		func(c *Config) any { return c.AdminConsole.SessionEncryptionKeyPrevious }),
 	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
 	// is what pins both now that the configuration reads it instead (#431).
 	{
 		env: "GOIABADA_I18N_OVERRIDES_DIR", def: "",
 		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
-		read: func() any { return GetAdminConsole().I18nOverridesDir },
+		read: func(c *Config) any { return c.AdminConsole.I18nOverridesDir },
 	},
 
 	// Auth server: the two endpoints this process talks to. The other 22 GOIABADA_AUTHSERVER_*
@@ -166,13 +166,13 @@ var configVariables = []configVar{
 	// guard below checks that in both directions, against config.go.
 	strVar("GOIABADA_AUTHSERVER_BASEURL", "authserver-baseurl", "http://localhost:9090",
 		"https://auth.env.example.com", "https://auth.flag.example.com",
-		func() any { return GetAuthServer().BaseURL }),
+		func(c *Config) any { return c.AuthServer.BaseURL }),
 	strVar("GOIABADA_AUTHSERVER_INTERNALBASEURL", "authserver-internalbaseurl", "",
 		"http://auth-env.internal:9090", "http://auth-flag.internal:9090",
-		func() any { return GetAuthServer().InternalBaseURL }),
+		func(c *Config) any { return c.AuthServer.InternalBaseURL }),
 }
 
-// nonLiveEnvVars are the GOIABADA_* names loadFrom's file mentions that are not live
+// nonLiveEnvVars are the GOIABADA_* names Load's file mentions that are not live
 // configuration. They land on no field, so they have no row, and the drift guard carries them as
 // named exceptions rather than as silence.
 //
@@ -181,7 +181,7 @@ var configVariables = []configVar{
 // stopped warning about (#351) and now spells only in the comment saying so: the drift guard
 // reads names wherever they appear in the source, so a name in prose needs an entry here just as
 // one in a warning list does. What holds the warning itself to naming only the admin console's is
-// TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly, not this list. The last two are the
+// TestLoad_WarnsAboutThisProcessesRemovedSettingOnly, not this list. The last two are the
 // variables ValidateRemovedAdminConsoleVars refuses outright rather than loads (#285).
 var nonLiveEnvVars = []string{
 	"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE",
@@ -190,24 +190,27 @@ var nonLiveEnvVars = []string{
 	"GOIABADA_ADMINCONSOLE_ISSUER",
 }
 
-// loadMatrix drives loadFrom with its own flag set and returns it, so a case can assert on
-// what was registered as well as on what was landed. Every name in the roster is cleared
-// first, so a developer's own environment cannot decide what a default case observes.
+// loadMatrix drives Load with its own flag set and returns it beside the configuration, so a case
+// can assert on what was registered as well as on what was landed. Every name in the roster is
+// cleared first, so a developer's own environment cannot decide what a default case observes.
 //
 // A load error fails the case, so every row of the matrix also shows that the values it sets
 // load without a refusal (#434).
-func loadMatrix(t *testing.T, env map[string]string, args []string) *flag.FlagSet {
+func loadMatrix(t *testing.T, env map[string]string, args []string) (*flag.FlagSet, *Config) {
 	t.Helper()
 
-	fs, err := loadMatrixRefusing(t, env, args)
+	fs, c, err := loadMatrixRefusing(t, env, args)
 	if err != nil {
-		t.Fatalf("loadFrom() = %v, want no error", err)
+		t.Fatalf("Load() = %v, want no error", err)
 	}
-	return fs
+	if c == nil {
+		t.Fatal("Load() answered neither a configuration nor an error")
+	}
+	return fs, c
 }
 
 // loadMatrixRefusing is loadMatrix answering the load's error rather than failing on it.
-func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*flag.FlagSet, error) {
+func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*flag.FlagSet, *Config, error) {
 	t.Helper()
 
 	for _, v := range configVariables {
@@ -220,20 +223,18 @@ func loadMatrixRefusing(t *testing.T, env map[string]string, args []string) (*fl
 		t.Setenv(key, value)
 	}
 
-	saved := cfg
-	t.Cleanup(func() { cfg = saved })
-
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	return fs, loadFrom(fs, args)
+	c, err := Load(fs, args)
+	return fs, c, err
 }
 
-// TestLoadFrom_RefusesAMalformedVariable is decision 7 of #434 over the four numeric and boolean
-// variables this binary loads, each through loadFrom rather than the helper alone, so a row
-// fails if loadFrom reads the variable any other way. Each case also gives a valid flag for the
+// TestLoad_RefusesAMalformedVariable is decision 7 of #434 over the four numeric and boolean
+// variables this binary loads, each through Load rather than the helper alone, so a row
+// fails if Load reads the variable any other way. Each case also gives a valid flag for the
 // same setting, which must not rescue the variable: the value the operator wrote is wrong
 // whichever of the two wins.
-func TestLoadFrom_RefusesAMalformedVariable(t *testing.T) {
+func TestLoad_RefusesAMalformedVariable(t *testing.T) {
 	tests := []struct {
 		env, value, flag, want string
 	}{
@@ -248,22 +249,27 @@ func TestLoadFrom_RefusesAMalformedVariable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.env, func(t *testing.T) {
-			_, err := loadMatrixRefusing(t, map[string]string{tt.env: tt.value}, []string{tt.flag})
+			_, c, err := loadMatrixRefusing(t, map[string]string{tt.env: tt.value}, []string{tt.flag})
 
 			want := "malformed configuration: " + tt.want
 			if err == nil || err.Error() != want {
-				t.Errorf("loadFrom() with %s=%q and %s = %v, want %q", tt.env, tt.value, tt.flag, err, want)
+				t.Errorf("Load() with %s=%q and %s = %v, want %q", tt.env, tt.value, tt.flag, err, want)
+			}
+			// A refused load answers no configuration, so main cannot start on one it was told is
+			// wrong, and nothing downstream can read a half-checked value (#441).
+			if c != nil {
+				t.Errorf("Load() refused and still answered a configuration: %+v", c)
 			}
 		})
 	}
 }
 
-// TestLoadFrom_NamesEveryMalformedVariableInOneError is the row that pins "all at once". Keep it:
-// a loadFrom stopping at the first malformed variable passes every other case, and costs the
+// TestLoad_NamesEveryMalformedVariableInOneError is the row that pins "all at once". Keep it:
+// a Load stopping at the first malformed variable passes every other case, and costs the
 // operator one restart per typo. The error is one line, because main writes it to stderr as the
 // one line an operator reads (#434).
-func TestLoadFrom_NamesEveryMalformedVariableInOneError(t *testing.T) {
-	_, err := loadMatrixRefusing(t, map[string]string{
+func TestLoad_NamesEveryMalformedVariableInOneError(t *testing.T) {
+	_, _, err := loadMatrixRefusing(t, map[string]string{
 		"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP":    "90 91",
 		"GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS": "yes",
 	}, nil)
@@ -271,35 +277,57 @@ func TestLoadFrom_NamesEveryMalformedVariableInOneError(t *testing.T) {
 	want := `malformed configuration: GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP is "90 91", not an integer; ` +
 		`GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS is "yes", not a boolean (true or false)`
 	if err == nil || err.Error() != want {
-		t.Errorf("loadFrom() = %v, want %q", err, want)
+		t.Errorf("Load() = %v, want %q", err, want)
 	}
 }
 
-func TestLoadFrom_Defaults(t *testing.T) {
+// TestLoad_ReturnsTheParseError: under a ContinueOnError set the parse's refusal is answered rather
+// than dropped, as the auth server's Load answers it, and -h keeps flag.ErrHelp, so a caller can
+// tell a request for the usage text from a mistake. main passes flag.CommandLine, whose
+// ExitOnError has already printed the usage and exited 2 by then (#441).
+func TestLoad_ReturnsTheParseError(t *testing.T) {
+	t.Run("a flag this binary does not register", func(t *testing.T) {
+		_, c, err := loadMatrixRefusing(t, nil, []string{"-db-type=mysql"})
+		if err == nil || !strings.Contains(err.Error(), "flag provided but not defined: -db-type") {
+			t.Errorf("Load() = %v, want the parse's refusal of -db-type", err)
+		}
+		if c != nil {
+			t.Errorf("Load() refused and still answered a configuration: %+v", c)
+		}
+	})
+	t.Run("-h", func(t *testing.T) {
+		_, _, err := loadMatrixRefusing(t, nil, []string{"-h"})
+		if !errors.Is(err, flag.ErrHelp) {
+			t.Errorf("Load() = %v, want flag.ErrHelp", err)
+		}
+	})
+}
+
+func TestLoad_Defaults(t *testing.T) {
 	for _, v := range configVariables {
 		t.Run(v.env, func(t *testing.T) {
-			loadMatrix(t, nil, nil)
+			_, c := loadMatrix(t, nil, nil)
 
-			if got := v.read(); !reflect.DeepEqual(got, v.def) {
+			if got := v.read(c); !reflect.DeepEqual(got, v.def) {
 				t.Errorf("%s unset: got %#v, want the default %#v", v.env, got, v.def)
 			}
 		})
 	}
 }
 
-func TestLoadFrom_FromTheEnvironment(t *testing.T) {
+func TestLoad_FromTheEnvironment(t *testing.T) {
 	for _, v := range configVariables {
 		t.Run(v.env, func(t *testing.T) {
-			loadMatrix(t, map[string]string{v.env: v.envValue}, nil)
+			_, c := loadMatrix(t, map[string]string{v.env: v.envValue}, nil)
 
-			if got := v.read(); !reflect.DeepEqual(got, v.envWant) {
+			if got := v.read(c); !reflect.DeepEqual(got, v.envWant) {
 				t.Errorf("%s=%q: got %#v, want %#v", v.env, v.envValue, got, v.envWant)
 			}
 		})
 	}
 }
 
-func TestLoadFrom_FlagBeatsTheEnvironment(t *testing.T) {
+func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 	for _, v := range configVariables {
 		if v.flag == "" {
 			continue
@@ -308,9 +336,9 @@ func TestLoadFrom_FlagBeatsTheEnvironment(t *testing.T) {
 			// The variable is set to a value the flag does not use, so a pass cannot come
 			// from the environment having supplied the same answer.
 			args := []string{"-" + v.flag + "=" + v.flagValue}
-			loadMatrix(t, map[string]string{v.env: v.envValue}, args)
+			_, c := loadMatrix(t, map[string]string{v.env: v.envValue}, args)
 
-			if got := v.read(); !reflect.DeepEqual(got, v.flagWant) {
+			if got := v.read(c); !reflect.DeepEqual(got, v.flagWant) {
 				t.Errorf("%s=%q with %s: got %#v, want the flag's %#v",
 					v.env, v.envValue, args[0], got, v.flagWant)
 			}
@@ -358,7 +386,7 @@ var adminConsoleFlags = []string{
 // not defined" and exits 2 where it used to parse and change nothing.
 //
 // Asserting these by name is what makes the case fail for its stated reason. "Not in the expected
-// set" would also pass if loadFrom registered nothing at all.
+// set" would also pass if Load registered nothing at all.
 var refusedFlags = []string{
 	"admin-email",
 	"admin-password",
@@ -390,17 +418,17 @@ var refusedFlags = []string{
 	"db-username",
 }
 
-// TestLoadFrom_RegistersExactlyTheAdminConsoleFlags holds what this binary's command line is, in
-// both directions: a flag in the list that loadFrom does not register, and a flag it registers
+// TestLoad_RegistersExactlyTheAdminConsoleFlags holds what this binary's command line is, in
+// both directions: a flag in the list that Load does not register, and a flag it registers
 // that the list does not claim.
-func TestLoadFrom_RegistersExactlyTheAdminConsoleFlags(t *testing.T) {
-	fs := loadMatrix(t, nil, nil)
+func TestLoad_RegistersExactlyTheAdminConsoleFlags(t *testing.T) {
+	fs, _ := loadMatrix(t, nil, nil)
 
 	registered := map[string]bool{}
 	fs.VisitAll(func(f *flag.Flag) { registered[f.Name] = true })
 
 	if len(registered) == 0 {
-		t.Fatal("loadFrom registered no flags at all, so this case checked nothing")
+		t.Fatal("Load registered no flags at all, so this case checked nothing")
 	}
 
 	expected := map[string]bool{}
@@ -410,22 +438,22 @@ func TestLoadFrom_RegistersExactlyTheAdminConsoleFlags(t *testing.T) {
 
 	for _, name := range adminConsoleFlags {
 		if !registered[name] {
-			t.Errorf("the admin console is meant to register %q and loadFrom does not", name)
+			t.Errorf("the admin console is meant to register %q and Load does not", name)
 		}
 	}
 	for _, name := range sortedKeys(registered) {
 		if !expected[name] {
-			t.Errorf("loadFrom registers %q, which is not one of the admin console's flags", name)
+			t.Errorf("Load registers %q, which is not one of the admin console's flags", name)
 		}
 	}
 }
 
-// TestLoadFrom_RefusesTheAuthServersOwnFlags is decision 3's narrowing asserted as a refusal.
+// TestLoad_RefusesTheAuthServersOwnFlags is decision 3's narrowing asserted as a refusal.
 // Registering the peer's listener, logging and database flags is loading the peer's
 // configuration, and a flag this binary cannot act on reads to an operator as having configured
 // something: `goiabada-adminconsole -db-type=mysql` parsed and was ignored before the split.
-func TestLoadFrom_RefusesTheAuthServersOwnFlags(t *testing.T) {
-	fs := loadMatrix(t, nil, nil)
+func TestLoad_RefusesTheAuthServersOwnFlags(t *testing.T) {
+	fs, _ := loadMatrix(t, nil, nil)
 
 	registered := map[string]bool{}
 	fs.VisitAll(func(f *flag.Flag) { registered[f.Name] = true })
@@ -480,7 +508,7 @@ func TestFlagLists_AgreeWithTheTable(t *testing.T) {
 
 // TestConfigVariables_EveryRowCanFail holds the table to the discipline its own cases depend
 // on: a row whose environment value is its default, or whose flag value is its environment
-// value, has a case that passes whatever loadFrom does with it.
+// value, has a case that passes whatever Load does with it.
 func TestConfigVariables_EveryRowCanFail(t *testing.T) {
 	seenEnv := map[string]bool{}
 	seenFlag := map[string]bool{}
@@ -521,7 +549,7 @@ var (
 	flagNameInSource = regexp.MustCompile(`fs\.[A-Za-z0-9]+Var\([^,]+, *"([^"]+)"`)
 )
 
-// TestConfigSource_EveryVariableAndFlagHasARow reads config.go and compares what loadFrom
+// TestConfigSource_EveryVariableAndFlagHasARow reads config.go and compares what Load
 // actually names against the table, in both directions. A variable or a flag added with no
 // row fails, and so does a row for one that is gone: without it the matrix locks whatever it
 // happened to be written against, and a setting added later is simply not covered.
@@ -601,13 +629,13 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
-// TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly is decision 4 of #351: each process warns
+// TestLoad_WarnsAboutThisProcessesRemovedSettingOnly is decision 4 of #351: each process warns
 // about its own removed settings. Both binaries used to warn about both removed cookie variables,
 // so the admin console's log carried a line about a setting whose cookies it never wrote.
 //
 // Both variables are set, so the case cannot pass by the auth server's simply being absent, and
 // the record naming it would be a failure rather than a silence.
-func TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
+func TestLoad_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 
 	loadMatrix(t, map[string]string{
@@ -630,9 +658,9 @@ func TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
 	}
 }
 
-// TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet is the quiet half. Without it the case above
-// passes for a loadFrom that warns unconditionally.
-func TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
+// TestLoad_SaysNothingWhenNoRemovedSettingIsSet is the quiet half. Without it the case above
+// passes for a Load that warns unconditionally.
+func TestLoad_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 
 	loadMatrix(t, nil, nil)

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -54,6 +53,7 @@ func HandleAccountChangePasswordPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountPasswordAPI,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get access token
@@ -113,6 +113,6 @@ func HandleAccountChangePasswordPost(
 			return
 		}
 
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/change-password", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/account/change-password", http.StatusFound)
 	}
 }

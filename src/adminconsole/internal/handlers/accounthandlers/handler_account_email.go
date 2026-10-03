@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -82,6 +81,7 @@ func HandleAccountEmailPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailAPI,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -157,6 +157,6 @@ func HandleAccountEmailPost(
 			return
 		}
 
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/email", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/account/email", http.StatusFound)
 	}
 }

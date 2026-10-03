@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -36,6 +37,7 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 			router:        chi.NewRouter(),
 			sessionStore:  newTestSessionStore(),
 			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer), publicsettings.DefaultTTL),
+			cfg:           &config.Config{},
 		}
 		app := s.initMiddleware()
 		app.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {

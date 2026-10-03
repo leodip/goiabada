@@ -33,7 +33,7 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 			return HandleAdminGroupsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups")},
 		{"HandleAdminGroupNewPost", func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminGroupNewPost(h, c)
+			return HandleAdminGroupNewPost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/new",
 			handlertest.WithForm(url.Values{"groupIdentifier": {"a-group"}}))},
 		{"HandleAdminGroupAttributesGet", func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
@@ -62,7 +62,7 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 			return HandleAdminGroupDeleteGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/delete", routed)},
 		{"HandleAdminGroupDeletePost", func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminGroupDeletePost(h, c)
+			return HandleAdminGroupDeletePost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/delete", routed,
 			handlertest.WithForm(url.Values{"groupIdentifier": {"a-group"}}))},
 		{"HandleAdminGroupMembersGet", func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
@@ -92,7 +92,7 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 			return HandleAdminGroupSettingsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/settings", routed)},
 		{"HandleAdminGroupSettingsPost", func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminGroupSettingsPost(h, nil, c)
+			return HandleAdminGroupSettingsPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/settings", routed,
 			handlertest.WithForm(url.Values{}))},
 	}

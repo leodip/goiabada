@@ -124,7 +124,7 @@ func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
 		IsSystemLevelResource: true,
 	}}
 
-	handler := HandleAdminResourceDeletePost(httpHelper, apiClient)
+	handler := HandleAdminResourceDeletePost(httpHelper, apiClient, consoleBaseURL)
 	req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
 		handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"))
 	handler.ServeHTTP(httptest.NewRecorder(), req)

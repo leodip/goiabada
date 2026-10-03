@@ -43,9 +43,14 @@ type Server struct {
 
 	staticFS   fs.FS
 	templateFS fs.FS
+
+	// The configuration main loaded, read here and in the route table, which hands each handler
+	// the values it uses as it builds it (#441).
+	cfg *config.Config
 }
 
-func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache, trustedProxies []*net.IPNet) *Server {
+func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache,
+	trustedProxies []*net.IPNet, cfg *config.Config) *Server {
 
 	s := Server{
 		router:        router,
@@ -53,9 +58,11 @@ func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, sett
 		settingsCache: settingsCache,
 
 		trustedProxies: trustedProxies,
+
+		cfg: cfg,
 	}
 
-	if envVar := config.GetAdminConsole().StaticDir; len(envVar) == 0 {
+	if envVar := cfg.AdminConsole.StaticDir; len(envVar) == 0 {
 		s.staticFS = web.StaticFS()
 		slog.Info("using the embedded static files")
 	} else {
@@ -63,7 +70,7 @@ func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, sett
 		slog.Info("using static files from a directory", "directory", envVar)
 	}
 
-	if envVar := config.GetAdminConsole().TemplateDir; len(envVar) == 0 {
+	if envVar := cfg.AdminConsole.TemplateDir; len(envVar) == 0 {
 		s.templateFS = web.TemplateFS()
 		slog.Info("using the embedded template files")
 	} else {
@@ -79,10 +86,10 @@ func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, sett
 // the error, unlogged: main writes the one record for it and owns the exit. The client secret is
 // main's to check, before anything is built (#426, #390).
 func (s *Server) Start(ctx context.Context) error {
-	httpsHost := config.GetAdminConsole().ListenHostHttps
-	httpsPort := config.GetAdminConsole().ListenPortHttps
-	certFile := config.GetAdminConsole().CertFile
-	keyFile := config.GetAdminConsole().KeyFile
+	httpsHost := s.cfg.AdminConsole.ListenHostHttps
+	httpsPort := s.cfg.AdminConsole.ListenPortHttps
+	certFile := s.cfg.AdminConsole.CertFile
+	keyFile := s.cfg.AdminConsole.KeyFile
 	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
 
 	// One record per listener where five and three lines used to be. A reader
@@ -95,8 +102,8 @@ func (s *Server) Start(ctx context.Context) error {
 		"cert_file", certFile,
 		"key_file", keyFile)
 
-	httpHost := config.GetAdminConsole().ListenHostHttp
-	httpPort := config.GetAdminConsole().ListenPortHttp
+	httpHost := s.cfg.AdminConsole.ListenHostHttp
+	httpPort := s.cfg.AdminConsole.ListenPortHttp
 	httpEnabled := httpHost != "" && httpPort > 0
 
 	slog.InfoContext(ctx, "http listener configuration",
@@ -304,13 +311,13 @@ func (s *Server) initMiddleware() chi.Router {
 	s.router.Use(middleware.RequestID)
 
 	// Security headers (before Recoverer so 500 responses carry them too)
-	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(config.GetAdminConsole().IsCookieSecure()))
+	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(s.cfg.AdminConsole.IsCookieSecure()))
 
 	// Real IP: resolve the client IP into r.RemoteAddr from the socket peer and
 	// (when trusted) the forwarded headers, so all downstream consumers (session/
 	// audit IP, request logger) share one trustworthy value.
 	s.router.Use(custom_middleware.MiddlewareRealIP(
-		config.GetAdminConsole().TrustProxyHeaders,
+		s.cfg.AdminConsole.TrustProxyHeaders,
 		s.trustedProxies,
 	))
 
@@ -333,7 +340,7 @@ func (s *Server) initMiddleware() chi.Router {
 	//
 	// It stays before StripSlashes, which edits r.URL.Path in place, which is why the
 	// middleware renders the target before calling the next handler.
-	logHttpRequests := config.GetAdminConsole().LogHttpRequests
+	logHttpRequests := s.cfg.AdminConsole.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(custom_middleware.MiddlewareRequestLogger(logHttpRequests))
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -40,6 +41,7 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 			router:        chi.NewRouter(),
 			sessionStore:  newTestSessionStore(),
 			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer), publicsettings.DefaultTTL),
+			cfg:           &config.Config{},
 		}
 		s.initMiddleware()
 		s.router.Post("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {
@@ -198,6 +200,7 @@ func csrfProbe(t *testing.T, path string, headers map[string]string) *httptest.R
 		router:        chi.NewRouter(),
 		sessionStore:  newTestSessionStore(),
 		settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer), publicsettings.DefaultTTL),
+		cfg:           &config.Config{},
 	}
 	s.initMiddleware()
 

@@ -95,6 +95,7 @@ func HandleAdminUserAuthenticationPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userAuthenticationAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +194,6 @@ func HandleAdminUserAuthenticationPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/authentication", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/authentication", user.Id), r), http.StatusFound)
 	}
 }

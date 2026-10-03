@@ -12,7 +12,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -102,37 +101,19 @@ type Config struct {
 	AuthServer   AuthServerConfig
 }
 
-var (
-	cfg     Config
-	once    sync.Once
-	loadErr error
-)
-
-// Init initializes the configuration and answers the load's refusal, a malformed numeric or
-// boolean variable. The once keeps the error as well as the load, so every call answers it and a
-// caller cannot read a refused configuration by calling twice (#434).
-func Init() error {
-	once.Do(func() { loadErr = load() })
-	return loadErr
-}
-
-func load() error {
-	return loadFrom(flag.CommandLine, os.Args[1:])
-}
-
-// loadFrom is load with the flag set and the arguments supplied.
+// Load reads the configuration from the environment, registers a flag over each value that has
+// one on fs, and parses args. Each caller passes its own set: main flag.CommandLine, whose
+// ExitOnError keeps the usage text and exit 2 for a bad flag, and a test a ContinueOnError set of
+// its own, which is also what lets it load twice in one process (#320). main loads once and hands
+// the result to the server, which hands each handler the values it uses, so nothing reads the
+// configuration at request time (#441).
 //
-// The seam exists because these flags live on the process-global
-// flag.CommandLine, which panics on the second registration of any name: load()
-// can therefore run exactly once per process, and no test could call it twice to
-// observe what a flag or a variable lands on the config (#320).
-//
-// It answers every numeric or boolean variable that is set and does not parse, in one error, and
-// fills cfg either way. A flag given for the same setting does not rescue the variable: the value
-// the operator wrote is wrong whichever of the two wins (#434).
-func loadFrom(fs *flag.FlagSet, args []string) error {
+// It answers a whole configuration or an error: the parse's, or one naming every numeric or
+// boolean variable that is set and does not parse. A flag given for the same setting does not
+// rescue the variable: the value the operator wrote is wrong whichever of the two wins (#434).
+func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	var malformed malformedValues
-	cfg = Config{
+	c := &Config{
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:                          getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
 			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
@@ -162,38 +143,39 @@ func loadFrom(fs *flag.FlagSet, args []string) error {
 	}
 
 	// Admin console
-	fs.StringVar(&cfg.AdminConsole.BaseURL, "adminconsole-baseurl", cfg.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	fs.StringVar(&cfg.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", cfg.AdminConsole.ListenHostHttps, "Admin console https host")
-	fs.IntVar(&cfg.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", cfg.AdminConsole.ListenPortHttps, "Admin console https port")
-	fs.StringVar(&cfg.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", cfg.AdminConsole.ListenHostHttp, "Admin console http host")
-	fs.IntVar(&cfg.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", cfg.AdminConsole.ListenPortHttp, "Admin console http port")
-	fs.BoolVar(&cfg.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", cfg.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
-	adminConsoleTrustedProxies := strings.Join(cfg.AdminConsole.TrustedProxies, ",")
+	fs.StringVar(&c.AdminConsole.BaseURL, "adminconsole-baseurl", c.AdminConsole.BaseURL, "Goiabada admin console base URL")
+	fs.StringVar(&c.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", c.AdminConsole.ListenHostHttps, "Admin console https host")
+	fs.IntVar(&c.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", c.AdminConsole.ListenPortHttps, "Admin console https port")
+	fs.StringVar(&c.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", c.AdminConsole.ListenHostHttp, "Admin console http host")
+	fs.IntVar(&c.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", c.AdminConsole.ListenPortHttp, "Admin console http port")
+	fs.BoolVar(&c.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", c.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	adminConsoleTrustedProxies := strings.Join(c.AdminConsole.TrustedProxies, ",")
 	fs.StringVar(&adminConsoleTrustedProxies, "adminconsole-trusted-proxies", adminConsoleTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
-	fs.BoolVar(&cfg.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", cfg.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
-	fs.StringVar(&cfg.AdminConsole.LogLevel, "adminconsole-log-level", cfg.AdminConsole.LogLevel, "Lowest level of log record the admin console writes. Options: debug, info, warn, error")
-	fs.StringVar(&cfg.AdminConsole.LogFormat, "adminconsole-log-format", cfg.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
-	fs.StringVar(&cfg.AdminConsole.CertFile, "adminconsole-certfile", cfg.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
-	fs.StringVar(&cfg.AdminConsole.KeyFile, "adminconsole-keyfile", cfg.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
-	fs.StringVar(&cfg.AdminConsole.StaticDir, "adminconsole-staticdir", cfg.AdminConsole.StaticDir, "Static files directory for admin console")
-	fs.StringVar(&cfg.AdminConsole.TemplateDir, "adminconsole-templatedir", cfg.AdminConsole.TemplateDir, "Template files directory for admin console")
-	fs.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
+	fs.BoolVar(&c.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", c.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
+	fs.StringVar(&c.AdminConsole.LogLevel, "adminconsole-log-level", c.AdminConsole.LogLevel, "Lowest level of log record the admin console writes. Options: debug, info, warn, error")
+	fs.StringVar(&c.AdminConsole.LogFormat, "adminconsole-log-format", c.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
+	fs.StringVar(&c.AdminConsole.CertFile, "adminconsole-certfile", c.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
+	fs.StringVar(&c.AdminConsole.KeyFile, "adminconsole-keyfile", c.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
+	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
+	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
+	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 
 	// Auth server: the two endpoints this process talks to, and nothing else. A flag the binary
 	// cannot act on is a trap rather than a courtesy, because it reads as having configured
 	// something -- so -db-type, -admin-email and the twenty-six others beside them are not
 	// registered here, and this binary now refuses them instead of ignoring them (#351).
-	fs.StringVar(&cfg.AuthServer.BaseURL, "authserver-baseurl", cfg.AuthServer.BaseURL, "Goiabada auth server base URL")
-	fs.StringVar(&cfg.AuthServer.InternalBaseURL, "authserver-internalbaseurl", cfg.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
+	fs.StringVar(&c.AuthServer.BaseURL, "authserver-baseurl", c.AuthServer.BaseURL, "Goiabada auth server base URL")
+	fs.StringVar(&c.AuthServer.InternalBaseURL, "authserver-internalbaseurl", c.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
 
-	// The error is discarded rather than returned: flag.CommandLine is built with
-	// ExitOnError, so a server given a bad flag has already exited by here, and a
-	// test supplying its own set asserts on the config rather than on the parse.
-	_ = fs.Parse(args)
+	// Under flag.CommandLine, built with ExitOnError, a bad flag has already exited by here; a set
+	// built with ContinueOnError answers it, flag.ErrHelp for -h included.
+	if err := fs.Parse(args); err != nil {
+		return nil, errs.WithStack(err)
+	}
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
-	cfg.AdminConsole.TrustedProxies = splitCSV(adminConsoleTrustedProxies)
+	c.AdminConsole.TrustedProxies = splitCSV(adminConsoleTrustedProxies)
 
 	// Warn about removed settings still present in the environment so a
 	// deployment relying on them notices they are now ignored. The Secure cookie
@@ -205,22 +187,17 @@ func loadFrom(fs *flag.FlagSet, args []string) error {
 	// one it never honoured. Each binary warning about both would mean each carrying the other's
 	// list of removed names, which is the coupling this split exists to remove (#351).
 	for _, k := range deprecatedEnvVarsPresent("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE") {
-		// This is the one record in the tree the installed handler never sees: config.Init runs
+		// This is the one record in the tree the installed handler never sees: config.Load runs
 		// before logging.Install, because the level and format it installs are read from this
 		// very config. So it prints under Go's built-in handler, at its shape (#320).
 		slog.Warn("a removed setting is present in the environment and is ignored, because the secure cookie flag is now derived from an https base url",
 			"setting", k)
 	}
 
-	return malformed.err()
-}
-
-func GetAdminConsole() *AdminConsoleConfig {
-	return &cfg.AdminConsole
-}
-
-func GetAuthServer() *AuthServerConfig {
-	return &cfg.AuthServer
+	if err := malformed.err(); err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 func getEnv(key string, defaultVal string) string {
@@ -230,7 +207,7 @@ func getEnv(key string, defaultVal string) string {
 	return strings.TrimSpace(defaultVal)
 }
 
-// malformedValues collects every numeric or boolean variable loadFrom could not parse, so one
+// malformedValues collects every numeric or boolean variable Load could not parse, so one
 // refusal names them all rather than costing the operator a restart per typo (#434).
 type malformedValues []string
 
@@ -326,7 +303,7 @@ const (
 // raw environment because neither value is held in config any more.
 //
 // It refuses rather than warning, which is the deliberate difference from the removed-setting
-// loop in Init: an operator can miss a log line in a running deployment, and what they would
+// loop in Load: an operator can miss a log line in a running deployment, and what they would
 // otherwise meet is a token failure naming a client they never configured. The client id is
 // checked first, so an operator carrying both wrong values is told about the client id first.
 //

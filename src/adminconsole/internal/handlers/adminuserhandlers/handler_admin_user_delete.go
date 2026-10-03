@@ -83,6 +83,7 @@ func HandleAdminUserDeleteGet(
 func HandleAdminUserDeletePost(
 	httpHelper HttpHelper,
 	apiClient userDeleteAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +112,6 @@ func HandleAdminUserDeletePost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition("/admin/users/", r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, "/admin/users/", r), http.StatusFound)
 	}
 }

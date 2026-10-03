@@ -89,7 +89,7 @@ func TestHandleAdminUserProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues
 	}
 
 	rr := httptest.NewRecorder()
-	HandleAdminUserProfilePost(httpHelper, nil, apiClient).ServeHTTP(rr, handlertest.Request(http.MethodPost,
+	HandleAdminUserProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 		"/admin/users/7/profile?page=3&query=jane", handlertest.WithAccessToken(),
 		handlertest.WithRouteParam("userId", "7"), handlertest.WithForm(form)))
 
@@ -148,7 +148,7 @@ func TestHandleAdminUserProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t 
 			form := url.Values{"username": {"jane-doe"}, "zoneInfo": {zoneInfo}}
 
 			rr := httptest.NewRecorder()
-			HandleAdminUserProfilePost(httpHelper, nil, apiClient).ServeHTTP(rr, handlertest.Request(http.MethodPost,
+			HandleAdminUserProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 				"/admin/users/7/profile", handlertest.WithAccessToken(),
 				handlertest.WithRouteParam("userId", "7"), handlertest.WithForm(form)))
 

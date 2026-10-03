@@ -94,6 +94,7 @@ func HandleAdminUserEmailPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userEmailAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +172,6 @@ func HandleAdminUserEmailPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/email", updatedUser.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/email", updatedUser.Id), r), http.StatusFound)
 	}
 }

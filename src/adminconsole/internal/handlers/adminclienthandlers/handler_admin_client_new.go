@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -38,6 +37,7 @@ type clientNewAPI interface {
 func HandleAdminClientNewPost(
 	httpHelper HttpHelper,
 	apiClient clientNewAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +87,6 @@ func HandleAdminClientNewPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients", baseURL), http.StatusFound)
 	}
 }

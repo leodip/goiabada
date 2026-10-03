@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -68,11 +67,12 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	w := httptest.NewRecorder()
 	HandleAdminSettingsGeneralPost(httpHelper, store,
 		issuerChangingAPI{before: "https://old-issuer.example", after: "https://new-issuer.example"},
-		&invalidationRecorder{},
+		&invalidationRecorder{}, consoleBaseURL,
 	).ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, config.GetAdminConsole().BaseURL+"/auth/logout", w.Header().Get("Location"))
+	assert.Equal(t, "https://console.example.test/auth/logout", w.Header().Get("Location"),
+		"the sign-out goes to the base URL the handler was built with")
 
 	readReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	answered := w.Result().Cookies()

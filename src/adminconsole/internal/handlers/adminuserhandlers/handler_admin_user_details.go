@@ -94,6 +94,7 @@ func HandleAdminUserDetailsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userDetailsAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +138,6 @@ func HandleAdminUserDetailsPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/details", id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/details", id), r), http.StatusFound)
 	}
 }

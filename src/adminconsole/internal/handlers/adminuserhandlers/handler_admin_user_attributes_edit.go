@@ -96,6 +96,7 @@ func HandleAdminUserAttributesEditGet(
 func HandleAdminUserAttributesEditPost(
 	httpHelper HttpHelper,
 	apiClient userAttributesEditAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -191,6 +192,6 @@ func HandleAdminUserAttributesEditPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/attributes", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.Id), r), http.StatusFound)
 	}
 }

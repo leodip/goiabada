@@ -41,20 +41,20 @@ func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 			return HandleAdminResourcesGet(h, c)
 		}, request(http.MethodGet, "/admin/resources")},
 		{"HandleAdminResourceNewPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminResourceNewPost(h, c)
+			return HandleAdminResourceNewPost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/resources/new",
 			handlertest.WithForm(url.Values{"resourceIdentifier": {"some-resource"}}))},
 		{"HandleAdminResourceSettingsGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceSettingsGet(h, testStore(), c)
 		}, request(http.MethodGet, "/admin/resources/3/settings", routed)},
 		{"HandleAdminResourceSettingsPost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminResourceSettingsPost(h, testStore(), c)
+			return HandleAdminResourceSettingsPost(h, testStore(), c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/resources/3/settings", routed, handlertest.WithForm(url.Values{}))},
 		{"HandleAdminResourceDeleteGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourceDeleteGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/delete", routed)},
 		{"HandleAdminResourceDeletePost", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminResourceDeletePost(h, c)
+			return HandleAdminResourceDeletePost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/resources/3/delete", routed, handlertest.WithForm(url.Values{}))},
 		{"HandleAdminResourcePermissionsGet", func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminResourcePermissionsGet(h, testStore(), c)

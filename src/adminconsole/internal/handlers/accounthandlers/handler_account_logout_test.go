@@ -69,7 +69,7 @@ func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testi
 	}}
 
 	rec := httptest.NewRecorder()
-	HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(rec, logoutRequest())
+	HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, logoutRequest())
 
 	require.NotNil(t, apiClient.got, "the handler must reach the API")
 	assert.Equal(t, api.AccountLogoutResponseModeFormPost, apiClient.got.ResponseMode,
@@ -77,6 +77,8 @@ func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testi
 	assert.Equal(t, handlertest.AccessToken, apiClient.gotBearer,
 		"the bearer is the access token string the response carried, never a decoded token (#427)")
 	assert.NotEmpty(t, apiClient.got.State, "the console still sends a state")
+	assert.Equal(t, "https://console.example.test", apiClient.got.PostLogoutRedirectUri,
+		"the auth server sends the browser back to the base URL the handler was built with")
 
 	// The session cookie is cleared whichever arm is taken, so a 302 here would be a redirect the
 	// handler wrote rather than the cookie write.
@@ -102,7 +104,7 @@ func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
 	}}
 
 	rec := httptest.NewRecorder()
-	HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(rec, logoutRequest())
+	HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, logoutRequest())
 
 	assert.Equal(t, http.StatusFound, rec.Code)
 	assert.Equal(t, "https://auth.example.com/auth/logout?id_token_hint=the.id.token",
@@ -131,9 +133,11 @@ func TestHandleAccountLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *tes
 			apiClient := &logoutApiClient{}
 			rec := httptest.NewRecorder()
 
-			HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(rec, tc.req)
+			HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, tc.req)
 
 			assert.Equal(t, http.StatusFound, rec.Code)
+			assert.Equal(t, "https://console.example.test", rec.Header().Get("Location"),
+				"home is the base URL the handler was built with")
 			assert.Nil(t, apiClient.got, "there is no logout to prepare without both tokens")
 		})
 	}

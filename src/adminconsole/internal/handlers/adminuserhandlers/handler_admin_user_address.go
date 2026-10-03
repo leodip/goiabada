@@ -109,6 +109,7 @@ func HandleAdminUserAddressPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userAddressAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	countries := countries.All()
@@ -197,6 +198,6 @@ func HandleAdminUserAddressPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/address", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/address", user.Id), r), http.StatusFound)
 	}
 }

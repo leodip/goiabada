@@ -32,10 +32,10 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			return HandleAccountAddressGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/address")},
 		{"HandleAccountAddressPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAccountAddressPost(h, nil, c)
+			return HandleAccountAddressPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/address", handlertest.WithForm(url.Values{}))},
 		{"HandleAccountChangePasswordPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAccountChangePasswordPost(h, nil, c)
+			return HandleAccountChangePasswordPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/change-password", handlertest.WithForm(url.Values{
 			"currentPassword":         {"P4ss!word"},
 			"newPassword":             {"N3w!P4ssword"},
@@ -45,7 +45,7 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			return HandleAccountEmailGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/email")},
 		{"HandleAccountEmailPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAccountEmailPost(h, nil, c)
+			return HandleAccountEmailPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/email",
 			handlertest.WithForm(url.Values{"email": {"jane@example.com"}}))},
 		{"HandleAccountEmailSendVerificationPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
@@ -55,7 +55,7 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			return HandleAccountEmailVerificationGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/email-verification")},
 		{"HandleAccountEmailVerificationPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAccountEmailVerificationPost(h, nil, c)
+			return HandleAccountEmailVerificationPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/email-verification",
 			handlertest.WithForm(url.Values{"verificationCode": {"123456"}}))},
 		{"HandleAccountManageConsentsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
@@ -69,7 +69,7 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			return HandleAccountOtpGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/account/otp")},
 		{"HandleAccountOtpPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAccountOtpPost(h, c)
+			return HandleAccountOtpPost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/otp", handlertest.WithForm(url.Values{
 			"password": {"P4ss!word"}, "otp": {"123456"},
 		}))},
@@ -77,7 +77,7 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			return HandleAccountPhoneGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/phone")},
 		{"HandleAccountPhonePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAccountPhonePost(h, nil, c)
+			return HandleAccountPhonePost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/phone", handlertest.WithForm(url.Values{}))},
 		{"HandleAccountPictureGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountPictureGet(h, c)
@@ -92,7 +92,7 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			return HandleAccountProfileGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/account/profile")},
 		{"HandleAccountProfilePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAccountProfilePost(h, nil, c)
+			return HandleAccountProfilePost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/profile", handlertest.WithForm(url.Values{}))},
 		{"HandleAccountSessionsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAccountSessionsGet(h, c)

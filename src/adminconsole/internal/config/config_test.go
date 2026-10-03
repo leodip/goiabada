@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/hex"
-	"errors"
 	"flag"
 	"io"
 	"os"
@@ -222,27 +221,6 @@ func TestMalformedValues_Err(t *testing.T) {
 	want := `malformed configuration: A is "x", not an integer; B is "y", not a boolean (true or false)`
 	if err := two.err(); err == nil || err.Error() != want {
 		t.Errorf("err() = %v, want %q", err, want)
-	}
-}
-
-// TestInit_ReturnsTheLoadErrorOnEveryCall is the one Init call in this package, because the once
-// it holds cannot be reset: the first call refuses a malformed port, and the second refuses again
-// with the variable fixed, which is what shows the once kept the error rather than the load
-// running again or the error being dropped after the first answer (#434).
-func TestInit_ReturnsTheLoadErrorOnEveryCall(t *testing.T) {
-	const key = "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP"
-	saved := cfg
-	t.Cleanup(func() { cfg = saved })
-
-	t.Setenv(key, "https")
-	first := Init()
-	if first == nil || !strings.Contains(first.Error(), key+` is "https", not an integer`) {
-		t.Fatalf("Init() = %v, want the refusal naming %s", first, key)
-	}
-
-	t.Setenv(key, "9091")
-	if second := Init(); !errors.Is(second, first) {
-		t.Errorf("the second Init() = %v, want the first call's error %v", second, first)
 	}
 }
 
@@ -603,11 +581,11 @@ func unsetEnv(t *testing.T, key string) {
 	_ = os.Unsetenv(key)
 }
 
-// TestLoadFrom_TrustedProxies is the consumer half of the trusted-proxy parse:
+// TestLoad_TrustedProxies is the consumer half of the trusted-proxy parse:
 // the table of what an entry means is ParseTrustedProxies' own, in core. Here it
-// is only that the list loadFrom reads reaches it, and that a refusal names the
+// is only that the list Load reads reaches it, and that a refusal names the
 // setting an operator has to fix (#425).
-func TestLoadFrom_TrustedProxies(t *testing.T) {
+func TestLoad_TrustedProxies(t *testing.T) {
 	const key = "GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"
 	tests := []struct {
 		name       string
@@ -629,16 +607,14 @@ func TestLoadFrom_TrustedProxies(t *testing.T) {
 			if tt.value != nil {
 				t.Setenv(key, *tt.value)
 			}
-			saved := cfg
-			t.Cleanup(func() { cfg = saved })
-
 			fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 			fs.SetOutput(io.Discard)
-			if err := loadFrom(fs, nil); err != nil {
-				t.Fatalf("loadFrom() = %v, want no error", err)
+			c, err := Load(fs, nil)
+			if err != nil {
+				t.Fatalf("Load() = %v, want no error", err)
 			}
 
-			ranges, err := cfg.AdminConsole.TrustedProxyRanges()
+			ranges, err := c.AdminConsole.TrustedProxyRanges()
 			if tt.wantErr != nil {
 				if err == nil {
 					t.Fatalf("TrustedProxyRanges() = %v, want an error", ranges)
@@ -675,8 +651,8 @@ func TestLoadFrom_TrustedProxies(t *testing.T) {
 
 func ptr(s string) *string { return &s }
 
-// loadLogSettings drives loadFrom with its own flag set, which is the whole
-// reason that seam exists: the flags are registered on the set handed in, so
+// loadLogSettings drives Load with its own flag set, which is the whole
+// reason it takes one: the flags are registered on the set handed in, so
 // each case gets a fresh registration instead of panicking on the second.
 func loadLogSettings(t *testing.T, env map[string]string, args []string) logSettings {
 	t.Helper()
@@ -688,22 +664,20 @@ func loadLogSettings(t *testing.T, env map[string]string, args []string) logSett
 		t.Setenv(key, value)
 	}
 
-	saved := cfg
-	t.Cleanup(func() { cfg = saved })
-
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	if err := loadFrom(fs, args); err != nil {
-		t.Fatalf("loadFrom() = %v, want no error", err)
+	c, err := Load(fs, args)
+	if err != nil {
+		t.Fatalf("Load() = %v, want no error", err)
 	}
 
 	return logSettings{
-		adminLevel:  cfg.AdminConsole.LogLevel,
-		adminFormat: cfg.AdminConsole.LogFormat,
+		adminLevel:  c.AdminConsole.LogLevel,
+		adminFormat: c.AdminConsole.LogFormat,
 	}
 }
 
-func TestLoadFrom_LogSettings(t *testing.T) {
+func TestLoad_LogSettings(t *testing.T) {
 	// Every flag case sets its variable to a value the flag does not use, so a
 	// pass cannot come from the environment having supplied the same answer.
 	tests := []struct {

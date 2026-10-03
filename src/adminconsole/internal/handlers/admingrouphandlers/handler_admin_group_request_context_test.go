@@ -133,7 +133,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		{
 			name: "HandleAdminGroupNewPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupNewPost(h, c)
+				return HandleAdminGroupNewPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/new",
 				handlertest.WithAccessToken(),
@@ -158,7 +158,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		{
 			name: "HandleAdminGroupSettingsPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupSettingsPost(h, nil, c)
+				return HandleAdminGroupSettingsPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/settings",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),
@@ -175,7 +175,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		{
 			name: "HandleAdminGroupDeletePost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupDeletePost(h, c)
+				return HandleAdminGroupDeletePost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/delete",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),

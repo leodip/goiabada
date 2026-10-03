@@ -147,7 +147,7 @@ func TestHandleAccountOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *t
 			client.updateErr = tc.updateErr
 
 			rr := httptest.NewRecorder()
-			HandleAccountOtpPost(httpHelper, client).ServeHTTP(rr, otpPostRequest(tc.form))
+			HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
 
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, testBase64Image, bind["base64Image"],
@@ -178,7 +178,7 @@ func TestHandleAccountOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testin
 	client.updateErr = apiError("OTP_ALREADY_ENABLED")
 
 	rr := httptest.NewRecorder()
-	HandleAccountOtpPost(httpHelper, client).ServeHTTP(rr,
+	HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)
@@ -199,7 +199,7 @@ func TestHandleAccountOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 	client.updateErr = apiError("AUTHENTICATION_FAILED")
 
 	rr := httptest.NewRecorder()
-	HandleAccountOtpPost(httpHelper, client).ServeHTTP(rr,
+	HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"password": {"wrong"}}))
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -216,7 +216,7 @@ func TestHandleAccountOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T)
 	client := newStubApiClient(false)
 
 	rr := httptest.NewRecorder()
-	HandleAccountOtpPost(httpHelper, client).ServeHTTP(rr,
+	HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)

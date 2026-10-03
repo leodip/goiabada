@@ -106,6 +106,7 @@ func HandleAdminUserPhonePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -186,6 +187,6 @@ func HandleAdminUserPhonePost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/phone", id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/phone", id), r), http.StatusFound)
 	}
 }
