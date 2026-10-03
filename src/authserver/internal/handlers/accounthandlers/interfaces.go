@@ -46,8 +46,9 @@ type PageRenderer interface {
 		data map[string]interface{}) (*bytes.Buffer, error)
 }
 
-// EmailSender delivers one message. The context is the request's, so the SMTP dial and write are
-// bounded by the request that asked for them.
+// EmailSender delivers one message. The context is the request's, or the job's that a request
+// handed its mail to (AfterResponse); either way it carries the request's id. The SMTP dial and
+// conversation are bounded by the sender's own deadlines.
 type EmailSender interface {
 	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error
 }
@@ -66,4 +67,12 @@ type PasswordValidator interface {
 // UserCreator creates the user row and its default permissions in one transaction.
 type UserCreator interface {
 	CreateUser(ctx context.Context, input *usercreation.CreateUserInput) (*models.User, error)
+}
+
+// AfterResponse runs work a handler hands off so that its response does not wait for it. The job
+// is given the context passed in, detached from its cancellation but keeping its values, so what it
+// records carries the request's id (#404 decision 8). The server's afterresponse.Jobs is the one
+// implementation, and shutdown waits for the jobs it holds.
+type AfterResponse interface {
+	Go(ctx context.Context, job func(ctx context.Context))
 }

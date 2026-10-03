@@ -6,12 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -153,12 +155,37 @@ func emailedLinksMatching(t *testing.T, to string, pattern *regexp.Regexp) []str
 	return links
 }
 
+// afterResponseWait bounds how long a test waits for what a forgot-password request does after
+// its response: the code, the audit record and the mail all arrive after the page does (#404
+// decision 8). Mailpit is on the same network and answers in milliseconds, so this is a ceiling
+// for a slow runner, not a delay any passing test pays.
+const afterResponseWait = 10 * time.Second
+
+// afterResponsePoll is how often a wait for the work after the response looks again.
+const afterResponsePoll = 50 * time.Millisecond
+
+// awaitResetLinks returns every reset link sent to an address, newest first, once at least count
+// have arrived, or whatever has arrived when afterResponseWait runs out, for the caller to refuse.
+func awaitResetLinks(t *testing.T, to string, count int) []string {
+	t.Helper()
+
+	deadline := time.Now().Add(afterResponseWait)
+	for {
+		links := emailedResetLinks(t, to)
+		if len(links) >= count || time.Now().After(deadline) {
+			return links
+		}
+		time.Sleep(afterResponsePoll)
+	}
+}
+
 // latestResetLink is the link a user would click, with the two properties #112 exists for
 // asserted at the source: no address in it at all, and so nothing in it that needs escaping.
+// It waits for the first link to arrive, since the mail is sent after the response.
 func latestResetLink(t *testing.T, to string) string {
 	t.Helper()
 
-	links := emailedResetLinks(t, to)
+	links := awaitResetLinks(t, to, 1)
 	require.NotEmpty(t, links, "expected a reset link emailed to %s", to)
 
 	link := links[0]
@@ -386,7 +413,7 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 	// A second request replaces the outstanding code, and with it the hash the first marker
 	// names.
 	requestPasswordReset(t, createHttpClient(t), email)
-	require.Len(t, emailedResetLinks(t, email), 2, "the second request must have emailed a second link")
+	require.Len(t, awaitResetLinks(t, email, 2), 2, "the second request must have emailed a second link")
 
 	getResp := loadPage(t, first, cleanURL)
 	getBody := bodyString(t, getResp)
@@ -581,6 +608,7 @@ const linkSentText = "a password reset link has been sent to your email address.
 // control: without it, mail not arriving could mean SMTP was never on.
 func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabled(t *testing.T) {
 	useMailpitSMTP(t)
+	requireDatabaseAuditLogs(t)
 
 	unknown := plusAddress()
 	unverifiedEmail := plusAddress()
@@ -612,6 +640,9 @@ func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabl
 		t.Run(tc.name, func(t *testing.T) {
 			page := requestPasswordResetPage(t, client, tc.email)
 			assert.Contains(t, page, linkSentText, "answered as an address with no account is")
+			// The record is the last thing the work after the response does for an account it
+			// sends nothing to, so once it is there nothing more is coming.
+			require.NotEmpty(t, awaitRequestedPasswordResetRecords(t, tc.email), "the request's work has run")
 
 			stored, err := database.GetUserById(context.Background(), nil, tc.user.Id)
 			require.NoError(t, err)
@@ -621,7 +652,7 @@ func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabl
 	}
 
 	requestPasswordReset(t, client, liveEmail)
-	require.NotEmpty(t, emailedResetLinks(t, liveEmail), "the live account is mailed, so SMTP was on")
+	require.NotEmpty(t, awaitResetLinks(t, liveEmail, 1), "the live account is mailed, so SMTP was on")
 
 	assert.Empty(t, emailedResetLinks(t, unverifiedEmail), "an unverified address must be sent nothing")
 	assert.Empty(t, emailedResetLinks(t, disabledEmail), "a disabled account must be sent nothing")
@@ -708,16 +739,32 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 		failedResetReasonsFor(t, user.Id), "each refused step is audited with the reason account_disabled")
 }
 
-// requestedPasswordResetRecordsFor returns the payload of every requested_password_reset record
+// awaitRequestedPasswordResetRecords returns the payload of every requested_password_reset record
 // whose emailDigest is the SHA-256 hex of the address, digested here with crypto/sha256 rather
-// than through the server's own helper, so a digest of anything else finds nothing.
-func requestedPasswordResetRecordsFor(t *testing.T, address string) []map[string]interface{} {
+// than through the server's own helper, so a digest of anything else finds nothing. A well-formed
+// request's record is written after its response (#404 decision 8), so this waits, up to
+// afterResponseWait, for at least one to arrive.
+func awaitRequestedPasswordResetRecords(t *testing.T, address string) []map[string]interface{} {
+	t.Helper()
+
+	adminToken, _ := createAdminClientWithToken(t)
+	deadline := time.Now().Add(afterResponseWait)
+	for {
+		records := requestedPasswordResetRecordsFor(t, adminToken, address)
+		if len(records) > 0 || time.Now().After(deadline) {
+			return records
+		}
+		time.Sleep(afterResponsePoll)
+	}
+}
+
+// requestedPasswordResetRecordsFor is one read of awaitRequestedPasswordResetRecords's records.
+func requestedPasswordResetRecordsFor(t *testing.T, adminToken string, address string) []map[string]interface{} {
 	t.Helper()
 
 	sum := sha256.Sum256([]byte(address))
 	digest := hex.EncodeToString(sum[:])
 
-	adminToken, _ := createAdminClientWithToken(t)
 	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.AuditRequestedPasswordReset+"&size=200")
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -766,7 +813,7 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 	// Submitted in capitals: the digest is of the address as it was looked up, lowercased.
 	malformedPage := requestPasswordResetPage(t, client, strings.ToUpper(malformed))
 	assert.NotContains(t, malformedPage, linkSentText, "a malformed address keeps its own error page")
-	require.NotEmpty(t, emailedResetLinks(t, liveEmail), "the live account is mailed, so SMTP was on")
+	require.NotEmpty(t, awaitResetLinks(t, liveEmail, 1), "the live account is mailed, so SMTP was on")
 
 	for _, tc := range []struct {
 		name    string
@@ -781,7 +828,7 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 		{name: "a malformed address", address: malformed, outcome: "invalid_address"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			records := requestedPasswordResetRecordsFor(t, tc.address)
+			records := awaitRequestedPasswordResetRecords(t, tc.address)
 			require.Len(t, records, 1, "exactly one record per request")
 			record := records[0]
 
@@ -798,4 +845,78 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 			}
 		})
 	}
+}
+
+// silentSMTPServer accepts connections on the loopback and never says a word, so a send to it
+// waits on the greeting until the sender's own deadline. The server under test runs on this
+// machine, so a listener here is what its dial reaches. It reports each connection it accepts,
+// and closes them all when the test ends, which fails the send at once.
+func silentSMTPServer(t *testing.T) (port int, accepted <-chan struct{}) {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	connections := make(chan net.Conn, 16)
+	notify := make(chan struct{}, 16)
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			connections <- conn
+			notify <- struct{}{}
+		}
+	}()
+	t.Cleanup(func() {
+		_ = ln.Close()
+		for {
+			select {
+			case conn := <-connections:
+				_ = conn.Close()
+			default:
+				return
+			}
+		}
+	})
+	return ln.Addr().(*net.TCPAddr).Port, notify
+}
+
+// A live account's request is answered before its mail is sent, and a mail server that never
+// answers is not the requester's problem: the page is the "link sent" one at 200, where a send
+// inside the request held it until the sender gave up and then answered 500, which an address
+// with no account never got (#404 decisions 7 and 8). The send is seen to start after the page
+// has arrived, and the code and the record are there although no mail went out.
+func TestForgotPassword_AnswersBeforeTheMailIsSent(t *testing.T) {
+	useMailpitSMTP(t)
+	requireDatabaseAuditLogs(t)
+	port, accepted := silentSMTPServer(t)
+	changeSettings(t, func(settings *models.Settings) {
+		settings.SMTPHost = "127.0.0.1"
+		settings.SMTPPort = port
+	})
+
+	email := plusAddress()
+	user, _ := createResetTestUser(t, email)
+
+	start := time.Now()
+	page := requestPasswordResetPage(t, createHttpClient(t), email)
+	answeredIn := time.Since(start)
+
+	assert.Contains(t, page, linkSentText, "the requester is told a link was sent")
+	assert.Less(t, answeredIn, 5*time.Second, "the response must not wait on the mail server")
+
+	select {
+	case <-accepted:
+	case <-time.After(afterResponseWait):
+		t.Fatal("the mail was never attempted")
+	}
+
+	records := awaitRequestedPasswordResetRecords(t, email)
+	require.Len(t, records, 1)
+	assert.Equal(t, "code_issued", records[0]["outcome"])
+
+	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	require.NoError(t, err)
+	assert.NotEmpty(t, stored.ForgotPasswordCodeHash, "the code is stored before the send")
 }

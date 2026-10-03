@@ -300,6 +300,12 @@ var slogSpreadSites = []slogSpreadSite{
 // authserver/internal/authorizerequest is listed on the same terms: its two operations run while
 // a POST to /auth/authorize is answered and while the GET that follows it is, and it writes one
 // record, for a parked row that does not parse (#437).
+//
+// authserver/internal/afterresponse is listed by the commit that creates it: it runs what a
+// handler hands off after its response, under the request's context detached from its
+// cancellation, and its one record, a job that panicked, is the request's to be filtered by.
+// Listing it is also what holds it to AssertRequestPathContext, since a context.Background() there
+// would cut every job's records and audit entries off from the request that started it (#404).
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -325,6 +331,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/userclaims",
 	"authserver/internal/userconsent",
 	"authserver/internal/authorizerequest",
+	"authserver/internal/afterresponse",
 	"authserver/internal/imageupload",
 	"authserver/internal/uithemes",
 	"adminconsole/internal/handlers",

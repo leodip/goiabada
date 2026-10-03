@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -237,4 +239,34 @@ func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
 	assert.Contains(t, err.Error(), "no listener is enabled")
 	assert.Contains(t, err.Error(), "auth server", "the refusal names the binary it stops")
 	assertNoErrorRecord(t, logs.Records())
+}
+
+// Shutdown waits for the work a request handed off to finish after its response, once the
+// listeners have drained, so a graceful stop loses no forgot-password record or mail (#404
+// decision 8). The job here is released only after stopBackgroundWork has been seen to wait.
+func TestStopBackgroundWork_WaitsForTheJobsInFlight(t *testing.T) {
+	s := &Server{jobs: afterresponse.New(), worker: workers.NewWorker(nil)}
+
+	release := make(chan struct{})
+	var finished atomic.Bool
+	s.jobs.Go(context.Background(), func(context.Context) {
+		<-release
+		finished.Store(true)
+	})
+
+	stopped := make(chan struct{})
+	go func() {
+		s.stopBackgroundWork()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+		t.Fatal("the shutdown did not wait for the job in flight")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(release)
+	waitFor(t, stopped, "the shutdown to finish once the job did")
+	assert.True(t, finished.Load(), "the job ran to its end before the shutdown finished")
 }
