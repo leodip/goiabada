@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import "net/http"
 
@@ -8,7 +8,7 @@ import "net/http"
 // reverse.
 const strictTransportSecurityValue = "max-age=31536000; includeSubDomains"
 
-// MiddlewareSecurityHeaders sets baseline security response headers on every
+// SecurityHeaders sets baseline security response headers on every
 // response. It is installed early in the chain (before Recoverer) so that even
 // panic (500) responses carry the headers.
 //
@@ -46,7 +46,7 @@ const strictTransportSecurityValue = "max-age=31536000; includeSubDomains"
 //
 //   - Strict-Transport-Security is emitted only when secure is true (i.e. the
 //     deployment serves over HTTPS); it is meaningless over plain HTTP.
-func MiddlewareSecurityHeaders(secure bool) func(next http.Handler) http.Handler {
+func SecurityHeaders(secure bool) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()

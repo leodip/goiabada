@@ -15,12 +15,12 @@ import (
 )
 
 // TestInitMiddleware_CsrfIsRegistered makes the claim the CSRF unit tables in
-// src/core/middleware cannot: that MiddlewareCsrf is actually mounted on the admin console's
+// src/core/httpmw cannot: that httpmw.CSRF is actually mounted on the admin console's
 // router. Those tables pass perfectly against a middleware nobody wired up, and #155 rewrote this
 // wiring, so a deleted Use() line is exactly the regression they would miss.
 //
 // The compiler does not cover it. Deleting the CSRF registration from initMiddleware still builds:
-// the package references custom_middleware on four other lines, so nothing goes unused. And the
+// the package references httpmw on other lines, so nothing goes unused. And the
 // admin console has no integration suite (src/authserver/tests holds the only one), so there is no
 // running-server test to catch it either. initMiddleware is an ordinary method though, and httptest
 // drives it with no harness at all.
@@ -30,7 +30,7 @@ import (
 // the chain: a lone 403 would prove nothing.
 func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 	// The settings cache points at an address nothing listens on, and that is deliberate: it is
-	// what keeps this a unit test. MiddlewareSettingsCache is the next entry after CSRF in
+	// what keeps this a unit test. middleware.SettingsCache is the next entry after CSRF in
 	// initMiddleware, and on a fetch failure it answers through http.Error rather than panicking,
 	// so a request that passes the origin check has a deterministic non-403 outcome and no live
 	// auth server is needed.
@@ -73,10 +73,10 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 
 		if rr.Code != http.StatusForbidden {
 			t.Fatalf("got status %d, want %d: a cross-site POST must be refused, and if it is not "+
-				"then MiddlewareCsrf is no longer registered on the admin console", rr.Code, http.StatusForbidden)
+				"then httpmw.CSRF is no longer registered on the admin console", rr.Code, http.StatusForbidden)
 		}
 
-		// The body is MiddlewareCsrf's own message, which is what attributes the 403 to the
+		// The body is httpmw.CSRF's own message, which is what attributes the 403 to the
 		// origin check rather than to any handler further down. Read from the catalog, so
 		// rewording the entry does not fail this test while a 403 from somewhere else still
 		// does. TestInitMiddleware_RefusalsAreLocalized covers it in the caller's language.
@@ -97,7 +97,7 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 	})
 }
 
-// TestInitMiddleware_CsrfPolicy makes the claims about which of this binary's routes the origin
+// TestInitMiddleware_CSRFPolicy makes the claims about which of this binary's routes the origin
 // check applies to. Until #385 the exemption table lived in core and named both binaries' routes,
 // so the admin console exempted /auth/authorize, /auth/token, /userinfo and /connect/register,
 // none of which it mounts. The table is this server's policy now (csrfPolicy in server.go), and
@@ -109,7 +109,7 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 //
 // Every row is paired with a same-origin control differing only in the origin headers, so no 403
 // can be attributed to anything else in the chain.
-func TestInitMiddleware_CsrfPolicy(t *testing.T) {
+func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 	tests := []struct {
 		name string
 		path string

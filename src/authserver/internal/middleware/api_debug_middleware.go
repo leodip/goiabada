@@ -308,10 +308,10 @@ func captureRequestBody(r *http.Request) capturedBody {
 	return capturedBody{head: head, size: size, err: err}
 }
 
-// APIDebugMiddleware logs detailed information about API requests and responses when enabled,
+// APIDebug logs detailed information about API requests and responses when enabled,
 // which is GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS, handed in at construction (#434). Off, it
 // returns next itself, so a request pays nothing for the switch.
-func APIDebugMiddleware(enabled bool) func(http.Handler) http.Handler {
+func APIDebug(enabled bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if !enabled {
 			return next

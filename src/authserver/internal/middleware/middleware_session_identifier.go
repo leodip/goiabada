@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -22,15 +22,15 @@ type sessionIdentifierDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
 }
 
-// MiddlewareSessionIdentifier puts on the request's context the session identifier the session
+// SessionIdentifier puts on the request's context the session identifier the session
 // cookie names, when that session still exists. A failure to read the session or its row is
 // answered through faults, in the format of the branch it is mounted on; on a page route it is
 // text/plain (#435).
-func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifierDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
+func SessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifierDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			requestId := middleware.GetReqID(ctx)
+			requestId := chimiddleware.GetReqID(ctx)
 
 			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
 

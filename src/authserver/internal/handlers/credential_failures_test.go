@@ -34,6 +34,6 @@ func (rateLimitTestRenderer) RenderTemplate(w http.ResponseWriter, r *http.Reque
 // through it. A nil audit logger is the supported shape: the limiter skips the audit write
 // and still emits its warning line and its rejection. It has no JSON writer, which LimitROPC
 // writes through only for a form that does not parse, and no case here sends one.
-func newTestRateLimiter(ceremonyStore CeremonyStore) *middleware.RateLimiterMiddleware {
-	return middleware.NewRateLimiterMiddleware(ceremonyStore, rateLimitTestRenderer{}, nil, nil, true)
+func newTestRateLimiter(ceremonyStore CeremonyStore) *middleware.RateLimiter {
+	return middleware.NewRateLimiter(ceremonyStore, rateLimitTestRenderer{}, nil, nil, true)
 }

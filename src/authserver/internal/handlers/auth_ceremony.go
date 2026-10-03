@@ -57,9 +57,9 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 	const maxAuditedValueLength = 100
 
 	// Truncated for the same reason accounthandlers' auditedClientIP truncates it for the two
-	// emailed-link flows: MiddlewareRealIP resolves the IP from a forwarded header in a proxied
+	// emailed-link flows: httpmw.RealIP resolves the IP from a forwarded header in a proxied
 	// deployment, so this is a sink for a value that originates outside the process.
-	clientIP := middleware.GetClientIPFromRequest(r)
+	clientIP := middleware.ClientIP(r)
 	if len(clientIP) > maxAuditedValueLength {
 		clientIP = clientIP[:maxAuditedValueLength]
 	}

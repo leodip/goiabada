@@ -29,7 +29,7 @@ import (
 	mock_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
 )
 
-// Seam 5 of #427: JwtSessionHandler, one row per step of its per-request order, over a real
+// Seam 5 of #427: SessionHandler, one row per step of its per-request order, over a real
 // ServerSideStore so what each row leaves in the session is read back through the store's own Get
 // with the browser's cookie, the way the next request would read it. The parser is the generated
 // mock, so these rows are thin on classification by design: which token is foreign is the parser's
@@ -221,7 +221,7 @@ type served struct {
 	jwtInfo  *oauthclient.JwtInfo
 }
 
-// serve sends one request carrying cookies through JwtSessionHandler over parser.
+// serve sends one request carrying cookies through SessionHandler over parser.
 func (h *sessionHarness) serve(parser tokenParser, cookies []*http.Cookie) served {
 	h.t.Helper()
 	return h.serveOn(context.Background(), parser, cookies)
@@ -230,7 +230,7 @@ func (h *sessionHarness) serve(parser tokenParser, cookies []*http.Cookie) serve
 // serveOn is serve with the request on ctx, the browser's own context.
 func (h *sessionHarness) serveOn(ctx context.Context, parser tokenParser, cookies []*http.Cookie) served {
 	h.t.Helper()
-	m := NewMiddlewareJwt(h.store, sessionTestName, parser, h.refresher, new(mock_middleware.AuthHelper),
+	m := NewJWT(h.store, sessionTestName, parser, h.refresher, new(mock_middleware.AuthHelper),
 		stubErrorRenderer{}, "http://console.example", "admin-console-client")
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil).WithContext(ctx)
@@ -239,7 +239,7 @@ func (h *sessionHarness) serveOn(ctx context.Context, parser tokenParser, cookie
 	}
 	var out served
 	out.recorder = httptest.NewRecorder()
-	m.JwtSessionHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	m.SessionHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out.reached = true
 		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 			out.jwtInfo = &jwtInfo
@@ -317,7 +317,7 @@ func (h *sessionHarness) assertContinuedUnauthenticated(out served) {
 }
 
 // Step 1.
-func TestJwtSessionHandler_NoTokenResponseContinuesUnauthenticated(t *testing.T) {
+func TestSessionHandler_NoTokenResponseContinuesUnauthenticated(t *testing.T) {
 	h := newSessionHarness(t)
 	cookies := h.seed(map[string]any{"unrelated": "kept"})
 
@@ -332,7 +332,7 @@ func TestJwtSessionHandler_NoTokenResponseContinuesUnauthenticated(t *testing.T)
 // carried across on a transitional path (decision 15). A token response with no ID token has
 // nothing to verify and goes the same way. Neither consults the parser nor sends a refresh, even
 // with a refresh token in hand.
-func TestJwtSessionHandler_SignsOutASessionItCannotVerify(t *testing.T) {
+func TestSessionHandler_SignsOutASessionItCannotVerify(t *testing.T) {
 	noIDToken := storedResponse()
 	noIDToken.IdToken = ""
 
@@ -380,7 +380,7 @@ func TestJwtSessionHandler_SignsOutASessionItCannotVerify(t *testing.T) {
 // issuer setting signs every other administrator out on their next page load rather than migrating
 // them silently (decision 3). Warn, not Error: #320 decision 5, pinned here so nobody restores
 // Error on the reasoning that another issuer sounds severe.
-func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
+func TestSessionHandler_InvalidIssuer(t *testing.T) {
 	h := newSessionHarness(t)
 	cookies := h.seed(signedIn(due()))
 	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).
@@ -399,7 +399,7 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 // Step 3, any other failure: decision 19's answer. The stored ID token no longer verifies, a key
 // that left the JWKS for one, so there is no verified token to compare a refreshed one with or to
 // keep, and the session is signed out with no refresh sent.
-func TestJwtSessionHandler_AStoredIDTokenThatNoLongerVerifiesIsSignedOutWithoutARefresh(t *testing.T) {
+func TestSessionHandler_AStoredIDTokenThatNoLongerVerifiesIsSignedOutWithoutARefresh(t *testing.T) {
 	h := newSessionHarness(t)
 	cookies := h.seed(signedIn(due()))
 	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).
@@ -419,7 +419,7 @@ func TestJwtSessionHandler_AStoredIDTokenThatNoLongerVerifiesIsSignedOutWithoutA
 // one. Here the stored ID token is signed by a key the JWKS no longer publishes when the console
 // first fetches it, a console started after the key was removed, and its access token is due, so
 // a middleware that fell through from step 3 to the refresh would send one.
-func TestJwtSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSignedOutWithoutARefresh(t *testing.T) {
+func TestSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSignedOutWithoutARefresh(t *testing.T) {
 	h := newSessionHarness(t)
 
 	signing, retired := oauthclienttest.Keys(t)
@@ -450,7 +450,7 @@ func TestJwtSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSi
 // never notices. Within the parser's ten-minute JWKS age the stored ID token still verifies; from
 // the age on, the next request refetches /certs, finds the key gone, and signs the session out
 // with no refresh sent although the access token is due.
-func TestJwtSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
+func TestSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
 	signing, _ := oauthclienttest.Keys(t)
 	stored := oauthclienttest.SignRS256(t, signing, "removed", oauthclienttest.ValidClaims())
 
@@ -514,7 +514,7 @@ func TestJwtSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
 // Step 4: nothing is refreshed until the recorded expiry is within the margin, and an unknown
 // expiry, 0, never is (decision 16). The stored response and the verified ID token reach the
 // request as they are, and the session is not written.
-func TestJwtSessionHandler_UsesTheStoredTokensUntilTheyAreDue(t *testing.T) {
+func TestSessionHandler_UsesTheStoredTokensUntilTheyAreDue(t *testing.T) {
 	testCases := []struct {
 		name      string
 		expiresAt int64
@@ -562,7 +562,7 @@ func (h *sessionHarness) expectRefreshValidation(cookies []*http.Cookie, accepte
 // ends the session at Warn, as step 3 does; any other, a different sub or sign-in time, ends it at
 // Error, because someone must look at that (decision 14). Nothing from the answer reaches the
 // session, before validation or after.
-func TestJwtSessionHandler_ARefusedRefreshEndsTheSession(t *testing.T) {
+func TestSessionHandler_ARefusedRefreshEndsTheSession(t *testing.T) {
 	testCases := []struct {
 		name    string
 		refused error
@@ -607,7 +607,7 @@ func TestJwtSessionHandler_ARefusedRefreshEndsTheSession(t *testing.T) {
 // token, or there is none to send. The session is signed out as it always was on a failed refresh,
 // and the chain continues unauthenticated. The refusal is the token client's one error (#441
 // decision 3), and the record names it as the client wrote it.
-func TestJwtSessionHandler_AFailedRefreshGrantSignsTheSessionOut(t *testing.T) {
+func TestSessionHandler_AFailedRefreshGrantSignsTheSessionOut(t *testing.T) {
 	t.Run("the auth server refuses the grant", func(t *testing.T) {
 		h := newSessionHarness(t)
 		cookies := h.seed(signedIn(due()))
@@ -664,7 +664,7 @@ func TestJwtSessionHandler_AFailedRefreshGrantSignsTheSessionOut(t *testing.T) {
 // stored ID token before anything is written, and what is written is what the parser accepted, with
 // the effective grant (RFC 6749 section 6: an omitted scope is the one originally granted) and the
 // expiry recomputed from the answer's expires_in. The refreshed identity reaches the request.
-func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
+func TestSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 	testCases := []struct {
 		name string
 		// answer is the token client's, the refresh token already kept when the endpoint issued
@@ -785,7 +785,7 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 // The browser goes away while the grant is in flight, which is where it goes away in practice, and
 // the backend refuses a done context as the real one does, so a check or a write still on the
 // browser's context fails this case by what it leaves in the session as well as by what it observed.
-func TestJwtSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
+func TestSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
 	h := newSessionHarness(t)
 	cookies := h.seed(signedIn(due()))
 

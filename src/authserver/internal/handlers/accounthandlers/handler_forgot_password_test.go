@@ -117,7 +117,7 @@ func (h *heldJobs) runAll(t *testing.T) {
 const forgotPasswordRequestId = "req-forgot-0001"
 
 // forgotPasswordRequest is a submission of the forgot-password form for an address, carrying
-// the settings MiddlewareSettings puts on every request of the application branch and a request id.
+// the settings middleware.Settings puts on every request of the application branch and a request id.
 func forgotPasswordRequest(email string) *http.Request {
 	form := url.Values{}
 	form.Add("email", email)

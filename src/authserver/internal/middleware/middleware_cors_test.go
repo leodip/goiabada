@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestMiddlewareCors(t *testing.T) {
+func TestCORS(t *testing.T) {
 	tests := []struct {
 		name          string
 		path          string
@@ -158,7 +158,7 @@ func TestMiddlewareCors(t *testing.T) {
 			db := mocks_data.NewDatabase(t)
 			tt.setupMock(db)
 
-			handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			}))
 
@@ -182,11 +182,11 @@ func TestMiddlewareCors(t *testing.T) {
 // UNIQUE (origin, client_id) migration 000034 adds. A strict mock is what pins which method runs:
 // the assertion below fails if the middleware goes back to scanning, and mocks_data.NewDatabase(t)
 // fails the test on any call that was not registered (#250).
-func TestMiddlewareCors_ConsultsWebOriginExistsAndNotAScan(t *testing.T) {
+func TestCORS_ConsultsWebOriginExistsAndNotAScan(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil).Once()
 
-	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -203,12 +203,12 @@ func TestMiddlewareCors_ConsultsWebOriginExistsAndNotAScan(t *testing.T) {
 // An unreadable list is not an empty one, and it is not a permissive one either. A database error
 // answering true here would let script on any origin read a token or userinfo response, so the
 // only safe answer is false. Nothing else in this file covers this path (#250).
-func TestMiddlewareCors_ADatabaseErrorFailsClosed(t *testing.T) {
+func TestCORS_ADatabaseErrorFailsClosed(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").
 		Return(false, errors.New("the database is unreachable")).Once()
 
-	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -230,11 +230,11 @@ func TestMiddlewareCors_ADatabaseErrorFailsClosed(t *testing.T) {
 // Read through Result().Header rather than the recorder's live map: the live map shows a header
 // that was set even if the response never carried it, which is how a test of a header can be
 // green about bytes that do not exist.
-func TestMiddlewareCors_APreflightIsCacheable(t *testing.T) {
+func TestCORS_APreflightIsCacheable(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 
-	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -249,7 +249,7 @@ func TestMiddlewareCors_APreflightIsCacheable(t *testing.T) {
 
 // Seam 4 of #386 for the CORS middleware, stage 7.
 //
-// MiddlewareCors is the one consumer in this batch whose port is reached from a middleware rather
+// CORS is the one consumer in this batch whose port is reached from a middleware rather
 // than a handler, and the one where dropping the request's context would be worse than slow: the
 // preflight decision is made inside AllowOriginFunc, which has the request in scope and nothing
 // else, so a WebOriginExists issued on context.Background() would keep answering for a browser
@@ -275,12 +275,12 @@ func theCorsRequestsContext() interface{} {
 
 // The accept arm: the origin lookup on a gated path is issued on behalf of the preflight that
 // asked for it.
-func TestMiddlewareCors_ChecksTheOriginUnderTheRequestsContext(t *testing.T) {
+func TestCORS_ChecksTheOriginUnderTheRequestsContext(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	db.On("WebOriginExists", theCorsRequestsContext(), mock.Anything, "http://allowed.com").
 		Return(true, nil).Once()
 
-	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -294,10 +294,10 @@ func TestMiddlewareCors_ChecksTheOriginUnderTheRequestsContext(t *testing.T) {
 // The reject arm: the discovery URL is allowed by the path alone, so the origin port is never
 // reached and there is no context to get wrong. It is the arm that stops the accept arm passing
 // on a middleware that consults the database unconditionally.
-func TestMiddlewareCors_AnUngatedPathReachesNoOriginPort(t *testing.T) {
+func TestCORS_AnUngatedPathReachesNoOriginPort(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	handler := MiddlewareCors(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

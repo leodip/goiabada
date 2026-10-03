@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"net/http"
@@ -19,7 +19,7 @@ type cookieNamer interface {
 	DeletionCookie(name string) *http.Cookie
 }
 
-// MiddlewareCookieReset deletes whatever an earlier session store left in this browser,
+// CookieReset deletes whatever an earlier session store left in this browser,
 // and takes the session once so the rest of the chain gets it for free.
 //
 // The first half is not housekeeping. The chunked cookie store split a session across up
@@ -42,7 +42,7 @@ type cookieNamer interface {
 // type through a mock. That type left with securecookie, and a store's only errors now are
 // storage failures, which the middlewares downstream answer as 500 with the cause logged
 // rather than by signing the visitor out (decision 11, #270).
-func MiddlewareCookieReset(sessionStore sessionstore.Store, sessionName string) func(next http.Handler) http.Handler {
+func CookieReset(sessionStore sessionstore.Store, sessionName string) func(next http.Handler) http.Handler {
 	namer, _ := sessionStore.(cookieNamer)
 
 	return func(next http.Handler) http.Handler {

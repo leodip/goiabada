@@ -44,7 +44,7 @@ import (
 // Only two things are supplied rather than performed. The bearer token is placed in the
 // request context in the shape JwtAuthorizationHeaderToContext would leave it, since
 // signature validation is not what this test claims; and the settings come from the context
-// rather than from MiddlewareSettings, because initMiddleware is not what is under test.
+// rather than from middleware.Settings, because initMiddleware is not what is under test.
 //
 // What the handler answers is deliberately not asserted, only that it is not a 429: these
 // cases own the wiring, and asserting a handler's own response here would duplicate its
@@ -102,7 +102,7 @@ const (
 		"?algorithm=SHA1&digits=6&issuer=Goiabada&period=30&secret=" + routesTestOTPSecret
 )
 
-// routesTestSettings is what MiddlewareSettings would put in the context. Self-registration
+// routesTestSettings is what middleware.Settings would put in the context. Self-registration
 // and SMTP are on, or two of the handlers below refuse before reaching their credential
 // check. Both audit sinks are off, which keeps the real AuditLogger from writing rows the
 // database mock was never asked for; that it reads settings at all is #212's finding, not
@@ -181,7 +181,7 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 	return s
 }
 
-// withRoutesTestSettings puts in the context what MiddlewareSettings puts there in
+// withRoutesTestSettings puts in the context what middleware.Settings puts there in
 // production. Both the handlers and the browser rejection page read it from there.
 func withRoutesTestSettings(r *http.Request) *http.Request {
 	return r.WithContext(reqctx.WithSettings(r.Context(), routesTestSettings()))

@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"net"
@@ -299,9 +299,9 @@ func TestParseTrustedProxies(t *testing.T) {
 	})
 }
 
-func TestMiddlewareRealIP_RewritesRemoteAddr(t *testing.T) {
+func TestRealIP_RewritesRemoteAddr(t *testing.T) {
 	var seen string
-	handler := MiddlewareRealIP(true, mustCIDRs(t, "10.0.0.0/8"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RealIP(true, mustCIDRs(t, "10.0.0.0/8"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = r.RemoteAddr
 		w.WriteHeader(http.StatusOK)
 	}))

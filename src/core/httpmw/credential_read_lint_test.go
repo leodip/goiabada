@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"testing"
@@ -38,8 +38,8 @@ import (
 //     RP-initiated logout needs (#109). It owns no credential policy, so a name listed here would
 //     be enforced there by accident rather than by decision.
 //
-// core is named as the tree to walk and core/middleware beneath it as a coverage floor, so the read
-// moving to another kernel package stays covered while a rename that empties core/middleware fails
+// core is named as the tree to walk and core/httpmw beneath it as a coverage floor, so the read
+// moving to another kernel package stays covered while a rename that empties core/httpmw fails
 // here instead of shrinking the walk in silence.
 func TestMiddleware_NoCredentialQueryFallback(t *testing.T) {
 	// The one credential-bearing name no kernel package may read from a form. A value under it
@@ -50,5 +50,5 @@ func TestMiddleware_NoCredentialQueryFallback(t *testing.T) {
 
 	guard.AssertNoCredentialQueryFallback(t, forbidden,
 		"core",
-		"core/middleware")
+		"core/httpmw")
 }

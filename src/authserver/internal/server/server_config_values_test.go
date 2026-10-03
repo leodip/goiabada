@@ -8,8 +8,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/logging/logtest"
-	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,7 @@ import (
 func newConfigValuesTestServer(t *testing.T, cfg *config.Config, remoteAddr *string) *Server {
 	t.Helper()
 
-	trusted, err := custom_middleware.ParseTrustedProxies([]string{"203.0.113.0/24"})
+	trusted, err := httpmw.ParseTrustedProxies([]string{"203.0.113.0/24"})
 	require.NoError(t, err)
 
 	s := newStaticBranchTestServer(mocks_data.NewDatabase(t))

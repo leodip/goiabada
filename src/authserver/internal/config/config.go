@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/middleware"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -69,7 +69,7 @@ func (c *AuthServerConfig) IsCookieSecure() bool {
 // a restriction the operator asked for and cannot get (#425). The value can come
 // from the variable or the flag, so the error names both.
 func (c *AuthServerConfig) TrustedProxyRanges() ([]*net.IPNet, error) {
-	ranges, err := middleware.ParseTrustedProxies(c.TrustedProxies)
+	ranges, err := httpmw.ParseTrustedProxies(c.TrustedProxies)
 	if err != nil {
 		return nil, errs.Wrap(err, "GOIABADA_AUTHSERVER_TRUSTED_PROXIES (--authserver-trusted-proxies)")
 	}

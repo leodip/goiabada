@@ -133,7 +133,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	assert.Equal(t, origin, refreshed.WebOrigins[0].Origin)
 }
 
-// The endpoint stores the canonical origin, which is the string MiddlewareCors compares to the
+// The endpoint stores the canonical origin, which is the string middleware.CORS compares to the
 // browser's Origin header byte for byte. urlutil.CanonicalOrigin owns the table of cases; these
 // two exist to prove the handler calls it at all, and they are the two an administrator produces
 // by accident: a URL copied out of a browser bar, which carries a trailing slash and whatever case

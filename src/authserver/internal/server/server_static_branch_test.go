@@ -22,13 +22,13 @@ import (
 // The static file branch carries neither the settings read nor the session load (#266
 // decision 17).
 //
-// This cannot be asserted anywhere but here. MiddlewareSettings and MiddlewareCookieReset
+// This cannot be asserted anywhere but here. middleware.Settings and httpmw.CookieReset
 // both have their own tests and both pass whatever router they are mounted on; what decides
 // the cost of a page view is which branch serveStaticFiles registers against, and that is a
 // property of this file alone.
 //
 // The cost it removes is not marginal. An auth page references seven same-origin assets and
-// an admin console page nine to eleven, MiddlewareSettings reads settings from the database
+// an admin console page nine to eleven, middleware.Settings reads settings from the database
 // uncached on every request, and after #266 a session load is a database read too. Mounted
 // on the root, one page view would cost seven settings reads and seven session reads for
 // files that can use neither.
@@ -80,7 +80,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 	database.AssertNumberOfCalls(t, "GetSettingsById", 1)
 }
 
-// nilTx is the transaction MiddlewareSettings passes, spelled out so AssertNotCalled names
+// nilTx is the transaction middleware.Settings passes, spelled out so AssertNotCalled names
 // the exact call it is denying rather than any call at all.
 var nilTx = (*sql.Tx)(nil)
 

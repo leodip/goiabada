@@ -26,7 +26,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(MiddlewareSettings(mockDB, PageFaults())(http.HandlerFunc(
+	chimiddleware.RequestID(Settings(mockDB, PageFaults())(http.HandlerFunc(
 		func(http.ResponseWriter, *http.Request) {
 			t.Error("the handler must not be reached when the settings cannot be read")
 		}))).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -67,7 +67,7 @@ func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
 	reached := false
 	// This is the production order: CORS evaluates the origin before the inner RequestID
 	// middleware can put an id on the context. Reordering the two changes the record (#335).
-	MiddlewareCors(mockDB)(chimiddleware.RequestID(http.HandlerFunc(
+	CORS(mockDB)(chimiddleware.RequestID(http.HandlerFunc(
 		func(w http.ResponseWriter, _ *http.Request) {
 			reached = true
 			w.WriteHeader(http.StatusOK)

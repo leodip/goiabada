@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -80,15 +81,15 @@ func (p *passThrough) ServeHTTP(w http.ResponseWriter, r *http.Request) { p.serv
 
 // Off, the middleware is not in the chain at all: it returns the handler it wraps, so no
 // request pays for a switch that is off, and nothing it does can reach a request (#434).
-func TestAPIDebugMiddleware_DisabledReturnsTheHandlerItWraps(t *testing.T) {
+func TestAPIDebug_DisabledReturnsTheHandlerItWraps(t *testing.T) {
 	next := &passThrough{serve: func(w http.ResponseWriter, r *http.Request) {}}
 
-	assert.Same(t, next, APIDebugMiddleware(false)(next))
+	assert.Same(t, next, APIDebug(false)(next))
 }
 
-func TestAPIDebugMiddleware_DisabledPassesStraightThrough(t *testing.T) {
+func TestAPIDebug_DisabledPassesStraightThrough(t *testing.T) {
 	called := false
-	handler := APIDebugMiddleware(false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebug(false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		// When disabled the handler must receive the original writer, not the wrapper.
 		_, wrapped := w.(*responseWriter)
@@ -103,8 +104,8 @@ func TestAPIDebugMiddleware_DisabledPassesStraightThrough(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, recorder.Code)
 }
 
-func TestAPIDebugMiddleware_EnabledWrapsAndPreservesTheResponse(t *testing.T) {
-	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestAPIDebug_EnabledWrapsAndPreservesTheResponse(t *testing.T) {
+	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, wrapped := w.(*responseWriter)
 		assert.True(t, wrapped, "the response writer must be wrapped when debugging is on")
 		w.WriteHeader(http.StatusAccepted)
@@ -120,9 +121,9 @@ func TestAPIDebugMiddleware_EnabledWrapsAndPreservesTheResponse(t *testing.T) {
 
 // The middleware drains the request body to log it, so it has to put it back or
 // the handler downstream would read nothing.
-func TestAPIDebugMiddleware_RequestBodyIsStillReadableDownstream(t *testing.T) {
+func TestAPIDebug_RequestBodyIsStillReadableDownstream(t *testing.T) {
 	var seen string
-	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		_, err := buf.ReadFrom(r.Body)
 		assert.NoError(t, err)
@@ -136,8 +137,8 @@ func TestAPIDebugMiddleware_RequestBodyIsStillReadableDownstream(t *testing.T) {
 	assert.Equal(t, body, seen, "the request body must be restored after being read for logging")
 }
 
-func TestAPIDebugMiddleware_EnabledWithNoRequestBody(t *testing.T) {
-	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestAPIDebug_EnabledWithNoRequestBody(t *testing.T) {
+	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
@@ -187,7 +188,7 @@ func debugRecord(t *testing.T, req *http.Request, respond func(w http.ResponseWr
 
 	var read []byte
 	var readErr error
-	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		read, readErr = io.ReadAll(r.Body)
 		if respond != nil {
 			respond(w)
@@ -200,7 +201,7 @@ func debugRecord(t *testing.T, req *http.Request, respond func(w http.ResponseWr
 	return records[0], string(read), readErr
 }
 
-func TestAPIDebugMiddleware_AnOversizedRequestBodyReachesTheHandlerWhole(t *testing.T) {
+func TestAPIDebug_AnOversizedRequestBodyReachesTheHandlerWhole(t *testing.T) {
 	body := oversizedBody()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", strings.NewReader(body))
 
@@ -213,7 +214,7 @@ func TestAPIDebugMiddleware_AnOversizedRequestBodyReachesTheHandlerWhole(t *test
 	assert.NotContains(t, fmt.Sprint(record.Attrs), "TAIL-SENTINEL")
 }
 
-func TestAPIDebugMiddleware_AnOversizedChunkedRequestBodyIsSaidToBeLargerThanTheCap(t *testing.T) {
+func TestAPIDebug_AnOversizedChunkedRequestBodyIsSaidToBeLargerThanTheCap(t *testing.T) {
 	body := oversizedBody()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", strings.NewReader(body))
 	// What a chunked request looks like to a handler: no declared length.
@@ -229,13 +230,13 @@ func TestAPIDebugMiddleware_AnOversizedChunkedRequestBodyIsSaidToBeLargerThanThe
 
 // The middleware must not buffer a body it will not log: before the handler reads
 // anything, exactly one byte past the cap has left the connection.
-func TestAPIDebugMiddleware_ReadsNoMoreThanOneBytePastTheCapBeforeTheHandler(t *testing.T) {
+func TestAPIDebug_ReadsNoMoreThanOneBytePastTheCapBeforeTheHandler(t *testing.T) {
 	source := &countingBody{Reader: strings.NewReader(oversizedBody())}
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", nil)
 	req.Body = source
 
 	readBeforeHandler := -1
-	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		readBeforeHandler = source.read
 		require.NoError(t, r.Body.Close())
 	}))
@@ -248,7 +249,7 @@ func TestAPIDebugMiddleware_ReadsNoMoreThanOneBytePastTheCapBeforeTheHandler(t *
 // A limit outside the middleware makes the read fail. The handler must see that failure
 // where the body ends, and not a prefix handed over as though it were the whole body,
 // whether the limit falls inside the prefix the middleware reads or after it.
-func TestAPIDebugMiddleware_AReadErrorReachesTheHandler(t *testing.T) {
+func TestAPIDebug_AReadErrorReachesTheHandler(t *testing.T) {
 	for _, limit := range []int64{1000, maxLoggedBody + 1000} {
 		t.Run(fmt.Sprintf("limit %d", limit), func(t *testing.T) {
 			body := oversizedBody()
@@ -271,7 +272,7 @@ func TestAPIDebugMiddleware_AReadErrorReachesTheHandler(t *testing.T) {
 
 // A body the limit cut short can still be valid JSON on its own. It is not logged,
 // because what was read is not what was sent.
-func TestAPIDebugMiddleware_DoesNotLogACutBodyThatParses(t *testing.T) {
+func TestAPIDebug_DoesNotLogACutBodyThatParses(t *testing.T) {
 	body := `{"givenName":"CUT-SENTINEL"}` + strings.Repeat(" ", 100)
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", nil)
@@ -284,14 +285,14 @@ func TestAPIDebugMiddleware_DoesNotLogACutBodyThatParses(t *testing.T) {
 	assert.Contains(t, record.Attrs["request_body"], "50 bytes read, not logged")
 }
 
-func TestAPIDebugMiddleware_AnOversizedResponseReachesTheClientWhole(t *testing.T) {
+func TestAPIDebug_AnOversizedResponseReachesTheClientWhole(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	chunk := strings.Repeat("y", 100_000)
 	const writes = 6
 
 	var capture *responseWriter
-	handler := APIDebugMiddleware(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capture = w.(*responseWriter)
 		for range writes {
 			_, _ = w.Write([]byte(chunk))
@@ -444,9 +445,13 @@ func TestDebugLog_BoundsAnOversizedMethod(t *testing.T) {
 
 	written, ok := records[0].Attrs["method"].(string)
 	require.True(t, ok)
-	assert.Equal(t, strings.Repeat("M", logging.MaxLoggedField)+
-		logging.TruncationMarker(logging.MaxLoggedField, len(method)), written,
-		"the retained prefix and a marker giving the limit and the true byte count, and nothing more")
+	prefix := strings.Repeat("M", logging.MaxLoggedField)
+	require.True(t, strings.HasPrefix(written, prefix), "the retained prefix is the first MaxLoggedField bytes")
+	marker := strings.TrimPrefix(written, prefix)
+	assert.NotContains(t, marker, "M", "nothing of the method past the retained prefix")
+	assert.Contains(t, marker, strconv.Itoa(logging.MaxLoggedField), "the marker gives the limit")
+	assert.Contains(t, marker, strconv.Itoa(len(method)), "the marker gives the true byte count")
+	assert.Less(t, len(marker), 64, "a marker, and nothing more")
 }
 
 // The request id is on the record because the handler puts it there, not because
@@ -921,14 +926,14 @@ func TestDebugLog_LogsBodiesFaithfully(t *testing.T) {
 // json.NewEncoder(w).Encode(resp) the endpoint writes its body with.
 // -----------------------------------------------------------------------------
 
-// debugAPIRouter mounts handler behind APIDebugMiddleware on a chi router, with the
+// debugAPIRouter mounts handler behind APIDebug on a chi router, with the
 // middleware as the first r.Use under /api/v1/account, which is how routes.go builds
 // the account API, with debug logging on.
 func debugAPIRouter(t *testing.T, method, pattern string, handler http.HandlerFunc) *chi.Mux {
 	t.Helper()
 	router := chi.NewRouter()
 	router.Route("/api/v1/account", func(r chi.Router) {
-		r.Use(APIDebugMiddleware(true))
+		r.Use(APIDebug(true))
 		r.Method(method, pattern, handler)
 	})
 	return router
@@ -938,7 +943,7 @@ func debugAPIRouter(t *testing.T, method, pattern string, handler http.HandlerFu
 // and once inside base64Image, which is a QR of the otpauth:// URL the seed is in.
 // Both must be gone from the log, and the client must still receive exactly what the
 // handler wrote.
-func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
+func TestAPIDebug_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	generator := otp.OTPSecretGenerator{}
@@ -988,7 +993,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 // TOTP code and the seed it was generated from. None may reach the log, and all three
 // must still reach the handler, which is the half that makes the middleware safe to
 // mount in front of a real endpoint rather than merely quiet.
-func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
+func TestAPIDebug_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	generator := otp.OTPSecretGenerator{}
@@ -1071,13 +1076,13 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 // Two cases, one accept and one reject, thin on purpose: the exhaustive table
 // belongs to RequestTargetForLog in src/core/logging, which owns the rule.
 //
-// Both drive APIDebugMiddleware rather than calling debugLog directly, and that
+// Both drive APIDebug rather than calling debugLog directly, and that
 // is load-bearing. debugLog takes the URL as a string parameter, so a test
 // calling it passes whatever string it likes and would still pass with the call
 // site handing over r.URL.String(). The change under test is the call site.
 // -----------------------------------------------------------------------------
 
-func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
+func TestAPIDebug_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {
@@ -1101,7 +1106,7 @@ func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
 // The page=2 beside it is what makes the absence attributable. A line that was
 // never written, or a request that never reached the middleware, would satisfy
 // "the search string is absent" perfectly.
-func TestAPIDebugMiddleware_DoesNotLogAUserSearchStringFromTheQuery(t *testing.T) {
+func TestAPIDebug_DoesNotLogAUserSearchStringFromTheQuery(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {

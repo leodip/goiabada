@@ -34,7 +34,7 @@ func settingsServer(t *testing.T, payload string) *httptest.Server {
 	return server
 }
 
-// runSettingsChain drives MiddlewareSettingsCache against authServerBaseURL and
+// runSettingsChain drives SettingsCache against authServerBaseURL and
 // reports what the next handler saw, or nil if it was never reached.
 func runSettingsChain(t *testing.T, authServerBaseURL string) (*httptest.ResponseRecorder, *api.PublicSettingsResponse) {
 	t.Helper()
@@ -73,7 +73,7 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	// decision 2).
 	chimiddleware.RequestID(
 		i18n.MiddlewareLocale(nil)(
-			MiddlewareSettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL), publicsettings.DefaultTTL))(next),
+			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL), publicsettings.DefaultTTL))(next),
 		),
 	).ServeHTTP(recorder, req)
 
@@ -95,7 +95,7 @@ func wantBody(t *testing.T, locale, key string) string {
 // Changing the issuer in Settings > General then left the console comparing a new
 // iss claim against a stale configured value, and every sign-in attempt landed
 // back at / (#285).
-func TestMiddlewareSettingsCache_IssuerComesFromThePayload(t *testing.T) {
+func TestSettingsCache_IssuerComesFromThePayload(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":true,"issuer":"https://from-authserver.example"}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
@@ -107,7 +107,7 @@ func TestMiddlewareSettingsCache_IssuerComesFromThePayload(t *testing.T) {
 
 // Without this, the case above is satisfied by a middleware that hardcodes a
 // response and ignores the payload entirely.
-func TestMiddlewareSettingsCache_TheOtherFieldsStillComeFromThePayload(t *testing.T) {
+func TestSettingsCache_TheOtherFieldsStillComeFromThePayload(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":true,"issuer":"https://from-authserver.example"}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
@@ -122,7 +122,7 @@ func TestMiddlewareSettingsCache_TheOtherFieldsStillComeFromThePayload(t *testin
 // An auth server too old to serve the field. Absent and explicitly empty decode
 // to the same Go value today, so they are separate cases on purpose: a later
 // change making the field a *string would split them.
-func TestMiddlewareSettingsCache_AbsentIssuerIsRefused(t *testing.T) {
+func TestSettingsCache_AbsentIssuerIsRefused(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
@@ -132,7 +132,7 @@ func TestMiddlewareSettingsCache_AbsentIssuerIsRefused(t *testing.T) {
 	assert.Nil(t, settings, "the next handler must not run with no issuer to validate against")
 }
 
-func TestMiddlewareSettingsCache_EmptyIssuerIsRefused(t *testing.T) {
+func TestSettingsCache_EmptyIssuerIsRefused(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":""}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
@@ -145,7 +145,7 @@ func TestMiddlewareSettingsCache_EmptyIssuerIsRefused(t *testing.T) {
 // Pre-existing behaviour, in this file because the fixture is shared and nothing
 // else in the repository asserts that a failed fetch stops the chain rather than
 // serving a zero-valued response.
-func TestMiddlewareSettingsCache_AnUnreachableAuthServerIsRefused(t *testing.T) {
+func TestSettingsCache_AnUnreachableAuthServerIsRefused(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
 	baseURL := server.URL
 	server.Close()
@@ -161,7 +161,7 @@ func TestMiddlewareSettingsCache_AnUnreachableAuthServerIsRefused(t *testing.T) 
 // and, separately, that it differs from the English one: without that second
 // assertion a middleware that ignored the localizer entirely would still pass here
 // on any key whose two translations happened to match.
-func TestMiddlewareSettingsCache_RefusalsAreLocalized(t *testing.T) {
+func TestSettingsCache_RefusalsAreLocalized(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload string
@@ -210,7 +210,7 @@ func TestMiddlewareSettingsCache_RefusalsAreLocalized(t *testing.T) {
 // nowhere. It names the auth server's address and whatever the dial failed with,
 // which is the operator's to read in the log and not the administrator's to read on
 // a page they cannot act on.
-func TestMiddlewareSettingsCache_TheFetchErrorStaysOutOfTheResponse(t *testing.T) {
+func TestSettingsCache_TheFetchErrorStaysOutOfTheResponse(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
 	baseURL := server.URL
 	server.Close()
@@ -268,7 +268,7 @@ func stackFrameCount(err error) int {
 	return strings.Count(fmt.Sprintf("%+v", err), "\n\t")
 }
 
-func TestMiddlewareSettingsCache_TheFetchRefusalLogsTheStackedErrorValue(t *testing.T) {
+func TestSettingsCache_TheFetchRefusalLogsTheStackedErrorValue(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
 	baseURL := server.URL
 	server.Close()
@@ -281,7 +281,7 @@ func TestMiddlewareSettingsCache_TheFetchRefusalLogsTheStackedErrorValue(t *test
 		"the API client captured a stack; logging the text is what threw it away")
 }
 
-func TestMiddlewareSettingsCache_TheIssuerRefusalLogsAStackedErrorOfItsOwn(t *testing.T) {
+func TestSettingsCache_TheIssuerRefusalLogsAStackedErrorOfItsOwn(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false}`)
 
 	var recorder *httptest.ResponseRecorder
@@ -303,7 +303,7 @@ func TestMiddlewareSettingsCache_TheIssuerRefusalLogsAStackedErrorOfItsOwn(t *te
 // the deadline exists for: a waiter that honours its request's end refuses at once, and one that
 // waited on the fetch regardless would sit on the client's own ten second timeout while holding
 // this handler goroutine open.
-func TestMiddlewareSettingsCache_ACancelledRequestStopsWaiting(t *testing.T) {
+func TestSettingsCache_ACancelledRequestStopsWaiting(t *testing.T) {
 	released := make(chan struct{})
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		<-released

@@ -62,7 +62,7 @@ func accountEmailPut(t *testing.T, body any) *http.Request {
 // puts one on every request.
 const accountEmailRequestId = "req-email-0001"
 
-// accountEmailSettings are the settings MiddlewareSettings puts on the request, with SMTP on, so
+// accountEmailSettings are the settings middleware.Settings puts on the request, with SMTP on, so
 // every case that expects no notice is asserting it where one could have been sent.
 func accountEmailSettings() *models.Settings {
 	return &models.Settings{

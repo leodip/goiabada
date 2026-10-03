@@ -89,19 +89,19 @@ func (s *stubAuditLogger) count(name string) int {
 
 // newTestMiddleware builds the middleware with a real HttpHelper over testTemplateFS and a
 // throwaway audit logger, for the cases that do not look at what was audited.
-func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimiterMiddleware {
+func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimiter {
 	m, _ := newAuditedTestMiddleware(ceremonyStore, enabled)
 	return m
 }
 
-func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
+func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiter, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
 	httpHelper := handlerhelpers.NewHttpHelper(testTemplateFS)
-	return NewRateLimiterMiddleware(ceremonyStore, httpHelper, httpHelper, auditLog, enabled), auditLog
+	return NewRateLimiter(ceremonyStore, httpHelper, httpHelper, auditLog, enabled), auditLog
 }
 
 // limiterRequest builds the request a limited route actually receives. Settings are on the
-// context because MiddlewareSettings is a global router.Use registered ahead of every
+// context because Settings is a global router.Use registered ahead of every
 // per-route limiter, and the browser rejection renders a template, which reads settings off
 // the context. A request built without them panics on the first 429, so this is the shape
 // the reject path has to work in rather than test scaffolding.
@@ -181,7 +181,7 @@ func spellingsOf(local, domain string) []string {
 // from inside the handler, exactly as HandleAuthPwdPost does on a wrong password. A case
 // that drives requests without it is measuring the per-IP tier, whatever it says it is
 // measuring (#219).
-func runPwd(m *RateLimiterMiddleware, email, ip string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+func runPwd(m *RateLimiter, email, ip string, failed bool) (int, bool, *httptest.ResponseRecorder) {
 	form := url.Values{"email": {email}}
 	req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -216,7 +216,7 @@ func runPwd(m *RateLimiterMiddleware, email, ip string, failed bool) (int, bool,
 func TestLimitPwd_PerIP(t *testing.T) {
 	const ipBudget = 30
 
-	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool) {
+	run := func(m *RateLimiter, email, ip string) (int, bool) {
 		code, reached, _ := runPwd(m, email, ip, false)
 		return code, reached
 	}
@@ -523,7 +523,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	const emailBudget = 5
 	const ipBudget = 20
 
-	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool) {
+	run := func(m *RateLimiter, email, ip string) (int, bool) {
 		form := url.Values{"email": {email}}
 		req := limiterRequest(http.MethodPost, "/forgot-password", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -686,7 +686,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 func TestLimitResetPwd_PerIP(t *testing.T) {
 	const budget = 30
 
-	run := func(m *RateLimiterMiddleware, target, ip string) (int, bool) {
+	run := func(m *RateLimiter, target, ip string) (int, bool) {
 		req := limiterRequest(http.MethodGet, target, nil)
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
@@ -772,7 +772,7 @@ func TestLimitResetPwd_PerIP(t *testing.T) {
 func TestLimitActivate_PerIP(t *testing.T) {
 	const budget = 20
 
-	run := func(m *RateLimiterMiddleware, target, ip string) (int, bool) {
+	run := func(m *RateLimiter, target, ip string) (int, bool) {
 		req := limiterRequest(http.MethodGet, target, nil)
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
@@ -858,7 +858,7 @@ func TestLimitActivate_PerIP(t *testing.T) {
 func TestLimitRegister_PerIP(t *testing.T) {
 	const budget = 20
 
-	run := func(m *RateLimiterMiddleware, email, ip string) (int, bool, *httptest.ResponseRecorder) {
+	run := func(m *RateLimiter, email, ip string) (int, bool, *httptest.ResponseRecorder) {
 		form := url.Values{"email": {email}, "password": {"whatever"}}
 		req := limiterRequest(http.MethodPost, "/account/register", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -972,7 +972,7 @@ func TestLimitRegister_PerIP(t *testing.T) {
 func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	const budget = 5
 
-	run := func(m *RateLimiterMiddleware, userId int, failed bool) (int, bool) {
+	run := func(m *RateLimiter, userId int, failed bool) (int, bool) {
 		req := limiterRequest(http.MethodPost, fmt.Sprintf("/auth/otp?userId=%d", userId), nil)
 		rr := httptest.NewRecorder()
 		reached := false
@@ -1082,7 +1082,7 @@ func verificationRequest(subject string) *http.Request {
 // runVerification drives one request through LimitEmailVerification and reports the status,
 // whether the handler ran, and the response. failed is what the handler found when it
 // compared the code, which is the only thing that spends this budget.
-func runVerification(m *RateLimiterMiddleware, subject string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+func runVerification(m *RateLimiter, subject string, failed bool) (int, bool, *httptest.ResponseRecorder) {
 	rr := httptest.NewRecorder()
 	reached := false
 	m.LimitEmailVerification(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1193,7 +1193,7 @@ func TestLimitEmailVerification_PerSubject(t *testing.T) {
 
 // runVerificationSend drives one request through LimitEmailVerificationSend and reports the
 // status, whether the handler ran, and the response. A blank subject carries no token.
-func runVerificationSend(m *RateLimiterMiddleware, subject string) (int, bool, *httptest.ResponseRecorder) {
+func runVerificationSend(m *RateLimiter, subject string) (int, bool, *httptest.ResponseRecorder) {
 	req := limiterRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 	if subject != "" {
 		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
@@ -1304,7 +1304,7 @@ func accountPasswordRequest(target, subject string) *http.Request {
 // runAccountPassword drives one request through LimitAccountPassword and reports the status,
 // whether the handler ran, and the response. failed is what the handler found when it
 // verified the password, which is the only thing that spends this budget.
-func runAccountPassword(m *RateLimiterMiddleware, target, subject string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+func runAccountPassword(m *RateLimiter, target, subject string, failed bool) (int, bool, *httptest.ResponseRecorder) {
 	rr := httptest.NewRecorder()
 	reached := false
 	m.LimitAccountPassword(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1482,7 +1482,7 @@ func TestLimitAccountPassword_PerSubject(t *testing.T) {
 // Every request has to record a failure: since stage 3 the account tiers count nothing
 // else, so a loop of plain requests would drive the per-IP tier instead and the cases below
 // would silently be about a different limiter.
-func tripBrowser(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecorder {
+func tripBrowser(t *testing.T, m *RateLimiter) *httptest.ResponseRecorder {
 	t.Helper()
 	var last *httptest.ResponseRecorder
 	for i := 0; i < 12; i++ {
@@ -1497,7 +1497,7 @@ func tripBrowser(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecor
 }
 
 // tripOAuth drives LimitDCR from one host until it is refused, at a budget of 10.
-func tripOAuth(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecorder {
+func tripOAuth(t *testing.T, m *RateLimiter) *httptest.ResponseRecorder {
 	t.Helper()
 	var last *httptest.ResponseRecorder
 	for i := 0; i < 12; i++ {
@@ -1592,7 +1592,7 @@ func TestRejection_OAuthClass(t *testing.T) {
 // at a budget of 5 failures. Every request has to record a failure: the tier counts nothing
 // else, so a loop of plain requests would never refuse and the case would hang on its own
 // success.
-func tripAPI(t *testing.T, m *RateLimiterMiddleware) *httptest.ResponseRecorder {
+func tripAPI(t *testing.T, m *RateLimiter) *httptest.ResponseRecorder {
 	t.Helper()
 	var last *httptest.ResponseRecorder
 	for i := 0; i < 8; i++ {
@@ -1759,7 +1759,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 // log line, so deleting it or restoring the address it used to interpolate would leave
 // the stage green.
 //
-// The repository already settled the policy this asserts: MiddlewareRequestLogger in
+// The repository already settled the policy this asserts: httpmw.RequestLogger in
 // this same package logs by allowlist "because a denylist fails open", and email is
 // deliberately not on that list. The address is carried by the audit event instead.
 func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
@@ -1800,7 +1800,7 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 // wrong tier, the wrong shape or the wrong audit identifier for one route fails here by name.
 type builtLimiter struct {
 	name    string
-	limit   func(m *RateLimiterMiddleware) func(http.Handler) http.Handler
+	limit   func(m *RateLimiter) func(http.Handler) http.Handler
 	request func() *http.Request
 	// failures is true for a failures-only tier, which only a credential failure the handler
 	// records can spend.
@@ -1842,25 +1842,25 @@ func builtLimiters() []builtLimiter {
 	}
 	return []builtLimiter{
 		{
-			name: "LimitActivate", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitActivate },
+			name: "LimitActivate", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitActivate },
 			request: ipRequest(http.MethodGet, "/activate"), budget: 20,
 			contentType: "text/html; charset=UTF-8", retryAfter: "300",
 			audited: map[string]interface{}{"limiter": "activate", "ip": ip}, warned: ipWarned("activate"),
 		},
 		{
-			name: "LimitRegister", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitRegister },
+			name: "LimitRegister", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitRegister },
 			request: ipRequest(http.MethodPost, "/register"), budget: 20,
 			contentType: "text/html; charset=UTF-8", retryAfter: "300",
 			audited: map[string]interface{}{"limiter": "register", "ip": ip}, warned: ipWarned("register"),
 		},
 		{
-			name: "LimitResetPwd", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitResetPwd },
+			name: "LimitResetPwd", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitResetPwd },
 			request: ipRequest(http.MethodGet, "/reset-password"), budget: 30,
 			contentType: "text/html; charset=UTF-8", retryAfter: "300",
 			audited: map[string]interface{}{"limiter": "reset_pwd", "ip": ip}, warned: ipWarned("reset_pwd"),
 		},
 		{
-			name: "LimitDCR", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitDCR },
+			name: "LimitDCR", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitDCR },
 			request: ipRequest(http.MethodPost, "/connect/register"), budget: 10,
 			contentType: "application/json", retryAfter: "60",
 			audited: map[string]interface{}{"limiter": "dcr", "ip": ip}, warned: ipWarned("dcr"),
@@ -1869,7 +1869,7 @@ func builtLimiters() []builtLimiter {
 			// The bucket is user_7, and the event records the user id itself, as an int64: the
 			// identifier the audit records is not the bucket key, which is why the subject
 			// function returns both.
-			name: "LimitOtp", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitOtp },
+			name: "LimitOtp", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitOtp },
 			request:  func() *http.Request { return limiterRequest(http.MethodPost, "/auth/otp?userId=7", nil) },
 			failures: true, budget: 5,
 			contentType: "text/html; charset=UTF-8", retryAfter: "900",
@@ -1879,7 +1879,7 @@ func builtLimiters() []builtLimiter {
 			},
 		},
 		{
-			name: "LimitEmailVerification", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitEmailVerification },
+			name: "LimitEmailVerification", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitEmailVerification },
 			request:  func() *http.Request { return verificationRequest(subject) },
 			failures: true, budget: 5,
 			contentType: "application/json", retryAfter: "900",
@@ -1888,7 +1888,7 @@ func builtLimiters() []builtLimiter {
 			noSubject: noToken("/api/v1/account/email/verification"),
 		},
 		{
-			name: "LimitAccountPassword", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitAccountPassword },
+			name: "LimitAccountPassword", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitAccountPassword },
 			request:  func() *http.Request { return accountPasswordRequest(accountPasswordRoute, subject) },
 			failures: true, budget: 5,
 			contentType: "application/json", retryAfter: "900",
@@ -1901,7 +1901,7 @@ func builtLimiters() []builtLimiter {
 
 // runBuilt drives one request through a built limiter, recording a credential failure from
 // inside the handler when failed is set, and reports whether the handler ran.
-func runBuilt(m *RateLimiterMiddleware, c builtLimiter, req *http.Request, failed bool) (*httptest.ResponseRecorder, bool) {
+func runBuilt(m *RateLimiter, c builtLimiter, req *http.Request, failed bool) (*httptest.ResponseRecorder, bool) {
 	rr := httptest.NewRecorder()
 	reached := false
 	c.limit(m)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2300,7 +2300,7 @@ func collectTierKeyFields(v reflect.Value, where string, into *[]foundTier, seen
 func TestLimitDCR_PerIP(t *testing.T) {
 	const budget = 10
 
-	run := func(m *RateLimiterMiddleware, ip string) (int, bool) {
+	run := func(m *RateLimiter, ip string) (int, bool) {
 		req := limiterRequest(http.MethodPost, "/connect/register", nil)
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
@@ -2364,7 +2364,7 @@ func TestLimitDCR_PerIP(t *testing.T) {
 // calls RecordCredentialFailure only where ValidateTokenRequest answered invalid_grant for a
 // password grant. A case that drives requests without it is measuring ropc_ip, whatever it
 // says it is measuring (#219).
-func runROPC(m *RateLimiterMiddleware, grantType, username, clientId, ip string,
+func runROPC(m *RateLimiter, grantType, username, clientId, ip string,
 	failed bool) (int, bool, *httptest.ResponseRecorder) {
 
 	form := url.Values{
@@ -2398,7 +2398,7 @@ func runROPC(m *RateLimiterMiddleware, grantType, username, clientId, ip string,
 func TestLimitROPC_PerIP(t *testing.T) {
 	const ipBudget = 30
 
-	run := func(m *RateLimiterMiddleware, username, ip string) (int, bool) {
+	run := func(m *RateLimiter, username, ip string) (int, bool) {
 		code, reached, _ := runROPC(m, "password", username, "app", ip, false)
 		return code, reached
 	}

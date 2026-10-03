@@ -93,7 +93,7 @@ func MiddlewareLocale(uiLocalesReader UILocalesReader) func(http.Handler) http.H
 // MiddlewareLocale does when authHelper is nil.
 //
 // It exists for a middleware that answers a request before MiddlewareLocale has
-// run and so has no localizer to reach for. MiddlewareCsrf is the case: it is
+// run and so has no localizer to reach for. httpmw.CSRF is the case: it is
 // mounted on the root router, above the branch that carries the locale
 // middleware, so that a route registered outside that branch cannot escape the
 // origin check. Moving it down to gain a localizer would trade a fail-safe

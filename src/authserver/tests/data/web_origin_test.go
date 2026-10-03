@@ -188,7 +188,7 @@ func TestDeleteWebOrigin(t *testing.T) {
 	}
 }
 
-// WebOriginExists is what MiddlewareCors consults on every CORS-checked request
+// WebOriginExists is what middleware.CORS consults on every CORS-checked request
 // after #250, in place of reading the whole table. Its answer decides whether a
 // browser is allowed to read a response from /auth/token, /auth/logout or
 // /userinfo, and every test above it injects a mocked Database, so this tier is

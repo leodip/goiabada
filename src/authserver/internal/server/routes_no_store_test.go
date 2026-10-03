@@ -17,8 +17,8 @@ import (
 // exists rather than a pair of spot checks: the route set comes from the router, so a route or a
 // whole group added under /api/v1/ later is covered without this file being edited.
 //
-// The claim is that MiddlewareNoStore is mounted on every API group, in a position early enough to
-// cover refusals as well as successes. Neither the middleware's own table in src/core/middleware
+// The claim is that middleware.NoStore is mounted on every API group, in a position early enough to
+// cover refusals as well as successes. Neither the middleware's own table in src/authserver/internal/middleware
 // nor any handler test can make it. The table composes the middleware around a handler by hand,
 // which is exactly the arrangement that keeps passing when the r.Use line disappears from
 // routes.go; routes_ratelimiter_test.go's own header records the same lesson for the limiters,
@@ -31,9 +31,9 @@ import (
 //
 // WHAT THIS DOES NOT OWN, and must not be described as owning (decision 16). It builds initRoutes
 // alone, so it cannot observe any response the four middleware mounted in initMiddleware produce
-// without calling next: a CORS preflight, which MiddlewareCors answers 200 itself; a settings
-// lookup failure's 500; MiddlewareCookieReset's redirect on a cookie it cannot decode; and
-// MiddlewareSessionIdentifier's return on a session-store error. Those four ship with neither
+// without calling next: a CORS preflight, which middleware.CORS answers 200 itself; a settings
+// lookup failure's 500; httpmw.CookieReset's redirect on a cookie it cannot decode; and
+// middleware.SessionIdentifier's return on a session-store error. Those four ship with neither
 // header field. None of them carries a credential, so RFC 6749 section 5.1 does not reach them.
 // This test is exhaustive over the routes the router registers, and it is not exhaustive over the
 // API's whole response surface.
@@ -114,21 +114,21 @@ func TestInitRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 			// requirement rather than a preference.
 			//
 			// Matched on the runtime function name rather than the function pointer:
-			// every call to MiddlewareNoStore returns a fresh closure with its own
+			// every call to middleware.NoStore returns a fresh closure with its own
 			// wrapper address, so reflect.Pointer comparison against a locally built one
 			// does not hold, while the compiler-assigned name does. A rename of
-			// MiddlewareNoStore fails this test loudly, which is the right outcome.
+			// middleware.NoStore fails this test loudly, which is the right outcome.
 			assert.True(t, strings.HasPrefix(rt.first, noStoreMiddlewareName+"."),
-				"MiddlewareNoStore must be the FIRST middleware on this route so that a "+
+				"middleware.NoStore must be the FIRST middleware on this route so that a "+
 					"refusal written by a guard still carries the pair; the chain starts with %q", rt.first)
 		})
 	}
 }
 
-// noStoreMiddlewareName is the compiler-assigned name of the closure MiddlewareNoStore returns,
+// noStoreMiddlewareName is the compiler-assigned name of the closure middleware.NoStore returns,
 // minus the trailing instance suffix (".1", ".func1") which differs between a mounted instance
 // and a freshly constructed one.
-const noStoreMiddlewareName = "github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareNoStore"
+const noStoreMiddlewareName = "github.com/leodip/goiabada/authserver/internal/middleware.NoStore"
 
 // routeTestPathParam matches a chi path parameter, including the {id:[0-9]+} form.
 var routeTestPathParam = regexp.MustCompile(`\{[^}]+\}`)

@@ -21,25 +21,25 @@ type tokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
-// MiddlewareBearerToken is the bearer guard set for one surface: the parse guard, the scope guards,
+// BearerToken is the bearer guard set for one surface: the parse guard, the scope guards,
 // the user-bound guard and the session guard, answering every refusal through that surface's
 // writer. routes.go builds one for the admin and account APIs and one for /userinfo, so which body a
 // refusal carries is fixed at construction and never inferred from the request (#435).
-type MiddlewareBearerToken struct {
+type BearerToken struct {
 	tokenParser tokenParser
 	refusals    bearerRefusals
 }
 
-// NewMiddlewareBearerTokenForAPI builds the guard set for /api/v1/*, whose refusals answer the
+// NewBearerTokenForAPI builds the guard set for /api/v1/*, whose refusals answer the
 // admin and account API's {error_code, error_description} envelope.
-func NewMiddlewareBearerTokenForAPI(tokenParser tokenParser) *MiddlewareBearerToken {
-	return &MiddlewareBearerToken{tokenParser: tokenParser, refusals: apiBearerRefusals{}}
+func NewBearerTokenForAPI(tokenParser tokenParser) *BearerToken {
+	return &BearerToken{tokenParser: tokenParser, refusals: apiBearerRefusals{}}
 }
 
-// NewMiddlewareBearerTokenForUserInfo builds the guard set for /userinfo, whose refusals answer
+// NewBearerTokenForUserInfo builds the guard set for /userinfo, whose refusals answer
 // {error, error_description} through jsonWriter, the writer the userinfo handler answers through.
-func NewMiddlewareBearerTokenForUserInfo(tokenParser tokenParser, jsonWriter jsonErrorWriter) *MiddlewareBearerToken {
-	return &MiddlewareBearerToken{tokenParser: tokenParser, refusals: userinfoBearerRefusals{jsonWriter: jsonWriter}}
+func NewBearerTokenForUserInfo(tokenParser tokenParser, jsonWriter jsonErrorWriter) *BearerToken {
+	return &BearerToken{tokenParser: tokenParser, refusals: userinfoBearerRefusals{jsonWriter: jsonWriter}}
 }
 
 // bearerScheme is the auth-scheme RFC 6750 section 2.1 defines. It is compared case-insensitively:
@@ -93,7 +93,7 @@ const formMediaType = "application/x-www-form-urlencoded"
 //     context; the scope guard behind it answers the realm-only challenge.
 //
 // A validated token is stored with reqctx.WithBearerToken, which every guard behind this reads.
-func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
+func (m *BearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			headerToken, inHeader := bearerTokenFromHeader(r.Header.Get("Authorization"))

@@ -42,7 +42,7 @@ func fieldCorpus() []string {
 // truncate is escape-then-clip's reference form, for a caller holding the whole
 // string rather than a deliberately unbuilt prefix.
 func truncate(s string, limit int) string {
-	return TruncateCounted(s, limit, len(s))
+	return truncateCounted(s, limit, len(s))
 }
 
 // -----------------------------------------------------------------------------

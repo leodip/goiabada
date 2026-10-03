@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Every admin and account API route runs under MiddlewareSettings, so a handler reached without
+// Every admin and account API route runs under middleware.Settings, so a handler reached without
 // settings is a wiring defect. It answers the one JSON 500 envelope this surface uses, with
 // reqctx.ErrNoSettings in the record, and this row stands for every settings read in the package:
 // they share this writer (#433 decision 6).

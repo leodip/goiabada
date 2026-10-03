@@ -72,7 +72,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), credentialSubject).Return(user, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, nil, true)
+	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true)
 
 	return &credentialEnv{
 		password: rateLimiter.LimitAccountPassword(
@@ -96,7 +96,7 @@ func (e *credentialEnv) putPassword(t *testing.T, current, next string) *httptes
 	req.Header.Set("Content-Type", "application/json")
 	req.RemoteAddr = "203.0.113.7:5000"
 	// The password validator reads the policy straight off the context and panics on the type
-	// assertion without it, and MiddlewareSettings puts it there in production.
+	// assertion without it, and middleware.Settings puts it there in production.
 	ctx := reqctx.WithSettings(req.Context(), &models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": credentialSubject})

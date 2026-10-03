@@ -26,7 +26,7 @@ import (
 // error shape rest-api.mdx documents (#426 decision 6). The limit's own boundary through the real
 // root chain is server/body_limit_test.go's; what is claimed here is the handler's answer.
 
-// cutBody is body behind a limit of limit bytes, as the root's MiddlewareBodyLimit leaves it.
+// cutBody is body behind a limit of limit bytes, as the root's httpmw.BodyLimit leaves it.
 func cutBody(w http.ResponseWriter, body string, limit int) io.ReadCloser {
 	return http.MaxBytesReader(w, io.NopCloser(strings.NewReader(body)), int64(limit))
 }

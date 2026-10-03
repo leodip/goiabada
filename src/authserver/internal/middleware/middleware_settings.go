@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -20,9 +20,9 @@ type settingsDatabase interface {
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 }
 
-// MiddlewareSettings puts the settings row on the request's context. A failure to read it is
+// Settings puts the settings row on the request's context. A failure to read it is
 // answered through faults, in the format of the branch it is mounted on (#435).
-func MiddlewareSettings(database settingsDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
+func Settings(database settingsDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -36,7 +36,7 @@ func MiddlewareSettings(database settingsDatabase, faults ServerFaults) func(nex
 				// reads. The sentence is unchanged; the log line is decision 9's shape, with the
 				// stack riding inside the error attribute rather than formatted into the message
 				// (#279).
-				requestId := middleware.GetReqID(r.Context())
+				requestId := chimiddleware.GetReqID(r.Context())
 				// No request_id attribute: the installed handler takes it off the context this
 				// call passes it (#320 decision 2). requestId is still read for the body below,
 				// which is what gives whoever hit this something to quote to an operator.
@@ -50,7 +50,7 @@ func MiddlewareSettings(database settingsDatabase, faults ServerFaults) func(nex
 	}
 }
 
-// AuditSwitches answers audit.Log's two switches. It sits beside MiddlewareSettings because it
+// AuditSwitches answers audit.Log's two switches. It sits beside Settings because it
 // reads what that middleware wrote: on every route of the application branch the settings are
 // already on the context, and taking them from there is what spares each audited request a second
 // settings read (#212 item 2, #328 decision 5). The root registrations, the rate limiter's tiers

@@ -401,7 +401,7 @@ type issuanceFacts struct {
 //     6, second half): the session was alive at /auth/completed, and if it was ended while the user
 //     sat on the consent screen, the grant minted here is brand new and no marker written by the
 //     termination can reach it. An EMPTY identifier is the shape that case arrives in, because
-//     MiddlewareSessionIdentifier puts the identifier in the request context ONLY when the row
+//     middleware.SessionIdentifier puts the identifier in the request context ONLY when the row
 //     exists; a non-empty one whose row is gone is the narrower race of a termination committing
 //     after the middleware's read. Neither is inert: grantIsOffline treats an empty session
 //     identifier as an offline grant, so a code issued here would yield an Offline refresh token

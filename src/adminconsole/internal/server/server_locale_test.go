@@ -21,7 +21,7 @@ import (
 //
 // The middleware tables in internal/middleware pass with the chain in either order,
 // because they mount the locale middleware themselves. This drives the real
-// initMiddleware, so moving i18n.MiddlewareLocale back below MiddlewareSettingsCache
+// initMiddleware, so moving i18n.MiddlewareLocale back below middleware.SettingsCache
 // fails the settings rows here and nothing else in the repository.
 //
 // The settings cache points at an address nothing listens on, which is what keeps
@@ -103,7 +103,7 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 		{
 			// The CSRF pair is mounted on the root router, above the branch that
 			// carries the locale middleware, so this row does not depend on the
-			// order the rows above pin: it passes only because MiddlewareCsrf
+			// order the rows above pin: it passes only because httpmw.CSRF
 			// resolves a tentative localizer of its own.
 			name: "the CSRF refusal answers in the language the browser asked for",
 			request: func() *http.Request {

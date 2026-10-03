@@ -169,7 +169,7 @@ func HandleDynamicClientRegistrationPost(
 			"clientIdentifier": client.ClientIdentifier,
 			"grantTypes":       req.GrantTypes,
 			"isPublic":         isPublic,
-			"sourceIP":         middleware.GetClientIPFromRequest(r),
+			"sourceIP":         middleware.ClientIP(r),
 		})
 
 		// 12. Build response (RFC 7591 §3.2.1)

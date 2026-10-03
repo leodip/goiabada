@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"log/slog"
@@ -59,7 +59,7 @@ func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
 
 	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(MiddlewareCsrf()(http.HandlerFunc(
+	chimiddleware.RequestID(CSRF()(http.HandlerFunc(
 		func(http.ResponseWriter, *http.Request) {
 			t.Error("the handler must not be reached on a refused request")
 		}))).ServeHTTP(rr, req)
@@ -89,7 +89,7 @@ func TestSlogConvention_RequestLogCarriesTheInjectedRequestIdOnce(t *testing.T) 
 	logged := logtest.CaptureSlog(t)
 
 	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(MiddlewareRequestLogger(true)(http.HandlerFunc(
+	chimiddleware.RequestID(RequestLogger(true)(http.HandlerFunc(
 		func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }),
 	)).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 

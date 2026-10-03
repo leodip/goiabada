@@ -40,7 +40,7 @@ func (s *stubAllClientsApiClient) UpdateClientWebOrigins(_ context.Context, acce
 
 // The page's effective list is the server-wide one, and this handler is what assembles it.
 //
-// MiddlewareCors checks an incoming Origin against every row in web_origins whatever client it
+// middleware.CORS checks an incoming Origin against every row in web_origins whatever client it
 // was registered against, because a CORS preflight carries no client identity, so an origin
 // registered on the least-trusted client is permitted for every client. Showing only this
 // client's rows implied a scoping the server does not honour and left an administrator unable to

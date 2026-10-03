@@ -69,7 +69,7 @@ func HandleAdminClientWebOriginsGet(
 		}
 
 		// The effective list, which is the page's honest answer to "what may call these
-		// endpoints from a browser today". MiddlewareCors checks an incoming Origin against
+		// endpoints from a browser today". middleware.CORS checks an incoming Origin against
 		// every row in the table regardless of which client it was registered against, because
 		// a CORS preflight carries no client identity, so an origin listed on the least-trusted
 		// client is permitted for every client. The page used to show only this client's rows,

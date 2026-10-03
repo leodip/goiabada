@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"net/http"
@@ -9,8 +9,8 @@ import (
 )
 
 // BodyLimitPolicy is one application's table of how many request-body bytes each of its routes may
-// read. Each server declares its own at its composition root and passes it to MiddlewareBodyLimit;
-// core owns the lookup and owns none of the numbers, as with CsrfPolicy, because the routes and what
+// read. Each server declares its own at its composition root and passes it to BodyLimit;
+// core owns the lookup and owns none of the numbers, as with CSRFPolicy, because the routes and what
 // they legitimately carry are the application's (#426).
 //
 // A limit is found by the pattern chi routes the request to, not by the path, so a route with a
@@ -104,7 +104,7 @@ func (l bodyLimiter) limitFor(method string, pattern string) int64 {
 	return l.fallback
 }
 
-// MiddlewareBodyLimit bounds every request body at the limit policy gives the route the request is
+// BodyLimit bounds every request body at the limit policy gives the route the request is
 // about to reach, before anything downstream can read it. routes is the router the middleware is
 // mounted on, consulted per request; the routes need not exist yet when this is called.
 //
@@ -119,7 +119,7 @@ func (l bodyLimiter) limitFor(method string, pattern string) int64 {
 //
 // Mount it after chi's StripSlashes, whose normalized path is what the lookup reads, and before
 // anything that reads a body at the root.
-func MiddlewareBodyLimit(routes chi.Routes, policy BodyLimitPolicy) func(next http.Handler) http.Handler {
+func BodyLimit(routes chi.Routes, policy BodyLimitPolicy) func(next http.Handler) http.Handler {
 	limiter := newBodyLimiter(policy)
 
 	return func(next http.Handler) http.Handler {

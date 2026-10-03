@@ -1506,7 +1506,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 // issuance's TestIssuePasswordGrant_* and TestMintROPCRefreshTokens cases.
 // Neither half substitutes for the other.
 //
-// This closes a real leak rather than guarding a hypothetical. MiddlewareSessionIdentifier
+// This closes a real leak rather than guarding a hypothetical. middleware.SessionIdentifier
 // is mounted globally with router.Use, so a browser cookie's session lands in the request
 // context even on /auth/token. The handler used to copy that into ROPCGrantInput, and the
 // shared ROPC input builder forwarded it into ID-token generation. A password grant for
@@ -1601,7 +1601,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 }
 
 // TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly is seam 2 for the
-// password grant: the handler driven through a real RateLimiterMiddleware, so what is
+// password grant: the handler driven through a real middleware.RateLimiter, so what is
 // asserted is the limiter's own observable behaviour rather than a spy reporting that a
 // method was called.
 //

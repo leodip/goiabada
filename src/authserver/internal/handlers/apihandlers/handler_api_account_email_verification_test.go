@@ -51,7 +51,7 @@ const (
 	verificationCode    = "ABCD1234"
 )
 
-// newVerificationEnv builds the handler behind a live, enabled RateLimiterMiddleware.
+// newVerificationEnv builds the handler behind a live, enabled middleware.RateLimiter.
 //
 // Through the middleware rather than called directly, and that is the point of this seam:
 // the reservation the handler converts is placed by the limiter and lives in the request
@@ -80,7 +80,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 		Return(true, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, nil, true)
+	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true)
 	handler := HandleAPIAccountEmailVerificationPost(database, auditLogger, rateLimiter, testDataCipher)
 
 	return &verificationEnv{
@@ -111,7 +111,7 @@ func (e *verificationEnv) post(t *testing.T, submitted string) *httptest.Respons
 	req.Header.Set("Content-Type", "application/json")
 	req.RemoteAddr = "203.0.113.7:5000"
 	// The handler reads SMTPEnabled straight off the context and panics on the type
-	// assertion without it, and MiddlewareSettings puts it there in production.
+	// assertion without it, and middleware.Settings puts it there in production.
 	ctx := reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": verificationSubject})

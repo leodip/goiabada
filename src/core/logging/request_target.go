@@ -71,7 +71,7 @@ var loggableQueryParams = map[string]struct{}{
 //
 // It sits beside FieldForLog because three sites log a request target and none
 // may do it differently: the request logger and the CSRF refusal in
-// core/middleware, and the auth server's API debug middleware (#159, #442).
+// core/httpmw, and the auth server's API debug middleware (#159, #442).
 func RequestTargetForLog(u *url.URL) string {
 	// The escaped path and never u.Path: Path is decoded, so a request for
 	// /auth/%0d%0aFAKE reaches a handler carrying a real CRLF. slog's handlers
@@ -79,7 +79,7 @@ func RequestTargetForLog(u *url.URL) string {
 	// is safe only because of the handler currently installed is safe by accident.
 	pathHead, pathLen := escapedPathForLog(u, maxLoggedTarget)
 	if u.RawQuery == "" {
-		return TruncateCounted(pathHead, maxLoggedTarget, pathLen)
+		return truncateCounted(pathHead, maxLoggedTarget, pathLen)
 	}
 
 	values, err := url.ParseQuery(u.RawQuery)
@@ -179,7 +179,7 @@ func (c *clipped) writeQueryComponent(s string) {
 }
 
 func (c *clipped) string() string {
-	return TruncateCounted(c.b.String(), c.limit, c.n)
+	return truncateCounted(c.b.String(), c.limit, c.n)
 }
 
 // clip returns the first limit bytes of s, and s itself when it is shorter.
@@ -204,7 +204,7 @@ func queryComponentForLog(s string) string {
 	if len(head) > maxLoggedQueryComponent {
 		head = head[:maxLoggedQueryComponent]
 	}
-	return TruncateCounted(url.QueryEscape(head), maxLoggedQueryComponent, queryEscapedLen(s))
+	return truncateCounted(url.QueryEscape(head), maxLoggedQueryComponent, queryEscapedLen(s))
 }
 
 // queryComponentLen returns the length queryComponentForLog(s) would have,
@@ -215,7 +215,7 @@ func queryComponentLen(s string) int {
 	if full <= maxLoggedQueryComponent {
 		return full
 	}
-	return maxLoggedQueryComponent + len(TruncationMarker(maxLoggedQueryComponent, full))
+	return maxLoggedQueryComponent + len(truncationMarker(maxLoggedQueryComponent, full))
 }
 
 // queryEscapedLen returns the length url.QueryEscape(s) would have, without

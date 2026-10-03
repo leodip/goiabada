@@ -79,7 +79,7 @@ func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 // 1b. With self-registration enabled the page renders.
 //
 // It used to also assert the form carried a CSRF token. There is no token any more: the POST below
-// is protected by the origin check in MiddlewareCsrf, which reads the browser's own Sec-Fetch-Site
+// is protected by the origin check in httpmw.CSRF, which reads the browser's own Sec-Fetch-Site
 // report and refuses anything it calls cross-site (#155). Nothing about that is visible in the
 // rendered HTML, so the assertion has no successor here rather than a weaker one.
 func TestSelfRegister_GetPage_Enabled(t *testing.T) {

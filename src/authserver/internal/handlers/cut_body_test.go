@@ -27,7 +27,7 @@ import (
 // here is each handler's answer, with the same body read whole under a limit equal to its length
 // and refused one byte short of it. The token endpoint's cases are in handler_token_test.go.
 
-// cutBody is body behind a limit of limit bytes, as the root's MiddlewareBodyLimit leaves it.
+// cutBody is body behind a limit of limit bytes, as the root's httpmw.BodyLimit leaves it.
 func cutBody(w http.ResponseWriter, body string, limit int) io.ReadCloser {
 	return http.MaxBytesReader(w, io.NopCloser(strings.NewReader(body)), int64(limit))
 }

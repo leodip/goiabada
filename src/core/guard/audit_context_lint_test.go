@@ -196,7 +196,7 @@ func inTest(auditLogger testLogger) {
 `)
 
 	// And in a mocks directory, generated scaffolding that raises nothing.
-	tree.write("core/middleware/mocks/exempt.go", `package mocks
+	tree.write("core/httpmw/mocks/exempt.go", `package mocks
 
 import "context"
 

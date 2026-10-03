@@ -897,7 +897,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 }
 
 // TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2 for the password
-// form: the handler driven through a real RateLimiterMiddleware, so what is asserted is the
+// form: the handler driven through a real middleware.RateLimiter, so what is asserted is the
 // limiter's own observable behaviour rather than a spy reporting that a method was called.
 //
 // Through the middleware rather than directly, and this is the point of the case. Since

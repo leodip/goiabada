@@ -102,7 +102,7 @@ func resetCleanGetRequest() *http.Request {
 	return httptest.NewRequest("GET", emaillinks.ResetPasswordPath, nil)
 }
 
-// resetPasswordSettings is what MiddlewareSettings puts on every request of the application
+// resetPasswordSettings is what middleware.Settings puts on every request of the application
 // branch. The handler reads the password policy off it and passes it to the validator, which the
 // stubs below pin by matching the policy rather than anything.
 var resetPasswordSettings = &models.Settings{PasswordPolicy: models.PasswordPolicyMedium}
@@ -1778,7 +1778,7 @@ func TestAuditFailedResetPasswordCode(t *testing.T) {
 		assert.NotContains(t, details, "email")
 	})
 
-	// MiddlewareRealIP resolves the address from a forwarded header in a proxied deployment,
+	// httpmw.RealIP resolves the address from a forwarded header in a proxied deployment,
 	// so this function is still a sink for a value originating outside the process.
 	t.Run("an oversized address is truncated", func(t *testing.T) {
 		req := resetCleanGetRequest()

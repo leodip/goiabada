@@ -9,8 +9,8 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// MiddlewareLocaleFromJWT reads the locale claim from the JWT info already on
-// the request context (set by JwtSessionHandler) and refines the localizer to
+// LocaleFromJWT reads the locale claim from the JWT info already on
+// the request context (set by SessionHandler) and refines the localizer to
 // it. It is the admin console's half of locale resolution: identity here is a
 // validated ID token on every authenticated route, so the refinement is a
 // middleware, where the auth server does it per handler once a password has
@@ -22,7 +22,7 @@ import (
 // previously resolved localizer rather than silently jumping to English (older
 // tokens, scope misconfiguration, a third-party admin client without the
 // profile scope).
-func MiddlewareLocaleFromJWT() func(http.Handler) http.Handler {
+func LocaleFromJWT() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()

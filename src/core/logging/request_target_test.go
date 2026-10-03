@@ -544,7 +544,7 @@ func assertRendersLikeEscapedPath(t *testing.T, u *url.URL, label string, limits
 
 		assert.Equal(t, len(want), total,
 			"%s at limit %d: Path=%q RawPath=%q", label, limit, u.Path, u.RawPath)
-		assert.Equal(t, TruncateCounted(want, limit, len(want)), TruncateCounted(head, limit, total),
+		assert.Equal(t, truncateCounted(want, limit, len(want)), truncateCounted(head, limit, total),
 			"%s at limit %d: Path=%q RawPath=%q", label, limit, u.Path, u.RawPath)
 	}
 }
@@ -670,7 +670,7 @@ func TestQueryComponentForLog_MatchesEscapeThenClip(t *testing.T) {
 		// was bounded. The bound is a cost property and must not become an output
 		// one.
 		escaped := url.QueryEscape(s)
-		assert.Equal(t, TruncateCounted(escaped, maxLoggedQueryComponent, len(escaped)), queryComponentForLog(s),
+		assert.Equal(t, truncateCounted(escaped, maxLoggedQueryComponent, len(escaped)), queryComponentForLog(s),
 			"input of %d bytes", len(s))
 	}
 }
@@ -708,7 +708,7 @@ func TestClipped_MatchesConcatenateThenClip(t *testing.T) {
 		}
 
 		joined := strings.Join(writes, "")
-		assert.Equal(t, TruncateCounted(joined, maxLoggedTarget, len(joined)), c.string(),
+		assert.Equal(t, truncateCounted(joined, maxLoggedTarget, len(joined)), c.string(),
 			"%d writes totalling %d bytes", len(writes), len(joined))
 	}
 }

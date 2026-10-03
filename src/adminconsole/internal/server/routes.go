@@ -43,7 +43,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	authHelper := oauthclient.NewAuthHelper(s.sessionStore, builtin.AdminConsoleSessionName, baseURL, s.cfg.AuthServer.BaseURL)
 
 	// Initialize middleware
-	middlewareJwt := middleware.NewMiddlewareJwt(
+	middlewareJwt := middleware.NewJWT(
 		s.sessionStore,
 		builtin.AdminConsoleSessionName,
 		tokenParser,
@@ -53,7 +53,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		baseURL,
 		builtin.AdminConsoleClientIdentifier,
 	)
-	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
+	jwtSessionHandler := middlewareJwt.SessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManageAccountPermissionIdentifier)})
 	// User-locale refinement sits inside each authenticated chain immediately
@@ -63,7 +63,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	// request intent (?ui_locales or in-flight AuthContext.UILocales) is
 	// present. Falls through to the existing localizer if the claim is
 	// missing — never silently jumps to English.
-	localeFromJWT := middleware.MiddlewareLocaleFromJWT()
+	localeFromJWT := middleware.LocaleFromJWT()
 
 	// Define middleware combinations
 	baseAuth := []func(http.Handler) http.Handler{

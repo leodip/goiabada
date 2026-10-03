@@ -13,7 +13,7 @@ import (
 // 4.3.3) and answers with its tokens.
 // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 //
-// No session identifier is read here on purpose. MiddlewareSessionIdentifier is mounted globally,
+// No session identifier is read here on purpose. middleware.SessionIdentifier is mounted globally,
 // so a browser cookie's session lands in the request context even on the token endpoint, and
 // forwarding it made a password grant for one user carry another user's session identifier in its
 // ID token whenever the browser was logged in as somebody else. ROPC is a direct credential

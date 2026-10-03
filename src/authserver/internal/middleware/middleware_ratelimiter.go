@@ -201,13 +201,13 @@ func withCredentialReservation(r *http.Request, res *reqctx.CredentialReservatio
 // failures-only tier, and a handler invoked outside its middleware. A method rather than a
 // function so a handler can take it as a one-method dependency, the way it takes its audit
 // logger.
-func (m *RateLimiterMiddleware) RecordCredentialFailure(r *http.Request) {
+func (m *RateLimiter) RecordCredentialFailure(r *http.Request) {
 	if res, ok := reqctx.CredentialReservationFrom(r.Context()); ok {
 		res.MarkFailed()
 	}
 }
 
-type RateLimiterMiddleware struct {
+type RateLimiter struct {
 	ceremonyStore authContextGetter
 	renderer      errorRenderer
 	// jsonWriter is the token endpoint's own error writer, which LimitROPC answers a form that does
@@ -236,10 +236,10 @@ type RateLimiterMiddleware struct {
 	ropcIp          *requestTier // RFC 6749 §4.3.2 MUST protect against brute force
 }
 
-func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRenderer, jsonWriter jsonErrorWriter,
-	auditLogger auditEventLogger, enabled bool) *RateLimiterMiddleware {
+func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jsonWriter jsonErrorWriter,
+	auditLogger auditEventLogger, enabled bool) *RateLimiter {
 
-	return &RateLimiterMiddleware{
+	return &RateLimiter{
 		ceremonyStore: ceremonyStore,
 		renderer:      renderer,
 		jsonWriter:    jsonWriter,
@@ -345,7 +345,7 @@ func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRen
 // details carries the identifier the audit event records, which is the one this limiter's
 // neighbours in the audit log already carry for the same event: the email for account
 // tiers, the user id for the OTP tier, the client block for IP tiers.
-func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, t *requestTier, key string,
+func (m *RateLimiter) tripped(w http.ResponseWriter, r *http.Request, t *requestTier, key string,
 	class rejectClass, details map[string]interface{}) bool {
 
 	if t.limiter.Allow(key) {
@@ -366,7 +366,7 @@ func (m *RateLimiterMiddleware) tripped(w http.ResponseWriter, r *http.Request, 
 // class comes from the caller rather than from the tier because one bucket can serve two
 // routes: pwdAccount is shared by the browser password form and the ROPC grant, and each has
 // to answer in the shape its own caller parses.
-func (m *RateLimiterMiddleware) refuse(w http.ResponseWriter, r *http.Request, t *tier, key string,
+func (m *RateLimiter) refuse(w http.ResponseWriter, r *http.Request, t *tier, key string,
 	class rejectClass, details map[string]interface{}) {
 
 	w.Header().Set("Retry-After", strconv.Itoa(int(t.window.Seconds())))
@@ -383,7 +383,7 @@ func (m *RateLimiterMiddleware) refuse(w http.ResponseWriter, r *http.Request, t
 // event: the installed handler reads chi's request id off it, so the warning below joins the
 // request log line for the request that was refused. Without it the operator has a rate-limit
 // warning and no way to tell which request produced it (#320 decision 2).
-func (m *RateLimiterMiddleware) reportTrip(ctx context.Context, t *tier, key string,
+func (m *RateLimiter) reportTrip(ctx context.Context, t *tier, key string,
 	details map[string]interface{}) {
 
 	attrs := []any{"limiter", t.name}
@@ -409,7 +409,7 @@ func (m *RateLimiterMiddleware) reportTrip(ctx context.Context, t *tier, key str
 }
 
 // reject writes the 429 in the shape the route's caller parses.
-func (m *RateLimiterMiddleware) reject(w http.ResponseWriter, r *http.Request, class rejectClass) {
+func (m *RateLimiter) reject(w http.ResponseWriter, r *http.Request, class rejectClass) {
 	// RFC 6585 Section 4's "Responses with the 429 status code MUST NOT be stored by a
 	// cache" binds caches rather than this origin. Saying it in the response is free and
 	// makes the intent explicit to an intermediary that ignores the status code.
@@ -455,7 +455,7 @@ func (m *RateLimiterMiddleware) reject(w http.ResponseWriter, r *http.Request, c
 	}
 }
 
-func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -464,7 +464,7 @@ func (m *RateLimiterMiddleware) LimitPwd(next http.Handler) http.Handler {
 		}
 
 		// Per-IP ceiling first: stops a single host from hammering many distinct
-		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		// accounts. The client IP is trustworthy here (resolved by httpmw.RealIP).
 		ipKey := clientIPRateLimitKey(r)
 		if m.tripped(w, r, m.pwdIp, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
 			return
@@ -518,7 +518,7 @@ type subjectFunc func(r *http.Request) (key string, audited map[string]interface
 // what ratelimit.FailureLimiter's in-flight count makes safe under concurrency; the handler
 // converts it by calling RecordCredentialFailure. A closure rather than a bare defer call,
 // since the verdict is not known until the handler has returned.
-func (m *RateLimiterMiddleware) limitFailuresPerSubject(next http.Handler, t *failureTier, class rejectClass,
+func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier, class rejectClass,
 	subject subjectFunc) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -550,7 +550,7 @@ func (m *RateLimiterMiddleware) limitFailuresPerSubject(next http.Handler, t *fa
 }
 
 // LimitOtp rate limits the OTP check, on the user of the sign-in ceremony the browser is in.
-func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitOtp(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.otp, rejectBrowser, m.ceremonyUserSubject)
 }
 
@@ -561,7 +561,7 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 //
 // No readable auth context means no user to key a bucket on, and the handler rejects that
 // request before reaching the OTP secret or the database.
-func (m *RateLimiterMiddleware) ceremonyUserSubject(r *http.Request) (string, map[string]interface{}, bool) {
+func (m *RateLimiter) ceremonyUserSubject(r *http.Request) (string, map[string]interface{}, bool) {
 	authContext, err := m.ceremonyStore.GetAuthContext(r)
 	if err != nil {
 		return "", nil, false
@@ -582,7 +582,7 @@ func (m *RateLimiterMiddleware) ceremonyUserSubject(r *http.Request) (string, ma
 // valid access token for that account. A request with no readable token passes through to
 // the handler, which answers ACCESS_TOKEN_REQUIRED before touching the code, so the skipped
 // limit costs nothing: LimitOtp's rule from #114, unchanged.
-func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitEmailVerification(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.emailVerification, rejectAPI, tokenSubject)
 }
 
@@ -594,7 +594,7 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 // a per-address key would bucket the caller's own choice of recipient and bound nothing, the
 // reason LimitRegister gives for keying on the client block. A request with no readable token
 // passes through to the handler, which answers ACCESS_TOKEN_REQUIRED before sending anything.
-func (m *RateLimiterMiddleware) LimitEmailVerificationSend(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitEmailVerificationSend(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -634,7 +634,7 @@ func (m *RateLimiterMiddleware) LimitEmailVerificationSend(next http.Handler) ht
 // to follow the account being attacked, and reaching any of them needs a valid access token
 // for that account. A request with no readable token passes through to the handler, which
 // answers ACCESS_TOKEN_REQUIRED before touching the password.
-func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitAccountPassword(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.accountPassword, rejectAPI, tokenSubject)
 }
 
@@ -671,7 +671,7 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 // limitPerIP writes the body of a limiter every request spends, keyed on the client block and
 // refusing in the shape class names. LimitActivate, LimitRegister, LimitResetPwd and LimitDCR
 // are this over their own tier (#439); the event a refusal audits records the block as ip.
-func (m *RateLimiterMiddleware) limitPerIP(next http.Handler, t *requestTier, class rejectClass) http.Handler {
+func (m *RateLimiter) limitPerIP(next http.Handler, t *requestTier, class rejectClass) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -679,7 +679,7 @@ func (m *RateLimiterMiddleware) limitPerIP(next http.Handler, t *requestTier, cl
 			return
 		}
 
-		// The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		// The client IP is trustworthy here (resolved by httpmw.RealIP).
 		ipKey := clientIPRateLimitKey(r)
 		if m.tripped(w, r, t, ipKey, class, map[string]interface{}{"ip": ipKey}) {
 			return
@@ -700,7 +700,7 @@ func (m *RateLimiterMiddleware) limitPerIP(next http.Handler, t *requestTier, cl
 // The threat model moved with it, as it did for LimitResetPwd. The code is the sole
 // credential at 193 bits of entropy, so blind guessing is infeasible; what is left to bound is
 // one host driving unauthenticated account creation, which an IP key does.
-func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitActivate(next http.Handler) http.Handler {
 	return m.limitPerIP(next, m.activate, rejectBrowser)
 }
 
@@ -714,7 +714,7 @@ func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
 //
 // The POST alone is limited. The GET renders a static form and reaches no probe, no mail and no
 // row, so limiting it would only refuse the page to a household behind one address.
-func (m *RateLimiterMiddleware) LimitRegister(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitRegister(next http.Handler) http.Handler {
 	return m.limitPerIP(next, m.register, rejectBrowser)
 }
 
@@ -729,7 +729,7 @@ func (m *RateLimiterMiddleware) LimitRegister(next http.Handler) http.Handler {
 // entropy, so blind guessing is infeasible and the per-account tier was never what bounded
 // it; what is left to bound is one host driving unauthenticated work, which an IP key does.
 // Matches the pwdIpLimiter and forgotPwdIpLimiter precedent.
-func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitResetPwd(next http.Handler) http.Handler {
 	return m.limitPerIP(next, m.resetPwd, rejectBrowser)
 }
 
@@ -737,7 +737,7 @@ func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
 // triggers a DB write, template render and SMTP send. It bounds both a single
 // address (mail-bombing) and a single source IP (resource DoS / spraying many
 // addresses).
-func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitForgotPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -746,7 +746,7 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 		}
 
 		// Per-IP ceiling: stops one host from mail-bombing many addresses. The
-		// client IP is trustworthy here (resolved by MiddlewareRealIP).
+		// client IP is trustworthy here (resolved by httpmw.RealIP).
 		ipKey := clientIPRateLimitKey(r)
 		if m.tripped(w, r, m.forgotPwdIp, ipKey, rejectBrowser, map[string]interface{}{"ip": ipKey}) {
 			return
@@ -771,7 +771,7 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 // registrations a minute for the whole deployment, and would need a setting of its own to turn off.
 // Each registration is bounded whatever the switch says, by the redirect URI count and length and
 // by the request body limit (#219, #426, #428).
-func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitDCR(next http.Handler) http.Handler {
 	return m.limitPerIP(next, m.dcr, rejectOAuth)
 }
 
@@ -780,11 +780,11 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 // keying on the full address hands one client 2^64 buckets, which voids every per-IP
 // tier (measured: 200 of 200 requests allowed against a 30/min budget, #219).
 //
-// Separate from GetClientIPFromRequest, not folded into it, because that function also
+// Separate from ClientIP, not folded into it, because that function also
 // feeds the audit sinks and the recorded addresses, which need the address an administrator
 // can act on rather than the block it sits in.
 //
-// MiddlewareRealIP guarantees the input is a real IP: it drops X-Forwarded-For entries
+// httpmw.RealIP guarantees the input is a real IP: it drops X-Forwarded-For entries
 // and an X-Real-IP that net.ParseIP rejects, and net/http guarantees RemoteAddr is
 // host:port. That matters because CanonicalizeIP returns anything that is not an IP
 // unchanged, "" included, which would put every such request in one global bucket.
@@ -794,9 +794,9 @@ func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 // as one reporting 203.0.113.7, where before every such client shared one bucket with
 // loopback and with each other. And a zone is dropped, so fe80::1%eth0 keys as its /64
 // rather than getting a bucket of its own; that is reachable only for a direct link-local
-// peer, since MiddlewareRealIP drops a zoned entry in a forwarded header.
+// peer, since httpmw.RealIP drops a zoned entry in a forwarded header.
 func clientIPRateLimitKey(r *http.Request) string {
-	return ratelimit.CanonicalizeIP(GetClientIPFromRequest(r))
+	return ratelimit.CanonicalizeIP(ClientIP(r))
 }
 
 // accountNetworkRateLimitKey buckets by an account as seen from one client block, which is
@@ -828,7 +828,7 @@ func accountNetworkRateLimitKey(r *http.Request, identifier string) string {
 // per-account budget meant an attacker escaped the ceiling by naming a second client, and
 // folding in the address meant they escaped it by moving host, so the per-account ceiling
 // RFC 6749 Section 4.3.2 makes a MUST did not exist at all (#107, #219).
-func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled
 		if !m.enabled {
@@ -856,7 +856,7 @@ func (m *RateLimiterMiddleware) LimitROPC(next http.Handler) http.Handler {
 		}
 
 		// Per-IP ceiling first: stops a single host spraying passwords across many distinct
-		// accounts. The client IP is trustworthy here (resolved by MiddlewareRealIP).
+		// accounts. The client IP is trustworthy here (resolved by httpmw.RealIP).
 		ipKey := clientIPRateLimitKey(r)
 		if m.tripped(w, r, m.ropcIp, ipKey, rejectOAuth, map[string]interface{}{"ip": ipKey}) {
 			return

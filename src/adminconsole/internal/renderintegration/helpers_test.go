@@ -36,7 +36,7 @@ func renderWithLayout(t *testing.T, layout, page string, bind map[string]interfa
 }
 
 // renderWithLayoutAs is renderWithLayout with an ID token on the context, which is how every
-// authenticated page reaches the renderer in production: JwtSessionHandler puts an oauthclient.JwtInfo
+// authenticated page reaches the renderer in production: middleware.SessionHandler puts an oauthclient.JwtInfo
 // there and HttpHelper.RenderTemplate turns its claims into the `loggedInUser` bind that
 // menu_layout.html reads for the dropdown label. Passing nil claims is the anonymous request, which
 // is what every other case in this package renders and why the label is blank in all of them.

@@ -33,7 +33,7 @@ import (
 // used to carry ?email= too, and form-urlencoded query parsing turned a '+' in the address
 // into a space, so the pre-registration was never found.
 
-// withSelfRegistration attaches the settings MiddlewareSettings would have, with self-registration
+// withSelfRegistration attaches the settings middleware.Settings would have, with self-registration
 // on or off. The handler refuses both hops while it is off (#425 decision 6).
 func withSelfRegistration(req *http.Request, enabled bool) *http.Request {
 	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: enabled}))
@@ -643,7 +643,7 @@ func TestRefuseActivationLink_AuditPayload(t *testing.T) {
 		assert.NotContains(t, details, "email")
 	})
 
-	// MiddlewareRealIP resolves the address from a forwarded header in a proxied deployment,
+	// httpmw.RealIP resolves the address from a forwarded header in a proxied deployment,
 	// so the entry is a sink for a value originating outside the process.
 	t.Run("an oversized address is truncated", func(t *testing.T) {
 		req := activationCleanGetRequest()

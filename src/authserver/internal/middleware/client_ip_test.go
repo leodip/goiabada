@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// TestGetClientIPFromRequest verifies the client IP is derived from
+// TestClientIP verifies the client IP is derived from
 // RemoteAddr only, ignoring spoofable X-Forwarded-For / X-Real-IP headers.
-func TestGetClientIPFromRequest(t *testing.T) {
+func TestClientIP(t *testing.T) {
 	tests := []struct {
 		name       string
 		remoteAddr string
@@ -51,8 +51,8 @@ func TestGetClientIPFromRequest(t *testing.T) {
 				req.Header.Set(k, v)
 			}
 
-			if got := GetClientIPFromRequest(req); got != tt.want {
-				t.Errorf("GetClientIPFromRequest(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
+			if got := ClientIP(req); got != tt.want {
+				t.Errorf("ClientIP(%q) = %q, want %q", tt.remoteAddr, got, tt.want)
 			}
 		})
 	}
