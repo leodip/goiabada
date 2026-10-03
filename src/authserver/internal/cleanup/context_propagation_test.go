@@ -1,4 +1,4 @@
-package workers
+package cleanup
 
 import (
 	"context"
@@ -40,7 +40,7 @@ func lifecycleContext() context.Context {
 // able to abandon when the process is shutting down.
 func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
@@ -59,7 +59,7 @@ func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
 // pass on a worker that swept unconditionally.
 func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
@@ -82,7 +82,7 @@ func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 // cannot interrupt them waits for the slowest DELETE in the schema.
 func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", theWorkersContext(), mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", theWorkersContext(), mock.Anything).Return(nil).Once()
@@ -103,7 +103,7 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 // shutdown cancels rather than under one the loop invented.
 func TestWorker_DeleteOldAuditLogs_SweepsUnderTheWorkersContext(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	// One short batch, which is what ends the loop after a single statement.
 	mockDB.On("DeleteOldAuditLogs", theWorkersContext(), mock.Anything, mock.Anything, auditLogDeleteBatchSize).

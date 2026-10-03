@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -144,7 +144,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	deviceName, deviceType, deviceOS := useragent.Labels(r)
 
 	userSession := &models.UserSession{
-		SessionIdentifier: uuidutil.New(),
+		SessionIdentifier: uuid.New(),
 		Started:           utcNow,
 		LastAccessed:      utcNow,
 		IpAddress:         ipAddress,
@@ -155,7 +155,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		DeviceName:        deviceName,
 		DeviceType:        deviceType,
 		DeviceOS:          deviceOS,
-		UserAgent:         useragent.Raw(r),
+		UserAgent:         useragent.BoundRaw(r.UserAgent()),
 
 		AuthStateGeneration: authStateGeneration,
 		OtpConfigGeneration: observedOtpConfigGeneration,
@@ -219,7 +219,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		// parser's guess at a browser name and now display only. Keying on them meant a coarser
 		// label collapsed two machines behind one address into one device, and a change of parser
 		// or of label format silently changed which sessions superseded which. The header is
-		// compared as sent, bounded by useragent.Bound on both sides, so the comparison is between
+		// compared as sent, bounded by useragent.BoundRaw on both sides, so the comparison is between
 		// two values cut at the same point (#281).
 		//
 		// Two consequences of pre-upgrade rows carrying an empty header, both accepted rather than

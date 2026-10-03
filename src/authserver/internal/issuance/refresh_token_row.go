@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -31,7 +31,7 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 
 	claims := make(jwt.MapClaims)
 
-	jti := uuidutil.New()
+	jti := uuid.New()
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
@@ -196,7 +196,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 
 	claims := make(jwt.MapClaims)
 
-	jti := uuidutil.New()
+	jti := uuid.New()
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()

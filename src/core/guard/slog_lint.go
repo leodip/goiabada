@@ -238,7 +238,7 @@ var slogSpreadSites = []slogSpreadSite{
 //     the configuration and build the route table before the first request, datafactory, the
 //     migrator, the four engine adapters, whose connection records and contexts are the
 //     connection's and not a request's, and bootstrap, the first-run seed.
-//   - Background work: workers, whose passes run on a timer with no request above them.
+//   - Background work: cleanup, whose passes run on a timer with no request above them.
 //   - Developer tools and generators: droptestdb, both schemadumps, ownershipdump, the two
 //     reference-data generators and pinnedfetch, the download they share.
 //   - Test support: the guards themselves and the refgraph reader they share with ownershipdump,
@@ -269,7 +269,7 @@ var slogNoRequestDirs = []string{
 	"authserver/internal/data/postgresdb",
 	"authserver/internal/data/sqlitedb",
 	"authserver/internal/bootstrap",
-	"authserver/internal/workers",
+	"authserver/internal/cleanup",
 	"authserver/cmd/droptestdb",
 	"authserver/cmd/schemadump",
 	"authserver/internal/data/schemadump",

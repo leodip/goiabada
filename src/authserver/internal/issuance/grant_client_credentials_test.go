@@ -7,7 +7,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -115,7 +115,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 			assertTimeClaimWithinRange(t, claims, "exp", time.Duration(tt.expectedLifetime)*time.Second,
 				"exp should be the expected lifetime from now")
 
-			_, err = uuidutil.Parse(claims["jti"].(string))
+			_, err = uuidtest.Parse(claims["jti"].(string))
 			assert.NoError(t, err)
 
 			mockDB.AssertExpectations(t)

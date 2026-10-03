@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -276,7 +276,7 @@ func repairCases000034(t *testing.T) []repair000034 {
 	// deleted row is one CanonicalOrigin refuses, or one whose canonical form
 	// cannot be stored.
 	for _, c := range cases {
-		canonical, ok := urlutil.CanonicalOrigin(c.raw)
+		canonical, ok := urlmatch.CanonicalOrigin(c.raw)
 		if c.deleted {
 			assert.Truef(t, !ok || len(canonical) > webOriginColumnLimit000034,
 				"%q is deleted here, so the write path must refuse it too, or this migration is destroying a value the endpoint would accept", c.raw)
@@ -286,7 +286,7 @@ func repairCases000034(t *testing.T) []repair000034 {
 		assert.Equalf(t, c.want, canonical,
 			"%q must repair to the same value the write path would store", c.raw)
 
-		again, ok := urlutil.CanonicalOrigin(c.want)
+		again, ok := urlmatch.CanonicalOrigin(c.want)
 		assert.Truef(t, ok && again == c.want,
 			"%q must be its own canonical form, or the repair has not finished", c.want)
 	}

@@ -1,29 +1,18 @@
-// Package uuidutil supplies the random identifiers this server hands out --
-// subjects, session identifiers, JTIs, key identifiers -- and validates ones it
-// reads back. It holds two functions, no types, and depends on nothing outside
-// the standard library.
+// Package uuid supplies the random identifiers this server hands out --
+// subjects, session identifiers, JTIs, key identifiers. It holds one function,
+// New, no types, and depends on nothing outside the standard library. Checking
+// that a value has this shape is a test's job, and is uuidtest.Parse.
 //
 // The values are RFC 9562 version 4 UUIDs in the canonical 36-character
 // 8-4-4-4-12 lowercase form, which is the shape every column, claim, JSON body
 // and template in this repository already carries. Callers hold them as
 // strings: nothing here takes the bits apart again, and no code path branches
 // on a version or a variant.
-package uuidutil
+package uuid
 
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
-	"strings"
-)
-
-// The reasons Parse refuses a string. They are matched with errors.Is, so a
-// test can assert that a case was refused for the reason it was written for
-// rather than merely refused.
-var (
-	errWrongLength = errors.New("uuidutil: wrong length, want 36 characters")
-	errHyphen      = errors.New("uuidutil: hyphen expected at index 8, 13, 18 and 23")
-	errNonHex      = errors.New("uuidutil: non-hex character")
 )
 
 // New returns a fresh RFC 9562 version 4 UUID in the canonical 36-character
@@ -60,40 +49,4 @@ func New() string {
 	out[23] = '-'
 	hex.Encode(out[24:36], b[10:16])
 	return string(out[:])
-}
-
-// Parse checks that s is a UUID in the canonical 36-character 8-4-4-4-12 form
-// and returns it lowercased. Hex digits of either case are accepted. The
-// version and variant nibbles are not inspected, so the nil UUID and a UUID of
-// any version parse.
-//
-// The braced "{...}", "urn:uuid:..." and unhyphenated 32-hex spellings are
-// legal UUIDs that other parsers accept, and this one refuses them on purpose:
-// nothing in this repository produces or receives them, so accepting them would
-// widen the set of strings that can reach a column or a claim while serving no
-// caller (#278). A value that arrives in one of those forms is a value from
-// somewhere unexpected, which is worth an error rather than a silent
-// normalisation.
-func Parse(s string) (string, error) {
-	if len(s) != 36 {
-		return "", errWrongLength
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch i {
-		case 8, 13, 18, 23:
-			if c != '-' {
-				return "", errHyphen
-			}
-		default:
-			if !isHexDigit(c) {
-				return "", errNonHex
-			}
-		}
-	}
-	return strings.ToLower(s), nil
-}
-
-func isHexDigit(c byte) bool {
-	return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F'
 }

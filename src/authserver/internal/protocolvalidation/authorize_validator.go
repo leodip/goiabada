@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -207,13 +207,13 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	// because it is registered (#122).
 	//
 	// Only the requested value is tested, and a second check inside the registration match would be
-	// dead code rather than defence in depth: RedirectURIMatches returns false unless the
-	// registered scheme is "http", so no absolute requested value can ever match a
-	// non-absolute registered one. Swept 63 registered/requested pairs to confirm it, 0
-	// matched.
+	// dead code rather than defence in depth: urlmatch.RedirectURIIsRegistered admits a value beyond
+	// exact equality only when the registered scheme is "http", so no absolute requested value can
+	// ever match a non-absolute registered one. Swept 63 registered/requested pairs to confirm it,
+	// 0 matched.
 	//
 	// Placed before ClientLoadRedirectURIs so a garbage value costs no query.
-	if !urlutil.IsAbsoluteRedirectURI(input.RedirectURI) {
+	if !urlmatch.IsAbsoluteRedirectURI(input.RedirectURI) {
 		// The client identifier is a bounded stored value, so it is safe to log. The
 		// requested URI is unbounded attacker-controlled input and is deliberately left
 		// out: the operator reads the offending value off the client's page.
@@ -231,7 +231,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	for _, r := range client.RedirectURIs {
 		registered = append(registered, r.URI)
 	}
-	if !urlutil.RedirectURIIsRegistered(registered, input.RedirectURI, allowLoopbackPortFlexibility) {
+	if !urlmatch.RedirectURIIsRegistered(registered, input.RedirectURI, allowLoopbackPortFlexibility) {
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotRegistered, nil)
 	}
 	return nil

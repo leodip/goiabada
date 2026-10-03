@@ -7,7 +7,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/rsakey"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -18,7 +18,7 @@ import (
 // It is the one path to a key pair: the rotator's replacement key and the seeder's first two are
 // all built here, where each used to assemble its own (#424).
 func NewKeyPair(dataCipher *encryption.DataCipher, state models.KeyState, bits int) (*models.KeyPair, error) {
-	kid := uuidutil.New()
+	kid := uuid.New()
 
 	material, err := rsakey.Generate(bits, kid)
 	if err != nil {

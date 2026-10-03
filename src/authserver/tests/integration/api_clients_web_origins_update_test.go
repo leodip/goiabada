@@ -134,7 +134,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 }
 
 // The endpoint stores the canonical origin, which is the string middleware.CORS compares to the
-// browser's Origin header byte for byte. urlutil.CanonicalOrigin owns the table of cases; these
+// browser's Origin header byte for byte. urlmatch.CanonicalOrigin owns the table of cases; these
 // two exist to prove the handler calls it at all, and they are the two an administrator produces
 // by accident: a URL copied out of a browser bar, which carries a trailing slash and whatever case
 // was typed, and an explicit default port, which a browser never sends (#250).
@@ -253,7 +253,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 
 	// Everything that is not a canonical origin is refused with one message that names the value
 	// and says what an origin looks like, rather than the three the old validator had. The
-	// scheme case is no longer separate: urlutil.CanonicalOrigin refuses "ftp://example.com" for
+	// scheme case is no longer separate: urlmatch.CanonicalOrigin refuses "ftp://example.com" for
 	// the same reason it refuses "not-a-url", and an administrator needs the same sentence for
 	// both (#250).
 	for _, sent := range []string{"not-a-url", "ftp://example.com", "https://user@example.com", "https://[2001:db8::1]"} {

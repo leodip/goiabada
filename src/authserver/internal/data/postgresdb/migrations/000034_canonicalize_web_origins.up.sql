@@ -2,7 +2,7 @@
 -- the table starts saying that a client may list a given origin once (#250). See
 -- the sqlite migration of the same number for why the rows need repairing, why
 -- the order of the six steps is load-bearing, why the set repaired here is
--- exactly the set urlutil.CanonicalOrigin accepts, and why the delete lists what
+-- exactly the set urlmatch.CanonicalOrigin accepts, and why the delete lists what
 -- is definitely wrong instead of whitelisting host characters.
 --
 -- What differs on this engine:

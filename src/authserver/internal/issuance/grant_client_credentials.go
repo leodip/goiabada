@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -40,7 +40,7 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 	claims["sub"] = client.ClientIdentifier
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
-	claims["jti"] = uuidutil.New()
+	claims["jti"] = uuid.New()
 
 	audCollection := []string{}
 	for _, scope := range scopes {

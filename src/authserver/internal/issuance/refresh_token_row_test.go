@@ -10,7 +10,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -79,7 +79,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -153,7 +153,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, claims, "exp", 1800*time.Second, "exp should be 1800 seconds from now")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -228,7 +228,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 24*time.Hour, "offline_access_max_lifetime should match existing refresh token")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)
@@ -320,7 +320,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", time.Duration(expectedRemainingTime)*time.Second, "exp should be close to the remaining time in the max lifetime")
 	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", time.Duration(expectedRemainingTime)*time.Second, "offline_access_max_lifetime is not correct")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	mockDB.AssertExpectations(t)

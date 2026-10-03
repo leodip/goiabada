@@ -32,7 +32,7 @@ import (
 // slogNoRequestDirs carries: in a package a request runs through, a request context is in reach
 // by construction. In a listed directory -- a startup pass, a worker, a migration, a command -- a
 // Background context is the honest answer and is admitted rather than refused, which is why the
-// four engine adapters' connection contexts, the migrator's, the workers' and both main
+// four engine adapters' connection contexts, the migrator's, the cleanup worker's and both main
 // packages' are untouched by this and stay that way. A package created anywhere else is checked
 // from its first commit (#442).
 //

@@ -1,4 +1,4 @@
-package urlutil
+package urlmatch
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 // TestIsLoopbackHost is the single source of truth for loopback host cases. The malformed
-// bracket and non-numeric port rows are not reachable through RedirectURIMatches today,
+// bracket and non-numeric port rows are not reachable through redirectURIMatches today,
 // which only ever passes url.URL.Hostname(); they are here because decision 9 exports this
 // predicate for reuse in #105's DCR validation, where the caller may pass Host instead.
 func TestIsLoopbackHost(t *testing.T) {
@@ -198,7 +198,7 @@ func TestIsAbsoluteRedirectURI(t *testing.T) {
 }
 
 // TestRedirectURIMatches pins that the port is the only component permitted to differ.
-// Flow gating is not covered here: RedirectURIMatches is flow agnostic and the caller owns
+// Flow gating is not covered here: redirectURIMatches is flow agnostic and the caller owns
 // that decision (decision 12), so those cases live with the authorization validator.
 func TestRedirectURIMatches(t *testing.T) {
 	tests := []struct {
@@ -265,7 +265,7 @@ func TestRedirectURIMatches(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, RedirectURIMatches(tc.registered, tc.requested))
+			assert.Equal(t, tc.want, redirectURIMatches(tc.registered, tc.requested))
 		})
 	}
 }
@@ -278,7 +278,7 @@ func TestRedirectURIIsRegistered(t *testing.T) {
 		flag       bool
 		want       bool
 	}{
-		// the list, which is what this function adds over RedirectURIMatches
+		// the list, which is what this function adds over redirectURIMatches
 		{"exact hit", []string{"https://a.example/cb"}, "https://a.example/cb", false, true},
 		{"exact hit, second entry", []string{"https://a.example/cb", "https://b.example/cb"}, "https://b.example/cb", false, true},
 		{"exact miss", []string{"https://a.example/cb"}, "https://evil.example/cb", false, false},
@@ -288,13 +288,13 @@ func TestRedirectURIIsRegistered(t *testing.T) {
 		{"empty requested against a populated list", []string{"https://a.example/cb"}, "", true, false},
 
 		// the flag, which is decision 7: the flow gate is the caller's parameter and not a
-		// rule read inside urlutil. Keep this pair. The two rows differ in the flag and in
+		// rule read inside urlmatch. Keep this pair. The two rows differ in the flag and in
 		// nothing else, so reading the flow inside the function breaks them and nothing else
 		// in the suite.
 		{"loopback, flag on", []string{"http://127.0.0.1/cb"}, "http://127.0.0.1:54321/cb", true, true},
 		{"loopback, flag off", []string{"http://127.0.0.1/cb"}, "http://127.0.0.1:54321/cb", false, false},
 
-		// one accept and one reject through RedirectURIMatches is all this table owns of its
+		// one accept and one reject through redirectURIMatches is all this table owns of its
 		// behaviour: the exhaustive matching table is TestRedirectURIMatches, directly above,
 		// and owning it twice means two places to update.
 		{"https loopback, flag on", []string{"https://127.0.0.1/cb"}, "https://127.0.0.1:8443/cb", true, false},

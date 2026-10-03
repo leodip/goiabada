@@ -13,7 +13,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,7 +40,7 @@ func TestNewKeyPair_BuildsTheRowTheKeySetStores(t *testing.T) {
 			assert.Equal(t, "RS256", row.Algorithm)
 			assert.Zero(t, row.Id, "NewKeyPair writes nothing, so no id is assigned")
 
-			parsedKid, err := uuidutil.Parse(row.KeyIdentifier)
+			parsedKid, err := uuidtest.Parse(row.KeyIdentifier)
 			require.NoError(t, err)
 			assert.Equal(t, row.KeyIdentifier, parsedKid)
 

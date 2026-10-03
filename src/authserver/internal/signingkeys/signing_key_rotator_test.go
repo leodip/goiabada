@@ -9,7 +9,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -108,7 +108,7 @@ func TestRotator_Rotate_Success(t *testing.T) {
 	// The kid is a canonical v4 the generator produced, not merely a non-empty string: it is
 	// published in the JWKS and every token header names it, so a malformed or duplicated one
 	// would make a signed token unverifiable (#278).
-	parsedKid, err := uuidutil.Parse(created.KeyIdentifier)
+	parsedKid, err := uuidtest.Parse(created.KeyIdentifier)
 	require.NoError(t, err)
 	assert.Equal(t, created.KeyIdentifier, parsedKid)
 	assert.NotEmpty(t, created.PrivateKeyPEM)

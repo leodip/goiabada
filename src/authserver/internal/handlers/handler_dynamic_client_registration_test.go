@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -34,8 +34,8 @@ import (
 // prefix bug this fixes (#105) was duplicated across them and a single-branch table would
 // pass with half the fix.
 //
-// The loopback host decision itself is owned by urlutil.IsLoopbackHost and its 38-row table
-// in src/authserver/internal/urlutil/redirect_uri_test.go. What is pinned here is that this function
+// The loopback host decision itself is owned by urlmatch.IsLoopbackHost and its 38-row table
+// in src/authserver/internal/urlmatch/redirect_uri_test.go. What is pinned here is that this function
 // consults it, plus everything else this function decides.
 func TestValidateRedirectURI(t *testing.T) {
 	tests := []struct {
@@ -58,7 +58,7 @@ func TestValidateRedirectURI(t *testing.T) {
 
 		// Keep these two. They REVERSE the previous behaviour: the old prefix test was
 		// case-sensitive, so an uppercase host was rejected. RFC 3986 section 6.2.2.1 makes
-		// the host case-insensitive and urlutil.IsLoopbackHost folds it, which is the same
+		// the host case-insensitive and urlmatch.IsLoopbackHost folds it, which is the same
 		// rule the authorization path already applies (issue #41, decision 10).
 		{"http://LOCALHOST/cb", true, true, "host case is not meaningful"},
 		{"http://LocalHost:3000/cb", true, true, "host case is not meaningful, with a port"},
@@ -91,9 +91,9 @@ func TestValidateRedirectURI(t *testing.T) {
 		{"not a valid uri", true, false, "unparseable"},
 		{"http:///cb", true, false, "empty host is not loopback"},
 
-		// These two reach their rejection before urlutil sees them, and the reason column
+		// These two reach their rejection before urlmatch sees them, and the reason column
 		// says so deliberately. url.ParseRequestURI rejects a non-numeric port outright, and
-		// a parsed Host can never carry a bracketed hostname, so urlutil's decisions 14 and
+		// a parsed Host can never carry a bracketed hostname, so urlmatch's decisions 14 and
 		// 15 are not reachable from this call site. Their own test file pins them.
 		{"http://localhost:evil/cb", true, false, "rejected by ParseRequestURI, not by the host check"},
 		{"http://127.0.0.1:80@evil.com/cb", true, false, "userinfo smuggling: the real host is evil.com"},
@@ -212,7 +212,7 @@ func TestGenerateDCRClientIdentifier_IsThePrefixAndAUUID(t *testing.T) {
 	rest, found := strings.CutPrefix(first, "dcr_")
 	require.True(t, found, "identifier %q must carry the dcr_ prefix", first)
 
-	parsed, err := uuidutil.Parse(rest)
+	parsed, err := uuidtest.Parse(rest)
 	require.NoError(t, err)
 	assert.Equal(t, rest, parsed, "the generator must emit the canonical lowercase form")
 

@@ -19,7 +19,7 @@ import (
 // RFC 8252 section 7.3: the client registers a portless http loopback redirect URI, then
 // presents an OS-assigned port at authorization time.
 //
-// The unit tests for this behaviour exercise a pure function (authserver/internal/urlutil) and a mocked
+// The unit tests for this behaviour exercise a pure function (authserver/internal/urlmatch) and a mocked
 // database (authserver/internal/protocolvalidation), so neither shows an ephemeral-port
 // callback actually completing. This does (#41).
 func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {

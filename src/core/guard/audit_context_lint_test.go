@@ -151,7 +151,7 @@ func raise(auditLogger logger) {
 }
 `)
 	// A listing names one directory, not its subtree, so a package beneath a listed one is checked.
-	tree.write("authserver/internal/workers/jobs/caught.go", `package jobs
+	tree.write("authserver/internal/cleanup/jobs/caught.go", `package jobs
 
 import "context"
 
@@ -225,7 +225,7 @@ func inMock(auditLogger logger) {
 		"core/sessionstore/aliased.go:12 context.Background() passed to .Log in a request-path package",
 		"core/sessionstore/aliased.go:16 context.TODO() passed to .Log in a request-path package",
 		"authserver/internal/newpackage/caught.go:10 context.Background() passed to .Log in a request-path package",
-		"authserver/internal/workers/jobs/caught.go:10 context.TODO() passed to .Log in a request-path package",
+		"authserver/internal/cleanup/jobs/caught.go:10 context.TODO() passed to .Log in a request-path package",
 	}
 	sort.Strings(want)
 	sort.Strings(got)
