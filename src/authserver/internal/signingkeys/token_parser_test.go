@@ -131,10 +131,10 @@ func TestDecodeAndValidateTokenString_ReturnsEveryClaimOfEachTokenType(t *testin
 			require.NotNil(t, result)
 			assert.Equal(t, token, result.TokenBase64)
 			for k, v := range tt.stringClaims {
-				assert.Equal(t, v, result.GetStringClaim(k), k)
+				assert.Equal(t, v, result.StringClaim(k), k)
 			}
-			assert.Equal(t, now.Unix(), result.GetTimeClaim("iat").Unix())
-			assert.Equal(t, expirationTime.Unix(), result.GetTimeClaim("exp").Unix())
+			assert.Equal(t, now.Unix(), result.TimeClaim("iat").Unix())
+			assert.Equal(t, expirationTime.Unix(), result.TimeClaim("exp").Unix())
 		})
 	}
 }
@@ -153,7 +153,7 @@ func TestDecodeAndValidateTokenString_TheExpirationCheckIsTheCallersChoice(t *te
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		assert.Equal(t, "user123", result.GetStringClaim("sub"))
+		assert.Equal(t, "user123", result.StringClaim("sub"))
 	})
 
 	t.Run("with the check it is refused as expired", func(t *testing.T) {
@@ -209,7 +209,7 @@ func TestDecodeAndValidateTokenString_AcceptsATokenSignedByAFallbackKey(t *testi
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "user123", result.GetStringClaim("sub"))
+	assert.Equal(t, "user123", result.StringClaim("sub"))
 }
 
 // A failed read of the fallback keys reaches the caller beside the parse error, each matchable:

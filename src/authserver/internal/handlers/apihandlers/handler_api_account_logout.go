@@ -134,7 +134,7 @@ func HandleAPIAccountLogoutRequestPost(
 		}
 
 		// Strict session check: current sid must belong to a live session and be associated with this client
-		sid := jwtToken.GetStringClaim("sid")
+		sid := jwtToken.StringClaim("sid")
 		if sid == "" {
 			writeJSONError(w, "Current token lacks session identifier", "INVALID_SESSION", http.StatusUnauthorized)
 			return
@@ -185,7 +185,7 @@ func HandleAPIAccountLogoutRequestPost(
 		now := time.Now().UTC()
 		claims := jwt.MapClaims{}
 		claims["iss"] = settings.Issuer
-		claims["sub"] = jwtToken.GetStringClaim("sub")
+		claims["sub"] = jwtToken.StringClaim("sub")
 		claims["iat"] = now.Unix()
 		claims["sid"] = sid
 		claims["aud"] = client.ClientIdentifier

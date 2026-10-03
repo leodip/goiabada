@@ -80,7 +80,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			http.StatusBadRequest)
 	}
 
-	jti := refreshTokenInfo.GetStringClaim("jti")
+	jti := refreshTokenInfo.StringClaim("jti")
 	if len(jti) == 0 {
 		return nil, errs.New("the refresh token is invalid because it does not contain a jti claim")
 	}
@@ -264,7 +264,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		}
 	}
 
-	refreshTokenType := refreshTokenInfo.GetStringClaim("typ")
+	refreshTokenType := refreshTokenInfo.StringClaim("typ")
 	switch refreshTokenType {
 	case issuance.TokenTypeRefresh.String():
 		// this is a normal refresh token
@@ -305,7 +305,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		// its lifetime is not linked to the user session
 
 		// check if it's still valid according to its max lifetime
-		maxLifetime := refreshTokenInfo.GetTimeClaim("offline_access_max_lifetime")
+		maxLifetime := refreshTokenInfo.TimeClaim("offline_access_max_lifetime")
 		if maxLifetime.IsZero() {
 			return nil, errs.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim")
 		}
@@ -377,7 +377,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	}
 	inputScopes := oidc.SplitScope(scopes)
 
-	sub := refreshTokenInfo.GetStringClaim("sub")
+	sub := refreshTokenInfo.StringClaim("sub")
 	user, err := val.database.GetUserBySubject(ctx, nil, sub)
 	if err != nil {
 		return nil, err

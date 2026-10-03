@@ -29,7 +29,7 @@ import (
 // with real signed tokens.
 //
 // What only this tier can prove is that the generation claim survives a full round trip: emitted
-// as JSON at issuance, parsed back as a float64, read through GetIntClaim and enforced by the
+// as JSON at issuance, parsed back as a float64, read through IntClaim and enforced by the
 // middleware, against real signed tokens.
 //
 // What this tier does NOT own, despite the temptation to assert it here: that the `dont-update`
@@ -793,7 +793,7 @@ func TestCredentialChange_OfflineTokenWorksAfterSessionDeletion(t *testing.T) {
 //
 // The token carries NO sid, so a generation mismatch is the only reason it can be rejected. That
 // makes this single case cover claim emission at issuance, the JSON float64 round trip, parsing
-// through GetIntClaim, and the middleware's sid-less branch, none of which the unit tables can
+// through IntClaim, and the middleware's sid-less branch, none of which the unit tables can
 // establish together.
 func TestCredentialChange_GenerationRoundTripsThroughTheToken(t *testing.T) {
 	grant := createOfflineGrant(t)

@@ -175,7 +175,7 @@ func HandleAPIUserPasswordPut(
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
-			loggedInUser = jwtToken.GetStringClaim("sub")
+			loggedInUser = jwtToken.StringClaim("sub")
 		}
 
 		// Both events, after commit. The pre-existing one is unchanged (decision 7).
@@ -451,7 +451,7 @@ func HandleAPIUserCreatePost(
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
-			loggedInUser = jwtToken.GetStringClaim("sub")
+			loggedInUser = jwtToken.StringClaim("sub")
 		}
 
 		// Log audit event
@@ -578,7 +578,7 @@ func HandleAPIUserEnabledPut(
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
-			loggedInUser = jwtToken.GetStringClaim("sub")
+			loggedInUser = jwtToken.StringClaim("sub")
 		}
 
 		// This endpoint serves BOTH directions, so the write is a compare-and-set and the
@@ -713,7 +713,7 @@ func HandleAPIUserDelete(
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
-			loggedInUser = jwtToken.GetStringClaim("sub")
+			loggedInUser = jwtToken.StringClaim("sub")
 		}
 
 		// Log audit event

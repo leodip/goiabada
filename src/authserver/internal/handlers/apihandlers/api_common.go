@@ -147,5 +147,5 @@ func callerSubject(r *http.Request) string {
 	if !ok {
 		return ""
 	}
-	return jwtToken.GetStringClaim("sub")
+	return jwtToken.StringClaim("sub")
 }

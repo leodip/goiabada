@@ -409,7 +409,7 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 		assert.Equal(t, *response, result.TokenResponse)
 		require.NotNil(t, result.IdToken)
 		assert.Equal(t, idToken, result.IdToken.TokenBase64)
-		assert.Equal(t, "1234567890", result.IdToken.GetStringClaim("sub"))
+		assert.Equal(t, "1234567890", result.IdToken.StringClaim("sub"))
 		// The access and refresh tokens are carried, never decoded: JwtInfo has no field to
 		// decode them into since #427, so the equality with the response above is the whole of it.
 	})
@@ -617,7 +617,7 @@ func TestDecodeAndValidateStoredIDToken(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, raw, token.TokenBase64)
-		assert.Equal(t, "1234567890", token.GetStringClaim("sub"))
+		assert.Equal(t, "1234567890", token.StringClaim("sub"))
 	})
 
 	t.Run("foreign is refused as foreign", func(t *testing.T) {

@@ -42,7 +42,7 @@ func HandleUserInfoGetPost(
 			return
 		}
 
-		sub := jwtToken.GetStringClaim("sub")
+		sub := jwtToken.StringClaim("sub")
 		if len(sub) == 0 {
 			jsonWriter.JsonError(w, r, errs.New("unable to get the sub claim from the access token"))
 			return
@@ -102,7 +102,7 @@ func HandleUserInfoGetPost(
 		// The same split JwtToken.HasScope performs internally, done once: a missing or
 		// non-string scope claim yields one empty element, which matches nothing, exactly as
 		// HasScope answers false for everything in that case.
-		scopes := strings.Split(jwtToken.GetStringClaim("scope"), " ")
+		scopes := strings.Split(jwtToken.StringClaim("scope"), " ")
 
 		// The two fields after the port are this endpoint's side of the two divergences
 		// userclaims keeps as inputs: the base URL is this handler's parameter, which routes.go

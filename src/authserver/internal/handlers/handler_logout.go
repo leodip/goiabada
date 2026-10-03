@@ -339,7 +339,7 @@ func classifyIdTokenHint(
 	// token carries iss, sub, iat, nbf, exp and a session-bound sid, and its aud is the resource
 	// identifier, so GetClientByClientIdentifier resolves it under the collision. Confirming it would
 	// skip the consent page entirely and end that client's half of the session (#109).
-	if typ := idToken.GetStringClaim("typ"); nonIdTokenTypValues[typ] {
+	if typ := idToken.StringClaim("typ"); nonIdTokenTypValues[typ] {
 		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
 	}
 
@@ -350,15 +350,15 @@ func classifyIdTokenHint(
 	//
 	// Kept rather than measured and discarded: the ownership gate at the bottom compares it against
 	// the owner of the session sid names.
-	subject := idToken.GetStringClaim("sub")
+	subject := idToken.StringClaim("sub")
 	if len(subject) == 0 {
 		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "sub is missing or empty")
 	}
-	if _, ok := idToken.GetIntClaim("iat"); !ok {
+	if _, ok := idToken.IntClaim("iat"); !ok {
 		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "iat is missing or is not an integral number")
 	}
 
-	hintIssuer := idToken.GetStringClaim("iss")
+	hintIssuer := idToken.StringClaim("iss")
 	if len(hintIssuer) == 0 {
 		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is missing")
 	}
@@ -366,9 +366,9 @@ func classifyIdTokenHint(
 		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is not this server", "iss", hintIssuer)
 	}
 
-	// GetStringClaim yields "" for an aud that arrived as an array, which is right for a hint: an ID
+	// StringClaim yields "" for an aud that arrived as an array, which is right for a hint: an ID
 	// Token this server issues has exactly one audience, the client identifier.
-	clientIdentifier := idToken.GetStringClaim("aud")
+	clientIdentifier := idToken.StringClaim("aud")
 	if len(clientIdentifier) == 0 {
 		return rejectIdTokenHint(r.Context(), "aud", "reason", "aud is missing, or is not a single string")
 	}
@@ -412,7 +412,7 @@ func classifyIdTokenHint(
 	// nbf is optional on an ID Token, but a present one still binds. Raw map presence rather than a
 	// zero-value test, so a present-but-malformed nbf is refused instead of read as absent.
 	if _, hasNbf := idToken.Claims["nbf"]; hasNbf {
-		nbf, ok := idToken.GetIntClaim("nbf")
+		nbf, ok := idToken.IntClaim("nbf")
 		if !ok {
 			return rejectIdTokenHint(r.Context(), "nbf", "reason", "nbf is present and is not an integral number")
 		}
@@ -424,12 +424,12 @@ func classifyIdTokenHint(
 	// exp must still be THERE. Decision 14 tolerates a past exp, not a missing one: a hint with no
 	// expiry at all is an indefinitely replayable forced-logout token, which is what the tolerance
 	// below is bounded to avoid becoming.
-	exp, ok := idToken.GetIntClaim("exp")
+	exp, ok := idToken.IntClaim("exp")
 	if !ok {
 		return rejectIdTokenHint(r.Context(), "exp", "reason", "exp is missing or is not an integral number")
 	}
 
-	sid := idToken.GetStringClaim("sid")
+	sid := idToken.StringClaim("sid")
 	if len(sid) == 0 {
 		return rejectIdTokenHint(r.Context(), "sid", "reason", "sid is missing")
 	}

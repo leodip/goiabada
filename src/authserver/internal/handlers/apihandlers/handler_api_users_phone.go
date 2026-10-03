@@ -142,7 +142,7 @@ func HandleAPIUserPhonePut(
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
 		if ok {
-			loggedInUser = jwtToken.GetStringClaim("sub")
+			loggedInUser = jwtToken.StringClaim("sub")
 		}
 
 		// Log audit event

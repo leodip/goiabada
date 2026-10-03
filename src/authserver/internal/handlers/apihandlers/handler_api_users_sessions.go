@@ -87,7 +87,7 @@ func HandleAPIUserSessionsGet(
 		// console used to compute for itself from the same claim (#373 decision 1).
 		currentSid := ""
 		if jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context()); ok {
-			currentSid = jwtToken.GetStringClaim("sid")
+			currentSid = jwtToken.StringClaim("sid")
 		}
 
 		sessions, err := buildSessionDetails(r.Context(), database, userSessions, settings, currentSid)

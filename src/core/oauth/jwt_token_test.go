@@ -8,85 +8,71 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetStringClaim(t *testing.T) {
+func TestStringClaim(t *testing.T) {
 	t.Run("Returns string value when claim is string", func(t *testing.T) {
-		jwt := JwtToken{Claims: map[string]interface{}{"test": "value"}}
-		assert.Equal(t, "value", jwt.GetStringClaim("test"))
+		token := JwtToken{Claims: map[string]interface{}{"test": "value"}}
+		assert.Equal(t, "value", token.StringClaim("test"))
 	})
 
 	t.Run("Returns empty string when claim does not exist", func(t *testing.T) {
-		jwt := JwtToken{Claims: map[string]interface{}{}}
-		assert.Equal(t, "", jwt.GetStringClaim("nonexistent"))
+		token := JwtToken{Claims: map[string]interface{}{}}
+		assert.Equal(t, "", token.StringClaim("nonexistent"))
 	})
 
 	t.Run("Returns empty string when claim is int (regression test for panic)", func(t *testing.T) {
-		jwt := JwtToken{Claims: map[string]interface{}{"test": 123}}
+		token := JwtToken{Claims: map[string]interface{}{"test": 123}}
 		// Before the fix, this would panic with: interface conversion: interface {} is int, not string
 		// After the fix, it returns empty string safely
 		assert.NotPanics(t, func() {
-			result := jwt.GetStringClaim("test")
+			result := token.StringClaim("test")
 			assert.Equal(t, "", result)
 		})
 	})
 
 	t.Run("Returns empty string when claim is bool (regression test for panic)", func(t *testing.T) {
-		jwt := JwtToken{Claims: map[string]interface{}{"test": true}}
+		token := JwtToken{Claims: map[string]interface{}{"test": true}}
 		assert.NotPanics(t, func() {
-			result := jwt.GetStringClaim("test")
+			result := token.StringClaim("test")
 			assert.Equal(t, "", result)
 		})
 	})
 
 	t.Run("Returns empty string when claim is object (regression test for panic)", func(t *testing.T) {
-		jwt := JwtToken{Claims: map[string]interface{}{"test": map[string]interface{}{"nested": "value"}}}
+		token := JwtToken{Claims: map[string]interface{}{"test": map[string]interface{}{"nested": "value"}}}
 		assert.NotPanics(t, func() {
-			result := jwt.GetStringClaim("test")
+			result := token.StringClaim("test")
 			assert.Equal(t, "", result)
 		})
 	})
 
 	t.Run("Returns empty string when claim is array (regression test for panic)", func(t *testing.T) {
-		jwt := JwtToken{Claims: map[string]interface{}{"test": []string{"a", "b"}}}
+		token := JwtToken{Claims: map[string]interface{}{"test": []string{"a", "b"}}}
 		assert.NotPanics(t, func() {
-			result := jwt.GetStringClaim("test")
+			result := token.StringClaim("test")
 			assert.Equal(t, "", result)
 		})
 	})
 }
 
-func TestGetTimeClaim(t *testing.T) {
+func TestTimeClaim(t *testing.T) {
 	now := time.Now().Unix()
-	jwt := JwtToken{Claims: map[string]interface{}{"time": float64(now)}}
-	assert.Equal(t, time.Unix(now, 0), jwt.GetTimeClaim("time"))
-	assert.Equal(t, time.Time{}, jwt.GetTimeClaim("nonexistent"))
-}
-
-func TestGetBoolClaim(t *testing.T) {
-	jwt := JwtToken{Claims: map[string]interface{}{"bool": true}}
-	assert.Equal(t, true, *jwt.GetBoolClaim("bool"))
-	assert.Nil(t, jwt.GetBoolClaim("nonexistent"))
-}
-
-func TestGetAddressClaim(t *testing.T) {
-	address := map[string]interface{}{"street": "123 Main St", "city": "Anytown"}
-	jwt := JwtToken{Claims: map[string]interface{}{"address": address}}
-	expected := map[string]string{"street": "123 Main St", "city": "Anytown"}
-	assert.Equal(t, expected, jwt.GetAddressClaim())
-	assert.Empty(t, JwtToken{Claims: map[string]interface{}{}}.GetAddressClaim())
+	token := JwtToken{Claims: map[string]interface{}{"time": float64(now)}}
+	assert.Equal(t, time.Unix(now, 0), token.TimeClaim("time"))
+	assert.Equal(t, time.Time{}, token.TimeClaim("nonexistent"))
 }
 
 func TestHasScope(t *testing.T) {
-	jwt := JwtToken{Claims: map[string]interface{}{"scope": "read write"}}
-	assert.True(t, jwt.HasScope("read"))
-	assert.True(t, jwt.HasScope("write"))
-	assert.False(t, jwt.HasScope("delete"))
+	token := JwtToken{Claims: map[string]interface{}{"scope": "read write"}}
+	assert.True(t, token.HasScope("read"))
+	assert.True(t, token.HasScope("write"))
+	assert.False(t, token.HasScope("delete"))
 	assert.False(t, JwtToken{Claims: map[string]interface{}{}}.HasScope("read"))
 }
 
-// TestGetIntClaim pins the exact returned tuple for every input shape (#106 decision 15,
+// TestIntClaim pins the exact returned tuple for every input shape (#106 decision 15,
 // finding 22).
 //
-// The tuple matters, not just the value. GetIntClaim reports only whether a PRESENT claim
+// The tuple matters, not just the value. IntClaim reports only whether a PRESENT claim
 // parsed, so absent and malformed both yield (0, false) and the accessor cannot tell them
 // apart. That is deliberate: it keeps the generic accessor unsurprising, and the one caller
 // that needs the distinction tests raw map presence first. If this ever changed to report
@@ -95,7 +81,7 @@ func TestHasScope(t *testing.T) {
 // The float64 rows are the load-bearing ones. Claims arrive through encoding/json, so a
 // JSON number is always float64; an implementation asserting to int would reject every
 // well-formed token.
-func TestGetIntClaim(t *testing.T) {
+func TestIntClaim(t *testing.T) {
 	const name = "auth_state_generation"
 
 	tests := []struct {
@@ -133,7 +119,7 @@ func TestGetIntClaim(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.label, func(t *testing.T) {
 			token := JwtToken{Claims: tc.claims}
-			gotValue, gotOk := token.GetIntClaim(name)
+			gotValue, gotOk := token.IntClaim(name)
 			assert.Equal(t, tc.wantOk, gotOk, "ok flag")
 			assert.Equal(t, tc.wantValue, gotValue, "value")
 		})

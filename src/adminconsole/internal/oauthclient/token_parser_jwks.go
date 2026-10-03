@@ -247,10 +247,10 @@ func (tp *JWKSTokenParser) verifyIDToken(ctx context.Context, raw string, accept
 // sameAuthentication is OIDC Core 12.2's comparison of a refreshed ID token with the one it
 // replaces.
 func sameAuthentication(previous, refreshed *oauth.JwtToken) error {
-	if previous.GetStringClaim("iss") != refreshed.GetStringClaim("iss") {
+	if previous.StringClaim("iss") != refreshed.StringClaim("iss") {
 		return errs.Wrap(ErrForeignToken, "the refreshed id token's iss differs from the previous one's")
 	}
-	if previous.GetStringClaim("sub") != refreshed.GetStringClaim("sub") {
+	if previous.StringClaim("sub") != refreshed.StringClaim("sub") {
 		return errs.New("the refreshed id token's sub differs from the previous one's")
 	}
 	if !sameAudience(previous, refreshed) {
@@ -260,8 +260,8 @@ func sameAuthentication(previous, refreshed *oauth.JwtToken) error {
 	_, previousHasAuthTime := previous.Claims["auth_time"]
 	_, refreshedHasAuthTime := refreshed.Claims["auth_time"]
 	if previousHasAuthTime && refreshedHasAuthTime {
-		previousAuthTime, previousOk := previous.GetIntClaim("auth_time")
-		refreshedAuthTime, refreshedOk := refreshed.GetIntClaim("auth_time")
+		previousAuthTime, previousOk := previous.IntClaim("auth_time")
+		refreshedAuthTime, refreshedOk := refreshed.IntClaim("auth_time")
 		if !previousOk || !refreshedOk || previousAuthTime != refreshedAuthTime {
 			return errs.New("the refreshed id token's auth_time differs from the previous one's")
 		}
@@ -275,8 +275,8 @@ func sameAuthentication(previous, refreshed *oauth.JwtToken) error {
 		}
 	}
 
-	if previousIat, ok := previous.GetIntClaim("iat"); ok {
-		refreshedIat, refreshedOk := refreshed.GetIntClaim("iat")
+	if previousIat, ok := previous.IntClaim("iat"); ok {
+		refreshedIat, refreshedOk := refreshed.IntClaim("iat")
 		if !refreshedOk || refreshedIat < previousIat {
 			return errs.New("the refreshed id token's iat is missing or earlier than the previous one's")
 		}
