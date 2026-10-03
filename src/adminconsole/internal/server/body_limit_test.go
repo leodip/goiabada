@@ -118,8 +118,8 @@ func TestInitMiddleware_TheBodyLimitSitsAfterStripSlashes(t *testing.T) {
 	strip := slices.Index(root, "github.com/go-chi/chi/v5/middleware.StripSlashes")
 	require.GreaterOrEqual(t, strip, 0, "StripSlashes must be on the root chain: %v", root)
 	require.Less(t, strip+2, len(root), "the root chain ends too early: %v", root)
-	assert.Equal(t, "github.com/leodip/goiabada/core/middleware.MiddlewareBodyLimit.func1", root[strip+1])
-	assert.Equal(t, "github.com/leodip/goiabada/core/middleware.MiddlewareSkipCsrf.func1", root[strip+2])
+	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.BodyLimit.func1", root[strip+1])
+	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1", root[strip+2])
 }
 
 // readWholeBody answers how much of the body it read, or the limit that refused it.

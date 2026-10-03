@@ -14,7 +14,7 @@ import (
 )
 
 // Seam 4's adapter half (#433 decision 8). audit.Log asks this for its two switches, and the
-// answer is the settings MiddlewareSettings already put on the request when there are any, which
+// answer is the settings Settings already put on the request when there are any, which
 // is what keeps #212 item 2's saved read: an audited request reads the settings row once, not once
 // more per event.
 

@@ -196,7 +196,7 @@
 "error.title" = "Server error"
 "error.body" = "We're sorry, but an error has occurred. You can find further information in the server logs."
 "error.request_id_label" = "Request id:"
-# Written by MiddlewareCsrf, which answers on the root router before the locale
+# Written by httpmw.CSRF, which answers on the root router before the locale
 # middleware runs and so resolves a tentative localizer of its own. The reason for
 # the refusal goes to the log, not to the browser: it names the deployment's own
 # origin handling and is of no use to the person reading the page.
@@ -292,7 +292,7 @@
 "adminconsole.error.title" = "Server error"
 "adminconsole.error.body" = "We're sorry, but an error has occurred. You can find further information in the server logs."
 "adminconsole.error.request_id_label" = "Request id:"
-# The two MiddlewareSettingsCache refusals. Plain text rather than the error page
+# The two middleware.SettingsCache refusals. Plain text rather than the error page
 # above: both mean the settings the page layout renders from are the thing that is
 # missing, so there is no page to render.
 "adminconsole.error.settings_unavailable" = "Unable to load the configuration from the auth server. You can find further information in the server logs."

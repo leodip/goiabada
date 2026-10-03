@@ -20,13 +20,13 @@ import (
 	mock_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
-func TestJwtSessionHandler_InvalidSession(t *testing.T) {
+func TestSessionHandler_InvalidSession(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
+	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -37,7 +37,7 @@ func TestJwtSessionHandler_InvalidSession(t *testing.T) {
 		t.Error("Next handler should not be called")
 	})
 
-	handler := middleware.JwtSessionHandler()(nextHandler)
+	handler := middleware.SessionHandler()(nextHandler)
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -50,7 +50,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
+	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -83,7 +83,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
+	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -151,7 +151,7 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -176,7 +176,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -216,7 +216,7 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			mockAuthHelper := new(mock_middleware.AuthHelper)
-			middleware := NewMiddlewareJwt(new(mock_sessionstore.Store), "test-session", new(mock_middleware.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+			middleware := NewJWT(new(mock_sessionstore.Store), "test-session", new(mock_middleware.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 			req := httptest.NewRequest("GET", testCase.requestLine, nil)
 			require.Equal(t, testCase.requestLine, req.RequestURI, "the request line did not reach the request as sent")
@@ -238,7 +238,7 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 }
 
 func TestBuildScopeString(t *testing.T) {
-	middleware := &MiddlewareJwt{}
+	middleware := &JWT{}
 
 	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
@@ -299,7 +299,7 @@ func TestBuildScopeString(t *testing.T) {
 }
 
 func TestBuildScopeString_Consistency(t *testing.T) {
-	middleware := &MiddlewareJwt{}
+	middleware := &JWT{}
 
 	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
@@ -332,7 +332,7 @@ func TestBuildScopeString_Consistency(t *testing.T) {
 }
 
 func TestBuildScopeString_LargeInput(t *testing.T) {
-	middleware := &MiddlewareJwt{}
+	middleware := &JWT{}
 
 	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
@@ -359,7 +359,7 @@ func TestBuildScopeString_LargeInput(t *testing.T) {
 }
 
 func TestBuildScopeString_SpecialCharacters(t *testing.T) {
-	middleware := &MiddlewareJwt{}
+	middleware := &JWT{}
 
 	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier

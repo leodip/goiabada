@@ -6,14 +6,14 @@ import (
 	"testing"
 )
 
-// Seam B: MiddlewareNoStore as a plain http.Handler decorator (#247).
+// Seam B: NoStore as a plain http.Handler decorator (#247).
 //
 // Every assertion below reads w.Result().Header rather than w.Header(). The two disagree:
 // httptest.ResponseRecorder.Header() returns the live map, which keeps accepting writes long
 // after the response has committed, while Result().Header returns the snapshot taken at
 // WriteHeader, which is what a client actually receives. Asserting through the live map is how a
 // header that never ships stays green, and this repository already carries one such assertion.
-func TestMiddlewareNoStore(t *testing.T) {
+func TestNoStore(t *testing.T) {
 	tests := []struct {
 		name string
 		// handler is what the middleware wraps. The two differ in when they commit the
@@ -44,7 +44,7 @@ func TestMiddlewareNoStore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			called := false
-			handler := MiddlewareNoStore()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler := NoStore()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				tt.handler(w, r)
 			}))
@@ -67,7 +67,7 @@ func TestMiddlewareNoStore(t *testing.T) {
 	}
 }
 
-// TestMiddlewareNoStore_HandlerCanOverrideCacheControl pins the escape hatch the design relies on:
+// TestNoStore_HandlerCanOverrideCacheControl pins the escape hatch the design relies on:
 // Header().Set replaces, so a handler that has a legitimate reason to be cacheable can say so and
 // win. This case exists so that the escape hatch is a stated property rather than an accident of
 // ordering, since a future rewrite as a wrapped ResponseWriter that forced the value on flush
@@ -84,8 +84,8 @@ func TestMiddlewareNoStore(t *testing.T) {
 // tests/integration/cache_directives_test.go for GET /api/v1/account/otp/enrollment, and
 // tests/integration/api_clients_detail_secret_test.go for GET /api/v1/admin/clients/{id}, which is
 // where the decrypted client secret goes out. That same mutation fails there (#247).
-func TestMiddlewareNoStore_HandlerCanOverrideCacheControl(t *testing.T) {
-	handler := MiddlewareNoStore()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestNoStore_HandlerCanOverrideCacheControl(t *testing.T) {
+	handler := NoStore()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=300")
 		w.WriteHeader(http.StatusOK)
 	}))

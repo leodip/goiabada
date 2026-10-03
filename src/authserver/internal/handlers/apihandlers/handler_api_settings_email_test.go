@@ -21,7 +21,7 @@ import (
 )
 
 // sendTestEmailRequest is an administrator's POST /api/v1/admin/settings/email/send-test to
-// "admin@example.com", carrying the settings MiddlewareSettings would have put on it.
+// "admin@example.com", carrying the settings middleware.Settings would have put on it.
 func sendTestEmailRequest(t *testing.T, settings *models.Settings) *http.Request {
 	t.Helper()
 

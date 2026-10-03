@@ -53,15 +53,15 @@ func (chainParser) DecodeAndValidateTokenString(_ context.Context, token string,
 // chainSurface is one of the two guard sets routes.go builds.
 type chainSurface struct {
 	name  string
-	build func() *MiddlewareBearerToken
+	build func() *BearerToken
 }
 
 func chainSurfaces() []chainSurface {
 	return []chainSurface{
-		{name: "api", build: func() *MiddlewareBearerToken { return NewMiddlewareBearerTokenForAPI(chainParser{}) }},
-		{name: "userinfo", build: func() *MiddlewareBearerToken {
+		{name: "api", build: func() *BearerToken { return NewBearerTokenForAPI(chainParser{}) }},
+		{name: "userinfo", build: func() *BearerToken {
 			// The real writer, so the /userinfo body is the bytes on the wire and not a recorded call.
-			return NewMiddlewareBearerTokenForUserInfo(chainParser{}, handlerhelpers.NewHttpHelper(nil))
+			return NewBearerTokenForUserInfo(chainParser{}, handlerhelpers.NewHttpHelper(nil))
 		}},
 	}
 }

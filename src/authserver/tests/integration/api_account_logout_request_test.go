@@ -525,7 +525,7 @@ var (
 	consentHidingClasses = map[string]bool{"hidden": true, "invisible": true, "collapse": true}
 
 	// The Content-Security-Policy directives this helper has been taught, checked against both places
-	// a policy can arrive: the response header, which MiddlewareSecurityHeaders sets on every
+	// a policy can arrive: the response header, which httpmw.SecurityHeaders sets on every
 	// response, and a meta http-equiv in the document head. Those two are the whole of it, so an
 	// allowlist over the directives closes the question rather than sampling it.
 	//
@@ -781,7 +781,7 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 	})
 	// This used to also require a gorilla.csrf.Token control on the form. There is no token any
 	// more (#155): the confirming POST is protected because it is same-origin, which the browser
-	// reports in Sec-Fetch-Site and MiddlewareCsrf enforces, and no hidden field carries that.
+	// reports in Sec-Fetch-Site and httpmw.CSRF enforces, and no hidden field carries that.
 	// The loop above still pins the form's shape, which is what the rest of this helper needs.
 
 	// Which button gives which answer, read the way the End-User reads it. Identifying the affirmative

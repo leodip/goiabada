@@ -182,7 +182,7 @@ func TestUserLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // method's own body: a batch that took the ctx into its signature and left a
 // context.Background() at its QuerySQL would pass every other tier.
 
-// The read every request path makes. MiddlewareSessionIdentifier, /auth/authorize,
+// The read every request path makes. middleware.SessionIdentifier, /auth/authorize,
 // /auth/level1completed, /auth/completed, the token endpoint and the bearer-token middleware all
 // resolve a session identifier through this one method, so it is the read most worth being able
 // to abandon.
@@ -388,7 +388,7 @@ func TestAcquireClientRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
-// WebOriginExists is the read MiddlewareCors makes on every CORS-checked request, and the one
+// WebOriginExists is the read middleware.CORS makes on every CORS-checked request, and the one
 // place in this batch where the refusal has to be an error rather than a value: the middleware
 // fails closed on an error and would allow the origin on a false with no error, so a method that
 // swallowed a cancellation into its exists boolean would turn an abandoned request into a

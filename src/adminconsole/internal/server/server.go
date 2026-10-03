@@ -19,15 +19,15 @@ import (
 	"log/slog"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	adminconsole_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/i18n"
-	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
 
 type Server struct {
@@ -304,7 +304,7 @@ const (
 // ten calls across the wire and a database read at the other end of each, on the module that
 // was kept database-free precisely so it would stay light.
 //
-// It is a correctness fix too. MiddlewareCookieReset answers a cookie it cannot decode with
+// It is a correctness fix too. httpmw.CookieReset answers a cookie it cannot decode with
 // a 302 back to the request target, which is not a sensible answer to a request for a
 // stylesheet.
 //
@@ -319,15 +319,15 @@ func (s *Server) initMiddleware() chi.Router {
 	// The CORS middleware is primarily for the auth server's OAuth endpoints
 
 	// Request ID
-	s.router.Use(middleware.RequestID)
+	s.router.Use(chimiddleware.RequestID)
 
 	// Security headers (before Recoverer so 500 responses carry them too)
-	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(s.cfg.AdminConsole.IsCookieSecure()))
+	s.router.Use(httpmw.SecurityHeaders(s.cfg.AdminConsole.IsCookieSecure()))
 
 	// Real IP: resolve the client IP into r.RemoteAddr from the socket peer and
 	// (when trusted) the forwarded headers, so all downstream consumers (session/
 	// audit IP, request logger) share one trustworthy value.
-	s.router.Use(custom_middleware.MiddlewareRealIP(
+	s.router.Use(httpmw.RealIP(
 		s.cfg.AdminConsole.TrustProxyHeaders,
 		s.trustedProxies,
 	))
@@ -337,7 +337,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// put in a query string landed in the log in full (#159). The redaction lives in the
 	// middleware.
 	//
-	// Mounted unconditionally: MiddlewareRequestLogger returns the next handler untouched
+	// Mounted unconditionally: httpmw.RequestLogger returns the next handler untouched
 	// when the flag is off, so the chain has one shape either way.
 	//
 	// It sits above Recoverer rather than below it so that a panicking request is recorded
@@ -353,34 +353,34 @@ func (s *Server) initMiddleware() chi.Router {
 	// middleware renders the target before calling the next handler.
 	logHttpRequests := s.cfg.AdminConsole.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
-	s.router.Use(custom_middleware.MiddlewareRequestLogger(logHttpRequests))
+	s.router.Use(httpmw.RequestLogger(logHttpRequests))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
 	// wrapped writer and lands in the record (#203).
-	s.router.Use(middleware.Recoverer)
+	s.router.Use(chimiddleware.Recoverer)
 
 	// Strip slashes
-	s.router.Use(middleware.StripSlashes)
+	s.router.Use(chimiddleware.StripSlashes)
 
 	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripSlashes, because
 	// the lookup resolves the route by the path StripSlashes normalized, and before anything else
 	// at the root, so no body is read without a bound.
-	s.router.Use(custom_middleware.MiddlewareBodyLimit(s.router, bodyLimitPolicy()))
+	s.router.Use(httpmw.BodyLimit(s.router, bodyLimitPolicy()))
 
 	// CSRF
 	// Note: CSRF runs before the locale middleware below, so there is no localizer on the
-	// context when a request is rejected. MiddlewareCsrf resolves a tentative one of its own
+	// context when a request is rejected. httpmw.CSRF resolves a tentative one of its own
 	// through i18n.ResolveRequestLocale, so the rejection is localized without moving the
 	// origin check down onto the application branch, where a route registered outside that
 	// branch would escape it.
 	//
-	// MiddlewareSkipCsrf marks the endpoints that are cross-origin by protocol, and MiddlewareCsrf
+	// httpmw.SkipCSRF marks the endpoints that are cross-origin by protocol, and httpmw.CSRF
 	// refuses every other state-changing cross-origin request outright, trusting no origin but this
-	// deployment's own (#155). MiddlewareCsrf takes no configuration; MiddlewareSkipCsrf takes this
+	// deployment's own (#155). httpmw.CSRF takes no configuration; httpmw.SkipCSRF takes this
 	// server's own exemption policy, which until #385 was a table in core naming both binaries'
 	// routes, so each exempted the other's.
-	s.router.Use(custom_middleware.MiddlewareSkipCsrf(csrfPolicy()))
-	s.router.Use(custom_middleware.MiddlewareCsrf())
+	s.router.Use(httpmw.SkipCSRF(csrfPolicy()))
+	s.router.Use(httpmw.CSRF())
 
 	// Everything below is on the application branch, not the root.
 
@@ -394,7 +394,7 @@ func (s *Server) initMiddleware() chi.Router {
 		//
 		// It goes first so that everything below it can answer a request in the
 		// caller's language. It used to go last, which left both of
-		// MiddlewareSettingsCache's refusals unable to reach a localizer: an
+		// middleware.SettingsCache's refusals unable to reach a localizer: an
 		// administrator whose browser asks for pt-BR was told in English that
 		// their auth server needs upgrading. Nothing here depends on that
 		// ordering being the other way round: i18n.resolveLocale reads
@@ -405,11 +405,11 @@ func (s *Server) initMiddleware() chi.Router {
 		i18n.MiddlewareLocale(nil),
 
 		// Adds settings to the request context (fetched from cache, not database)
-		adminconsole_middleware.MiddlewareSettingsCache(s.settingsCache),
+		middleware.SettingsCache(s.settingsCache),
 
 		// Clear the session cookie and redirect if unable to decode it, and delete
 		// whatever the chunked cookie store left in this browser
-		custom_middleware.MiddlewareCookieReset(s.sessionStore, builtin.AdminConsoleSessionName),
+		httpmw.CookieReset(s.sessionStore, builtin.AdminConsoleSessionName),
 	)
 
 	slog.Info("finished initializing middleware")
@@ -436,8 +436,8 @@ func (s *Server) initMiddleware() chi.Router {
 // /auth/logout is likewise absent. This server mounts GET /auth/logout only, and GET is a safe
 // method the origin check never applies to, so the auth server's conditional entry for it would
 // exempt nothing here.
-func csrfPolicy() custom_middleware.CsrfPolicy {
-	return custom_middleware.CsrfPolicy{
+func csrfPolicy() httpmw.CSRFPolicy {
+	return httpmw.CSRFPolicy{
 		// Matched EXACTLY, so a future sibling route is NOT silently exempted: it keeps full CSRF
 		// protection until it is deliberately added here.
 		ExactPaths: []string{
@@ -479,11 +479,11 @@ const (
 )
 
 // bodyLimitPolicy is the admin console's request-body table (#426): how many bytes each route may
-// read, looked up by MiddlewareBodyLimit at the root. A route missing from it gets
+// read, looked up by httpmw.BodyLimit at the root. A route missing from it gets
 // defaultBodyLimit, the smallest limit here, so an omission is a refused request rather than an
 // unbounded read.
-func bodyLimitPolicy() custom_middleware.BodyLimitPolicy {
-	return custom_middleware.BodyLimitPolicy{
+func bodyLimitPolicy() httpmw.BodyLimitPolicy {
+	return httpmw.BodyLimitPolicy{
 		Default: defaultBodyLimit,
 
 		Prefixes: map[string]int64{

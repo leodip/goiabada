@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMiddlewareCookieReset(t *testing.T) {
+func TestCookieReset(t *testing.T) {
 	const testSessionName = "test-session"
 
 	t.Run("No error", func(t *testing.T) {
@@ -23,7 +23,7 @@ func TestMiddlewareCookieReset(t *testing.T) {
 		mockStore.On("Get", mock.Anything, testSessionName).Return(&sessionstore.Session{}, nil)
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-		middleware := MiddlewareCookieReset(mockStore, testSessionName)
+		middleware := CookieReset(mockStore, testSessionName)
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func TestMiddlewareCookieReset(t *testing.T) {
 
 		reached := false
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { reached = true })
-		middleware := MiddlewareCookieReset(mockStore, testSessionName)
+		middleware := CookieReset(mockStore, testSessionName)
 
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
@@ -62,14 +62,14 @@ func TestMiddlewareCookieReset(t *testing.T) {
 	})
 }
 
-// TestMiddlewareCookieReset_StaleCookies covers the half of this middleware that exists
+// TestCookieReset_StaleCookies covers the half of this middleware that exists
 // because of #266: a browser arriving with the chunked cookie store's leftovers has to be
 // told to drop them, here, because nothing else ever will again.
 //
 // Over a real ServerSideStore rather than the mock the cases above use. The names, the
 // attributes and the decision about which names are safe to delete all come from the
 // store, and a mock cannot get any of them wrong in an interesting way.
-func TestMiddlewareCookieReset_StaleCookies(t *testing.T) {
+func TestCookieReset_StaleCookies(t *testing.T) {
 	const sessionName = "authserver"
 
 	newStore := func(secure bool) *sessionstore.ServerSideStore {
@@ -92,7 +92,7 @@ func TestMiddlewareCookieReset_StaleCookies(t *testing.T) {
 		}
 		rr := httptest.NewRecorder()
 		reached := false
-		MiddlewareCookieReset(store, sessionName)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		CookieReset(store, sessionName)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			reached = true
 		})).ServeHTTP(rr, req)
 		assert.True(t, reached, "the request must still reach the handler")

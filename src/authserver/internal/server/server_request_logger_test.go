@@ -17,13 +17,13 @@ import (
 )
 
 // TestInitMiddleware_RequestLoggerIsRegistered makes the claim the unit table in
-// src/core/middleware cannot: that MiddlewareRequestLogger is actually mounted on the auth server's
+// src/core/httpmw cannot: that httpmw.RequestLogger is actually mounted on the auth server's
 // router, and that it is wired to the configuration flag rather than mounted with a constant. That
 // table passes perfectly against a middleware nobody wired up, and deleting the Use() line here
-// still compiles, because the package references custom_middleware on six other lines.
+// still compiles, because the package references httpmw on other lines.
 //
 // It is deliberately thin. The middleware's behaviour belongs to its own tests in
-// src/core/middleware, and the redaction table belongs to RequestTargetForLog in src/core/logging.
+// src/core/httpmw, and the redaction table belongs to RequestTargetForLog in src/core/logging.
 // This owns one claim: a real request through this server's real chain of eleven middlewares
 // produces a log line, and that line does not carry the id_token_hint (#159).
 //
@@ -38,8 +38,8 @@ const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 // newLoggerTestServer builds a Server by hand, runs the real initMiddleware, and registers one
 // handler that answers 200 and records that it ran.
 //
-// The database is a mock with GetSettingsById stubbed, which MiddlewareSettings calls on every
-// request. MiddlewareCors also holds the database but needs no stub: go-chi/cors only calls
+// The database is a mock with GetSettingsById stubbed, which middleware.Settings calls on every
+// request. middleware.CORS also holds the database but needs no stub: go-chi/cors only calls
 // AllowOriginFunc for a request carrying an Origin header, and these send none. That is enforced
 // rather than assumed, since mocks_data.NewDatabase(t) fails the test on any call nobody expected.
 func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {

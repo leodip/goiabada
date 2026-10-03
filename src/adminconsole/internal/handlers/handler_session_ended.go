@@ -16,7 +16,7 @@ const flashSessionEnded = "sessionEnded"
 // HandleSessionEndedGet signs the administrator out after the admin API refused the console's
 // access token, and sends the browser home, where the notice says why (#427 decision 17).
 //
-// Only the token values go, the same two JwtSessionHandler clears when it signs a session out, so
+// Only the token values go, the same two middleware.SessionHandler clears when it signs a session out, so
 // the session survives to carry the notice. The home page is the destination because it does not
 // require a sign-in: sending the browser to a page that does would start a sign-in the auth server
 // may refuse again, and nothing here could then stop the loop.

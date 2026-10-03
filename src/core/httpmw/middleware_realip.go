@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"net"
@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// MiddlewareRealIP resolves the real client IP for each request and writes it
+// RealIP resolves the real client IP for each request and writes it
 // into r.RemoteAddr (as a bare IP, without a port), so that every downstream
 // consumer (rate limiter, session/audit IP, request logger) shares one
 // trustworthy value.
@@ -28,7 +28,7 @@ import (
 //   - true, trustedProxies set (the ranges ParseTrustedProxies returns): the
 //     forwarded chain is walked from the right, crossing only trusted hops,
 //     which is spoof-resistant across multiple proxies / a CDN.
-func MiddlewareRealIP(trustProxyHeaders bool, trustedProxies []*net.IPNet) func(next http.Handler) http.Handler {
+func RealIP(trustProxyHeaders bool, trustedProxies []*net.IPNet) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.RemoteAddr = resolveClientIP(
@@ -90,7 +90,7 @@ func resolveClientIP(remoteAddr, xff, xRealIP string, trustProxyHeaders bool, tr
 }
 
 // ParseTrustedProxies converts the configured trusted-proxy entries, each a
-// CIDR range or a bare IP, into the ranges MiddlewareRealIP walks. Each entry is
+// CIDR range or a bare IP, into the ranges RealIP walks. Each entry is
 // trimmed and an empty one is skipped. A bare address Go reads as IPv4 becomes
 // that host's /32, and so does its IPv4-mapped IPv6 spelling (::ffff:10.0.0.1):
 // the peer Go reports for that proxy is the IPv4 address, and appending /32 to
@@ -102,7 +102,7 @@ func resolveClientIP(remoteAddr, xff, xRealIP string, trustProxyHeaders bool, tr
 // refused entry yields no ranges at all. The caller refuses to start on that
 // error rather than skipping the entry: an operator who listed a proxy asked
 // for a restriction, and a list whose only entries are typos would otherwise
-// leave it empty, which MiddlewareRealIP reads as trusting any single hop
+// leave it empty, which RealIP reads as trusting any single hop
 // (#425).
 func ParseTrustedProxies(entries []string) ([]*net.IPNet, error) {
 	var out []*net.IPNet

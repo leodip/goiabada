@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/web"
-	custom_middleware "github.com/leodip/goiabada/core/middleware"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -152,5 +152,5 @@ func TestBodyLimitPolicy_TheLargestAcceptedSizeBuilds(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	assert.NotPanics(t, func() { custom_middleware.MiddlewareBodyLimit(router, policy) })
+	assert.NotPanics(t, func() { httpmw.BodyLimit(router, policy) })
 }

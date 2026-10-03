@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 )
 
-// csrfSkipContextKey marks a request that the application's CsrfPolicy has already cleared, so
-// MiddlewareCsrf can honour a decision MiddlewareSkipCsrf made earlier in the chain. It replaces
+// csrfSkipContextKey marks a request that the application's CSRFPolicy has already cleared, so
+// CSRF can honour a decision SkipCSRF made earlier in the chain. It replaces
 // gorilla/csrf's UnsafeSkipCheck, which left with the library (#155).
 //
 // The key type is unexported and the value is written only by markCsrfSkipped, which is what stops
@@ -25,15 +25,15 @@ func markCsrfSkipped(r *http.Request) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), csrfSkipContextKey{}, true))
 }
 
-// csrfSkipped reports whether MiddlewareSkipCsrf cleared this request.
+// csrfSkipped reports whether SkipCSRF cleared this request.
 func csrfSkipped(r *http.Request) bool {
 	skipped, _ := r.Context().Value(csrfSkipContextKey{}).(bool)
 	return skipped
 }
 
-// CsrfPolicy is one application's set of endpoints that are cross-origin by protocol design, so
+// CSRFPolicy is one application's set of endpoints that are cross-origin by protocol design, so
 // the origin check cannot apply to them. Each server declares its own at its composition root and
-// passes it to MiddlewareSkipCsrf; core owns the matching and owns none of the routes, because a
+// passes it to SkipCSRF; core owns the matching and owns none of the routes, because a
 // shared table means each binary exempts the other's endpoints, and the one that used to live here
 // had the admin console exempting /auth/authorize, /auth/token, /userinfo and /connect/register,
 // none of which it mounts, and the auth server exempting /auth/callback, which it does not (#385).
@@ -63,7 +63,7 @@ func csrfSkipped(r *http.Request) bool {
 //
 // The zero value exempts nothing, which is a usable policy and not a misconfiguration: a server
 // with no cross-origin binding supplies it and every state-changing request is origin-checked.
-type CsrfPolicy struct {
+type CSRFPolicy struct {
 	// ExactPaths are exempt when the request path equals one of them.
 	ExactPaths []string
 
@@ -91,7 +91,7 @@ type csrfSkipper struct {
 // evaluated once at startup: both refusals are programming errors that no request can produce and
 // that no deployment can configure its way into, so failing to start is the whole of the correct
 // response. Answering them per request would instead mean a server that boots with a hole in it.
-func newCsrfSkipper(policy CsrfPolicy) csrfSkipper {
+func newCsrfSkipper(policy CSRFPolicy) csrfSkipper {
 	exact := make(map[string]bool, len(policy.ExactPaths))
 	for _, path := range policy.ExactPaths {
 		exact[path] = true
@@ -145,9 +145,9 @@ func (s csrfSkipper) shouldSkip(r *http.Request, path string) bool {
 	return false
 }
 
-// MiddlewareSkipCsrf marks the requests policy exempts, for MiddlewareCsrf below to honour. The
-// policy is the caller's because the routes are: see CsrfPolicy.
-func MiddlewareSkipCsrf(policy CsrfPolicy) func(next http.Handler) http.Handler {
+// SkipCSRF marks the requests policy exempts, for CSRF below to honour. The
+// policy is the caller's because the routes are: see CSRFPolicy.
+func SkipCSRF(policy CSRFPolicy) func(next http.Handler) http.Handler {
 	skipper := newCsrfSkipper(policy)
 
 	return func(next http.Handler) http.Handler {
@@ -170,7 +170,7 @@ func MiddlewareSkipCsrf(policy CsrfPolicy) func(next http.Handler) http.Handler 
 	}
 }
 
-// MiddlewareCsrf rejects state-changing cross-origin requests, using
+// CSRF rejects state-changing cross-origin requests, using
 // net/http.CrossOriginProtection: the browser's own Sec-Fetch-Site report, falling back to
 // comparing the Origin header's host against Host when that header is absent.
 //
@@ -181,7 +181,7 @@ func MiddlewareSkipCsrf(policy CsrfPolicy) func(next http.Handler) http.Handler 
 //     trusted list to hold, and an entry added speculatively would silently widen the boundary for
 //     whatever cross-origin POST someone adds next. Trusting a host across both schemes is exactly
 //     what CVE-2025-47909 was, so the absence is the point.
-//   - No AddInsecureBypassPattern. The application's CsrfPolicy and MiddlewareSkipCsrf already own
+//   - No AddInsecureBypassPattern. The application's CSRFPolicy and SkipCSRF already own
 //     that decision, including its conditional entries, which a pattern cannot express.
 //   - No session key and no cookie. There is no CSRF token: the origin is the whole control.
 //   - No cookie-secure flag. The check never consults the server's idea of its own scheme, so a
@@ -190,7 +190,7 @@ func MiddlewareSkipCsrf(policy CsrfPolicy) func(next http.Handler) http.Handler 
 // Check is called inline rather than through CrossOriginProtection.Handler so the skip mark can
 // short-circuit it and so explainCsrfFailure still holds the request, which is the only thing that
 // can tell the failure causes apart.
-func MiddlewareCsrf() func(next http.Handler) http.Handler {
+func CSRF() func(next http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
 
 	return func(next http.Handler) http.Handler {

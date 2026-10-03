@@ -28,7 +28,7 @@ import (
 // apiBearerForTest is the API surface's guard set. These tests drive the scope, user-bound and
 // session guards with a token already in the context, so the parser is never reached; the whole
 // chain from the header to the refusal, on both surfaces, is bearer_guard_chain_test.go's.
-var apiBearerForTest = NewMiddlewareBearerTokenForAPI(nil)
+var apiBearerForTest = NewBearerTokenForAPI(nil)
 
 func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("passes when token has required scope", func(t *testing.T) {

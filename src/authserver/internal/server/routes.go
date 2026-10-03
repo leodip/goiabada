@@ -61,14 +61,14 @@ func (s *Server) initRoutes(branches appBranches) {
 	// bodies: the admin and account APIs their {error_code, error_description} envelope, /userinfo
 	// the RFC 6749 {error, error_description} shape its handler answers in. The routes choose the
 	// set; nothing reads the request path to decide (#435).
-	apiBearer := middleware.NewMiddlewareBearerTokenForAPI(tokenParser)
-	userinfoBearer := middleware.NewMiddlewareBearerTokenForUserInfo(tokenParser, httpHelper)
+	apiBearer := middleware.NewBearerTokenForAPI(tokenParser)
+	userinfoBearer := middleware.NewBearerTokenForUserInfo(tokenParser, httpHelper)
 
 	authServerConfig := &s.cfg.AuthServer
 	baseURL := authServerConfig.BaseURL
 	adminConsoleBaseURL := s.cfg.AdminConsole.BaseURL
 	maxUploadBytes := authServerConfig.ProfilePictureMaxSizeBytes
-	rateLimiter := middleware.NewRateLimiterMiddleware(
+	rateLimiter := middleware.NewRateLimiter(
 		ceremonyStore,
 		httpHelper,
 		httpHelper,
@@ -158,8 +158,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		// section 5.1's MUST reaches this group, and the 401 and 403 refusals below
 		// commit their status themselves: anything mounted behind the guards would
 		// never write the pair on a refusal (#247).
-		r.Use(middleware.MiddlewareNoStore())
-		r.Use(middleware.APIDebugMiddleware(authServerConfig.DebugAPIRequests))
+		r.Use(middleware.NoStore())
+		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireValidSession(s.database))
 
@@ -345,8 +345,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	api.Route("/api/v1/account", func(r chi.Router) {
 		// FIRST in the group, for the same reason as the admin group above. GET
 		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
-		r.Use(middleware.MiddlewareNoStore())
-		r.Use(middleware.APIDebugMiddleware(authServerConfig.DebugAPIRequests))
+		r.Use(middleware.NoStore())
+		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier))
 		// After the scope check, so an insufficient-scope caller still receives the 403 it
@@ -409,8 +409,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		// FIRST in the group, for the same reason as the two groups above: every 200
 		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
 		// response containing tokens, credentials, or other sensitive information".
-		r.Use(middleware.MiddlewareNoStore())
-		// No APIDebugMiddleware here, and it is the only /api/v1 group without it. That
+		r.Use(middleware.NoStore())
+		// No middleware.APIDebug here, and it is the only /api/v1 group without it. That
 		// middleware logs whole request and response bodies, redacting by field name, and
 		// this group's fields are called "id" and "data": neither matches its key set nor
 		// its password/secret/otp/token substring net, so turning the debug flag on would

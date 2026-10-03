@@ -37,13 +37,13 @@ func theSettingsRequestsContext() interface{} {
 }
 
 // The accept arm: the settings read is issued on behalf of the request that triggered it.
-func TestMiddlewareSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
+func TestSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	db.On("GetSettingsById", theSettingsRequestsContext(), mock.Anything, int64(1)).
 		Return(&models.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
 
 	reached := false
-	handler := MiddlewareSettings(db, PageFaults())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := Settings(db, PageFaults())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reached = true
 	}))
 

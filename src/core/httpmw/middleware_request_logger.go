@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"log/slog"
@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 )
 
-// MiddlewareRequestLogger writes one log record per request when enabled, with the
+// RequestLogger writes one log record per request when enabled, with the
 // query string redacted by logging.RequestTargetForLog.
 //
 // It replaces chi's middleware.Logger, which writes scheme://Host + r.RequestURI
@@ -21,9 +21,9 @@ import (
 // instead of two.
 //
 // The flag arrives as a parameter rather than being read here, following
-// MiddlewareRealIP, and enabled == false returns next untouched so both servers
+// RealIP, and enabled == false returns next untouched so both servers
 // can mount this unconditionally.
-func MiddlewareRequestLogger(enabled bool) func(next http.Handler) http.Handler {
+func RequestLogger(enabled bool) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if !enabled {
 			return next
@@ -58,7 +58,7 @@ func MiddlewareRequestLogger(enabled bool) func(next http.Handler) http.Handler 
 				attributes = append(attributes,
 					"method", logging.FieldForLog(r.Method),
 					"target", target,
-					// Already resolved to a bare client IP by MiddlewareRealIP.
+					// Already resolved to a bare client IP by RealIP.
 					"ip", logging.FieldForLog(r.RemoteAddr),
 					// Written raw. A panicking request reports 500, because this
 					// middleware is mounted above Recoverer in both servers, so the

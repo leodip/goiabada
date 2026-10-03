@@ -1613,7 +1613,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 // TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2 for the OTP form,
 // with the same shape and the same reason as the password one: the handler is driven
-// through a real RateLimiterMiddleware, because the reservation it converts is placed by
+// through a real middleware.RateLimiter, because the reservation it converts is placed by
 // the limiter and lives in the request context. Called directly, the handler has nothing to
 // convert and RecordCredentialFailure is a no-op, so the case would pass while proving
 // nothing (#219).

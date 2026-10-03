@@ -3,5 +3,5 @@
 // values on the context through reqctx, the audit switches read from those settings, the rate
 // limiter, CORS for discovery and the endpoints a browser client calls, the logout exemption of
 // the CSRF policy, no-store, and the API debug log. The middleware both processes mount is in
-// core/middleware (#385, #433).
+// core/httpmw (#385, #433).
 package middleware

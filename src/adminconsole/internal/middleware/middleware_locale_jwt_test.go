@@ -34,13 +34,13 @@ func localeSeenBy(t *testing.T, req *http.Request) string {
 	})).ServeHTTP(httptest.NewRecorder(), req)
 
 	var seen string
-	MiddlewareLocaleFromJWT()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+	LocaleFromJWT()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		seen = i18n.T(r.Context(), "auth.pwd.title")
 	})).ServeHTTP(httptest.NewRecorder(), base)
 	return seen
 }
 
-func TestMiddlewareLocaleFromJWT_ReadsLocaleClaim(t *testing.T) {
+func TestLocaleFromJWT_ReadsLocaleClaim(t *testing.T) {
 	// No explicit intent, locale claim present → the claim applies.
 	req := httptest.NewRequest("GET", "/admin/users", nil)
 	req = req.WithContext(reqctx.WithJwtInfo(req.Context(), newJwtInfoWithLocale("pt-BR")))
@@ -48,7 +48,7 @@ func TestMiddlewareLocaleFromJWT_ReadsLocaleClaim(t *testing.T) {
 	assert.Equal(t, "Entrar", localeSeenBy(t, req))
 }
 
-func TestMiddlewareLocaleFromJWT_SkipsWhenExplicitIntent(t *testing.T) {
+func TestLocaleFromJWT_SkipsWhenExplicitIntent(t *testing.T) {
 	// Explicit ?ui_locales=pt-BR; the user's claim is "en" — the refinement
 	// must not downgrade away from what the request asked for.
 	req := httptest.NewRequest("GET", "/admin/users?ui_locales=pt-BR", nil)
@@ -58,7 +58,7 @@ func TestMiddlewareLocaleFromJWT_SkipsWhenExplicitIntent(t *testing.T) {
 		"explicit pt-BR must not be overridden by claim=en")
 }
 
-func TestMiddlewareLocaleFromJWT_FallsThroughWhenClaimMissing(t *testing.T) {
+func TestLocaleFromJWT_FallsThroughWhenClaimMissing(t *testing.T) {
 	// No explicit intent, JWT present but no locale claim → keeps the
 	// previously resolved localizer. Accept-Language pt-BR is the signal that
 	// must survive.
@@ -72,7 +72,7 @@ func TestMiddlewareLocaleFromJWT_FallsThroughWhenClaimMissing(t *testing.T) {
 		"a missing locale claim must NOT silently jump to English")
 }
 
-func TestMiddlewareLocaleFromJWT_NoJwtInfoIsANoOp(t *testing.T) {
+func TestLocaleFromJWT_NoJwtInfoIsANoOp(t *testing.T) {
 	// The unauthenticated shape: nothing wrote a token set, so there is
 	// no claim to read and the baseline stands.
 	req := httptest.NewRequest("GET", "/admin/users", nil)

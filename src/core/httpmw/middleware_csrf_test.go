@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"context"
@@ -31,8 +31,8 @@ import (
 //
 // The names are shaped so that every negative case differs from a positive one in exactly the thing
 // under test: /exact against /exact-extra and /exact/child, /prefix/ against /prefix-extra.
-func fixtureCsrfPolicy(conditional func(*http.Request) bool) CsrfPolicy {
-	return CsrfPolicy{
+func fixtureCSRFPolicy(conditional func(*http.Request) bool) CSRFPolicy {
+	return CSRFPolicy{
 		ExactPaths: []string{"/exact", "/other-exact"},
 		Prefixes:   []string{"/prefix/"},
 		Conditional: map[string]func(*http.Request) bool{
@@ -47,7 +47,7 @@ func alwaysExempt(*http.Request) bool { return true }
 
 func neverExempt(*http.Request) bool { return false }
 
-func TestMiddlewareSkipCsrf(t *testing.T) {
+func TestSkipCSRF(t *testing.T) {
 	tests := []struct {
 		name string
 		path string
@@ -93,7 +93,7 @@ func TestMiddlewareSkipCsrf(t *testing.T) {
 			}
 
 			var got bool
-			handler := MiddlewareSkipCsrf(fixtureCsrfPolicy(predicate))(
+			handler := SkipCSRF(fixtureCSRFPolicy(predicate))(
 				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 					got = csrfSkipped(r)
 				}))
@@ -106,17 +106,17 @@ func TestMiddlewareSkipCsrf(t *testing.T) {
 	}
 }
 
-// TestMiddlewareSkipCsrf_TheZeroPolicyExemptsNothing is the case that fails if the matching ever
-// grows a default. A server with no cross-origin binding supplies CsrfPolicy{} and must get the
+// TestSkipCSRF_TheZeroPolicyExemptsNothing is the case that fails if the matching ever
+// grows a default. A server with no cross-origin binding supplies CSRFPolicy{} and must get the
 // origin check on everything; the paths below are the ones the table this replaced used to exempt
 // for every binary, which is the shape of the bug that would reintroduce them.
-func TestMiddlewareSkipCsrf_TheZeroPolicyExemptsNothing(t *testing.T) {
+func TestSkipCSRF_TheZeroPolicyExemptsNothing(t *testing.T) {
 	for _, path := range []string{"/", "/auth/authorize", "/auth/token", "/auth/callback",
 		"/userinfo", "/connect/register", "/api/v1/admin/users", "/static/app.css", "/auth/logout"} {
 
 		t.Run(path, func(t *testing.T) {
 			var got bool
-			handler := MiddlewareSkipCsrf(CsrfPolicy{})(
+			handler := SkipCSRF(CSRFPolicy{})(
 				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 					got = csrfSkipped(r)
 				}))
@@ -130,7 +130,7 @@ func TestMiddlewareSkipCsrf_TheZeroPolicyExemptsNothing(t *testing.T) {
 	}
 }
 
-// TestMiddlewareSkipCsrf_OnlyTheConditionalPathConsultsThePredicate pins the ordering, which is
+// TestSkipCSRF_OnlyTheConditionalPathConsultsThePredicate pins the ordering, which is
 // load-bearing rather than incidental: a predicate may read the request body, and the auth server's
 // does. A path an exact entry or a prefix already exempted must not reach one, or the /api/ subtree
 // would have its JSON body parsed by middleware before its handler decoded it, and the failure
@@ -139,7 +139,7 @@ func TestMiddlewareSkipCsrf_TheZeroPolicyExemptsNothing(t *testing.T) {
 // It counts calls rather than watching a body, so the assertion names the mechanism instead of a
 // side effect of it. The body-survival property belongs to the predicate that does the reading and
 // is asserted where that predicate lives, in the auth server.
-func TestMiddlewareSkipCsrf_OnlyTheConditionalPathConsultsThePredicate(t *testing.T) {
+func TestSkipCSRF_OnlyTheConditionalPathConsultsThePredicate(t *testing.T) {
 	tests := []struct {
 		name      string
 		path      string
@@ -160,7 +160,7 @@ func TestMiddlewareSkipCsrf_OnlyTheConditionalPathConsultsThePredicate(t *testin
 				return true
 			}
 
-			handler := MiddlewareSkipCsrf(fixtureCsrfPolicy(predicate))(
+			handler := SkipCSRF(fixtureCSRFPolicy(predicate))(
 				http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, tt.path, nil))
 
@@ -171,19 +171,19 @@ func TestMiddlewareSkipCsrf_OnlyTheConditionalPathConsultsThePredicate(t *testin
 	}
 }
 
-// TestMiddlewareSkipCsrf_RefusesASilentlyWrongPolicy covers the two shapes a policy value can
+// TestSkipCSRF_RefusesASilentlyWrongPolicy covers the two shapes a policy value can
 // express that the package-level tables it replaces could not, and that no request could reveal.
 //
 // Both are refused at construction, which is a composition root evaluated once at startup, so the
 // failure is a server that does not boot rather than a server that boots with a hole in it.
-func TestMiddlewareSkipCsrf_RefusesASilentlyWrongPolicy(t *testing.T) {
+func TestSkipCSRF_RefusesASilentlyWrongPolicy(t *testing.T) {
 	// A path in both tables is unconditionally exempt, because shouldSkip consults the exact set
 	// first and the predicate is never called. That is the whole hole the conditional shape exists
 	// to close: /auth/logout exempt unconditionally lets any origin POST a hintless logout, which
 	// the handler reads as the confirmation of its consent page (#109, decision 5).
 	t.Run("a path listed both exactly and conditionally", func(t *testing.T) {
 		assertPanics(t, func() {
-			MiddlewareSkipCsrf(CsrfPolicy{
+			SkipCSRF(CSRFPolicy{
 				ExactPaths:  []string{"/auth/logout"},
 				Conditional: map[string]func(*http.Request) bool{"/auth/logout": neverExempt},
 			})
@@ -194,7 +194,7 @@ func TestMiddlewareSkipCsrf_RefusesASilentlyWrongPolicy(t *testing.T) {
 	// server. It is what an unset constant or a dropped slice element looks like.
 	t.Run("an empty prefix", func(t *testing.T) {
 		assertPanics(t, func() {
-			MiddlewareSkipCsrf(CsrfPolicy{Prefixes: []string{"/static/", ""}})
+			SkipCSRF(CSRFPolicy{Prefixes: []string{"/static/", ""}})
 		})
 	})
 
@@ -206,7 +206,7 @@ func TestMiddlewareSkipCsrf_RefusesASilentlyWrongPolicy(t *testing.T) {
 				t.Fatalf("a well-formed policy panicked: %v", recovered)
 			}
 		}()
-		MiddlewareSkipCsrf(CsrfPolicy{
+		SkipCSRF(CSRFPolicy{
 			ExactPaths:  []string{"/auth/authorize"},
 			Prefixes:    []string{"/api/"},
 			Conditional: map[string]func(*http.Request) bool{"/auth/logout": neverExempt},
@@ -224,23 +224,23 @@ func assertPanics(t *testing.T, fn func()) {
 	fn()
 }
 
-// TestMiddlewareSkipCsrf_CombinedChain mounts the production middleware chain
-// (StripSlashes -> MiddlewareSkipCsrf -> MiddlewareCsrf) onto a chi router and issues real
+// TestSkipCSRF_CombinedChain mounts the production middleware chain
+// (StripSlashes -> SkipCSRF -> CSRF) onto a chi router and issues real
 // cross-origin POSTs. This proves the exemptions reach the enforcing middleware end-to-end, beyond
-// the context-flag check in TestMiddlewareSkipCsrf, and it is the only place the trailing-slash
+// the context-flag check in TestSkipCSRF, and it is the only place the trailing-slash
 // form is exercised: chi's StripSlashes writes the normalized path to RouteContext.RoutePath rather
-// than to r.URL.Path, and MiddlewareSkipCsrf has to read it from there.
+// than to r.URL.Path, and SkipCSRF has to read it from there.
 //
 // Over the fixture policy, like everything else here. Each binary's own chain test makes the same
 // claims about its own routes, which is where "this server exempts /auth/token" now belongs.
-func TestMiddlewareSkipCsrf_CombinedChain(t *testing.T) {
+func TestSkipCSRF_CombinedChain(t *testing.T) {
 	const foreignOrigin = "https://www.certification.openid.net"
 
 	newRouter := func(predicate func(*http.Request) bool) *chi.Mux {
 		r := chi.NewRouter()
 		r.Use(chimiddleware.StripSlashes)
-		r.Use(MiddlewareSkipCsrf(fixtureCsrfPolicy(predicate)))
-		r.Use(MiddlewareCsrf())
+		r.Use(SkipCSRF(fixtureCSRFPolicy(predicate)))
+		r.Use(CSRF())
 
 		inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -295,14 +295,14 @@ func TestMiddlewareSkipCsrf_CombinedChain(t *testing.T) {
 	}
 }
 
-// TestMiddlewareSkipCsrf_LeavesTheBodyForTheHandler is the boundary the ordering test states in
+// TestSkipCSRF_LeavesTheBodyForTheHandler is the boundary the ordering test states in
 // terms of calls, asserted in the terms that actually bite: the exempt prefixes on a real server
 // include a whole REST subtree whose handlers decode JSON straight off r.Body. Nothing in this
 // middleware may consume it.
 //
 // The conditional path is included with a predicate that does parse the form, which is what the
 // auth server's does, because Go caching the parse in r.PostForm is the only reason that is safe.
-func TestMiddlewareSkipCsrf_LeavesTheBodyForTheHandler(t *testing.T) {
+func TestSkipCSRF_LeavesTheBodyForTheHandler(t *testing.T) {
 	const payload = "id_token_hint=a.b.c&state=opaque"
 
 	for _, path := range []string{"/exact", "/prefix/thing", "/unlisted", "/conditional"} {
@@ -312,7 +312,7 @@ func TestMiddlewareSkipCsrf_LeavesTheBodyForTheHandler(t *testing.T) {
 			}
 
 			var got string
-			handler := MiddlewareSkipCsrf(fixtureCsrfPolicy(parsingPredicate))(
+			handler := SkipCSRF(fixtureCSRFPolicy(parsingPredicate))(
 				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 					// r.FormValue, because that is what a handler uses and it reads the cache the
 					// predicate populated. io.ReadAll would answer "" for the parsed case and say
@@ -334,8 +334,8 @@ func TestMiddlewareSkipCsrf_LeavesTheBodyForTheHandler(t *testing.T) {
 	}
 }
 
-// TestMiddlewareCsrf_OriginDecisions is the matrix CVE-2025-47909 lives in, at the seam where it is
-// observable: MiddlewareCsrf composed with a recording handler, no chi, no exemption tables.
+// TestCSRF_OriginDecisions is the matrix CVE-2025-47909 lives in, at the seam where it is
+// observable: CSRF composed with a recording handler, no chi, no exemption tables.
 //
 // Every row varies exactly one thing from a passing neighbour, so no row can pass for the wrong
 // reason: change only the method, or only Sec-Fetch-Site, or only the Origin scheme, and the expected
@@ -346,7 +346,7 @@ func TestMiddlewareSkipCsrf_LeavesTheBodyForTheHandler(t *testing.T) {
 // trusted origins and gorilla/csrf compared only the host, never the scheme, so a network attacker
 // serving a page over plaintext http on either host was accepted. Their value is invisible once the
 // design is right, which is exactly when a later reader is tempted to delete them: keep them.
-func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
+func TestCSRF_OriginDecisions(t *testing.T) {
 	// The host this deployment is reached on. The old code derived a trusted list from the
 	// configured base URLs; the new one compares against Host and trusts nothing else.
 	const ourHost = "auth.example.com"
@@ -362,7 +362,7 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 		origin string
 		// secFetchSite is sent only when non-empty.
 		secFetchSite string
-		// skipped marks the request the way MiddlewareSkipCsrf does for an exempt path.
+		// skipped marks the request the way SkipCSRF does for an exempt path.
 		skipped bool
 		allowed bool
 	}{
@@ -412,7 +412,7 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 		{name: "DELETE cross-site is refused", method: http.MethodDelete, secFetchSite: "cross-site", origin: "https://evil.example.com", allowed: false},
 
 		// The context-key contract between the two middlewares, which is the only assertion here
-		// that pins it. MiddlewareSkipCsrf marks an exempt path and MiddlewareCsrf must honour the
+		// that pins it. SkipCSRF marks an exempt path and CSRF must honour the
 		// mark even for a request it would otherwise refuse outright.
 		{name: "a marked-skipped cross-site POST is allowed", secFetchSite: "cross-site", origin: "https://evil.example.com", skipped: true, allowed: true},
 	}
@@ -425,7 +425,7 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 			}
 
 			reached := false
-			handler := MiddlewareCsrf()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			handler := CSRF()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				reached = true
 				w.WriteHeader(http.StatusOK)
 			}))
@@ -478,15 +478,15 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 	}
 }
 
-// TestMiddlewareCsrf_TheRefusalRecordIsBounded: every value the refusal record takes from the
+// TestCSRF_TheRefusalRecordIsBounded: every value the refusal record takes from the
 // request is the client's to choose and arrives before anything has authenticated it. Each is
 // megabytes long here and made of bytes a log line must not carry, and the record stays small and
 // printable (#425, the bound #159 put on the request logger).
-func TestMiddlewareCsrf_TheRefusalRecordIsBounded(t *testing.T) {
+func TestCSRF_TheRefusalRecordIsBounded(t *testing.T) {
 	const size = 1 << 20
 	capture := logtest.CaptureSlog(t)
 
-	handler := MiddlewareCsrf()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := CSRF()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		t.Error("request reached the handler, want it refused")
 	}))
 
@@ -529,8 +529,10 @@ func TestMiddlewareCsrf_TheRefusalRecordIsBounded(t *testing.T) {
 	target, ok := record.Attrs["target"].(string)
 	require.True(t, ok, "target is a string attribute")
 	assert.Equal(t, logging.RequestTargetForLog(req.URL), target, "rendered as the request logger renders it")
-	// The renderer's whole-target bound, 4096, written out because it is unexported in logging.
-	assert.LessOrEqual(t, len(target), 4096+len(logging.TruncationMarker(4096, 1<<30)))
+	// The renderer's whole-target bound, 4096, written out because it is unexported in logging,
+	// plus the room its truncation marker takes, which states two byte counts in under 64 bytes.
+	assert.LessOrEqual(t, len(target), 4096+64)
+	assert.Greater(t, len(target), 4096, "cut at the whole-target bound and marked, not dropped")
 	printable(t, "target", target)
 
 	// The request logger's key for the same value; the old "path" carried it raw.

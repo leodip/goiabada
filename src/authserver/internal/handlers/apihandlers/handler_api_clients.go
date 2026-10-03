@@ -1038,7 +1038,7 @@ func HandleAPIClientWebOriginsPut(
 		// /auth/token from the browser needs one and enables no redirect-based flow at all.
 		// Gating this on the authorization code flow, as it was, refused a legitimate
 		// configuration the rest of the server permits, and a registered origin is inert until
-		// MiddlewareCors reads it, so the gate protected nothing. Restoring consistency with the
+		// middleware.CORS reads it, so the gate protected nothing. Restoring consistency with the
 		// page next door reintroduces this bug (#250).
 
 		var req api.UpdateClientWebOriginsRequest
@@ -1057,7 +1057,7 @@ func HandleAPIClientWebOriginsPut(
 		// Validate list and entries: non-empty, canonical origin, within the column, no duplicates.
 		//
 		// urlutil.CanonicalOrigin is what makes a saved value one CORS can ever match.
-		// MiddlewareCors compares the stored string to the browser's Origin header byte for
+		// middleware.CORS compares the stored string to the browser's Origin header byte for
 		// byte, and the validation this replaced accepted anything url.ParseRequestURI parsed
 		// with an http or https scheme, then stored it verbatim in lower case. Six of ten
 		// realistic inputs were accepted and permanently dead, including

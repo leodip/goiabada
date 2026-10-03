@@ -15,7 +15,7 @@ const (
 )
 
 // withSessionSettings puts settings carrying the two lifetimes above on the request, where
-// MiddlewareSettings puts them in production.
+// middleware.Settings puts them in production.
 func withSessionSettings(r *http.Request) *http.Request {
 	return withSettings(r, &models.Settings{
 		UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds,

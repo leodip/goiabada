@@ -238,7 +238,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
 		// An empty identifier is the shape the terminated ceremony actually arrives in:
-		// MiddlewareSessionIdentifier finds the row gone, deletes the identifier from the
+		// middleware.SessionIdentifier finds the row gone, deletes the identifier from the
 		// cookie session, and leaves it out of the request context. It is also the shape
 		// grantIsOffline reads as an offline grant, so a code issued here would produce a
 		// refresh token with a max lifetime and no session to check.
@@ -1226,7 +1226,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 // mayBind is forced true for an implicit request only when the identifier is EMPTY, meaning
 // the browser carries no ambient session at all and there is nothing to cross-bind to. A
 // NON-EMPTY identifier whose row has vanished is a different shape and is refused, which is the
-// answer the code flow has given since #129: MiddlewareSessionIdentifier publishes the
+// answer the code flow has given since #129: middleware.SessionIdentifier publishes the
 // identifier only when the row exists, so arriving here with one that no longer resolves means
 // the session was ended during this very request.
 //
@@ -1363,7 +1363,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 const liveSessionIdentifier = "session-identifier-abc"
 
 // requestWithSessionIdentifier builds the /auth/issue request the way
-// MiddlewareSessionIdentifier leaves it when the session row exists: the identifier is in the
+// middleware.SessionIdentifier leaves it when the session row exists: the identifier is in the
 // request context. Its absence is the terminated case, which is why the subtests that expect
 // a code have to opt in (#129 stage 6).
 func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.Request {

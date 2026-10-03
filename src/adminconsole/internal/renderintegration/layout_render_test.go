@@ -105,7 +105,7 @@ func menuLabelText(t *testing.T, out string) string {
 // Every other render here is an anonymous request, so `loggedInUser` is never bound and the dropdown
 // label comes back empty — which reads as "no handler binds it" if the harness is mistaken for the
 // product. The bind is real and it is central: HttpHelper.RenderTemplate builds it from the
-// ID token's claims, and JwtSessionHandler puts that token on the context ahead of every route in
+// ID token's claims, and middleware.SessionHandler puts that token on the context ahead of every route in
 // routes.go that renders a menu page. Rendering with a token is what distinguishes the two.
 func TestRender_MenuLabelShowsTheLoggedInUser(t *testing.T) {
 	claims := jwt.MapClaims{

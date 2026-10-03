@@ -103,13 +103,13 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/guard` | kernel | — |
 | `core/hashutil` | kernel | — |
 | `core/hostport` | kernel | — |
+| `core/httpmw` | kernel | — |
 | `core/i18n` | kernel | — |
 | `core/inputvalidation` | kernel | — |
 | `core/internal` | kernel | — |
 | `core/locales` | kernel | — |
 | `core/localzone` | kernel | — |
 | `core/logging` | kernel | — |
-| `core/middleware` | kernel | — |
 | `core/oauth` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
@@ -288,8 +288,8 @@ removes it. An exception is not a waiver: when the edge goes, the row must go wi
 fails until it does. That is how the epic burned down, and the table is empty because it finished.
 A row added here now is a debt taken on deliberately, not one inherited.
 
-Both ends name a package, never a module and never a parent. A row granting `core/middleware`
-an edge grants it to `core/middleware` alone: not to `core`, and not to `core/oauth`, which
+Both ends name a package, never a module and never a parent. A row granting `core/httpmw`
+an edge grants it to `core/httpmw` alone: not to `core`, and not to `core/oauth`, which
 would need a row of its own. A module-wide grant would let a second package acquire the same
 dependency in silence, and the count of rows is the only measure of how much is owed.
 

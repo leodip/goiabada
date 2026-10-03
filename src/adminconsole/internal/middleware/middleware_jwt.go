@@ -59,7 +59,7 @@ type ServerErrorRenderer interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
 }
 
-type MiddlewareJwt struct {
+type JWT struct {
 	sessionStore   sessionstore.Store
 	sessionName    string
 	tokenParser    tokenParser
@@ -70,9 +70,9 @@ type MiddlewareJwt struct {
 	clientID       string
 }
 
-// NewMiddlewareJwt constructs a DB-free JWT middleware. tokenRefresher sends the refresh grant;
+// NewJWT constructs a DB-free JWT middleware. tokenRefresher sends the refresh grant;
 // clientID is the client the sign-in redirect names.
-func NewMiddlewareJwt(
+func NewJWT(
 	sessionStore sessionstore.Store,
 	sessionName string,
 	tokenParser tokenParser,
@@ -81,8 +81,8 @@ func NewMiddlewareJwt(
 	errorRenderer ServerErrorRenderer,
 	baseURL string,
 	clientID string,
-) *MiddlewareJwt {
-	return &MiddlewareJwt{
+) *JWT {
+	return &JWT{
 		sessionStore:   sessionStore,
 		sessionName:    sessionName,
 		tokenParser:    tokenParser,
@@ -94,7 +94,7 @@ func NewMiddlewareJwt(
 	}
 }
 
-// JwtSessionHandler puts the signed-in administrator's verified ID token and token response on the
+// SessionHandler puts the signed-in administrator's verified ID token and token response on the
 // request context, refreshing the access token when its recorded expiry is near. The console trusts
 // one token, the ID token, and only once oauthclient has verified it; the access and refresh tokens
 // are carried as strings and never decoded (#427). Per request, in order:
@@ -113,7 +113,7 @@ func NewMiddlewareJwt(
 //     used until the auth server refuses it.
 //  5. The refresh's answer is validated before anything is stored.
 //  6. Put the verified ID token and the token response on the context.
-func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
+func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -199,7 +199,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 
 // clearTokens deletes the token values from the session and saves it, answering the error page
 // when the save fails. It reports whether the session was saved.
-func (m *MiddlewareJwt) clearTokens(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session) bool {
+func (m *JWT) clearTokens(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session) bool {
 	delete(sess.Values, sessionkeys.SessionKeyJwt)
 	delete(sess.Values, sessionkeys.SessionKeyJwtExpiresAt)
 	if err := m.sessionStore.Save(r, w, sess); err != nil {
@@ -211,7 +211,7 @@ func (m *MiddlewareJwt) clearTokens(w http.ResponseWriter, r *http.Request, sess
 
 // signOut clears the token values and continues the chain unauthenticated, so a page that requires
 // a scope sends the browser to sign in again.
-func (m *MiddlewareJwt) signOut(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session, next http.Handler) {
+func (m *JWT) signOut(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session, next http.Handler) {
 	if m.clearTokens(w, r, sess) {
 		next.ServeHTTP(w, r)
 	}
@@ -219,7 +219,7 @@ func (m *MiddlewareJwt) signOut(w http.ResponseWriter, r *http.Request, sess *se
 
 // endSession clears the token values and sends the browser to the root rather than on to the page
 // it asked for.
-func (m *MiddlewareJwt) endSession(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session) {
+func (m *JWT) endSession(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session) {
 	if m.clearTokens(w, r, sess) {
 		http.Redirect(w, r, "/", http.StatusFound)
 	}
@@ -230,7 +230,7 @@ func (m *MiddlewareJwt) endSession(w http.ResponseWriter, r *http.Request, sess 
 // Warn, not Error: a token from another issuer is a condition this middleware is here to meet, and
 // it meets it by clearing the session and sending the browser to the root. Nobody has to act, and
 // an error log that fills with handled conditions has no error log left (#320 decision 5).
-func (m *MiddlewareJwt) endForeignSession(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session, cause error) {
+func (m *JWT) endForeignSession(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session, cause error) {
 	slog.WarnContext(r.Context(),
 		"the id token names another issuer or audience, clearing the session and redirecting to root",
 		"error", cause)
@@ -242,7 +242,7 @@ func (m *MiddlewareJwt) endForeignSession(w http.ResponseWriter, r *http.Request
 // before anything reaches the session. It returns the refreshed JwtInfo once it is stored. refused
 // is the parser's refusal of the answer, which ends the session; err is a grant that could not be
 // completed, which signs it out. With no refresh token all three are nil.
-func (m *MiddlewareJwt) refreshToken(
+func (m *JWT) refreshToken(
 	w http.ResponseWriter,
 	r *http.Request,
 	stored oauth.TokenResponse,
@@ -306,7 +306,7 @@ func (m *MiddlewareJwt) refreshToken(
 }
 
 // RequiresScope is a middleware that checks if the user has the required scope to access the resource.
-func (m *MiddlewareJwt) RequiresScope(
+func (m *JWT) RequiresScope(
 	scopesAnyOf []string,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -349,7 +349,7 @@ func (m *MiddlewareJwt) RequiresScope(
 	}
 }
 
-func (m *MiddlewareJwt) buildScopeString(customScopes []string) string {
+func (m *JWT) buildScopeString(customScopes []string) string {
 
 	// Default required scopes.
 	// "profile" is required for the locale claim to be emitted in tokens

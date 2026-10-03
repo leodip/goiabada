@@ -206,9 +206,8 @@ var slogWatchedImports = watchedImports{
 // The two builders spread a run they assemble themselves. reportTrip's keys are "limiter" and a
 // tier's keyField, whose value is a literal at each newTier call and is held by
 // TestRateLimiter_EveryTierLogsUnderAConventionalKey in authserver/internal/middleware.
-// MiddlewareRequestLogger
-// appends the request line's attributes under literal keys in its own body, conditionally, which
-// is why it is a run and not one call.
+// httpmw.RequestLogger appends the request line's attributes under literal keys in its own body,
+// conditionally, which is why it is a run and not one call.
 var slogSpreadSites = []slogSpreadSite{
 	{scope: "authserver/internal/apiresponse", name: "WriteInternalServerError",
 		forwarder: apiresponseImportPath + ".WriteInternalServerError"},
@@ -221,7 +220,7 @@ var slogSpreadSites = []slogSpreadSite{
 	{scope: "authserver/internal/handlers", name: "rejectIdTokenHint",
 		forwarder: handlersImportPath + ".rejectIdTokenHint"},
 	{scope: "authserver/internal/middleware", name: "reportTrip"},
-	{scope: "core/middleware", name: "MiddlewareRequestLogger"},
+	{scope: "core/httpmw", name: "RequestLogger"},
 }
 
 // slogNoRequestDirs is the scope of rule 5, and of AssertRequestPathContext and

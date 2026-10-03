@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"errors"
@@ -53,7 +53,7 @@ func bodyLimitReader(w http.ResponseWriter, r *http.Request) {
 func newBodyLimitRouter(policy BodyLimitPolicy, handler http.HandlerFunc) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(chimiddleware.StripSlashes)
-	router.Use(MiddlewareBodyLimit(router, policy))
+	router.Use(BodyLimit(router, policy))
 	registerBodyLimitRoutes(router, handler)
 	return router
 }
@@ -75,9 +75,9 @@ func serveBody(router http.Handler, method string, target string, size int) stri
 	return recorder.Body.String()
 }
 
-// TestMiddlewareBodyLimit_TheLimitEachRequestMeets drives each rule of the lookup with a body far
+// TestBodyLimit_TheLimitEachRequestMeets drives each rule of the lookup with a body far
 // past every limit in the table, so the answer is the limit that refused it.
-func TestMiddlewareBodyLimit_TheLimitEachRequestMeets(t *testing.T) {
+func TestBodyLimit_TheLimitEachRequestMeets(t *testing.T) {
 	router := newBodyLimitRouter(bodyLimitFixturePolicy(), bodyLimitReader)
 
 	tests := []struct {
@@ -102,21 +102,21 @@ func TestMiddlewareBodyLimit_TheLimitEachRequestMeets(t *testing.T) {
 	}
 }
 
-// TestMiddlewareBodyLimit_TheBoundary shows the limit is on bytes read, not one short or one over.
-func TestMiddlewareBodyLimit_TheBoundary(t *testing.T) {
+// TestBodyLimit_TheBoundary shows the limit is on bytes read, not one short or one over.
+func TestBodyLimit_TheBoundary(t *testing.T) {
 	router := newBodyLimitRouter(bodyLimitFixturePolicy(), bodyLimitReader)
 
 	assert.Equal(t, "read 32 id=", serveBody(router, http.MethodPost, "/api/items", 32), "a body of exactly the limit reads whole")
 	assert.Equal(t, "refused at 32", serveBody(router, http.MethodPost, "/api/items", 33), "one byte more is refused")
 }
 
-// TestMiddlewareBodyLimit_LeavesTheRouteContextAlone: the lookup resolves a pattern with a
+// TestBodyLimit_LeavesTheRouteContextAlone: the lookup resolves a pattern with a
 // parameter in it, and must do so without touching the request's own route context. Given that
 // context, Find would rewrite its RoutePath to the subrouter's remainder, which the root then
 // routes by, and would leave its parameters behind. So the handler reports the pattern chi
 // actually routed to and every parameter it holds, not only the one it looks for, which a leaked
 // copy would also supply, and the report must equal the same router's without the middleware.
-func TestMiddlewareBodyLimit_LeavesTheRouteContextAlone(t *testing.T) {
+func TestBodyLimit_LeavesTheRouteContextAlone(t *testing.T) {
 	report := func(w http.ResponseWriter, r *http.Request) {
 		rctx := chi.RouteContext(r.Context())
 		_, _ = fmt.Fprintf(w, "%s %v %v", rctx.RoutePattern(), rctx.URLParams.Keys, rctx.URLParams.Values)
@@ -130,9 +130,9 @@ func TestMiddlewareBodyLimit_LeavesTheRouteContextAlone(t *testing.T) {
 	assert.Equal(t, want, serveBody(newBodyLimitRouter(bodyLimitFixturePolicy(), report), http.MethodPost, "/api/items/7", 3))
 }
 
-// TestMiddlewareBodyLimit_ARequestWithNoBodyIsUntouched covers both shapes of "no body": the
+// TestBodyLimit_ARequestWithNoBodyIsUntouched covers both shapes of "no body": the
 // http.NoBody net/http gives a request without one, and a nil a handler-level caller may pass.
-func TestMiddlewareBodyLimit_ARequestWithNoBodyIsUntouched(t *testing.T) {
+func TestBodyLimit_ARequestWithNoBodyIsUntouched(t *testing.T) {
 	var seen io.ReadCloser
 	router := newBodyLimitRouter(bodyLimitFixturePolicy(), func(_ http.ResponseWriter, r *http.Request) {
 		seen = r.Body
@@ -149,9 +149,9 @@ func TestMiddlewareBodyLimit_ARequestWithNoBodyIsUntouched(t *testing.T) {
 	assert.Nil(t, seen, "a nil body must stay nil")
 }
 
-// TestMiddlewareBodyLimit_AHandlersTighterBoundStillTrips: the table sits above the handlers that
+// TestBodyLimit_AHandlersTighterBoundStillTrips: the table sits above the handlers that
 // bound their own bodies, and must not be what answers for them.
-func TestMiddlewareBodyLimit_AHandlersTighterBoundStillTrips(t *testing.T) {
+func TestBodyLimit_AHandlersTighterBoundStillTrips(t *testing.T) {
 	router := newBodyLimitRouter(bodyLimitFixturePolicy(), func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 10)
 		bodyLimitReader(w, r)
@@ -161,9 +161,9 @@ func TestMiddlewareBodyLimit_AHandlersTighterBoundStillTrips(t *testing.T) {
 	assert.Equal(t, "refused at 10", serveBody(router, http.MethodPost, "/api/items/7", 1000), "past both")
 }
 
-// TestMiddlewareBodyLimit_RefusesASilentlyWrongPolicy: each shape below would boot a server whose
+// TestBodyLimit_RefusesASilentlyWrongPolicy: each shape below would boot a server whose
 // table does not say what it looks like it says.
-func TestMiddlewareBodyLimit_RefusesASilentlyWrongPolicy(t *testing.T) {
+func TestBodyLimit_RefusesASilentlyWrongPolicy(t *testing.T) {
 	valid := bodyLimitFixturePolicy
 
 	tests := []struct {
@@ -183,11 +183,11 @@ func TestMiddlewareBodyLimit_RefusesASilentlyWrongPolicy(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			policy := test.policy()
-			assert.Panics(t, func() { MiddlewareBodyLimit(chi.NewRouter(), policy) })
+			assert.Panics(t, func() { BodyLimit(chi.NewRouter(), policy) })
 		})
 	}
 
 	t.Run("the fixture itself is accepted", func(t *testing.T) {
-		require.NotPanics(t, func() { MiddlewareBodyLimit(chi.NewRouter(), valid()) })
+		require.NotPanics(t, func() { BodyLimit(chi.NewRouter(), valid()) })
 	})
 }

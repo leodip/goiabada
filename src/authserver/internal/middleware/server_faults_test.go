@@ -78,7 +78,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
 				db := mocks_data.NewDatabase(t)
 				db.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
-				return MiddlewareSettings(db, faults)
+				return Settings(db, faults)
 			},
 			pageSentence: "fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
 			pageMessage:  "unable to load the settings",
@@ -89,7 +89,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
 				store := mocks_sessionstore.NewStore(t)
 				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, errors.New("the session backend is down"))
-				return MiddlewareSessionIdentifier(store, mocks_data.NewDatabase(t), faults)
+				return SessionIdentifier(store, mocks_data.NewDatabase(t), faults)
 			},
 			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
 			pageMessage:  "unable to get the session store",
@@ -102,7 +102,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(sessionWithIdentifier(store, "sid-1"), nil)
 				db := mocks_data.NewDatabase(t)
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
-				return MiddlewareSessionIdentifier(store, db, faults)
+				return SessionIdentifier(store, db, faults)
 			},
 			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
 			pageMessage:  "unable to get the user session",
@@ -116,7 +116,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("the session backend is down"))
 				db := mocks_data.NewDatabase(t)
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, nil)
-				return MiddlewareSessionIdentifier(store, db, faults)
+				return SessionIdentifier(store, db, faults)
 			},
 			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
 			pageMessage:  "unable to save the session",

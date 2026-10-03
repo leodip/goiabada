@@ -2,7 +2,7 @@ package middleware
 
 import "net/http"
 
-// MiddlewareNoStore refuses caching of the response it wraps, with the pair
+// NoStore refuses caching of the response it wraps, with the pair
 // RFC 6749 section 5.1 requires:
 //
 //	Cache-Control: no-store
@@ -48,7 +48,7 @@ import "net/http"
 //
 // Handlers that set their own Cache-Control still win, since Header().Set
 // replaces. Nothing under /api/v1 sets one.
-func MiddlewareNoStore() func(next http.Handler) http.Handler {
+func NoStore() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()

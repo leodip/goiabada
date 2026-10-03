@@ -13,15 +13,15 @@ import (
 )
 
 // TestInitMiddleware_RequestLoggerIsRegistered makes the claim the unit table in
-// src/core/middleware cannot: that MiddlewareRequestLogger is actually mounted on the admin
+// src/core/httpmw cannot: that httpmw.RequestLogger is actually mounted on the admin
 // console's router, and that it is wired to the configuration flag rather than mounted with a
 // constant. That table passes perfectly against a middleware nobody wired up, and deleting the
-// Use() line here still compiles, because the package references custom_middleware on five other
+// Use() line here still compiles, because the package references httpmw on other
 // lines. The admin console also has no integration suite of its own, so there is no running-server
 // test to catch it either.
 //
 // It is deliberately thin, for the same reason its auth server twin is: the middleware's behaviour
-// belongs to its own tests in src/core/middleware, and the redaction table belongs to
+// belongs to its own tests in src/core/httpmw, and the redaction table belongs to
 // RequestTargetForLog in src/core/logging. This owns one claim, that a real request through this
 // server's real chain produces a log line and that the line carries no token (#159).
 
@@ -38,7 +38,7 @@ const loggerTestTarget = "/admin/clients?page=2&size=10&id_token_hint=" + jwtLik
 // handler that answers 200 and records that it ran.
 //
 // Unlike server_csrf_test.go, which points the settings cache at an address nothing listens on,
-// this one serves /api/public/settings from a local httptest server. MiddlewareSettingsCache
+// this one serves /api/public/settings from a local httptest server. middleware.SettingsCache
 // answers 500 and returns on a fetch failure, so an unreachable auth server would stop the request
 // before the handler, and "the request still reached the handler" is exactly the half of this test
 // that says the logger did not swallow it.
@@ -89,7 +89,7 @@ func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 
 	output := logged.Text()
 	if got := strings.Count(output, `msg="http request"`); got != 1 {
-		t.Fatalf("got %d request log records, want 1: MiddlewareRequestLogger must be mounted on "+
+		t.Fatalf("got %d request log records, want 1: httpmw.RequestLogger must be mounted on "+
 			"the admin console", got)
 	}
 

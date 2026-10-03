@@ -18,20 +18,20 @@ import (
 	"log/slog"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
-	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/i18n"
-	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
 
 type Server struct {
@@ -331,12 +331,12 @@ const (
 // format a route answers a fault in (see appBranches, #435).
 //
 // The cost that split removes is not hypothetical. An auth page references seven
-// same-origin assets, and MiddlewareSettings reads settings from the database uncached on
+// same-origin assets, and middleware.Settings reads settings from the database uncached on
 // every request, so a single page view already cost seven database reads for files that
 // could not use the result. Once the session moved out of the cookie and into a row, each
 // of those would have cost a session read as well.
 //
-// It is a correctness fix too. MiddlewareCookieReset answers a cookie it cannot decode
+// It is a correctness fix too. httpmw.CookieReset answers a cookie it cannot decode
 // with a 302 back to the request target, which is not a sensible answer to a request for
 // a stylesheet.
 //
@@ -348,18 +348,18 @@ func (s *Server) initMiddleware() appBranches {
 	slog.Info("initializing middleware")
 
 	// CORS
-	s.router.Use(authserver_middleware.MiddlewareCors(s.database))
+	s.router.Use(middleware.CORS(s.database))
 
 	// Request ID
-	s.router.Use(middleware.RequestID)
+	s.router.Use(chimiddleware.RequestID)
 
 	// Security headers (before Recoverer so 500 responses carry them too)
-	s.router.Use(custom_middleware.MiddlewareSecurityHeaders(s.cfg.AuthServer.IsCookieSecure()))
+	s.router.Use(httpmw.SecurityHeaders(s.cfg.AuthServer.IsCookieSecure()))
 
 	// Real IP: resolve the client IP into r.RemoteAddr from the socket peer and
 	// (when trusted) the forwarded headers, so all downstream consumers (rate
 	// limiter, session/audit IP, request logger) share one trustworthy value.
-	s.router.Use(custom_middleware.MiddlewareRealIP(
+	s.router.Use(httpmw.RealIP(
 		s.cfg.AuthServer.TrustProxyHeaders,
 		s.trustedProxies,
 	))
@@ -368,7 +368,7 @@ func (s *Server) initMiddleware() appBranches {
 	// wrote the raw request target to stdout, query string and all, so an id_token_hint JWT
 	// landed in the log in full (#159). The redaction lives in the middleware.
 	//
-	// Mounted unconditionally: MiddlewareRequestLogger returns the next handler untouched
+	// Mounted unconditionally: httpmw.RequestLogger returns the next handler untouched
 	// when the flag is off, so the chain has one shape either way.
 	//
 	// It sits above Recoverer rather than below it so that a panicking request is recorded
@@ -384,42 +384,42 @@ func (s *Server) initMiddleware() appBranches {
 	// middleware renders the target before calling the next handler.
 	logHttpRequests := s.cfg.AuthServer.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
-	s.router.Use(custom_middleware.MiddlewareRequestLogger(logHttpRequests))
+	s.router.Use(httpmw.RequestLogger(logHttpRequests))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
 	// wrapped writer and lands in the record (#203).
-	s.router.Use(middleware.Recoverer)
+	s.router.Use(chimiddleware.Recoverer)
 
 	// Strip slashes
-	s.router.Use(middleware.StripSlashes)
+	s.router.Use(chimiddleware.StripSlashes)
 
 	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripSlashes, because
-	// the lookup resolves the route by the path StripSlashes normalized; before MiddlewareSkipCsrf,
+	// the lookup resolves the route by the path StripSlashes normalized; before httpmw.SkipCSRF,
 	// because the /auth/logout exemption predicate parses the form body right there at the root,
 	// and a body read before this mount would be read without a bound.
-	s.router.Use(custom_middleware.MiddlewareBodyLimit(s.router,
+	s.router.Use(httpmw.BodyLimit(s.router,
 		bodyLimitPolicy(s.cfg.AuthServer.ProfilePictureMaxSizeBytes)))
 
 	// CSRF
 	// Note: CSRF runs before the locale middleware below, so there is no localizer on the context
-	// when a request is rejected. MiddlewareCsrf resolves a tentative one of its own through
+	// when a request is rejected. httpmw.CSRF resolves a tentative one of its own through
 	// i18n.ResolveRequestLocale, so the rejection is localized without moving the origin check
 	// down onto the application branch, where a route registered outside that branch would
 	// escape it.
 	//
-	// MiddlewareSkipCsrf marks the endpoints that are cross-origin by protocol, and MiddlewareCsrf
+	// httpmw.SkipCSRF marks the endpoints that are cross-origin by protocol, and httpmw.CSRF
 	// refuses every other state-changing cross-origin request outright, trusting no origin but this
-	// deployment's own (#155). MiddlewareCsrf takes no configuration; MiddlewareSkipCsrf takes this
+	// deployment's own (#155). httpmw.CSRF takes no configuration; httpmw.SkipCSRF takes this
 	// server's own exemption policy, which until #385 was a table in core naming both binaries'
 	// routes, so each exempted the other's.
-	s.router.Use(custom_middleware.MiddlewareSkipCsrf(csrfPolicy()))
-	s.router.Use(custom_middleware.MiddlewareCsrf())
+	s.router.Use(httpmw.SkipCSRF(csrfPolicy()))
+	s.router.Use(httpmw.CSRF())
 
 	// Everything below is on the application branch, not the root.
 
 	// Global locale middleware: resolves a tentative localizer from
 	// ?ui_locales, UI locales from an in-flight authorize flow,
-	// Accept-Language, or English. Must run AFTER MiddlewareSessionIdentifier
+	// Accept-Language, or English. Must run AFTER middleware.SessionIdentifier
 	// so the session is decoded — the reader gets UI locales from session-backed
 	// authorize state. User-locale refinement happens per-handler in authserver
 	// (an i18n.WithLocale call once a password has been checked), since
@@ -428,9 +428,9 @@ func (s *Server) initMiddleware() appBranches {
 	i18nCeremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
 	branches := appBranches{
-		pages:    s.applicationBranch(authserver_middleware.PageFaults(), i18nCeremonyStore),
-		protocol: s.applicationBranch(authserver_middleware.ProtocolFaults(handlerhelpers.NewHttpHelper(s.templateFS)), i18nCeremonyStore),
-		api:      s.applicationBranch(authserver_middleware.APIFaults(), i18nCeremonyStore),
+		pages:    s.applicationBranch(middleware.PageFaults(), i18nCeremonyStore),
+		protocol: s.applicationBranch(middleware.ProtocolFaults(handlerhelpers.NewHttpHelper(s.templateFS)), i18nCeremonyStore),
+		api:      s.applicationBranch(middleware.APIFaults(), i18nCeremonyStore),
 	}
 
 	slog.Info("finished initializing middleware")
@@ -442,21 +442,21 @@ func (s *Server) initMiddleware() appBranches {
 // handler through faults. The three branches initMiddleware builds run this same middleware in the
 // same order and differ only in faults: the settings or the session could not be read, or something
 // panicked.
-func (s *Server) applicationBranch(faults authserver_middleware.ServerFaults, i18nCeremonyStore *ceremony.Store) chi.Router {
+func (s *Server) applicationBranch(faults middleware.ServerFaults, i18nCeremonyStore *ceremony.Store) chi.Router {
 	return s.router.With(
 		// Answers a panic on the branch in the branch's format; on the page branch it is a
 		// pass-through and the root Recoverer answers
 		faults.Recoverer,
 
 		// Adds settings to the request context
-		authserver_middleware.MiddlewareSettings(s.database, faults),
+		middleware.Settings(s.database, faults),
 
 		// Clear the session cookie and redirect if unable to decode it, and delete
 		// whatever the chunked cookie store left in this browser
-		custom_middleware.MiddlewareCookieReset(s.sessionStore, sessionkeys.AuthServerSessionName),
+		httpmw.CookieReset(s.sessionStore, sessionkeys.AuthServerSessionName),
 
 		// Adds the session identifier (if available) to the request context
-		authserver_middleware.MiddlewareSessionIdentifier(s.sessionStore, s.database, faults),
+		middleware.SessionIdentifier(s.sessionStore, s.database, faults),
 
 		i18n.MiddlewareLocale(i18nCeremonyStore),
 	)
@@ -492,8 +492,8 @@ type appBranches struct {
 // /auth/callback is deliberately not here. It is the admin console's OAuth callback and this binary
 // does not mount it; it was in the shared table this replaces, which is the kind of entry a
 // per-application policy exists to stop.
-func csrfPolicy() custom_middleware.CsrfPolicy {
-	return custom_middleware.CsrfPolicy{
+func csrfPolicy() httpmw.CSRFPolicy {
+	return httpmw.CSRFPolicy{
 		// Matched EXACTLY, so a future sibling route (e.g. /auth/token-introspect or
 		// /userinfo-export) is NOT silently exempted: it keeps full CSRF protection until it is
 		// deliberately added here.
@@ -541,7 +541,7 @@ func csrfPolicy() custom_middleware.CsrfPolicy {
 			// RP-initiated logout, exempt only for a POST carrying an id_token_hint. See
 			// middleware.LogoutIdTokenHintPresent for why presence is the test and why it is read
 			// through the same function the logout handler classifies the parameter with (#109).
-			"/auth/logout": authserver_middleware.LogoutIdTokenHintPresent,
+			"/auth/logout": middleware.LogoutIdTokenHintPresent,
 		},
 	}
 }
@@ -568,7 +568,7 @@ const (
 )
 
 // bodyLimitPolicy is the auth server's request-body table (#426): how many bytes each route may
-// read, looked up by MiddlewareBodyLimit at the root. A route missing from it gets
+// read, looked up by httpmw.BodyLimit at the root. A route missing from it gets
 // defaultBodyLimit, the smallest limit here, so an omission is a refused request rather than an
 // unbounded read.
 //
@@ -578,10 +578,10 @@ const (
 // profilePictureMaxSizeBytes is GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES, read once at startup, so
 // raising it raises the upload rows with it. config.Load holds it positive and at most
 // config.MaxProfilePictureMaxSizeBytes, which is what keeps the sum below from wrapping (#435).
-func bodyLimitPolicy(profilePictureMaxSizeBytes int64) custom_middleware.BodyLimitPolicy {
+func bodyLimitPolicy(profilePictureMaxSizeBytes int64) httpmw.BodyLimitPolicy {
 	uploadLimit := profilePictureMaxSizeBytes + uploadMultipartAllowance
 
-	return custom_middleware.BodyLimitPolicy{
+	return httpmw.BodyLimitPolicy{
 		Default: defaultBodyLimit,
 
 		Prefixes: map[string]int64{

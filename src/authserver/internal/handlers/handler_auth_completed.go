@@ -359,7 +359,7 @@ func bindReusedSession(
 	// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
 	// will be upgraded to reflect the stronger authentication that was performed.
 	bumpedSession, err := userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
-		authContext.AuthMethods, targetAcrLevel, middleware.GetClientIPFromRequest(r))
+		authContext.AuthMethods, targetAcrLevel, middleware.ClientIP(r))
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +498,7 @@ func bindNewSession(
 	newSession, removedSessions, err := userSessionManager.StartNewUserSession(
 		w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel,
 		authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
-		authContext.AuthenticatedAt, middleware.GetClientIPFromRequest(r), replacing)
+		authContext.AuthenticatedAt, middleware.ClientIP(r), replacing)
 
 	// Every row the sign-in removed is gone once its transaction committed, which includes a
 	// failure that came after the commit, so each is audited before either answer. The payload is

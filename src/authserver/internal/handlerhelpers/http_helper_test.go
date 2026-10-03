@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newRequest is httptest.NewRequest with settings on its context, as MiddlewareSettings puts them
+// newRequest is httptest.NewRequest with settings on its context, as middleware.Settings puts them
 // on every application request, so a render reaches its template.
 func newRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
@@ -255,7 +255,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", buf.String())
 	})
 
-	// Every application route runs under MiddlewareSettings, so a render without settings is a
+	// Every application route runs under middleware.Settings, so a render without settings is a
 	// wiring defect. It is refused with the one sentinel, for the caller's 500 path to answer, and
 	// binds nothing into the page data (#433 decision 7).
 	t.Run("Without settings the render is refused", func(t *testing.T) {

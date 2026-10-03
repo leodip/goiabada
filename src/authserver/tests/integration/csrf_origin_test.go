@@ -13,7 +13,7 @@ import (
 )
 
 // TestCsrf_MiddlewareIsRegistered makes the one claim the unit tables in
-// src/core/middleware/middleware_csrf_test.go cannot: that MiddlewareCsrf is actually mounted on
+// src/core/httpmw/middleware_csrf_test.go cannot: that httpmw.CSRF is actually mounted on
 // the running auth server. Those tables pass perfectly against a middleware nobody wired up, and
 // #155 rewrote both server wirings, so a deleted Use() line is exactly the regression they would
 // miss.
@@ -56,9 +56,9 @@ func TestCsrf_MiddlewareIsRegistered(t *testing.T) {
 
 		require.Equal(t, http.StatusForbidden, resp.StatusCode,
 			"a cross-site POST to a cookie-authenticated form endpoint must be refused; "+
-				"if this is not a 403, MiddlewareCsrf is no longer registered on the auth server")
+				"if this is not a 403, httpmw.CSRF is no longer registered on the auth server")
 
-		// The body is MiddlewareCsrf's own message, which is what attributes the 403 to the
+		// The body is httpmw.CSRF's own message, which is what attributes the 403 to the
 		// origin check rather than to any handler further down. It is read from the catalog
 		// rather than repeated here, and this request sends no Accept-Language, so the running
 		// server answers the English entry.

@@ -17,8 +17,8 @@ type settingsGetter interface {
 	Get(ctx context.Context) (*api.PublicSettingsResponse, error)
 }
 
-// MiddlewareSettingsCache adds settings to the request context by fetching from the cache
-func MiddlewareSettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler {
+// SettingsCache adds settings to the request context by fetching from the cache
+func SettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Fetch settings from cache (auto-refreshes if expired)

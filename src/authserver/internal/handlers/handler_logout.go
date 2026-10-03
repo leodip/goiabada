@@ -438,7 +438,7 @@ func classifyIdTokenHint(
 	if len(sessionIdentifier) == 0 {
 		// An RP may end a session with a hint alone and no cookie in play, which is what makes
 		// RP-initiated logout work from a back-channel-less RP, so the hint's own sid names the
-		// session. MiddlewareSessionIdentifier fills the context only when the cookie resolves to a
+		// session. middleware.SessionIdentifier fills the context only when the cookie resolves to a
 		// live row, so "no identifier" covers a cookie whose session has already gone too.
 		sessionIdentifier = sid
 	} else if sid != sessionIdentifier {

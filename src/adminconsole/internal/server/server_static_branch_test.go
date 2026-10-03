@@ -27,7 +27,7 @@ import (
 // a single page view would cost ten calls across the wire and a database read at the far end
 // of each, on the module that was kept database-free precisely to stay light.
 //
-// It cannot be asserted anywhere but here. MiddlewareSettingsCache and MiddlewareCookieReset
+// It cannot be asserted anywhere but here. middleware.SettingsCache and httpmw.CookieReset
 // both have their own tests and both pass whatever router they are mounted on; what decides
 // the cost of a page view is which branch serveStaticFiles registers against, and that is a
 // property of this file alone.

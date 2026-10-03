@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Every application route runs under MiddlewareSettings, so a handler reached without settings is
+// Every application route runs under middleware.Settings, so a handler reached without settings is
 // a wiring defect rather than a request a client can make. Each answers it through the 500 writer
 // its other failures already use, passing reqctx.ErrNoSettings, and nothing is read or written
 // first. One row per writer in this package, not one per read site: the rest share these writers

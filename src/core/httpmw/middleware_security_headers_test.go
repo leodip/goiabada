@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"net/http"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestMiddlewareSecurityHeaders(t *testing.T) {
+func TestSecurityHeaders(t *testing.T) {
 	tests := []struct {
 		name   string
 		secure bool
@@ -39,7 +39,7 @@ func TestMiddlewareSecurityHeaders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			called := false
-			handler := MiddlewareSecurityHeaders(tt.secure)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler := SecurityHeaders(tt.secure)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusOK)
 			}))
@@ -61,7 +61,7 @@ func TestMiddlewareSecurityHeaders(t *testing.T) {
 	}
 }
 
-// TestMiddlewareSecurityHeaders_ReferrerPolicyIsNotNoReferrer guards a regression that
+// TestSecurityHeaders_ReferrerPolicyIsNotNoReferrer guards a regression that
 // broke every login: Referrer-Policy: no-referrer makes browsers send "Origin: null" on
 // form POSTs, and the CSRF origin check rejects an opaque origin because it has no host to
 // compare against Host. The result was a 403 on the password form, the OTP form, the
@@ -83,9 +83,9 @@ func TestMiddlewareSecurityHeaders(t *testing.T) {
 // no-referrer does not. same-origin is chosen because it still keeps authorization codes
 // and state values out of Referer headers sent to other origins, which was the point of
 // setting the header in the first place.
-func TestMiddlewareSecurityHeaders_ReferrerPolicyIsNotNoReferrer(t *testing.T) {
+func TestSecurityHeaders_ReferrerPolicyIsNotNoReferrer(t *testing.T) {
 	for _, secure := range []bool{false, true} {
-		handler := MiddlewareSecurityHeaders(secure)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := SecurityHeaders(secure)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
 

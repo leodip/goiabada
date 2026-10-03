@@ -35,7 +35,7 @@ const (
 	foreignOrigin = "https://www.certification.openid.net"
 )
 
-func TestInitMiddleware_CsrfPolicy(t *testing.T) {
+func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 	tests := []struct {
 		name string
 		path string
@@ -100,7 +100,7 @@ func TestInitMiddleware_CsrfPolicy(t *testing.T) {
 				t.Fatalf("cross-site POST %s: got status %d, want %d", tt.path, rr.Code, tt.wantStatus)
 			}
 			if tt.wantStatus == http.StatusForbidden {
-				// The body is MiddlewareCsrf's own message, which is what attributes the 403 to the
+				// The body is httpmw.CSRF's own message, which is what attributes the 403 to the
 				// origin check rather than to any handler further down. Read from the catalog, so
 				// rewording the entry does not fail this test while a 403 from somewhere else still
 				// does.
@@ -152,7 +152,7 @@ func newCsrfTestServer(t *testing.T) *Server {
 	t.Helper()
 
 	database := mocks_data.NewDatabase(t)
-	// MiddlewareCors consults the registered web origins for /auth/token, /auth/logout and
+	// middleware.CORS consults the registered web origins for /auth/token, /auth/logout and
 	// /userinfo when an Origin header is present, which every cross-site row here sends. Answering
 	// false is the production answer for an unregistered origin and keeps CORS out of the result:
 	// the origin check is what these rows are about.

@@ -40,23 +40,23 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	wantRoot := []string{
 		"github.com/go-chi/cors.(*Cors).Handler-fm",
 		"github.com/go-chi/chi/v5/middleware.RequestID",
-		"github.com/leodip/goiabada/core/middleware.MiddlewareSecurityHeaders.func1",
-		"github.com/leodip/goiabada/core/middleware.MiddlewareRealIP.func1",
-		"github.com/leodip/goiabada/core/middleware.MiddlewareRequestLogger.func1",
+		"github.com/leodip/goiabada/core/httpmw.SecurityHeaders.func1",
+		"github.com/leodip/goiabada/core/httpmw.RealIP.func1",
+		"github.com/leodip/goiabada/core/httpmw.RequestLogger.func1",
 		"github.com/go-chi/chi/v5/middleware.Recoverer",
 		"github.com/go-chi/chi/v5/middleware.StripSlashes",
 		// After StripSlashes, whose path it routes by, and before the /auth/logout exemption
 		// predicate, which parses the form body (#426).
-		"github.com/leodip/goiabada/core/middleware.MiddlewareBodyLimit.func1",
-		"github.com/leodip/goiabada/core/middleware.MiddlewareSkipCsrf.func1",
-		"github.com/leodip/goiabada/core/middleware.MiddlewareCsrf.func1",
+		"github.com/leodip/goiabada/core/httpmw.BodyLimit.func1",
+		"github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1",
+		"github.com/leodip/goiabada/core/httpmw.CSRF.func1",
 	}
 	// The same chain on all three branches, which differ only in how its faults are answered.
 	wantApp := append(append([]string{}, wantRoot...),
 		"github.com/leodip/goiabada/authserver/internal/middleware.ServerFaults.Recoverer-fm",
-		"github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareSettings.func1",
-		"github.com/leodip/goiabada/core/middleware.MiddlewareCookieReset.func1",
-		"github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareSessionIdentifier.func1",
+		"github.com/leodip/goiabada/authserver/internal/middleware.Settings.func1",
+		"github.com/leodip/goiabada/core/httpmw.CookieReset.func1",
+		"github.com/leodip/goiabada/authserver/internal/middleware.SessionIdentifier.func1",
 		"github.com/leodip/goiabada/core/i18n.MiddlewareLocale.func1",
 	)
 

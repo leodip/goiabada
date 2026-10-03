@@ -15,7 +15,7 @@ type corsDatabase interface {
 	WebOriginExists(ctx context.Context, tx *sql.Tx, origin string) (bool, error)
 }
 
-func MiddlewareCors(database corsDatabase) func(next http.Handler) http.Handler {
+func CORS(database corsDatabase) func(next http.Handler) http.Handler {
 	return cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
 			// StripSlashes runs below this middleware, so the slashed form of a covered path

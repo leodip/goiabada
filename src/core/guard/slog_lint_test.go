@@ -306,7 +306,7 @@ func (m *limiter) reportTrip(ctx context.Context, keyField, key string) {
 	slog.WarnContext(ctx, "rate limit reached", attrs...)
 }
 `)
-	tree.write("core/middleware/builders.go", `package middleware
+	tree.write("core/httpmw/builders.go", `package httpmw
 
 import (
 	"log/slog"
@@ -315,7 +315,7 @@ import (
 
 type limiter struct{}
 
-func MiddlewareRequestLogger() func(http.Handler) http.Handler {
+func RequestLogger() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			attributes := []any{"method", r.Method}
@@ -378,7 +378,7 @@ func withContext(ctx context.Context, id string) {
 `)
 	// parseCIDRs was admitted until #425 withdrew it, so its plain record is a finding now: the
 	// admission was removed, not moved elsewhere in the package.
-	tree.write("core/middleware/middleware_realip.go", `package middleware
+	tree.write("core/httpmw/middleware_realip.go", `package httpmw
 
 import "log/slog"
 
@@ -554,7 +554,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"authserver/internal/handlers/plain.go:9 a plain slog.Info in a request-path package",
 		"authserver/internal/handlers/plain.go:13 a plain slog.Warn in a request-path package",
 		"authserver/internal/handlers/plain.go:14 a plain slog.Debug in a request-path package",
-		"core/middleware/middleware_realip.go:5 a plain slog.Warn in a request-path package",
+		"core/httpmw/middleware_realip.go:5 a plain slog.Warn in a request-path package",
 		"adminconsole/internal/handlerhelpers/namesake.go:5 a plain slog.Warn in a request-path package",
 		"adminconsole/internal/handlerhelpers/namesake.go:7 a plain slog.Warn in a request-path package",
 		// rule 5 in packages no list names, which is every package but the ones with no request

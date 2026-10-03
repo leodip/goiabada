@@ -164,7 +164,7 @@ func assertReadNoFurtherThanTheValue(t *testing.T, server *httptest.Server, coun
 	}
 }
 
-// paddingTestSettings is what MiddlewareSettings reads. Registration is on so DCR reaches its
+// paddingTestSettings is what middleware.Settings reads. Registration is on so DCR reaches its
 // decode; both audit sinks are off so the real AuditLogger writes no row.
 func paddingTestSettings() *models.Settings {
 	return &models.Settings{Id: 1, AppName: "Goiabada", DynamicClientRegistrationEnabled: true}

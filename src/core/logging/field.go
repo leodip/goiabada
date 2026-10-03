@@ -8,7 +8,7 @@ import (
 // MaxLoggedField bounds each client-chosen scalar attribute: the method, the
 // request id and the IP. All three can be enormous, measured rather than
 // assumed: a 900000-byte method and a 900000-byte X-Request-Id both reach the
-// handler, and MiddlewareRealIP writes a 900000-byte X-Forwarded-For entry
+// handler, and httpmw.RealIP writes a 900000-byte X-Forwarded-For entry
 // straight into r.RemoteAddr.
 //
 // 128 is set from what legitimate values measure: chi's own generated request
@@ -18,22 +18,22 @@ import (
 // header makes one log line of 900 KB (#159).
 const MaxLoggedField = 128
 
-// TruncateCounted returns s unchanged when it fits, and otherwise the retained
+// truncateCounted returns s unchanged when it fits, and otherwise the retained
 // prefix followed by a marker giving the limit and the true byte count. It is
 // for a caller that holds the retained prefix and the true length separately,
 // having deliberately never built the rest. s must be at least limit bytes long
 // whenever total exceeds limit.
-func TruncateCounted(s string, limit, total int) string {
+func truncateCounted(s string, limit, total int) string {
 	if total <= limit {
 		return s
 	}
-	return s[:limit] + TruncationMarker(limit, total)
+	return s[:limit] + truncationMarker(limit, total)
 }
 
-// TruncationMarker is the only place the marker's text is written, so that a
+// truncationMarker is the only place the marker's text is written, so that a
 // caller measuring a component it has deliberately not rendered still agrees
 // with the renderer to the byte.
-func TruncationMarker(limit, total int) string {
+func truncationMarker(limit, total int) string {
 	return fmt.Sprintf("[truncated, %d of %d bytes]", limit, total)
 }
 
@@ -118,5 +118,5 @@ func FieldForLog(s string) string {
 	if len(head) > MaxLoggedField {
 		head = head[:MaxLoggedField]
 	}
-	return TruncateCounted(SafeLogValue(head), MaxLoggedField, safeLogValueLen(s))
+	return truncateCounted(SafeLogValue(head), MaxLoggedField, safeLogValueLen(s))
 }

@@ -11,12 +11,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authorizerequest"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -106,7 +106,7 @@ func HandleAuthorizeGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		requestId := middleware.GetReqID(r.Context())
+		requestId := chimiddleware.GetReqID(r.Context())
 
 		// A request that does not parse is answered on the page and never by redirect: a malformed
 		// escape drops the field it sits in, so the client_id or redirect_uri the redirect would be
@@ -159,7 +159,7 @@ func HandleAuthorizeGet(
 			State:                         state,
 			Nonce:                         params.Get("nonce"),
 			UserAgent:                     r.UserAgent(),
-			IpAddress:                     authserver_middleware.GetClientIPFromRequest(r),
+			IpAddress:                     middleware.ClientIP(r),
 		}
 		// The scope the client asked for, normalized, is what the validator judges below, once
 		// ValidateScopes has found the scope as sent well formed; the scope stored is what the
@@ -882,7 +882,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 
 	// Bump the user session to update LastAccessed time
 	_, err = userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
-		authContext.AuthMethods, authContext.AcrLevel, authserver_middleware.GetClientIPFromRequest(r))
+		authContext.AuthMethods, authContext.AcrLevel, middleware.ClientIP(r))
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return

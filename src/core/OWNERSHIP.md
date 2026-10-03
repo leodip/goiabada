@@ -289,6 +289,16 @@ command itself and fails on a tree it changed.
 | `core/hostport` | `Join` | both-apps | — |
 | `core/hostport` | `Unbracket` | own-package | — |
 | `core/hostport/hostporttest` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/hostport/hostporttest` names it in production. |
+| `core/httpmw` | `BodyLimit` | both-apps | — |
+| `core/httpmw` | `BodyLimitPolicy` | both-apps | — |
+| `core/httpmw` | `CSRF` | both-apps | — |
+| `core/httpmw` | `CSRFPolicy` | both-apps | — |
+| `core/httpmw` | `CookieReset` | both-apps | — |
+| `core/httpmw` | `ParseTrustedProxies` | both-apps | — |
+| `core/httpmw` | `RealIP` | both-apps | — |
+| `core/httpmw` | `RequestLogger` | both-apps | — |
+| `core/httpmw` | `SecurityHeaders` | both-apps | — |
+| `core/httpmw` | `SkipCSRF` | both-apps | — |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressLine1TooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
@@ -407,22 +417,10 @@ command itself and fails on a tree it changed.
 | `core/logging` | `MaxLoggedField` | own-package | — |
 | `core/logging` | `RequestTargetForLog` | kernel | — |
 | `core/logging` | `SafeLogValue` | own-package | — |
-| `core/logging` | `TruncateCounted` | own-package | — |
-| `core/logging` | `TruncationMarker` | own-package | — |
 | `core/logging` | `WrapRequestID` | kernel | — |
 | `core/logging/logtest` | `CaptureSlog` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `CapturedRecord` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
-| `core/middleware` | `BodyLimitPolicy` | both-apps | — |
-| `core/middleware` | `CsrfPolicy` | both-apps | — |
-| `core/middleware` | `MiddlewareBodyLimit` | both-apps | — |
-| `core/middleware` | `MiddlewareCookieReset` | both-apps | — |
-| `core/middleware` | `MiddlewareCsrf` | both-apps | — |
-| `core/middleware` | `MiddlewareRealIP` | both-apps | — |
-| `core/middleware` | `MiddlewareRequestLogger` | both-apps | — |
-| `core/middleware` | `MiddlewareSecurityHeaders` | both-apps | — |
-| `core/middleware` | `MiddlewareSkipCsrf` | both-apps | — |
-| `core/middleware` | `ParseTrustedProxies` | both-apps | — |
 | `core/oauth` | `ConformErrorDescription` | both-apps | — |
 | `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |

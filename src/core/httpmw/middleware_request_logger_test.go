@@ -1,4 +1,4 @@
-package middleware
+package httpmw
 
 import (
 	"net/http"
@@ -18,7 +18,7 @@ const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 	"eyJzdWIiOiJVU0VSLVNVQiIsInNpZCI6IlNFU1NJT04tSUQifQ.U0lHTkFUVVJF"
 
 // -----------------------------------------------------------------------------
-// MiddlewareRequestLogger
+// RequestLogger
 //
 // The target's rendering, its redaction and its bounds, is logging's and is tested
 // beside RequestTargetForLog in core/logging. These own what the middleware adds.
@@ -37,11 +37,11 @@ func records(capture *logtest.SlogCapture) int {
 	return strings.Count(capture.Text(), `msg="http request"`)
 }
 
-func TestMiddlewareRequestLogger_DisabledWritesNothingAndStillServes(t *testing.T) {
+func TestRequestLogger_DisabledWritesNothingAndStillServes(t *testing.T) {
 	buf := logtest.CaptureSlog(t)
 	ran := false
 
-	handler := MiddlewareRequestLogger(false)(okHandler(&ran))
+	handler := RequestLogger(false)(okHandler(&ran))
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth/authorize?client_id=c", nil))
 
 	assert.Equal(t, 0, records(buf), "nothing is logged when the flag is off")
@@ -50,7 +50,7 @@ func TestMiddlewareRequestLogger_DisabledWritesNothingAndStillServes(t *testing.
 	assert.True(t, ran, "the handler must still run")
 }
 
-func TestMiddlewareRequestLogger_SkipList(t *testing.T) {
+func TestRequestLogger_SkipList(t *testing.T) {
 	tests := []struct {
 		name      string
 		path      string
@@ -69,7 +69,7 @@ func TestMiddlewareRequestLogger_SkipList(t *testing.T) {
 			buf := logtest.CaptureSlog(t)
 			ran := false
 
-			handler := MiddlewareRequestLogger(true)(okHandler(&ran))
+			handler := RequestLogger(true)(okHandler(&ran))
 			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, test.path, nil))
 
 			assert.Equal(t, test.wantLines, records(buf))
@@ -80,11 +80,11 @@ func TestMiddlewareRequestLogger_SkipList(t *testing.T) {
 	}
 }
 
-func TestMiddlewareRequestLogger_LogsExactlyOneRecord(t *testing.T) {
+func TestRequestLogger_LogsExactlyOneRecord(t *testing.T) {
 	buf := logtest.CaptureSlog(t)
 	ran := false
 
-	handler := MiddlewareRequestLogger(true)(okHandler(&ran))
+	handler := RequestLogger(true)(okHandler(&ran))
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth/authorize?client_id=c", nil))
 
 	assert.Equal(t, 1, records(buf))
@@ -94,7 +94,7 @@ func TestMiddlewareRequestLogger_LogsExactlyOneRecord(t *testing.T) {
 }
 
 // The goal sentence of the change: the reported defect, at both endpoints.
-func TestMiddlewareRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
+func TestRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
 	tests := []struct {
 		name   string
 		target string
@@ -117,7 +117,7 @@ func TestMiddlewareRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
 			buf := logtest.CaptureSlog(t)
 			ran := false
 
-			handler := MiddlewareRequestLogger(true)(okHandler(&ran))
+			handler := RequestLogger(true)(okHandler(&ran))
 			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, test.target, nil))
 
 			assert.Equal(t, 1, records(buf))
@@ -127,10 +127,10 @@ func TestMiddlewareRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
 	}
 }
 
-func TestMiddlewareRequestLogger_RecordsStatusAndBytes(t *testing.T) {
+func TestRequestLogger_RecordsStatusAndBytes(t *testing.T) {
 	buf := logtest.CaptureSlog(t)
 
-	handler := MiddlewareRequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte("nope!"))
 	}))
@@ -144,7 +144,7 @@ func TestMiddlewareRequestLogger_RecordsStatusAndBytes(t *testing.T) {
 // middleware reports whatever the writer beneath it wrote, so it says 500 for a panic only when
 // Recoverer is beneath it. Both servers mount it that way and their own cases pin that; this owns
 // the property those cases depend on.
-func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) {
+func TestRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) {
 	panicking := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic("a handler panicked")
 	})
@@ -152,7 +152,7 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 	t.Run("Recoverer beneath the logger", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 
-		handler := MiddlewareRequestLogger(true)(chimiddleware.Recoverer(panicking))
+		handler := RequestLogger(true)(chimiddleware.Recoverer(panicking))
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
@@ -166,7 +166,7 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 	t.Run("Recoverer above the logger", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 
-		handler := chimiddleware.Recoverer(MiddlewareRequestLogger(true)(panicking))
+		handler := chimiddleware.Recoverer(RequestLogger(true)(panicking))
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
@@ -176,12 +176,12 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 	})
 }
 
-func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
+func TestRequestLogger_RequestId(t *testing.T) {
 	t.Run("present when chi's RequestID ran ahead of the logger", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 		ran := false
 
-		handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
+		handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
 		request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
 		request.Header.Set(chimiddleware.RequestIDHeader, "REQUEST-ID-SENTINEL")
 		handler.ServeHTTP(httptest.NewRecorder(), request)
@@ -193,7 +193,7 @@ func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 		ran := false
 
-		handler := MiddlewareRequestLogger(true)(okHandler(&ran))
+		handler := RequestLogger(true)(okHandler(&ran))
 		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
 		assert.Equal(t, 1, records(buf))
@@ -204,8 +204,8 @@ func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
 
 // The three client-chosen scalar attributes. Each can arrive at 900000 bytes: the
 // method and X-Request-Id straight from the request, and r.RemoteAddr because
-// MiddlewareRealIP copies an X-Forwarded-For entry into it.
-func TestMiddlewareRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
+// RealIP copies an X-Forwarded-For entry into it.
+func TestRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 	const huge = 900000
 
 	tests := []struct {
@@ -237,7 +237,7 @@ func TestMiddlewareRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 			buf := logtest.CaptureSlog(t)
 			ran := false
 
-			handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
+			handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
 			request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
 			test.setup(request)
 			handler.ServeHTTP(httptest.NewRecorder(), request)
@@ -250,7 +250,7 @@ func TestMiddlewareRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 	}
 }
 
-func TestMiddlewareRequestLogger_TheClipIsLossy(t *testing.T) {
+func TestRequestLogger_TheClipIsLossy(t *testing.T) {
 	// Pinned rather than left to be discovered: two request ids of equal length
 	// that differ only after byte 128 log identically, truncation marker included.
 	// This is the accepted cost of the 128-byte bound. Nothing reads as a complete
@@ -270,7 +270,7 @@ func TestMiddlewareRequestLogger_TheClipIsLossy(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 		ran := false
 
-		handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
+		handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
 		request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
 		request.Header.Set(chimiddleware.RequestIDHeader, requestId)
 		handler.ServeHTTP(httptest.NewRecorder(), request)
@@ -289,7 +289,7 @@ func TestMiddlewareRequestLogger_TheClipIsLossy(t *testing.T) {
 		"and the marker says so, so neither record claims to be complete")
 }
 
-func TestMiddlewareRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
+func TestRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 	tests := []struct {
 		name     string
 		setup    func(r *http.Request)
@@ -318,7 +318,7 @@ func TestMiddlewareRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 			buf := logtest.CaptureSlog(t)
 			ran := false
 
-			handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
+			handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
 			request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
 			test.setup(request)
 			handler.ServeHTTP(httptest.NewRecorder(), request)
@@ -331,7 +331,7 @@ func TestMiddlewareRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 	}
 }
 
-func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *testing.T) {
+func TestRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *testing.T) {
 	// The one attribute whose value depends on WHEN it is read. Both servers
 	// register chi's StripSlashes immediately after this middleware, and it edits
 	// r.URL.Path in place, so a logger that rendered the target on the way out
@@ -341,7 +341,7 @@ func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *t
 	buf := logtest.CaptureSlog(t)
 
 	var seenByHandler string
-	chain := MiddlewareRequestLogger(true)(
+	chain := RequestLogger(true)(
 		chimiddleware.StripSlashes(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			seenByHandler = r.URL.Path
 			w.WriteHeader(http.StatusOK)
@@ -356,12 +356,12 @@ func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *t
 		"the log must carry the target that arrived, trailing slash and all")
 }
 
-func TestMiddlewareRequestLogger_LogsARequestThatPanics(t *testing.T) {
+func TestRequestLogger_LogsARequestThatPanics(t *testing.T) {
 	// This is what pins the deferred write, which is otherwise invisible: chi's
 	// logger produced a line for a panicking request and so must this one.
 	buf := logtest.CaptureSlog(t)
 
-	handler := MiddlewareRequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("handler exploded")
 	}))
 

@@ -15,7 +15,7 @@ import (
 )
 
 // RequireBearerTokenScope requires a bearer token carrying requiredScope.
-func (m *MiddlewareBearerToken) RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handler {
+func (m *BearerToken) RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handler {
 	return m.RequireBearerTokenScopeAnyOf([]string{requiredScope})
 }
 
@@ -25,7 +25,7 @@ func (m *MiddlewareBearerToken) RequireBearerTokenScope(requiredScope string) fu
 // JwtAuthorizationHeaderToContext has already refused every presented token it did not store. It
 // is answered 401 with the realm-only challenge: RFC 6750 section 3.1, a request lacking any
 // authentication information SHOULD NOT be told an error code (#435).
-func (m *MiddlewareBearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) http.Handler {
+func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
@@ -88,7 +88,7 @@ func (m *MiddlewareBearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []st
 // path is ever added that bypasses generateAccessTokenCore, this guard silently locks it
 // out of these endpoints. It fails closed, which is the right direction for a guard whose
 // job is to establish that a user is present.
-func (m *MiddlewareBearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
+func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Mirrors RequireBearerTokenScopeAnyOf exactly, so this guard introduces no new
@@ -166,7 +166,7 @@ type apiAuthDatabase interface {
 // Reads reqctx.BearerTokenFrom (set by JwtAuthorizationHeaderToContext),
 // not reqctx.ValidatedTokenFrom, so it works regardless of whether a scope
 // middleware ran first.
-func (m *MiddlewareBearerToken) RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handler {
+func (m *BearerToken) RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
