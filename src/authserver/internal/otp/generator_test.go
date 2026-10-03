@@ -15,21 +15,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewOTPSecretGenerator(t *testing.T) {
-	generator := NewOTPSecretGenerator()
-	assert.NotNil(t, generator, "NewOTPSecretGenerator should return a non-nil generator")
+func TestNewKeyGenerator(t *testing.T) {
+	generator := NewKeyGenerator()
+	assert.NotNil(t, generator, "NewKeyGenerator should return a non-nil generator")
 }
 
-func TestGenerateOTPSecret(t *testing.T) {
-	generator := NewOTPSecretGenerator()
+func TestGenerateKeyURL(t *testing.T) {
+	generator := NewKeyGenerator()
 
 	t.Run("Valid input", func(t *testing.T) {
 		email := "test@example.com"
 		appName := "TestApp"
 
-		keyURL, err := generator.GenerateOTPSecret(email, appName)
+		keyURL, err := generator.GenerateKeyURL(email, appName)
 
-		require.NoError(t, err, "GenerateOTPSecret should not return an error for valid input")
+		require.NoError(t, err, "GenerateKeyURL should not return an error for valid input")
 		require.NotEmpty(t, keyURL, "the otpauth URL should not be empty")
 
 		// The URL is the whole record of the key, so what it says about the key matters as
@@ -47,38 +47,38 @@ func TestGenerateOTPSecret(t *testing.T) {
 	})
 
 	t.Run("Empty email", func(t *testing.T) {
-		_, err := generator.GenerateOTPSecret("", "TestApp")
+		_, err := generator.GenerateKeyURL("", "TestApp")
 
-		assert.Error(t, err, "GenerateOTPSecret should return an error for empty email")
+		assert.Error(t, err, "GenerateKeyURL should return an error for empty email")
 		assert.Contains(t, err.Error(), "email is empty", "Error message should mention empty email")
 	})
 
 	t.Run("Whitespace email", func(t *testing.T) {
-		_, err := generator.GenerateOTPSecret("   ", "TestApp")
+		_, err := generator.GenerateKeyURL("   ", "TestApp")
 
-		assert.Error(t, err, "GenerateOTPSecret should return an error for whitespace email")
+		assert.Error(t, err, "GenerateKeyURL should return an error for whitespace email")
 		assert.Contains(t, err.Error(), "email is empty", "Error message should mention empty email")
 	})
 
 	t.Run("Empty app name", func(t *testing.T) {
-		_, err := generator.GenerateOTPSecret("test@example.com", "")
+		_, err := generator.GenerateKeyURL("test@example.com", "")
 
-		assert.Error(t, err, "GenerateOTPSecret should return an error for empty app name")
+		assert.Error(t, err, "GenerateKeyURL should return an error for empty app name")
 		assert.Contains(t, err.Error(), "app name is empty", "Error message should mention empty app name")
 	})
 
 	t.Run("Whitespace app name", func(t *testing.T) {
-		_, err := generator.GenerateOTPSecret("test@example.com", "   ")
+		_, err := generator.GenerateKeyURL("test@example.com", "   ")
 
-		assert.Error(t, err, "GenerateOTPSecret should return an error for whitespace app name")
+		assert.Error(t, err, "GenerateKeyURL should return an error for whitespace app name")
 		assert.Contains(t, err.Error(), "app name is empty", "Error message should mention empty app name")
 	})
 
 	t.Run("Different output for different inputs", func(t *testing.T) {
-		url1, err1 := generator.GenerateOTPSecret("test1@example.com", "TestApp1")
+		url1, err1 := generator.GenerateKeyURL("test1@example.com", "TestApp1")
 		require.NoError(t, err1)
 
-		url2, err2 := generator.GenerateOTPSecret("test2@example.com", "TestApp2")
+		url2, err2 := generator.GenerateKeyURL("test2@example.com", "TestApp2")
 		require.NoError(t, err2)
 
 		assert.NotEqual(t, url1, url2, "URLs should be different for different inputs")
@@ -95,9 +95,9 @@ func TestGenerateOTPSecret(t *testing.T) {
 			email := fake.LetterN(58) + "@b.com" // 64 characters
 			appName := fake.LetterN(32)
 
-			keyURL, err := generator.GenerateOTPSecret(email, appName)
+			keyURL, err := generator.GenerateKeyURL(email, appName)
 
-			require.NoError(t, err, "GenerateOTPSecret should not return an error for maximum valid lengths")
+			require.NoError(t, err, "GenerateKeyURL should not return an error for maximum valid lengths")
 			assert.NotEmpty(t, keyURL, "the otpauth URL should not be empty for maximum valid lengths")
 
 			secret, err := SecretFromKeyURL(keyURL)
@@ -109,9 +109,9 @@ func TestGenerateOTPSecret(t *testing.T) {
 			longEmail := strings.Repeat("a", 61) + "@b.com" // 65 characters
 			appName := "TestApp"
 
-			_, err := generator.GenerateOTPSecret(longEmail, appName)
+			_, err := generator.GenerateKeyURL(longEmail, appName)
 
-			require.Error(t, err, "GenerateOTPSecret should return an error for email longer than 64 characters")
+			require.Error(t, err, "GenerateKeyURL should return an error for email longer than 64 characters")
 			assert.Contains(t, err.Error(), "email is too long", "Error message should mention email is too long")
 		})
 
@@ -119,9 +119,9 @@ func TestGenerateOTPSecret(t *testing.T) {
 			email := "test@example.com"
 			longAppName := strings.Repeat("b", 33) // 33 characters
 
-			_, err := generator.GenerateOTPSecret(email, longAppName)
+			_, err := generator.GenerateKeyURL(email, longAppName)
 
-			require.Error(t, err, "GenerateOTPSecret should return an error for app name longer than 32 characters")
+			require.Error(t, err, "GenerateKeyURL should return an error for app name longer than 32 characters")
 			assert.Contains(t, err.Error(), "app name is too long", "Error message should mention app name is too long")
 		})
 	})
@@ -136,7 +136,7 @@ func TestGenerateOTPSecret(t *testing.T) {
 // its path and its query, so "&", "+" and spaces are where a serialization that looked right for
 // ordinary input would come back as a different key.
 func TestKeyURLRoundTrip(t *testing.T) {
-	generator := NewOTPSecretGenerator()
+	generator := NewKeyGenerator()
 
 	cases := []struct{ appName, email string }{
 		{"Goiabada", "a@b.co"},
@@ -147,7 +147,7 @@ func TestKeyURLRoundTrip(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.appName+" / "+c.email, func(t *testing.T) {
-			keyURL, err := generator.GenerateOTPSecret(c.email, c.appName)
+			keyURL, err := generator.GenerateKeyURL(c.email, c.appName)
 			require.NoError(t, err)
 
 			secret, err := SecretFromKeyURL(keyURL)

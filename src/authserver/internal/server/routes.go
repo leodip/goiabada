@@ -36,7 +36,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database))
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
-	permissionChecker := permissions.NewPermissionChecker(s.database)
+	permissionChecker := permissions.NewChecker(s.database)
 	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker, s.dataCipher)
 	emailValidator := accountvalidation.NewEmailValidator(s.database)
 	passwordValidator := accountvalidation.NewPasswordValidator()
@@ -47,9 +47,9 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
 	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)
-	otpSecretGenerator := otp.NewOTPSecretGenerator()
+	otpSecretGenerator := otp.NewKeyGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.dataCipher, userSessionManager)
-	userCreator := usercreation.NewUserCreator(s.database)
+	userCreator := usercreation.New(s.database)
 	emailSender := emaildelivery.NewSender(s.dataCipher)
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
@@ -113,7 +113,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	publicSettingsHandler := handlers.NewHandlerPublicSettings(s.database)
+	publicSettingsHandler := handlers.NewPublicSettings(s.database)
 	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	pages.Route("/auth", func(r chi.Router) {

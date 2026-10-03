@@ -34,7 +34,7 @@ func TestNewSessionStore_TheAdministratorsCookieEndsWithTheBrowser(t *testing.T)
 			w := httptest.NewRecorder()
 			session, err := store.Get(req, builtin.AdminConsoleSessionName)
 			require.NoError(t, err)
-			session.Values[sessionkeys.SessionKeyJwt] = "a-token-set"
+			session.Values[sessionkeys.JWT] = "a-token-set"
 			require.NoError(t, store.Save(req, w, session))
 
 			setCookie := w.Result().Header.Values("Set-Cookie")

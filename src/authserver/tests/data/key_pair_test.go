@@ -446,7 +446,7 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 // compare-and-set. Both leave the row where it found it, and both come back with moved
 // false, so the error return is the only thing that tells them apart.
 //
-// It matters because of what the caller does with the distinction. SigningKeyRotator maps
+// It matters because of what the caller does with the distinction. signingkeys.Rotator maps
 // a false return to ErrRotationInProgress, which the API answers with 409 and the admin
 // console renders as "Another key rotation is in progress": an administrator reading that
 // understands the rotation they asked for already happened, and does not retry. A storage

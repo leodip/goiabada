@@ -299,7 +299,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			_, err = userCreator.CreateUser(r.Context(), &usercreation.CreateUserInput{
+			_, err = userCreator.CreateUser(r.Context(), &usercreation.Input{
 				Email:         email,
 				EmailVerified: false,
 				PasswordHash:  passwordHash,

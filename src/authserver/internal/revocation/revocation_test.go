@@ -235,7 +235,7 @@ func TestRevokeUserAuthState_RequiresATransaction(t *testing.T) {
 	assert.Contains(t, err.Error(), "requires a transaction")
 	// Nothing was attempted. The strict mock has no expectations registered, so any call at
 	// all would fail the test on its own.
-	assert.Equal(t, RevocationResult{
+	assert.Equal(t, UserAuthStateResult{
 		TerminatedSessionIdentifiers: []string{},
 		RevokedRefreshTokenJtis:      []string{},
 	}, result)
@@ -1411,4 +1411,16 @@ func TestLogAuthCodeReuse_Payload(t *testing.T) {
 		"sessionIdentifier":       reuseSid,
 		"revokedRefreshTokenJtis": []string{"rt-1", "rt-2"},
 	}, recorder.details)
+}
+
+// TestReasons_AreStoredData holds the five reason spellings. Each is written into the reason of
+// an audit record, and ReasonClientBecamePublic also into a rotation family's revocation record,
+// so a spelling changed here leaves every row already stored unmatched by a consumer filtering
+// on the new one. Only the Go names are free to change.
+func TestReasons_AreStoredData(t *testing.T) {
+	assert.Equal(t, "password_reset", ReasonPasswordReset)
+	assert.Equal(t, "password_change", ReasonPasswordChange)
+	assert.Equal(t, "admin_password_set", ReasonAdminPasswordSet)
+	assert.Equal(t, "account_disabled", ReasonAccountDisabled)
+	assert.Equal(t, "client_became_public", ReasonClientBecamePublic)
 }

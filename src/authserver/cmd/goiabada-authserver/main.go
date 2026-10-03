@@ -289,6 +289,6 @@ func dispatch(args []string) (migrateArgs []string, isMigrate bool, err error) {
 // (#431).
 func newSessionStore(backend sessionstore.Backend, secure bool,
 	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ServerSideStore, error) {
-	return sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeySessionIdentifier, secure,
+	return sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, secure,
 		sessionstore.PersistentCookie, current, previous)
 }

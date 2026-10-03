@@ -16,17 +16,17 @@ type publicSettingsDatabase interface {
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 }
 
-type HandlerPublicSettings struct {
+type PublicSettings struct {
 	database publicSettingsDatabase
 }
 
-func NewHandlerPublicSettings(database publicSettingsDatabase) *HandlerPublicSettings {
-	return &HandlerPublicSettings{
+func NewPublicSettings(database publicSettingsDatabase) *PublicSettings {
+	return &PublicSettings{
 		database: database,
 	}
 }
 
-func (h *HandlerPublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *PublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET requests. This endpoint answers JSON, so its refusals answer JSON too:
 	// until now a caller that mis-spelled the method, or hit a settings failure, got
 	// text/plain from a route it had every reason to parse (#279 decision 17).

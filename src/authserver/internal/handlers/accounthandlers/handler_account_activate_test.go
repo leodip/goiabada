@@ -438,7 +438,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
 		createdUser := &models.User{Id: 3, Email: activateTestEmail}
-		userCreator.On("CreateUser", mock.Anything, &usercreation.CreateUserInput{
+		userCreator.On("CreateUser", mock.Anything, &usercreation.Input{
 			Email:         activateTestEmail,
 			EmailVerified: true,
 			PasswordHash:  "password_hash",

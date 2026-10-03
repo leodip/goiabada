@@ -38,14 +38,14 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 }
 
 // The accept arm for the settings read.
-func TestHandlerPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
+func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetSettingsById", theRequestsContext(), mock.Anything, int64(1)).
 		Return(&models.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	NewHandlerPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))
+	NewPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -54,11 +54,11 @@ func TestHandlerPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T
 // The reject arm: a method other than GET is refused before the settings read, so the port is
 // never reached and there is no context to get wrong. It is the arm that stops the accept arm
 // passing on a handler that read the settings before deciding whether to answer at all.
-func TestHandlerPublicSettings_AWrongMethodReachesNoSettingsPort(t *testing.T) {
+func TestPublicSettings_AWrongMethodReachesNoSettingsPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
-	NewHandlerPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodPost, "/api/v1/public/settings"))
+	NewPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodPost, "/api/v1/public/settings"))
 
 	require.Equal(t, http.StatusMethodNotAllowed, rr.Code)
 	database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)

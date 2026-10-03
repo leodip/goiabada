@@ -18,7 +18,7 @@ type authSessionStore interface {
 }
 
 // Store keeps a browser's AuthContext in the server-side session, under
-// sessionkeys.SessionKeyAuthContext, between the hops of one authorization ceremony. It was
+// sessionkeys.AuthContext, between the hops of one authorization ceremony. It was
 // handlerhelpers.AuthHelper until #435 moved it beside the type it persists; the handlers reach it
 // through their CeremonyStore port, and server.go's locale middleware through UILocales.
 type Store struct {
@@ -38,7 +38,7 @@ func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	jsonData, ok := sess.Values[sessionkeys.SessionKeyAuthContext].(string)
+	jsonData, ok := sess.Values[sessionkeys.AuthContext].(string)
 	if !ok {
 		return nil, ErrNoAuthContext
 	}
@@ -62,7 +62,7 @@ func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authCont
 	if err != nil {
 		return err
 	}
-	sess.Values[sessionkeys.SessionKeyAuthContext] = string(jsonData)
+	sess.Values[sessionkeys.AuthContext] = string(jsonData)
 	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err
@@ -77,7 +77,7 @@ func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	delete(sess.Values, sessionkeys.SessionKeyAuthContext)
+	delete(sess.Values, sessionkeys.AuthContext)
 	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err

@@ -543,9 +543,9 @@ func TestHandleAPIAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T)
 		pendingEnrollment(t, otpTestKeyURL, time.Now().UTC().Add(-otpEnrollmentLifetime-time.Minute))
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
-	freshKeyURL, err := (&otp.OTPSecretGenerator{}).GenerateOTPSecret("otp@example.com", "Goiabada")
+	freshKeyURL, err := (&otp.KeyGenerator{}).GenerateKeyURL("otp@example.com", "Goiabada")
 	require.NoError(t, err)
-	generator.On("GenerateOTPSecret", user.Email, "Goiabada").Return(freshKeyURL, nil).Once()
+	generator.On("GenerateKeyURL", user.Email, "Goiabada").Return(freshKeyURL, nil).Once()
 
 	// The staleBefore the handler passes must be far enough back to leave the expired value
 	// replaceable and no further, so it is captured and checked rather than waved through.
@@ -582,9 +582,9 @@ func TestHandleAPIAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *te
 	loser.OtpEnrollmentSecretEncrypted, loser.OtpEnrollmentIssuedAt = nil, sql.NullTime{}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(loser, nil).Once()
 
-	mintedKeyURL, err := (&otp.OTPSecretGenerator{}).GenerateOTPSecret("otp@example.com", "Goiabada")
+	mintedKeyURL, err := (&otp.KeyGenerator{}).GenerateKeyURL("otp@example.com", "Goiabada")
 	require.NoError(t, err)
-	generator.On("GenerateOTPSecret", loser.Email, "Goiabada").Return(mintedKeyURL, nil).Once()
+	generator.On("GenerateKeyURL", loser.Email, "Goiabada").Return(mintedKeyURL, nil).Once()
 
 	database.On("TryInstallPendingOTPEnrollment", mock.Anything, (*sql.Tx)(nil), loser.Id,
 		mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
@@ -615,9 +615,9 @@ func TestHandleAPIAccountOTPEnrollmentGet_LostRaceToACompletedEnrollment(t *test
 	user.OtpEnrollmentSecretEncrypted, user.OtpEnrollmentIssuedAt = nil, sql.NullTime{}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
-	keyURL, err := (&otp.OTPSecretGenerator{}).GenerateOTPSecret("otp@example.com", "Goiabada")
+	keyURL, err := (&otp.KeyGenerator{}).GenerateKeyURL("otp@example.com", "Goiabada")
 	require.NoError(t, err)
-	generator.On("GenerateOTPSecret", user.Email, "Goiabada").Return(keyURL, nil).Once()
+	generator.On("GenerateKeyURL", user.Email, "Goiabada").Return(keyURL, nil).Once()
 	database.On("TryInstallPendingOTPEnrollment", mock.Anything, (*sql.Tx)(nil), user.Id,
 		mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
 

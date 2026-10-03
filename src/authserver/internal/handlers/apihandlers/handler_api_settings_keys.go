@@ -20,7 +20,7 @@ import (
 
 // settingsKeysDatabase is what the signing key endpoints need: the key rows they list and delete.
 //
-// It embeds the rotator's port because rotating a key is signingkeys.SigningKeyRotator's job, not
+// It embeds the rotator's port because rotating a key is signingkeys.Rotator's job, not
 // this endpoint's.
 type settingsKeysDatabase interface {
 	signingkeys.RotationDatabase
@@ -89,7 +89,7 @@ func HandleAPISettingsKeysGet(
 
 // HandleAPISettingsKeysRotatePost - POST /api/v1/admin/settings/keys/rotate
 //
-// The transition itself lives in signingkeys.SigningKeyRotator, which takes it as one transaction.
+// The transition itself lives in signingkeys.Rotator, which takes it as one transaction.
 // This used to be five unsynchronised writes here, and the delete of the previous key ran
 // before the check that a next key even existed, so a rotation that was about to be refused
 // had already destroyed the key still signing live tokens (#251).
@@ -99,7 +99,7 @@ func HandleAPISettingsKeysRotatePost(
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
-	rotator := signingkeys.NewSigningKeyRotator(database, dataCipher)
+	rotator := signingkeys.NewRotator(database, dataCipher)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := rotator.Rotate(r.Context())

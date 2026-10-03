@@ -54,7 +54,7 @@ func (_m *UserCreator) EXPECT() *UserCreator_Expecter {
 }
 
 // CreateUser provides a mock function for the type UserCreator
-func (_mock *UserCreator) CreateUser(ctx context.Context, input *usercreation.CreateUserInput) (*models.User, error) {
+func (_mock *UserCreator) CreateUser(ctx context.Context, input *usercreation.Input) (*models.User, error) {
 	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
@@ -63,17 +63,17 @@ func (_mock *UserCreator) CreateUser(ctx context.Context, input *usercreation.Cr
 
 	var r0 *models.User
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.CreateUserInput) (*models.User, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.Input) (*models.User, error)); ok {
 		return returnFunc(ctx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.CreateUserInput) *models.User); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.Input) *models.User); ok {
 		r0 = returnFunc(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.User)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *usercreation.CreateUserInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *usercreation.Input) error); ok {
 		r1 = returnFunc(ctx, input)
 	} else {
 		r1 = ret.Error(1)
@@ -88,20 +88,20 @@ type UserCreator_CreateUser_Call struct {
 
 // CreateUser is a helper method to define mock.On call
 //   - ctx context.Context
-//   - input *usercreation.CreateUserInput
+//   - input *usercreation.Input
 func (_e *UserCreator_Expecter) CreateUser(ctx any, input any) *UserCreator_CreateUser_Call {
 	return &UserCreator_CreateUser_Call{Call: _e.mock.On("CreateUser", ctx, input)}
 }
 
-func (_c *UserCreator_CreateUser_Call) Run(run func(ctx context.Context, input *usercreation.CreateUserInput)) *UserCreator_CreateUser_Call {
+func (_c *UserCreator_CreateUser_Call) Run(run func(ctx context.Context, input *usercreation.Input)) *UserCreator_CreateUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *usercreation.CreateUserInput
+		var arg1 *usercreation.Input
 		if args[1] != nil {
-			arg1 = args[1].(*usercreation.CreateUserInput)
+			arg1 = args[1].(*usercreation.Input)
 		}
 		run(
 			arg0,
@@ -116,7 +116,7 @@ func (_c *UserCreator_CreateUser_Call) Return(user *models.User, err error) *Use
 	return _c
 }
 
-func (_c *UserCreator_CreateUser_Call) RunAndReturn(run func(ctx context.Context, input *usercreation.CreateUserInput) (*models.User, error)) *UserCreator_CreateUser_Call {
+func (_c *UserCreator_CreateUser_Call) RunAndReturn(run func(ctx context.Context, input *usercreation.Input) (*models.User, error)) *UserCreator_CreateUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

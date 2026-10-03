@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// These tests own UserCreator.CreateUser at the unit tier: the user row and its account
+// These tests own Creator.CreateUser at the unit tier: the user row and its account
 // permission land in one transaction opened through RunInTransaction, the permission insert
 // names the id the user insert assigned, a failed insert hands its error to the helper and
 // inserts no permission, and a missing account permission is refused before any transaction
@@ -49,7 +49,7 @@ func accountPermissions() []models.Permission {
 	}
 }
 
-func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction(t *testing.T) {
+func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
@@ -64,7 +64,7 @@ func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransac
 		return up.UserId == 77 && up.PermissionId == accountPermissionId
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
-	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{
+	user, err := New(db).CreateUser(context.Background(), &Input{
 		Email:         "ada@example.com",
 		EmailVerified: true,
 		PasswordHash:  "hash",
@@ -89,7 +89,7 @@ func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransac
 	assert.Equal(t, accountPermissionId, user.Permissions[0].Id)
 }
 
-func TestUserCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPermission(t *testing.T) {
+func TestCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPermission(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
@@ -97,7 +97,7 @@ func TestUserCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPerm
 	stub := mocks_data.ExpectRunInTransaction(db, txSentinel)
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Return(boom).Once()
 
-	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
+	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user, "no user is returned alongside an error")
@@ -105,27 +105,27 @@ func TestUserCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPerm
 	db.AssertNotCalled(t, "CreateUserPermission", mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestUserCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.T) {
+func TestCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	boom := errors.New("cannot begin")
 	mocks_data.ExpectRunInTransactionRefused(db, boom)
 
-	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
+	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user)
 	db.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestUserCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTransaction(t *testing.T) {
+func TestCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTransaction(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	expectAccountPermissionLookup(db, []models.Permission{
 		{Id: 30, PermissionIdentifier: "something-else"},
 	})
 
-	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
+	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to find the account permission")
@@ -136,12 +136,12 @@ func TestUserCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTrans
 // A lookup answers (nil, nil) for a row that is not there. The creator used to read the id off
 // that nil and panic; it refuses instead, naming the resource, before any other read and before
 // any transaction opens (#425).
-func TestUserCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *testing.T) {
+func TestCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
 		Return(nil, nil).Once()
 
-	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
+	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to find the "+builtin.AuthServerResourceIdentifier+" resource")
@@ -150,10 +150,10 @@ func TestUserCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *tes
 	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
-// TestUserCreator_CreateUser_TheBodyIsSafeToRerun is the property RunInTransaction relies on: a
+// TestCreator_CreateUser_TheBodyIsSafeToRerun is the property RunInTransaction relies on: a
 // second run of the body, as after a deadlock, inserts the user again and names the id THAT
 // insert assigned, not the one the rolled-back attempt left on the model.
-func TestUserCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
+func TestCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	expectAccountPermissionLookup(db, accountPermissions())
 
@@ -177,7 +177,7 @@ func TestUserCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 		permissionUserIds = append(permissionUserIds, args.Get(2).(*models.UserPermission).UserId)
 	}).Return(nil).Twice()
 
-	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
+	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 	require.NoError(t, err)
 
 	assert.Equal(t, []int64{77, 78}, permissionUserIds,

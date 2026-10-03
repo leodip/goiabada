@@ -8,7 +8,7 @@ import (
 )
 
 // StepSeconds is the TOTP time step in seconds. It is the library default that
-// GenerateOTPSecret relies on, restated here because the step is what identifies a
+// GenerateKeyURL relies on, restated here because the step is what identifies a
 // consumed code.
 const StepSeconds = 30
 

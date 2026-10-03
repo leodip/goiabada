@@ -33,8 +33,8 @@ var rotatorTx = &sql.Tx{}
 // newTestRotator builds a rotator at the smallest key size crypto/rsa will still generate.
 // The replacement key is generated on every path now, including every refusal, so at 4096
 // each of the cases below would pay about 300ms for material most of them never store.
-func newTestRotator(database *mocks_data.Database) *SigningKeyRotator {
-	rotator := NewSigningKeyRotator(database, testDataCipher)
+func newTestRotator(database *mocks_data.Database) *Rotator {
+	rotator := NewRotator(database, testDataCipher)
 	rotator.keySizeBits = 1024
 	return rotator
 }
@@ -58,7 +58,7 @@ func fullKeySet() []models.KeyPair {
 	}
 }
 
-func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
+func TestRotator_Rotate_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	var calls []string
@@ -124,9 +124,9 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 	assert.NoError(t, err, "the replacement key does not open under the rotator's cipher")
 }
 
-// TestSigningKeyRotator_Rotate_SucceedsWithNoPreviousKey covers the first rotation after
+// TestRotator_Rotate_SucceedsWithNoPreviousKey covers the first rotation after
 // seeding, where there is nothing to delete.
-func TestSigningKeyRotator_Rotate_SucceedsWithNoPreviousKey(t *testing.T) {
+func TestRotator_Rotate_SucceedsWithNoPreviousKey(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	mocks_data.ExpectRunInTransaction(database, rotatorTx)
@@ -144,10 +144,10 @@ func TestSigningKeyRotator_Rotate_SucceedsWithNoPreviousKey(t *testing.T) {
 	database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite is the defect this change exists
+// TestRotator_Rotate_GuardRefusesBeforeAnyWrite is the defect this change exists
 // to fix. The guard used to run after the delete, so a deployment with no next key lost the
 // key that signs its live tokens and was then refused anyway (#251).
-func TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
+func TestRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 	testCases := []struct {
 		name string
 		keys []models.KeyPair
@@ -191,11 +191,11 @@ func TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 	}
 }
 
-// TestSigningKeyRotator_Rotate_LosesTheDemotion is the losing rotation: it read a snapshot
+// TestRotator_Rotate_LosesTheDemotion is the losing rotation: it read a snapshot
 // another rotation has already acted on, so its compare-and-set transitions nothing. The
 // delete it has already issued rolls back with it, which is the property the whole
 // transaction exists for.
-func TestSigningKeyRotator_Rotate_LosesTheDemotion(t *testing.T) {
+func TestRotator_Rotate_LosesTheDemotion(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	stub := mocks_data.ExpectRunInTransaction(database, rotatorTx)
@@ -217,9 +217,9 @@ func TestSigningKeyRotator_Rotate_LosesTheDemotion(t *testing.T) {
 	assert.ErrorIs(t, stub.BodyErr, ErrRotationInProgress)
 }
 
-// TestSigningKeyRotator_Rotate_LosesThePromotion is the same refusal one statement later:
+// TestRotator_Rotate_LosesThePromotion is the same refusal one statement later:
 // another rotation promoted the next key between this one's read and its own write.
-func TestSigningKeyRotator_Rotate_LosesThePromotion(t *testing.T) {
+func TestRotator_Rotate_LosesThePromotion(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	stub := mocks_data.ExpectRunInTransaction(database, rotatorTx)
@@ -239,11 +239,11 @@ func TestSigningKeyRotator_Rotate_LosesThePromotion(t *testing.T) {
 	assert.ErrorIs(t, stub.BodyErr, ErrRotationInProgress)
 }
 
-// TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep injects a failure at each
+// TestRotator_Rotate_RollsBackOnFailureAtEveryStep injects a failure at each
 // database call in turn and asserts nothing commits. On postgres a failed statement aborts
 // the whole transaction and every later command in it is refused with SQLSTATE 25P02
 // (decision 4), which is why each of these must return at once rather than carry on.
-func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
+func TestRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 	failure := errors.New("engine failure")
 
 	testCases := []struct {
@@ -332,10 +332,10 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 	}
 }
 
-// TestSigningKeyRotator_Rotate_CommitFailureIsReported closes the last step. There is
+// TestRotator_Rotate_CommitFailureIsReported closes the last step. There is
 // nothing to roll back that the deferred rollback will not handle, but the error must
 // still reach the caller rather than reporting a rotation that did not land.
-func TestSigningKeyRotator_Rotate_CommitFailureIsReported(t *testing.T) {
+func TestRotator_Rotate_CommitFailureIsReported(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	failure := errors.New("commit failed")
 
@@ -351,10 +351,10 @@ func TestSigningKeyRotator_Rotate_CommitFailureIsReported(t *testing.T) {
 	assert.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
 }
 
-// TestSigningKeyRotator_Rotate_ATransactionThatCannotOpenIsReported is the helper failing
+// TestRotator_Rotate_ATransactionThatCannotOpenIsReported is the helper failing
 // before the body runs. It also pins that the key material is generated before the
 // transaction opens: nothing else is called.
-func TestSigningKeyRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testing.T) {
+func TestRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	failure := errors.New("cannot begin")
 
@@ -364,17 +364,17 @@ func TestSigningKeyRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testin
 	database.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything, mock.Anything)
 }
 
-// TestSigningKeyRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction is the only
+// TestRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction is the only
 // direct observation of §4C's first ordering rule. A key size crypto/rsa refuses makes the
 // generation fail, and RunInTransaction is then never reached: move the generation inside
 // the transaction and this test sees a transaction opened for a rotation that could never
 // have written anything. The rule exists because a 4096-bit generation is the slow step by
 // three orders of magnitude, and holding a transaction open across it is what made the
 // window wide enough to hit (#251).
-func TestSigningKeyRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *testing.T) {
+func TestRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	rotator := NewSigningKeyRotator(database, testDataCipher)
+	rotator := NewRotator(database, testDataCipher)
 	rotator.keySizeBits = 512 // crypto/rsa refuses anything under 1024
 
 	err := rotator.Rotate(context.Background())
@@ -384,9 +384,9 @@ func TestSigningKeyRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
-// TestNewSigningKeyRotator_UsesFourThousandNinetySixBits pins the production key size,
+// TestNewRotator_UsesFourThousandNinetySixBits pins the production key size,
 // which no exported surface carries. The tests above all lower it, so without this nothing
 // would notice it changing.
-func TestNewSigningKeyRotator_UsesFourThousandNinetySixBits(t *testing.T) {
-	assert.Equal(t, 4096, NewSigningKeyRotator(mocks_data.NewDatabase(t), testDataCipher).keySizeBits)
+func TestNewRotator_UsesFourThousandNinetySixBits(t *testing.T) {
+	assert.Equal(t, 4096, NewRotator(mocks_data.NewDatabase(t), testDataCipher).keySizeBits)
 }

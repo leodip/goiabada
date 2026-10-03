@@ -50,7 +50,7 @@ func TestHandlers_SignInRotatesTheSessionIdentifier(t *testing.T) {
 	// The write that makes a session authenticated in this module. It is the store's own
 	// AuthenticatedKey for the adminconsole owner, so this string is the definition of
 	// the transition rather than one example of it.
-	const authenticatedWrite = "sessionkeys.SessionKeyJwt] ="
+	const authenticatedWrite = "sessionkeys.JWT] ="
 
 	// The rotation, named by its call. The store's Regenerate is on no shared interface: a
 	// file that rotates declares a port naming it and calls it, so the call is what it must

@@ -80,10 +80,10 @@ const (
 	OutcomeReplayed
 )
 
-// VerifyResult is the outcome and the time step it was decided on, following RevocationResult's
-// shape rather than returning a bare bool the callers would each interpret. Step is the matched
-// step, which the replay audit record at all three sites carries; it is zero when nothing
-// matched, since there is no step to name.
+// VerifyResult is the outcome and the time step it was decided on, following
+// revocation.UserAuthStateResult's shape rather than returning a bare bool the callers would each
+// interpret. Step is the matched step, which the replay audit record at all three sites carries;
+// it is zero when nothing matched, since there is no step to name.
 type VerifyResult struct {
 	Outcome VerifyOutcome
 	Step    int64

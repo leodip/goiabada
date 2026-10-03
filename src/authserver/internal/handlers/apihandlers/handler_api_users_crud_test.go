@@ -615,7 +615,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			if tc.wantCreated {
 				userCreator.On("CreateUser", mock.Anything, mock.Anything).
 					Run(func(args mock.Arguments) {
-						gotPasswordHash = args.Get(1).(*usercreation.CreateUserInput).PasswordHash
+						gotPasswordHash = args.Get(1).(*usercreation.Input).PasswordHash
 					}).Return(createdUser, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
 			}

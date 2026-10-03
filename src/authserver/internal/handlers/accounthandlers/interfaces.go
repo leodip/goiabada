@@ -66,7 +66,7 @@ type PasswordValidator interface {
 
 // UserCreator creates the user row and its default permissions in one transaction.
 type UserCreator interface {
-	CreateUser(ctx context.Context, input *usercreation.CreateUserInput) (*models.User, error)
+	CreateUser(ctx context.Context, input *usercreation.Input) (*models.User, error)
 }
 
 // AfterResponse runs work a handler hands off so that its response does not wait for it. The job

@@ -117,7 +117,7 @@ func (s *ctxRecordingApiClient) UpdateSettingsUITheme(ctx context.Context, _ str
 func newSettingsTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		sessionkeys.SessionKeyJwt,
+		sessionkeys.JWT,
 		false,
 		sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{

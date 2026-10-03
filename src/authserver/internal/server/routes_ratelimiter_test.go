@@ -240,7 +240,7 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	})
 	assert.NoError(t, err)
 
-	sess.Values[sessionkeys.SessionKeyAuthContext] = string(authContext)
+	sess.Values[sessionkeys.AuthContext] = string(authContext)
 
 	recorder := httptest.NewRecorder()
 	assert.NoError(t, s.sessionStore.Save(r, recorder, sess))

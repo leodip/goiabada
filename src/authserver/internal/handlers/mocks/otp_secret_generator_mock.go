@@ -49,12 +49,12 @@ func (_m *OtpSecretGenerator) EXPECT() *OtpSecretGenerator_Expecter {
 	return &OtpSecretGenerator_Expecter{mock: &_m.Mock}
 }
 
-// GenerateOTPSecret provides a mock function for the type OtpSecretGenerator
-func (_mock *OtpSecretGenerator) GenerateOTPSecret(email string, appName string) (string, error) {
+// GenerateKeyURL provides a mock function for the type OtpSecretGenerator
+func (_mock *OtpSecretGenerator) GenerateKeyURL(email string, appName string) (string, error) {
 	ret := _mock.Called(email, appName)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateOTPSecret")
+		panic("no return value specified for GenerateKeyURL")
 	}
 
 	var r0 string
@@ -75,19 +75,19 @@ func (_mock *OtpSecretGenerator) GenerateOTPSecret(email string, appName string)
 	return r0, r1
 }
 
-// OtpSecretGenerator_GenerateOTPSecret_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateOTPSecret'
-type OtpSecretGenerator_GenerateOTPSecret_Call struct {
+// OtpSecretGenerator_GenerateKeyURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateKeyURL'
+type OtpSecretGenerator_GenerateKeyURL_Call struct {
 	*mock.Call
 }
 
-// GenerateOTPSecret is a helper method to define mock.On call
+// GenerateKeyURL is a helper method to define mock.On call
 //   - email string
 //   - appName string
-func (_e *OtpSecretGenerator_Expecter) GenerateOTPSecret(email any, appName any) *OtpSecretGenerator_GenerateOTPSecret_Call {
-	return &OtpSecretGenerator_GenerateOTPSecret_Call{Call: _e.mock.On("GenerateOTPSecret", email, appName)}
+func (_e *OtpSecretGenerator_Expecter) GenerateKeyURL(email any, appName any) *OtpSecretGenerator_GenerateKeyURL_Call {
+	return &OtpSecretGenerator_GenerateKeyURL_Call{Call: _e.mock.On("GenerateKeyURL", email, appName)}
 }
 
-func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) Run(run func(email string, appName string)) *OtpSecretGenerator_GenerateOTPSecret_Call {
+func (_c *OtpSecretGenerator_GenerateKeyURL_Call) Run(run func(email string, appName string)) *OtpSecretGenerator_GenerateKeyURL_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -105,12 +105,12 @@ func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) Run(run func(email string, 
 	return _c
 }
 
-func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) Return(s string, err error) *OtpSecretGenerator_GenerateOTPSecret_Call {
+func (_c *OtpSecretGenerator_GenerateKeyURL_Call) Return(s string, err error) *OtpSecretGenerator_GenerateKeyURL_Call {
 	_c.Call.Return(s, err)
 	return _c
 }
 
-func (_c *OtpSecretGenerator_GenerateOTPSecret_Call) RunAndReturn(run func(email string, appName string) (string, error)) *OtpSecretGenerator_GenerateOTPSecret_Call {
+func (_c *OtpSecretGenerator_GenerateKeyURL_Call) RunAndReturn(run func(email string, appName string) (string, error)) *OtpSecretGenerator_GenerateKeyURL_Call {
 	_c.Call.Return(run)
 	return _c
 }

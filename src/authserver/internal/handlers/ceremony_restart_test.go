@@ -182,7 +182,7 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-		auditLogger, permissions.NewPermissionChecker(database), testBaseURL, testAdminConsoleBaseURL)
+		auditLogger, permissions.NewChecker(database), testBaseURL, testAdminConsoleBaseURL)
 
 	sessionIdentifier := "new-test-session"
 	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)

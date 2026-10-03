@@ -50,7 +50,7 @@ type CeremonyStore interface {
 }
 
 type OtpSecretGenerator interface {
-	GenerateOTPSecret(email string, appName string) (string, error)
+	GenerateKeyURL(email string, appName string) (string, error)
 }
 
 // TokenIssuer redeems a validated grant at the token endpoint, one method per grant. Each owns its

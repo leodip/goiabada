@@ -1911,7 +1911,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
 		claims := jwt.MapClaims{}
-		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, nil, claims, user, []string{"openid", "profile"})
+		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIDConnectClaims(ctx, nil, claims, user, []string{"openid", "profile"})
 
 		assert.Equal(t, "https://auth.example.com/userinfo/picture/sub-42", claims["picture"])
 		assert.Equal(t, "https://auth.example.com/account/profile", claims["profile"])
@@ -1923,7 +1923,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
 		claims := jwt.MapClaims{}
-		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, nil, claims, user, []string{"openid", "email"})
+		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIDConnectClaims(ctx, nil, claims, user, []string{"openid", "email"})
 
 		assert.NotContains(t, claims, "picture")
 		mockDB.AssertNotCalled(t, "UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything)

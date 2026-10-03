@@ -146,7 +146,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 				writeInternalServerError(w, r, reqctx.ErrNoSettings)
 				return
 			}
-			keyURL, err = otpSecretGenerator.GenerateOTPSecret(user.Email, settings.AppName)
+			keyURL, err = otpSecretGenerator.GenerateKeyURL(user.Email, settings.AppName)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return

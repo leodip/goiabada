@@ -184,7 +184,7 @@ func HandleAPIUserPasswordPut(
 			"loggedInUser": loggedInUser,
 		})
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
-			revocation.RevocationReasonAdminPasswordSet, loggedInUser, result)
+			revocation.ReasonAdminPasswordSet, loggedInUser, result)
 
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
@@ -422,7 +422,7 @@ func HandleAPIUserCreatePost(
 		req.FamilyName = strings.TrimSpace(req.FamilyName)
 
 		// Create user using UserCreator
-		createdUser, err := userCreator.CreateUser(r.Context(), &usercreation.CreateUserInput{
+		createdUser, err := userCreator.CreateUser(r.Context(), &usercreation.Input{
 			Email:         req.Email,
 			EmailVerified: req.EmailVerified,
 			PasswordHash:  passwordHash,
@@ -598,7 +598,7 @@ func HandleAPIUserEnabledPut(
 		// errResetPasswordClaimLost does when its conditional write claims no row (#425). The
 		// helper opens it through RunInTransaction, so a deadlock reruns the compare-and-set and
 		// the sweep together (#301); the compare-and-set asks the row again on every attempt.
-		disableWithRevocation := func() (revocation.RevocationResult, bool, error) {
+		disableWithRevocation := func() (revocation.UserAuthStateResult, bool, error) {
 			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", func(tx *sql.Tx) error {
 				flipped, setErr := database.TrySetUserEnabled(r.Context(), tx, userId, true, false)
 				if setErr != nil {
@@ -613,15 +613,15 @@ func HandleAPIUserEnabledPut(
 				return nil
 			})
 			if errors.Is(txErr, errUserAlreadyDisabled) {
-				return revocation.RevocationResult{}, false, nil
+				return revocation.UserAuthStateResult{}, false, nil
 			}
 			if txErr != nil {
-				return revocation.RevocationResult{}, false, txErr
+				return revocation.UserAuthStateResult{}, false, txErr
 			}
 			return result, true, nil
 		}
 
-		var result revocation.RevocationResult
+		var result revocation.UserAuthStateResult
 		transitioned := false
 
 		if req.Enabled {
@@ -649,7 +649,7 @@ func HandleAPIUserEnabledPut(
 		// Only on a real disable transition, and only after its commit.
 		if transitioned {
 			revocation.LogRevokedUserAuthState(r.Context(), auditLogger, userId,
-				revocation.RevocationReasonAccountDisabled, loggedInUser, result)
+				revocation.ReasonAccountDisabled, loggedInUser, result)
 		}
 
 		// Get the updated user to return

@@ -44,8 +44,8 @@ func SessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifi
 				return
 			}
 
-			if sess.Values[sessionkeys.SessionKeySessionIdentifier] != nil {
-				sessionIdentifier := sess.Values[sessionkeys.SessionKeySessionIdentifier].(string)
+			if sess.Values[sessionkeys.SessionIdentifier] != nil {
+				sessionIdentifier := sess.Values[sessionkeys.SessionIdentifier].(string)
 
 				userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 				if err != nil {
@@ -60,7 +60,7 @@ func SessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifi
 					// session has been deleted from DB, clear only the session identifier
 					// but preserve other session data (like AuthContext for ongoing auth flows)
 					slog.WarnContext(ctx, "session not found in the database, clearing the session identifier")
-					delete(sess.Values, sessionkeys.SessionKeySessionIdentifier)
+					delete(sess.Values, sessionkeys.SessionIdentifier)
 					err = sessionStore.Save(r, w, sess)
 					if err != nil {
 						if faults.answered(w, r, errs.Wrap(err, "unable to save the session")) {

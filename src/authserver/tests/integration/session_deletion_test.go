@@ -23,7 +23,7 @@ import (
 // "Login fails silently when database session is deleted during auth flow"
 //
 // The bug scenario:
-// 1. User has a session cookie with SessionKeySessionIdentifier pointing to a DB session
+// 1. User has a session cookie with sessionkeys.SessionIdentifier pointing to a DB session
 // 2. That DB session gets deleted (expired, deployment, manual cleanup)
 // 3. User starts a new auth flow - browser still has the old session cookie
 // 4. Middleware clears session identifier but previously also cleared AuthContext (bug)

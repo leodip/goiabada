@@ -30,7 +30,7 @@ func TestNewSessionStore_TheEndUsersCookieFollowsTheRowsExpiry(t *testing.T) {
 			w := httptest.NewRecorder()
 			session, err := store.Get(req, sessionkeys.AuthServerSessionName)
 			require.NoError(t, err)
-			session.Values[sessionkeys.SessionKeySessionIdentifier] = "a-user-session"
+			session.Values[sessionkeys.SessionIdentifier] = "a-user-session"
 			require.NoError(t, store.Save(req, w, session))
 
 			setCookie := w.Result().Header.Values("Set-Cookie")

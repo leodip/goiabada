@@ -32,7 +32,7 @@ import (
 
 func TestPublicSettings_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := NewHandlerPublicSettings(database)
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
 		Id:          1,
@@ -62,7 +62,7 @@ func TestPublicSettings_OnlyGetIsAllowed(t *testing.T) {
 			// NewDatabase(t) fails on any unexpected call, so the absence of a
 			// GetSettingsById expectation proves the method check short circuits.
 			database := mocks_data.NewDatabase(t)
-			handler := NewHandlerPublicSettings(database)
+			handler := NewPublicSettings(database)
 
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, httptest.NewRequest(method, "/api/public/settings", nil))
@@ -78,7 +78,7 @@ func TestPublicSettings_OnlyGetIsAllowed(t *testing.T) {
 
 func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := NewHandlerPublicSettings(database)
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(nil, errors.New("database is down")).Once()
@@ -98,7 +98,7 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 // authentication.
 func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := NewHandlerPublicSettings(database)
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
 
@@ -134,7 +134,7 @@ func (f *failingResponseWriter) WriteHeader(int) {}
 
 func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := NewHandlerPublicSettings(database)
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
 		Id: 1, AppName: "Goiabada",
@@ -189,7 +189,7 @@ func TestPublicSettingsResponse_ExposesOnlyAllowlistedFields(t *testing.T) {
 // namely someone replacing the DTO mapping with a direct encode of settings.
 func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := NewHandlerPublicSettings(database)
+	handler := NewPublicSettings(database)
 
 	aesKey := []byte("SENTINEL-legacy-aes-encryption-key")
 	smtpPassword := []byte("SENTINEL-smtp-password-encrypted")

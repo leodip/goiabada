@@ -1,6 +1,6 @@
 // Package usercreation creates a user account: the user row and the account-management permission
 // every user is given, written together in one transaction. Registration, activation and the admin
-// API's create go through UserCreator rather than writing the two rows themselves; the first-run
+// API's create go through Creator rather than writing the two rows themselves; the first-run
 // seed writes its administrator inside its own transaction, in internal/bootstrap.
 package usercreation
 
@@ -24,17 +24,17 @@ type userCreatorDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
-type UserCreator struct {
+type Creator struct {
 	database userCreatorDatabase
 }
 
-func NewUserCreator(database userCreatorDatabase) *UserCreator {
-	return &UserCreator{
+func New(database userCreatorDatabase) *Creator {
+	return &Creator{
 		database: database,
 	}
 }
 
-type CreateUserInput struct {
+type Input struct {
 	Email         string
 	EmailVerified bool
 	PasswordHash  string
@@ -43,7 +43,7 @@ type CreateUserInput struct {
 	FamilyName    string
 }
 
-func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (*models.User, error) {
+func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*models.User, error) {
 
 	user := &models.User{
 		Subject:       uuidutil.New(),

@@ -46,12 +46,12 @@ func (s *AuthHelper) RedirToAuthorize(
 	state := securerandom.String(16)
 	nonce := securerandom.String(16)
 
-	sess.Values[sessionkeys.SessionKeyState] = state
-	sess.Values[sessionkeys.SessionKeyNonce] = nonce
-	sess.Values[sessionkeys.SessionKeyCodeVerifier] = codeVerifier
-	sess.Values[sessionkeys.SessionKeyRedirectURI] = redirectURI
-	sess.Values[sessionkeys.SessionKeyRedirectBack] = redirectBack
-	sess.Values[sessionkeys.SessionKeyRequestedScope] = scope
+	sess.Values[sessionkeys.State] = state
+	sess.Values[sessionkeys.Nonce] = nonce
+	sess.Values[sessionkeys.CodeVerifier] = codeVerifier
+	sess.Values[sessionkeys.RedirectURI] = redirectURI
+	sess.Values[sessionkeys.RedirectBack] = redirectBack
+	sess.Values[sessionkeys.RequestedScope] = scope
 	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err

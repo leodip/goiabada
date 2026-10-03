@@ -1,5 +1,5 @@
 // Package permissions decides what a resource:permission scope means and who holds it: ResolveScope
-// turns a scope into the permission row it names, and PermissionChecker answers whether a user
+// turns a scope into the permission row it names, and Checker answers whether a user
 // holds that row directly or through a group, one scope at a time or over a whole requested scope
 // string. The protocol validators and the authorization handlers ask it; none of them resolves a
 // scope or walks a user's grants on its own (#425).
@@ -124,12 +124,12 @@ type permissionCheckerDatabase interface {
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-type PermissionChecker struct {
+type Checker struct {
 	database permissionCheckerDatabase
 }
 
-func NewPermissionChecker(database permissionCheckerDatabase) *PermissionChecker {
-	return &PermissionChecker{
+func NewChecker(database permissionCheckerDatabase) *Checker {
+	return &Checker{
 		database: database,
 	}
 }
@@ -141,7 +141,7 @@ func NewPermissionChecker(database permissionCheckerDatabase) *PermissionChecker
 // The fresh row is the point: the caller's *models.User is never loaded onto, so a check cannot
 // mutate a struct its caller goes on to use, and a user deleted since the caller read it holds
 // nothing rather than whatever the caller's copy still says.
-func (pc *PermissionChecker) loadGrantHolder(ctx context.Context, userId int64) (*models.User, error) {
+func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*models.User, error) {
 	user, err := pc.database.GetUserById(ctx, nil, userId)
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func holdsPermission(user *models.User, permissionId int64) bool {
 	return false
 }
 
-func (pc *PermissionChecker) UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error) {
+func (pc *Checker) UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error) {
 	user, err := pc.loadGrantHolder(ctx, userId)
 	if err != nil {
 		return false, err
@@ -222,7 +222,7 @@ func (pc *PermissionChecker) UserHasScopePermission(ctx context.Context, userId 
 // lookup alone. The user and their grants are then loaded once, at the first scope that resolves,
 // and every later scope is answered from that one load: it used to reload them per scope, four of
 // the six reads each resource scope cost (#425).
-func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error) {
+func (pc *Checker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error) {
 
 	if user == nil {
 		return "", errs.New("user is nil")

@@ -12,25 +12,25 @@
 // agree on beyond the session's name, which is the one key core still declares (#385).
 package sessionkeys
 
-// SessionKeyJwt is the authenticated-session key. Its string value, like every one here, is the
+// JWT is the authenticated-session key. Its string value, like every one here, is the
 // one core declared, byte for byte: a session written before #385 moved them and read after it
 // must still resolve, since the admin console's sessions outlive a deployment.
-const SessionKeyJwt string = "Jwt"
+const JWT string = "Jwt"
 
-// SessionKeyJwtExpiresAt is the Unix second the stored access token lapses at, computed from
+// JWTExpiresAt is the Unix second the stored access token lapses at, computed from
 // the token response's expires_in when it arrives, or 0 when the response gave none and the
-// expiry is unknown. It is written beside SessionKeyJwt at sign-in and at every refresh and
-// deleted wherever SessionKeyJwt is, because the console never decodes its access token to
+// expiry is unknown. It is written beside JWT at sign-in and at every refresh and
+// deleted wherever JWT is, because the console never decodes its access token to
 // read an expiry out of it (#427).
-const SessionKeyJwtExpiresAt string = "JwtExpiresAt"
+const JWTExpiresAt string = "JwtExpiresAt"
 
-const SessionKeyState string = "State"
-const SessionKeyNonce string = "Nonce"
-const SessionKeyRedirectURI string = "RedirectURI"
-const SessionKeyCodeVerifier string = "CodeVerifier"
-const SessionKeyRedirectBack string = "RedirectBack"
+const State string = "State"
+const Nonce string = "Nonce"
+const RedirectURI string = "RedirectURI"
+const CodeVerifier string = "CodeVerifier"
+const RedirectBack string = "RedirectBack"
 
-// SessionKeyRequestedScope is the scope the authorize request asked for. The callback takes the
+// RequestedScope is the scope the authorize request asked for. The callback takes the
 // grant to equal it when the token response carries no scope parameter, which RFC 6749 section
 // 3.3 allows only when the two are identical (#427).
-const SessionKeyRequestedScope string = "RequestedScope"
+const RequestedScope string = "RequestedScope"

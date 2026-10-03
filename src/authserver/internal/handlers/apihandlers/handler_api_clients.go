@@ -693,7 +693,7 @@ func HandleAPIClientAuthenticationPut(
 			// already-public client revoked nothing and must not claim to.
 			if becamePublic {
 				revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
-					revocation.RevocationReasonClientBecamePublic, callerSubject(r), result)
+					revocation.ReasonClientBecamePublic, callerSubject(r), result)
 			}
 		} else if err := database.UpdateClient(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.Id)
