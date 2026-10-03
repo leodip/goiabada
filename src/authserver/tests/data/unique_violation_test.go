@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // TestCreateUser_DuplicateEmailIsErrUniqueViolation is the tier this part of #279 exists for.

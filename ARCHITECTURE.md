@@ -131,8 +131,8 @@ Notes on rows that are not self-evident:
 - `core/testutil` is kernel because it is test support compiled into no binary. It is still held to
   the kernel rule, and #360 is what made that hold rather than merely claim
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
-  edge was noticed when `uuidutil` moved, and `fake` moved with it to
-  `authserver/internal/testutil/fake`. No admin console file ever imported it.
+  edge was noticed when `uuidutil` moved, and `fake` moved with it to the auth server, where it is
+  `authserver/internal/fake` since #442. No admin console file ever imported it.
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
@@ -384,7 +384,7 @@ row refuses its package and every package under it, and the refusal is transitiv
 helper is caught through the framework it imports, the moment it imports one, with no list of
 helpers to keep. That covers 16 of the 18 test-support packages in the tree when it was written,
 every mock among them. The two it does not cover import no framework:
-`authserver/internal/testutil/fake`, a random-string source over `crypto/rand`, and
+`authserver/internal/fake`, a random-string source over `crypto/rand`, and
 `core/internal/refgraph`, which is tooling rather than test code. Linking either would be odd, not
 harmful. Keying on a path instead — `testutil`, `mocks`, a name ending in `test` — would be a rule
 about spelling, which no guard in this repository is.

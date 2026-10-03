@@ -358,9 +358,9 @@ Three test types:
 
 **Best way to run all tests**: `./run-tests.sh` inside the dev container (from `src/authserver/`).
 
-**Test fixtures**: tests draw random values from `authserver/internal/testutil/fake`, a test-only package
-over `crypto/rand` that replaced a third-party faker in #272. Reach for it rather than adding a
-dependency the next time a test needs a random string.
+**Test fixtures**: tests draw random values from `authserver/internal/fake`, a test-only package
+over `crypto/rand` that replaced a third-party faker in #272 and left `internal/testutil` in #442.
+Reach for it rather than adding a dependency the next time a test needs a random string.
 
 **Settings row in the integration tier**: every integration test runs against one server and one
 settings row, which the server reads on every request, so a value a test leaves there is what every
