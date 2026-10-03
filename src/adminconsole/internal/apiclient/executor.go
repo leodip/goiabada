@@ -15,10 +15,10 @@ import (
 )
 
 // generalAPITimeout bounds every request the general AuthServerClient makes. Ten seconds,
-// matching sessionTokenTimeout and httpBackendTimeout in this package and the SettingsClient
-// next door: all four sit on the admin console's page-load path, where a handler goroutine held
-// open by an auth server that accepted the connection and then stopped answering is the failure
-// this exists to survive. A fourth distinct value on the same path would only invite the question
+// matching oauthclient.TokenExchangeTimeout, sessionbackend's httpBackendTimeout and the
+// SettingsClient next door: all four sit on the admin console's page-load path, where a handler
+// goroutine held open by an auth server that accepted the connection and then stopped answering
+// is the failure this exists to survive. A fourth distinct value on the same path would only invite the question
 // of why they differ (#386 decision 6).
 //
 // It is a constant rather than a setting because the two processes are deployed together, so the

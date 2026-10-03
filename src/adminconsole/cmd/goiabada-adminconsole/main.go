@@ -13,10 +13,11 @@ import (
 	_ "time/tzdata" // embeds the zone database localzone.Install resolves TZ against (#49, #331, #432)
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/server"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionbackend"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
@@ -161,14 +162,19 @@ func main() {
 	//
 	// What it replaces put the whole session, an entire token set included, in the cookie
 	// and split the ciphertext across up to fifty of them (#266).
-	tokenSource := apiclient.NewSessionTokenSource(
-		config.GetAuthServer().GetEffectiveBaseURL(),
+	//
+	// The bearer is a client_credentials token from the one token client, cached by
+	// SessionTokenSource; the backend asks it for one and knows nothing of the grant (#441).
+	authServerBaseURL := config.GetAuthServer().GetEffectiveBaseURL()
+	tokenSource := oauthclient.NewSessionTokenSource(oauthclient.NewTokenClient(
+		oauthclient.TokenEndpointURL(authServerBaseURL),
 		coreconstants.AdminConsoleClientIdentifier,
 		adminConsoleConfig.OAuthClientSecret,
-	)
+		oauthclient.NewAuthServerHTTPClient(),
+	))
 
 	sessionStore, err := newSessionStore(
-		apiclient.NewSessionBackend(config.GetAuthServer().GetEffectiveBaseURL(), tokenSource),
+		sessionbackend.New(authServerBaseURL, tokenSource),
 		config.GetAdminConsole().IsCookieSecure(),
 		currentKeys,
 		previousKeys,

@@ -8,8 +8,8 @@ import (
 )
 
 // refreshMargin is how long before the access token's recorded expiry the console refreshes it.
-// Its twin is sessionTokenExpiryMargin in adminconsole/internal/apiclient/session_client.go,
-// which gives the console's other token, its client-credentials one, the same 30 seconds.
+// Its twin is sessionTokenExpiryMargin in session_token_source.go, which gives the console's
+// other token, its client-credentials one, the same 30 seconds.
 const refreshMargin = 30 * time.Second
 
 // ExpiresAt turns a token response's expires_in into the Unix second at which its access token

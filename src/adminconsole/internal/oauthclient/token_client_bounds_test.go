@@ -193,7 +193,7 @@ func (o *outboundContext) client() *http.Client {
 // operator's log. Passing ctx straight through is the one-token change this case
 // exists to catch.
 func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestId(t *testing.T) {
-	for _, g := range grants {
+	for _, g := range singleUseGrants {
 		t.Run(g.name, func(t *testing.T) {
 			const wantRequestID = "the-inbound-request-id"
 			ctx, cancel := context.WithCancel(
@@ -222,6 +222,59 @@ func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestI
 				"the detached request keeps the caller's values, so request_id still reaches its records")
 		})
 	}
+}
+
+// client_credentials spends nothing: the auth server issues a token and burns no grant,
+// so a caller that goes away abandons nothing a retry cannot ask for again. It therefore
+// keeps its caller's cancellation, and the session lookup behind it ends with the page
+// load that asked for it, as it did before #441. TokenExchangeTimeout still bounds it,
+// since a browser context carries no deadline (#441 decision 2).
+func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *testing.T) {
+	t.Run("a cancelled caller cancels the request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		outbound := &outboundContext{}
+		tokenResponse, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client()).
+			ClientCredentials(ctx, "s")
+
+		require.Error(t, err)
+		assert.Nil(t, tokenResponse)
+		if outbound.called.Load() {
+			assert.ErrorIs(t, outbound.ctxErr, context.Canceled,
+				"the request carries the caller's cancellation rather than a detached context")
+		}
+	})
+
+	t.Run("a live caller with no deadline gets TokenExchangeTimeout", func(t *testing.T) {
+		const wantRequestID = "the-inbound-request-id"
+		ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID)
+
+		outbound := &outboundContext{}
+		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client()).ClientCredentials(ctx, "s")
+
+		require.Error(t, err)
+		require.True(t, outbound.called.Load())
+		assert.NoError(t, outbound.ctxErr)
+		require.True(t, outbound.hasLimit, "a browser context carries no deadline, so the client sets one")
+		assert.LessOrEqual(t, time.Until(outbound.deadline), TokenExchangeTimeout)
+		assert.Greater(t, time.Until(outbound.deadline), TokenExchangeTimeout-time.Second)
+		assert.Equal(t, wantRequestID, outbound.requestID)
+	})
+
+	t.Run("a caller's own shorter deadline still holds", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		callerDeadline, _ := ctx.Deadline()
+
+		outbound := &outboundContext{}
+		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client()).ClientCredentials(ctx, "s")
+
+		require.Error(t, err)
+		require.True(t, outbound.hasLimit)
+		assert.Equal(t, callerDeadline, outbound.deadline,
+			"the request's context derives from the caller's, so the earlier of the two deadlines wins")
+	})
 }
 
 // -----------------------------------------------------------------------------

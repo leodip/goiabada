@@ -23,12 +23,15 @@ import (
 // handler_auth_callback.go calls it with the code the auth server just
 // redirected back with, and what it returns becomes the administrator's
 // session. Refresh is the JWT middleware's refresh grant, sent when the stored
-// access token is due. The client is built once with the token URL, the client
-// id and the secret, so neither caller names any of them (#338, #441).
+// access token is due. ClientCredentials is the grant SessionTokenSource caches,
+// the bearer the console's browser-session storage presents. The client is built
+// once with the token URL, the client id and the secret, so no caller names any
+// of them (#338, #441).
 //
-// Both grants share the transport, the read bound and the refusal, so the cases
-// about those run once per grant, over grants below. What differs, the form each
-// posts and Refresh's kept refresh token, has cases of its own.
+// The three grants share the transport, the read bound and the refusal, so the
+// cases about those run once per grant, over grants below. What differs, the form
+// each posts, Refresh's kept refresh token and the client-credentials refusal's
+// client id and remedy, has cases of its own.
 //
 // The seam is the token URL, which is an httptest.Server here, the same shape
 // newJwksServer uses. These cases pass a nil client and so take the configured
@@ -92,20 +95,31 @@ func newTokenEndpoint(t *testing.T, status int, body string) (string, *requestRe
 }
 
 // grant is one of the token client's grants, sent with throwaway values: the cases
-// running over grants are about the answer, not the request.
+// running over grants are about the answer, not the request. refusalSuffix is what
+// the grant appends to the shared refusal's message, which only client_credentials
+// does: it names the client the token was refused for (#266, #441 decision 3).
 type grant struct {
-	name string
-	send func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error)
+	name          string
+	send          func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error)
+	refusalSuffix string
 }
 
 var grants = []grant{
-	{"authorization_code", func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error) {
+	{name: "authorization_code", send: func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error) {
 		return c.ExchangeCode(ctx, "c", "r", "cv")
 	}},
-	{"refresh_token", func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error) {
+	{name: "refresh_token", send: func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error) {
 		return c.Refresh(ctx, "rt")
 	}},
+	{name: "client_credentials", send: func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error) {
+		return c.ClientCredentials(ctx, "s")
+	}, refusalSuffix: ` for client_id "ci"`},
 }
+
+// singleUseGrants are the two grants the auth server spends as it answers, which is
+// what detaches them from their caller's cancellation. client_credentials spends
+// nothing, so it keeps its caller's.
+var singleUseGrants = grants[:2]
 
 // sendAgainst builds a client for tokenURL with a nil HTTP client and sends g.
 func (g grant) sendAgainst(tokenURL string) (*oauth.TokenResponse, error) {
@@ -186,6 +200,31 @@ func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	// Exactly those four: no scope, so the grant is the one originally granted.
 	assert.ElementsMatch(t, []string{
 		"grant_type", "refresh_token", "client_id", "client_secret",
+	}, formKeys(seen.form))
+}
+
+// The client-credentials grant's form is RFC 6749 section 4.4.2's, with the scope the
+// caller asks for and the client authenticated in the body (#441 decision 7). It is the
+// form SessionTokenSource posted before #441, parameter for parameter.
+func TestClientCredentials_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
+	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{"access_token":"at"}`)
+
+	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil).
+		ClientCredentials(context.Background(), "the-resource:the-permission")
+	require.NoError(t, err)
+
+	seen := recorder.snapshot()
+	assert.Equal(t, http.MethodPost, seen.method)
+	assert.Equal(t, "/auth/token", seen.path, "posted to the token URL the client was built with")
+	assert.Equal(t, "application/x-www-form-urlencoded", seen.contentType)
+
+	assert.Equal(t, "client_credentials", seen.form.Get("grant_type"))
+	assert.Equal(t, "the-client-id", seen.form.Get("client_id"))
+	assert.Equal(t, "the-client-secret", seen.form.Get("client_secret"))
+	assert.Equal(t, "the-resource:the-permission", seen.form.Get("scope"))
+
+	assert.ElementsMatch(t, []string{
+		"grant_type", "client_id", "client_secret", "scope",
 	}, formKeys(seen.form))
 }
 
@@ -368,7 +407,7 @@ func TestTokenClient_ARefusalCarriesTheStatusTheErrorAndItsDescription(t *testin
 			assert.Equal(t, "invalid_grant", refusal.ErrorCode)
 			assert.Equal(t, "the grant has expired", refusal.ErrorDescription)
 			assert.Equal(t,
-				"the auth server's token endpoint answered 400 (invalid_grant: the grant has expired)",
+				"the auth server's token endpoint answered 400 (invalid_grant: the grant has expired)"+g.refusalSuffix,
 				err.Error())
 		})
 	}
@@ -411,7 +450,7 @@ func TestTokenClient_ARefusalMessageNamesOnlyWhatTheAnswerCarried(t *testing.T) 
 				_, err := g.sendAgainst(tokenURL)
 
 				require.Error(t, err)
-				assert.Equal(t, tc.want, err.Error())
+				assert.Equal(t, tc.want+g.refusalSuffix, err.Error())
 			})
 		}
 	}
@@ -458,7 +497,7 @@ func TestTokenClient_ARefusalNeverCarriesTheRawBody(t *testing.T) {
 				var refusal *TokenEndpointError
 				require.True(t, errors.As(err, &refusal))
 				assert.Equal(t, tc.status, refusal.StatusCode)
-				assert.Equal(t, tc.want, err.Error())
+				assert.Equal(t, tc.want+g.refusalSuffix, err.Error())
 				assert.NotContains(t, err.Error(), "secret-peer-text")
 			})
 		}
@@ -493,8 +532,104 @@ func TestTokenClient_ARefusalIsConformedAndBounded(t *testing.T) {
 
 			assert.NotContains(t, err.Error(), "\n", "the newline the peer sent does not split a log line")
 			assert.NotContains(t, err.Error(), description, "the description does not reach the message whole")
-			assert.Equal(t, "the auth server's token endpoint answered 400 (invalid?grant: "+wantDescription+")",
+			assert.Equal(t, "the auth server's token endpoint answered 400 (invalid?grant: "+wantDescription+")"+g.refusalSuffix,
 				err.Error())
 		})
 	}
+}
+
+// The client-credentials refusal names the client and, for the two codes that mean the
+// client is not provisioned for this grant, what to fix (#266, #441 decision 3).
+//
+// The deployment this protects is one where the seeded client lost what migration 000035
+// provisions on it. The client id is no longer configurable (#285), but both halves stay
+// editable from the admin console: an administrator can turn the client credentials flow
+// off on `admin-console-client`, or take the browser-sessions permission away from it.
+// Every admin console page then fails, and the way back in does not go through the admin
+// console. The log line is the whole remedy an operator gets, so it is asserted rather
+// than left to whoever reads the source next.
+//
+// unauthorized_client is client credentials being off on that client and invalid_scope
+// is that client not holding the permission, which are the two refusals the token
+// endpoint actually produces here.
+func TestClientCredentials_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
+	const scope = "the-resource:the-permission"
+
+	refusal := func(code string) string {
+		return `{"error":"` + code + `","error_description":"some description the endpoint chose"}`
+	}
+
+	// The client id is deliberately not `admin-console-client`, which is what production
+	// passes: a message that hardcoded the identifier would satisfy an assertion on the
+	// real one while carrying nothing the caller gave it.
+	send := func(t *testing.T, status int, body string) error {
+		t.Helper()
+		tokenURL, _ := newTokenEndpoint(t, status, body)
+		tokenResponse, err := NewTokenClient(tokenURL, "a-client-of-my-own", "the-secret", nil).
+			ClientCredentials(context.Background(), scope)
+		require.Error(t, err)
+		assert.Nil(t, tokenResponse)
+		return err
+	}
+
+	for _, code := range []string{"unauthorized_client", "invalid_scope"} {
+		t.Run(code, func(t *testing.T) {
+			err := send(t, http.StatusBadRequest, refusal(code))
+
+			assert.Equal(t,
+				"the auth server's token endpoint answered 400 ("+code+": some description the endpoint chose)"+
+					` for client_id "a-client-of-my-own", which needs the client credentials flow enabled`+
+					" and the "+scope+" permission granted",
+				err.Error())
+
+			var endpointRefusal *TokenEndpointError
+			require.True(t, errors.As(err, &endpointRefusal),
+				"the client id and the remedy ride on the one refusal error, which a caller still matches")
+			assert.Equal(t, code, endpointRefusal.ErrorCode)
+		})
+	}
+
+	// A refusal that is not a provisioning fault must not send an operator to the Clients
+	// page. It still names the code and the client, because both are useful either way.
+	t.Run("server_error carries no remedy", func(t *testing.T) {
+		err := send(t, http.StatusInternalServerError, refusal("server_error"))
+
+		assert.Equal(t,
+			"the auth server's token endpoint answered 500 (server_error: some description the endpoint chose)"+
+				` for client_id "a-client-of-my-own"`,
+			err.Error())
+	})
+
+	// A refusal with no JSON body at all still has to produce a message, since a proxy in
+	// front of the auth server can answer before the token endpoint is reached.
+	t.Run("a bodyless refusal still names the client", func(t *testing.T) {
+		err := send(t, http.StatusBadGateway, "")
+
+		assert.Equal(t, `the auth server's token endpoint answered 502 for client_id "a-client-of-my-own"`,
+			err.Error())
+	})
+
+	// The remedy is keyed on the conformed code, so a code the peer dressed up does not
+	// earn it, and a newline from the peer cannot forge a line in the console's log.
+	t.Run("a forbidden rune in the error code earns no remedy and forges no line", func(t *testing.T) {
+		err := send(t, http.StatusBadRequest, `{"error":"invalid_scope\nforged"}`)
+
+		assert.NotContains(t, err.Error(), "\n")
+		assert.NotContains(t, err.Error(), "permission granted")
+		assert.Contains(t, err.Error(), `for client_id "a-client-of-my-own"`)
+	})
+
+	// Transport failures are not refusals: nothing answered, so there is no client to blame
+	// and no remedy to give.
+	t.Run("an unreachable endpoint is not a refusal", func(t *testing.T) {
+		server := httptest.NewServer(http.NotFoundHandler())
+		tokenURL := server.URL + "/auth/token"
+		server.Close()
+
+		_, err := NewTokenClient(tokenURL, "a-client-of-my-own", "the-secret", nil).
+			ClientCredentials(context.Background(), scope)
+
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "a-client-of-my-own")
+	})
 }
