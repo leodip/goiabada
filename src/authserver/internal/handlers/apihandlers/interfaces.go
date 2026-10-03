@@ -23,7 +23,7 @@ import (
 // UserCreator's is accounthandlers' (#431).
 //
 // Per-file database ports stay per-file, beside the function taking them: the database is the
-// dependency that genuinely varies from handler to handler, and these eight do not.
+// dependency that genuinely varies from handler to handler, and these nine do not.
 
 // AuditLogger records one security event. The context is first because every audit event raised
 // while serving a request is correlated to that request: the installed slog handler reads chi's
@@ -44,8 +44,9 @@ type PageRenderer interface {
 		data map[string]interface{}) (*bytes.Buffer, error)
 }
 
-// EmailSender delivers one message. The context is the request's, so the SMTP dial and write are
-// bounded by the request that asked for them.
+// EmailSender delivers one message. The context is the request's, or the job's that a request
+// handed its mail to (AfterResponse); either way it carries the request's id. The SMTP dial and
+// conversation are bounded by the sender's own deadlines.
 type EmailSender interface {
 	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error
 }
@@ -88,4 +89,13 @@ type CredentialFailureRecorder interface {
 // produces the seed (#387).
 type OtpSecretGenerator interface {
 	GenerateOTPSecret(email string, appName string) (string, error)
+}
+
+// AfterResponse runs work a handler hands off so that its response does not wait for it. The job
+// is given the context passed in, detached from its cancellation but keeping its values, so what it
+// logs carries the request's id. The server's afterresponse.Jobs is the one implementation, and
+// shutdown waits for the jobs it holds. The email change hands it the notice to the previous
+// address, which must never fail or hold up the change it reports (#404 decision 11).
+type AfterResponse interface {
+	Go(ctx context.Context, job func(ctx context.Context))
 }

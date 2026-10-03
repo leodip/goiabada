@@ -1513,6 +1513,7 @@
 "email.register_confirmation.subject" = "Bem-vindo(a)!"
 "email.verification.subject" = "Verificação de e-mail - código {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - crie uma senha para sua nova conta"
+"email.address_changed.subject" = "Seu endereço de e-mail foi alterado"
 
 # --- Bootstrap de JS --------------------------------------------------------
 

@@ -1349,7 +1349,7 @@ PUT /api/v1/account/email
 ```
 
 <Aside type="note">
-Requires the current password, which is checked before anything else about the request: a blank one is refused with `400 VALIDATION_ERROR`, and a wrong one with `400 AUTHENTICATION_FAILED`. A wrong password counts against the same failure limit as [Change password](#change-password) and the OTP change. Changing email marks it as unverified. Use the verification endpoints to verify the new email. Submitting the address the account already has changes nothing and keeps it verified.
+Requires the current password, which is checked before anything else about the request: a blank one is refused with `400 VALIDATION_ERROR`, and a wrong one with `400 AUTHENTICATION_FAILED`. A wrong password counts against the same failure limit as [Change password](#change-password) and the OTP change. Changing email marks it as unverified. Use the verification endpoints to verify the new email. Submitting the address the account already has changes nothing and keeps it verified. When SMTP is enabled, the previous address is sent a notice that the address was changed, in the user's language; it does not name the new address, and a notice that cannot be sent does not fail the change.
 </Aside>
 
 #### Send verification email

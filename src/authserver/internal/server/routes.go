@@ -360,7 +360,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// The email change verifies the account password too, so it spends the same bucket as
 		// the password and OTP changes below (#404).
 		r.With(rateLimiter.LimitAccountPassword).Put("/email",
-			apihandlers.HandleAPIAccountEmailPut(s.database, emailValidator, auditLogger, rateLimiter))
+			apihandlers.HandleAPIAccountEmailPut(httpHelper, s.database, emailValidator, emailSender, auditLogger, rateLimiter, s.jobs))
 		r.Post("/email/verification/send", apihandlers.HandleAPIAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher, adminConsoleBaseURL))
 		// The verification check is limited, the send beside it is not: sending checks no
 		// credential and already carries its own 60 second resend cooldown.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -79,7 +80,8 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 		otp: rateLimiter.LimitAccountPassword(
 			HandleAPIAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher)),
 		email: rateLimiter.LimitAccountPassword(
-			HandleAPIAccountEmailPut(database, accountvalidation.NewEmailValidator(database), auditLogger, rateLimiter)),
+			HandleAPIAccountEmailPut(mocks_handlers.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
+				mocks_accounthandlers.NewEmailSender(t), auditLogger, rateLimiter, &heldJobs{})),
 		database: database,
 	}
 }

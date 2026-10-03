@@ -1606,6 +1606,7 @@
 "email.register_confirmation.subject" = "Welcome!"
 "email.verification.subject" = "Email verification - code {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - create a password for your new account"
+"email.address_changed.subject" = "Your email address was changed"
 
 # --- JS bootstrap ------------------------------------------------------------
 #
