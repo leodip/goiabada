@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Seu endereço de e-mail foi alterado{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Olá {{.name}},</p>
+
+    <p>O endereço de e-mail da sua conta {{ .appName }} foi alterado, então este endereço não receberá mais mensagens sobre ela, incluindo links de redefinição de senha.</p>
+
+    <p>Se foi você quem fez essa alteração, não é preciso fazer nada.</p>
+
+    <p><strong>Se não foi você, outra pessoa pode saber a sua senha.</strong> Entre na sua conta, altere a sua senha e restaure o seu endereço de e-mail, ou entre em contato com o administrador.</p>
+
+    <p>Atenciosamente,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

@@ -4,16 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // accountEmailDatabase is what the account email endpoints need: the caller's own user row.
@@ -30,10 +33,13 @@ type accountEmailValidator interface {
 
 // HandleAPIAccountEmailPut - PUT /api/v1/account/email
 func HandleAPIAccountEmailPut(
+	pageRenderer PageRenderer,
 	database accountEmailDatabase,
 	emailValidator accountEmailValidator,
+	emailSender EmailSender,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	afterResponse AfterResponse,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
@@ -107,6 +113,7 @@ func HandleAPIAccountEmailPut(
 			writeEmailTakenOrInternalServerError(w, r, err)
 			return
 		}
+		previousEmail := user.Email
 		user.Email = email
 		user.EmailVerified = false
 		user.EmailVerificationCodeEncrypted = nil
@@ -122,5 +129,56 @@ func HandleAPIAccountEmailPut(
 		// Response
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
+
+		notifyPreviousAddress(r, pageRenderer, emailSender, afterResponse, previousEmail, user)
 	}
+}
+
+// notifyPreviousAddress tells the address the account had that it was changed, which is what warns
+// an account holder whose password was stolen (#404 decisions 9 and 11). It is sent only when SMTP
+// is enabled, and after the response, so the change neither waits for the mail nor fails with it:
+// a notice that cannot be rendered or sent is an Error record on the request's id, and writes no
+// audit entry of its own.
+//
+// The notice names neither the new address, which whoever reads the old mailbox has no business
+// learning, nor carries a link. It is rendered in the user's stored locale, falling back to
+// English, as the reset mail is.
+func notifyPreviousAddress(r *http.Request, pageRenderer PageRenderer, emailSender EmailSender,
+	afterResponse AfterResponse, previousEmail string, user *models.User) {
+
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		slog.ErrorContext(r.Context(), "unable to notify the previous email address", "user_id", user.Id, "error", reqctx.ErrNoSettings)
+		return
+	}
+	if !settings.SMTPEnabled {
+		return
+	}
+
+	userId := user.Id
+	bind := map[string]interface{}{
+		"name": user.FullName(),
+	}
+	locale := user.Locale
+	smtpConfig := emaildelivery.SMTPConfigFromSettings(settings)
+
+	afterResponse.Go(r.Context(), func(ctx context.Context) {
+		// The request is read for nothing but the renderer's inputs, under the job's context:
+		// the request's own is cancelled once the response has gone.
+		emailReq := r.WithContext(i18n.WithLocale(ctx, true, locale, "en"))
+		buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_address_changed.html", bind)
+		if err != nil {
+			slog.ErrorContext(ctx, "unable to render the email address change notice", "user_id", userId, "error", err)
+			return
+		}
+
+		input := &emaildelivery.SendEmailInput{
+			To:       previousEmail,
+			Subject:  i18n.T(emailReq.Context(), "email.address_changed.subject"),
+			HtmlBody: buf.String(),
+		}
+		if err := emailSender.SendEmail(ctx, smtpConfig, input); err != nil {
+			slog.ErrorContext(ctx, "unable to send the email address change notice", "user_id", userId, "error", err)
+		}
+	})
 }

@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
@@ -256,4 +258,94 @@ func TestAPIAccountEmailPut_ResubmittingTheCurrentAddressKeepsItVerified(t *test
 	assert.Equal(t, before.Email, after.Email)
 	assert.True(t, after.EmailVerified, "re-saving the address must not clear its verified flag")
 	assert.Equal(t, before.UpdatedAt, after.UpdatedAt, "nothing was written")
+}
+
+// awaitMailTo returns every message Goiabada has sent to an address, once at least one has
+// arrived or afterResponseWait has run out, for the caller to refuse an empty result. The notice
+// is sent after the response, so it is waited for rather than expected at once (#404 decision 11).
+func awaitMailTo(t *testing.T, to string) []mailpit.Message {
+	t.Helper()
+
+	client := mailpit.New(mailpitURL)
+	deadline := time.Now().Add(afterResponseWait)
+	for {
+		summaries, err := client.List()
+		require.NoError(t, err)
+		messages := []mailpit.Message{}
+		for _, summary := range summaries {
+			for _, addr := range summary.To {
+				if strings.EqualFold(addr.Address, to) {
+					message, err := client.Message(summary.ID)
+					require.NoError(t, err)
+					messages = append(messages, message)
+					break
+				}
+			}
+		}
+		if len(messages) > 0 || time.Now().After(deadline) {
+			return messages
+		}
+		time.Sleep(afterResponsePoll)
+	}
+}
+
+// TestAPIAccountEmailPut_TellsThePreviousAddress is #404 decisions 9 and 11 over real SMTP: once
+// the change is answered, the address the account had receives one notice, in the user's locale,
+// saying the address was changed, warning that someone else may know the password, and naming
+// neither the new address nor carrying a link. The new address receives nothing.
+func TestAPIAccountEmailPut_TellsThePreviousAddress(t *testing.T) {
+	useMailpitSMTP(t)
+
+	for _, tc := range []struct {
+		locale  string
+		subject string
+		warning string
+	}{
+		{"en", "Your email address was changed", "someone else may know your password"},
+		{"pt-BR", "Seu endereço de e-mail foi alterado", "outra pessoa pode saber a sua senha"},
+	} {
+		t.Run(tc.locale, func(t *testing.T) {
+			accessToken, u := accountEmailUserWithPassword(t)
+			stored, err := database.GetUserById(context.Background(), nil, u.Id)
+			require.NoError(t, err)
+			stored.Locale = tc.locale
+			require.NoError(t, database.UpdateUser(context.Background(), nil, stored))
+			previous := stored.Email
+			newEmail := strings.ToLower(fake.LetterN(12)) + "@example.com"
+
+			resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/email", accessToken,
+				api.UpdateAccountEmailRequest{Email: newEmail, CurrentPassword: accountEmailPassword})
+			_ = resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			messages := awaitMailTo(t, previous)
+			require.Len(t, messages, 1, "the previous address is told exactly once")
+			notice := messages[0]
+			assert.Equal(t, tc.subject, notice.Subject)
+			assert.Contains(t, notice.HTML, tc.warning)
+			assert.NotContains(t, strings.ToLower(notice.HTML+notice.Text), newEmail, "the notice must not name the new address")
+			assert.NotContains(t, notice.HTML, "href", "the notice carries no link")
+
+			// Read once the notice has arrived, which is when the same job would have sent to the
+			// new address too.
+			assert.Empty(t, sentTo(t, newEmail), "the new address is not sent the notice")
+		})
+	}
+}
+
+// sentTo returns what Mailpit holds for an address now, without waiting.
+func sentTo(t *testing.T, to string) []mailpit.Summary {
+	t.Helper()
+
+	summaries, err := mailpit.New(mailpitURL).List()
+	require.NoError(t, err)
+	matched := []mailpit.Summary{}
+	for _, summary := range summaries {
+		for _, addr := range summary.To {
+			if strings.EqualFold(addr.Address, to) {
+				matched = append(matched, summary)
+			}
+		}
+	}
+	return matched
 }
