@@ -10,7 +10,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
-	oauth "github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // tokenParserDatabase is what token parsing needs: the keys a signature may have been made with.
