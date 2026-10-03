@@ -31,7 +31,7 @@ func sessionRefusal() error {
 	return &apiclient.APIError{Code: "invalid_token", Message: "Session has been terminated", StatusCode: http.StatusUnauthorized}
 }
 
-func (refusingImageAPI) UploadAccountProfilePicture(context.Context, string, []byte, string) (*apiclient.ProfilePictureUploadResponse, error) {
+func (refusingImageAPI) UploadAccountProfilePicture(context.Context, string, []byte, string) (*api.ProfilePictureUploadResponse, error) {
 	return nil, sessionRefusal()
 }
 
@@ -39,7 +39,7 @@ func (refusingImageAPI) DeleteAccountProfilePicture(context.Context, string) err
 	return sessionRefusal()
 }
 
-func (refusingImageAPI) UploadUserProfilePicture(context.Context, string, int64, []byte, string) (*apiclient.ProfilePictureUploadResponse, error) {
+func (refusingImageAPI) UploadUserProfilePicture(context.Context, string, int64, []byte, string) (*api.ProfilePictureUploadResponse, error) {
 	return nil, sessionRefusal()
 }
 
@@ -47,7 +47,7 @@ func (refusingImageAPI) DeleteUserProfilePicture(context.Context, string, int64)
 	return sessionRefusal()
 }
 
-func (refusingImageAPI) UploadClientLogo(context.Context, string, int64, []byte, string) (*apiclient.ClientLogoUploadResponse, error) {
+func (refusingImageAPI) UploadClientLogo(context.Context, string, int64, []byte, string) (*api.ClientLogoUploadResponse, error) {
 	return nil, sessionRefusal()
 }
 
@@ -59,7 +59,7 @@ func (refusingImageAPI) GetClientById(context.Context, string, int64) (*api.Clie
 	return nil, sessionRefusal()
 }
 
-func (refusingImageAPI) GetClientLogo(context.Context, string, int64) (*apiclient.ClientLogoInfo, error) {
+func (refusingImageAPI) GetClientLogo(context.Context, string, int64) (*api.ClientLogoInfoResponse, error) {
 	return nil, sessionRefusal()
 }
 

@@ -911,13 +911,9 @@ var schemaStructNames = map[string]string{
 // had: a name and the reason it is not a defect. Exact, so a schema that acquires a struct of
 // its own name fails this test until its entry comes out.
 var schemasWithNoAPIStruct = map[string]string{
-	// Four bodies their handlers build as a map[string]interface{} literal rather than from a
-	// declared type, so there is nothing to pair with. The declared shapes are confirmed
-	// against what the handlers actually write by the census, not by this test.
-	"ClientLogoInfoResponse":       "handler_api_client_logo.go builds this body as a map literal; no Go type declares it",
-	"ClientLogoUploadResponse":     "handler_api_client_logo.go builds this body as a map literal; no Go type declares it",
-	"ProfilePictureInfoResponse":   "the profile picture handlers build this body as a map literal; no Go type declares it",
-	"ProfilePictureUploadResponse": "the profile picture handlers build this body as a map literal; no Go type declares it",
+	// Empty since #441. The last four entries were the picture and logo answers, whose handlers
+	// built them as map[string]interface{} literals; each is a type in core/api/pictures.go now,
+	// so their properties are checked here like every other schema's.
 }
 
 // apiStructsWithNoSchema is the other half. A struct here is a shape the server can write or
@@ -1303,31 +1299,21 @@ func sortedKeys[V any](m map[string]V) []string {
 // different meanings at once, and there is none today; if one appears, this test names it rather
 // than guessing which meaning was intended.
 //
-// The five schemas no Go type declares carry their expected sets by hand in
-// untypedResponseRequired below, exactly, because a handler building a map literal has no tag for
-// this test to read.
+// A schema no Go type declares carries its expected set by hand in untypedResponseRequired below,
+// exactly, because there is no tag for this test to read.
 
 // untypedResponseRequired is the expected `required` set for each response schema that no Go type
-// declares, so those five are held to the same standard as the rest rather than skipped. Exact:
-// the schema's array must equal this set, so both a deletion and an addition fail.
+// in core/api declares, so those are held to the same standard as the rest rather than skipped.
+// Exact: the schema's array must equal this set, so both a deletion and an addition fail.
 //
-// Each one is a map[string]interface{} literal in its handler, and the verdict comes from reading
-// the writes: a key assigned unconditionally is required, a key assigned inside an `if` is not.
+// One is left. The four picture and logo answers were here as map[string]interface{} literals
+// until #441 gave each a type in core/api/pictures.go, whose omitempty tags are now what this
+// test reads.
 var untypedResponseRequired = map[string][]string{
 	// database/sql.NullTime as encoding/json writes it. No tags and no MarshalJSON, so both
 	// exported fields are always present; when Valid is false, Time is the zero instant rather
 	// than absent.
 	"NullTime": {"Time", "Valid"},
-
-	// handler_api_client_logo.go: the info handler always writes hasLogo and adds logoUrl only
-	// when hasLogo is true; the upload handler writes both keys unconditionally. The delete
-	// handler answers SuccessResponse, not this, which is why pictureUrl is unconditional here.
-	"ClientLogoInfoResponse":   {"hasLogo"},
-	"ClientLogoUploadResponse": {"success", "pictureUrl"},
-
-	// The account and admin profile picture handlers, same shape as the two above.
-	"ProfilePictureInfoResponse":   {"hasPicture"},
-	"ProfilePictureUploadResponse": {"success", "pictureUrl"},
 }
 
 func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
@@ -1350,7 +1336,7 @@ func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
 	for _, schema := range sortedKeys(responseOnly) {
 		required := resolveSchemaRequired(t, doc.Components.Schemas, schema, map[string]bool{})
 
-		// The hand-written five first, checked exactly and then done with.
+		// The hand-written ones first, checked exactly and then done with.
 		if expected, untyped := untypedResponseRequired[schema]; untyped {
 			want := map[string]bool{}
 			for _, p := range expected {

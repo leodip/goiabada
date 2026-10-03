@@ -9,8 +9,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// ProfilePictureUploadResponse is defined in account_client.go
-
 func (c *AuthServerClient) SearchUsersPaginated(ctx context.Context, accessToken, query string, page, pageSize int) ([]api.UserResponse, int, error) {
 	// url.Values.Encode sorts its keys, so the query this endpoint has always been sent is
 	// page, then query, then size, whatever order they are added in.
@@ -144,14 +142,8 @@ func (c *AuthServerClient) CreateUserAdmin(ctx context.Context, accessToken stri
 	return &response.User, nil
 }
 
-// ProfilePictureInfo contains profile picture metadata
-type ProfilePictureInfo struct {
-	HasPicture bool   `json:"hasPicture"`
-	PictureUrl string `json:"pictureUrl,omitempty"`
-}
-
-func (c *AuthServerClient) GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*ProfilePictureInfo, error) {
-	return execute[ProfilePictureInfo](ctx, c, accessToken, apiRequest{
+func (c *AuthServerClient) GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error) {
+	return execute[api.ProfilePictureInfoResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
 		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile-picture",
 		contentType:   contentTypeJSON,
@@ -160,13 +152,13 @@ func (c *AuthServerClient) GetUserProfilePicture(ctx context.Context, accessToke
 }
 
 // UploadUserProfilePicture uploads a profile picture for a user (admin)
-func (c *AuthServerClient) UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error) {
+func (c *AuthServerClient) UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error) {
 	body, contentType, err := multipartPicture(filename, pictureData)
 	if err != nil {
 		return nil, err
 	}
 
-	return execute[ProfilePictureUploadResponse](ctx, c, accessToken, apiRequest{
+	return execute[api.ProfilePictureUploadResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
 		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile-picture",
 		rawBody:       body,

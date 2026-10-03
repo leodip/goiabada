@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -27,18 +28,18 @@ import (
 // 200 from the API with HasPicture false, so every error here is a real one, and it now goes
 // through the classifier (#425).
 type accountPictureApiClient struct {
-	picture *apiclient.ProfilePictureInfo
+	picture *api.ProfilePictureInfoResponse
 	err     error
 }
 
-func (c *accountPictureApiClient) GetAccountProfilePicture(_ context.Context, accessToken string) (*apiclient.ProfilePictureInfo, error) {
+func (c *accountPictureApiClient) GetAccountProfilePicture(_ context.Context, accessToken string) (*api.ProfilePictureInfoResponse, error) {
 	return c.picture, c.err
 }
 
 func TestHandleAccountPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 	testCases := []struct {
 		name         string
-		picture      *apiclient.ProfilePictureInfo
+		picture      *api.ProfilePictureInfoResponse
 		err          error
 		wantNotFound bool
 		wantError    bool
@@ -62,12 +63,12 @@ func TestHandleAccountPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		},
 		{
 			name:          "a picture renders the page with its address",
-			picture:       &apiclient.ProfilePictureInfo{HasPicture: true, PictureUrl: "https://auth.example/account/picture"},
+			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureUrl: "https://auth.example/account/picture"},
 			wantUrlPrefix: "https://auth.example/account/picture?t=",
 		},
 		{
 			name:    "no picture renders the page without one",
-			picture: &apiclient.ProfilePictureInfo{HasPicture: false},
+			picture: &api.ProfilePictureInfoResponse{HasPicture: false},
 		},
 	}
 
@@ -120,11 +121,11 @@ func TestHandleAccountPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 // the browser's mistake. The 500 rows are what stops that from becoming "everything is a 4xx".
 type pictureApiClient struct {
 	apiclient.ApiClient
-	response *apiclient.ProfilePictureUploadResponse
+	response *api.ProfilePictureUploadResponse
 	err      error
 }
 
-func (c *pictureApiClient) UploadAccountProfilePicture(_ context.Context, accessToken string, pictureData []byte, filename string) (*apiclient.ProfilePictureUploadResponse, error) {
+func (c *pictureApiClient) UploadAccountProfilePicture(_ context.Context, accessToken string, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error) {
 	return c.response, c.err
 }
 
@@ -244,9 +245,9 @@ type uploadRecorder struct {
 	picture []byte
 }
 
-func (c *uploadRecorder) UploadAccountProfilePicture(_ context.Context, _ string, pictureData []byte, _ string) (*apiclient.ProfilePictureUploadResponse, error) {
+func (c *uploadRecorder) UploadAccountProfilePicture(_ context.Context, _ string, pictureData []byte, _ string) (*api.ProfilePictureUploadResponse, error) {
 	c.picture = pictureData
-	return &apiclient.ProfilePictureUploadResponse{Success: true, PictureUrl: "https://auth.example.com/userinfo/picture/a-subject"}, nil
+	return &api.ProfilePictureUploadResponse{Success: true, PictureUrl: "https://auth.example.com/userinfo/picture/a-subject"}, nil
 }
 
 // A multipart body the request-body limit cut short answers the JSON 400 an unparseable form

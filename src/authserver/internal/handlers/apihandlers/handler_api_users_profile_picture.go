@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 )
 
 // usersProfilePictureDatabase is what the administrator's user picture endpoints need: the user
@@ -109,10 +110,9 @@ func HandleAPIUserProfilePicturePost(
 			"loggedInUser": loggedInUser,
 		})
 
-		// Return success response
-		response := map[string]interface{}{
-			"success":    true,
-			"pictureUrl": baseURL + "/userinfo/picture/" + user.Subject,
+		response := api.ProfilePictureUploadResponse{
+			Success:    true,
+			PictureUrl: baseURL + "/userinfo/picture/" + user.Subject,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -170,10 +170,7 @@ func HandleAPIUserProfilePictureDelete(
 			"loggedInUser": loggedInUser,
 		})
 
-		// Return success response
-		response := map[string]interface{}{
-			"success": true,
-		}
+		response := api.SuccessResponse{Success: true}
 
 		writeJSON(w, r, http.StatusOK, response)
 	}
@@ -217,12 +214,9 @@ func HandleAPIUserProfilePictureGet(
 			return
 		}
 
-		response := map[string]interface{}{
-			"hasPicture": hasPicture,
-		}
-
+		response := api.ProfilePictureInfoResponse{HasPicture: hasPicture}
 		if hasPicture {
-			response["pictureUrl"] = baseURL + "/userinfo/picture/" + user.Subject
+			response.PictureUrl = baseURL + "/userinfo/picture/" + user.Subject
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

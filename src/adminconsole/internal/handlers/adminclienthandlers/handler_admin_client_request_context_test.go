@@ -51,7 +51,7 @@ func (s *ctxRecordingApiClient) GetClientPermissions(ctx context.Context, _ stri
 	return nil, nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetClientLogo(ctx context.Context, _ string, _ int64) (*apiclient.ClientLogoInfo, error) {
+func (s *ctxRecordingApiClient) GetClientLogo(ctx context.Context, _ string, _ int64) (*api.ClientLogoInfoResponse, error) {
 	return nil, s.record(ctx)
 }
 

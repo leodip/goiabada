@@ -8,15 +8,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // accountPictureAPI is what the account picture endpoint needs: the one read it serves.
 type accountPictureAPI interface {
-	GetAccountProfilePicture(ctx context.Context, accessToken string) (*apiclient.ProfilePictureInfo, error)
+	GetAccountProfilePicture(ctx context.Context, accessToken string) (*api.ProfilePictureInfoResponse, error)
 }
 
 func HandleAccountPictureGet(
@@ -80,7 +80,7 @@ func HandleAccountPictureGet(
 // delete.
 type accountProfilePictureAPI interface {
 	DeleteAccountProfilePicture(ctx context.Context, accessToken string) error
-	UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*apiclient.ProfilePictureUploadResponse, error)
+	UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error)
 }
 
 // HandleAccountProfilePicturePost handles uploading a profile picture for the current user

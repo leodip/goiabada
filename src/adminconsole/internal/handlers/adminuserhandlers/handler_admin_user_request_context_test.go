@@ -84,7 +84,7 @@ func (s *ctxRecordingApiClient) DeleteUser(ctx context.Context, _ string, _ int6
 	return s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UploadUserProfilePicture(ctx context.Context, _ string, _ int64, _ []byte, _ string) (*apiclient.ProfilePictureUploadResponse, error) {
+func (s *ctxRecordingApiClient) UploadUserProfilePicture(ctx context.Context, _ string, _ int64, _ []byte, _ string) (*api.ProfilePictureUploadResponse, error) {
 	return nil, s.record(ctx)
 }
 

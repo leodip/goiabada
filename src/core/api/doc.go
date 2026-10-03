@@ -6,7 +6,7 @@
 //
 // One file per resource, each declaring that resource's requests beside its responses: users,
 // groups, clients, resources and their permissions, settings, account (the self-service API),
-// sessions (the user sessions an administrator lists, and the browser session endpoint the admin
-// console keeps its own sessions behind), audit, and errors, which holds the two envelopes every
-// resource answers with (#441).
+// pictures (a user's profile picture and a client's logo), sessions (the user sessions an
+// administrator lists, and the browser session endpoint the admin console keeps its own sessions
+// behind), audit, and errors, which holds the two envelopes every resource answers with (#441).
 package api

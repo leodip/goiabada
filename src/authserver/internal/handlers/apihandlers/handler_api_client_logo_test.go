@@ -98,11 +98,7 @@ func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["hasLogo"].(bool))
-	assert.Equal(t, testBaseURL+"/client/logo/my-app", response["logoUrl"])
+	assert.JSONEq(t, `{"hasLogo":true,"logoUrl":"`+testBaseURL+`/client/logo/my-app"}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 }
@@ -125,11 +121,7 @@ func TestHandleAPIClientLogoGet_NoLogo(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.False(t, response["hasLogo"].(bool))
-	assert.Nil(t, response["logoUrl"])
+	assert.JSONEq(t, `{"hasLogo":false}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 }
@@ -291,11 +283,7 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["success"].(bool))
-	assert.Equal(t, testBaseURL+"/client/logo/my-app", response["pictureUrl"])
+	assert.JSONEq(t, `{"success":true,"pictureUrl":"`+testBaseURL+`/client/logo/my-app"}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -337,10 +325,7 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["success"].(bool))
+	assert.JSONEq(t, `{"success":true,"pictureUrl":"`+testBaseURL+`/client/logo/my-app"}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -438,10 +423,7 @@ func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.True(t, response["success"].(bool))
+	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)

@@ -106,6 +106,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `AccountOTPEnrollmentResponse` | both-apps | — |
 | `core/api` | `AddGroupMemberRequest` | both-apps | — |
 | `core/api` | `AuditLogResponse` | both-apps | — |
+| `core/api` | `ClientLogoInfoResponse` | both-apps | — |
+| `core/api` | `ClientLogoUploadResponse` | both-apps | — |
 | `core/api` | `ClientResponse` | both-apps | — |
 | `core/api` | `CreateClientRequest` | both-apps | — |
 | `core/api` | `CreateClientResponse` | both-apps | — |
@@ -152,6 +154,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `GroupWithPermissionResponse` | both-apps | — |
 | `core/api` | `PermissionResponse` | both-apps | — |
 | `core/api` | `PhoneCountryResponse` | both-apps | — |
+| `core/api` | `ProfilePictureInfoResponse` | both-apps | — |
+| `core/api` | `ProfilePictureUploadResponse` | both-apps | — |
 | `core/api` | `PublicSettingsResponse` | both-apps | — |
 | `core/api` | `RedirectURIResponse` | reachable | — |
 | `core/api` | `ResourcePermissionUpsert` | both-apps | — |

@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 )
 
 // clientLogoDatabase is what the client logo endpoints need: the client and the logo row they
@@ -109,10 +110,9 @@ func HandleAPIClientLogoPost(
 			"loggedInUser": loggedInUser,
 		})
 
-		// Return success response
-		response := map[string]interface{}{
-			"success":    true,
-			"pictureUrl": baseURL + "/client/logo/" + client.ClientIdentifier,
+		response := api.ClientLogoUploadResponse{
+			Success:    true,
+			PictureUrl: baseURL + "/client/logo/" + client.ClientIdentifier,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -170,10 +170,7 @@ func HandleAPIClientLogoDelete(
 			"loggedInUser": loggedInUser,
 		})
 
-		// Return success response
-		response := map[string]interface{}{
-			"success": true,
-		}
+		response := api.SuccessResponse{Success: true}
 
 		writeJSON(w, r, http.StatusOK, response)
 	}
@@ -217,12 +214,9 @@ func HandleAPIClientLogoGet(
 			return
 		}
 
-		response := map[string]interface{}{
-			"hasLogo": hasLogo,
-		}
-
+		response := api.ClientLogoInfoResponse{HasLogo: hasLogo}
 		if hasLogo {
-			response["logoUrl"] = baseURL + "/client/logo/" + client.ClientIdentifier
+			response.LogoUrl = baseURL + "/client/logo/" + client.ClientIdentifier
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

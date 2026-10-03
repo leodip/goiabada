@@ -8,18 +8,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// ClientLogoInfo contains client logo metadata
-type ClientLogoInfo struct {
-	HasLogo bool   `json:"hasLogo"`
-	LogoUrl string `json:"logoUrl,omitempty"`
-}
-
-// ClientLogoUploadResponse represents the response from uploading a client logo
-type ClientLogoUploadResponse struct {
-	Success    bool   `json:"success"`
-	PictureUrl string `json:"pictureUrl"`
-}
-
 // The ten methods below accept the whole 2xx range rather than one status, which is how they were
 // written and what their characterization rows record. The rest of the client names the single
 // status it expects; these keep the range because narrowing one would refuse an answer the auth
@@ -165,10 +153,10 @@ func (c *AuthServerClient) DeleteClient(ctx context.Context, accessToken string,
 // The three logo methods are the exception in this file: each accepts 200 alone, as it was
 // written.
 
-func (c *AuthServerClient) GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*ClientLogoInfo, error) {
-	// Decoded straight into ClientLogoInfo: this endpoint answers the object itself rather than
-	// wrapping it in an envelope.
-	return execute[ClientLogoInfo](ctx, c, accessToken, apiRequest{
+func (c *AuthServerClient) GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error) {
+	// Decoded straight into api.ClientLogoInfoResponse: this endpoint answers the object itself
+	// rather than wrapping it in an envelope.
+	return execute[api.ClientLogoInfoResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
 		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo",
 		contentType:   contentTypeJSON,
@@ -176,13 +164,13 @@ func (c *AuthServerClient) GetClientLogo(ctx context.Context, accessToken string
 	})
 }
 
-func (c *AuthServerClient) UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error) {
+func (c *AuthServerClient) UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*api.ClientLogoUploadResponse, error) {
 	body, contentType, err := multipartPicture(filename, logoData)
 	if err != nil {
 		return nil, err
 	}
 
-	return execute[ClientLogoUploadResponse](ctx, c, accessToken, apiRequest{
+	return execute[api.ClientLogoUploadResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
 		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo",
 		rawBody:       body,
