@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -500,14 +499,14 @@ func userInfoRequestForScopes(t *testing.T, sub string, oidcScopes string) *http
 // errors.As rather than the bare assertion these cases used, so a wrap on the way to JsonError
 // could not turn the whole expectation into a panic in a mock matcher (#279 decision 6).
 func isUserInfoInvalidToken(err error, description string) bool {
-	var detail *customerrors.ErrorDetail
+	var detail *oauth.ErrorDetail
 	if !errors.As(err, &detail) {
 		return false
 	}
-	return detail.GetCode() == "invalid_token" &&
-		detail.GetDescription() == description &&
-		detail.GetHttpStatusCode() == http.StatusUnauthorized &&
-		detail.GetWWWAuthenticate() ==
+	return detail.Code() == "invalid_token" &&
+		detail.Description() == description &&
+		detail.HTTPStatus() == http.StatusUnauthorized &&
+		detail.WWWAuthenticate() ==
 			`Bearer realm="goiabada", error="invalid_token", error_description="`+description+`"`
 }
 

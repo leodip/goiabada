@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // TestValidateTokenRequest_ClientAuthentication is authenticateClient's table, one row per grant
@@ -50,12 +50,12 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 
 	refusedWith := func(t *testing.T, err error, want refusal) {
 		t.Helper()
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
-		assert.Equal(t, want.code, detail.GetCode())
-		assert.Equal(t, want.description, detail.GetDescription())
-		assert.Equal(t, want.status, detail.GetHttpStatusCode())
-		assert.Equal(t, want.challenge, detail.GetWWWAuthenticate())
+		assert.Equal(t, want.code, detail.Code())
+		assert.Equal(t, want.description, detail.Description())
+		assert.Equal(t, want.status, detail.HTTPStatus())
+		assert.Equal(t, want.challenge, detail.WWWAuthenticate())
 	}
 
 	fixtures := []grantFixture{
@@ -271,12 +271,12 @@ func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
 					&ValidateTokenRequestInput{GrantType: grant, ClientId: "the_client", ClientSecret: "a_secret"})
 
 				assert.Nil(t, result)
-				var detail *customerrors.ErrorDetail
+				var detail *oauth.ErrorDetail
 				require.ErrorAs(t, err, &detail)
-				assert.Equal(t, r.code, detail.GetCode())
-				assert.Equal(t, r.description, detail.GetDescription())
-				assert.Equal(t, r.status, detail.GetHttpStatusCode())
-				assert.Equal(t, r.challenge, detail.GetWWWAuthenticate())
+				assert.Equal(t, r.code, detail.Code())
+				assert.Equal(t, r.description, detail.Description())
+				assert.Equal(t, r.status, detail.HTTPStatus())
+				assert.Equal(t, r.challenge, detail.WWWAuthenticate())
 			})
 		}
 
@@ -289,12 +289,12 @@ func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
 				&ValidateTokenRequestInput{GrantType: grant, ClientSecret: "a_secret"})
 
 			assert.Nil(t, result)
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Equal(t, "Missing required client_id parameter.", detail.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
-			assert.Empty(t, detail.GetWWWAuthenticate())
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Equal(t, "Missing required client_id parameter.", detail.Description())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+			assert.Empty(t, detail.WWWAuthenticate())
 		})
 	}
 }

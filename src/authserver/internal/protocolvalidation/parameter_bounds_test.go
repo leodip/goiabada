@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The bounds are storage's (models.StateMaxBytes, NonceMaxBytes, ScopeMaxBytes): the widths of the
@@ -55,13 +55,13 @@ func boundedValues(t *testing.T, bound int) []boundedValue {
 // 400, the exact text, and that the text carries no part of the value.
 func requireTooLong(t *testing.T, err error, code, parameter string, length, bound int, value string) {
 	t.Helper()
-	var detail *customerrors.ErrorDetail
+	var detail *oauth.ErrorDetail
 	require.ErrorAs(t, err, &detail)
-	assert.Equal(t, code, detail.GetCode())
-	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+	assert.Equal(t, code, detail.Code())
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 	assert.Equal(t, fmt.Sprintf("The '%s' parameter is too long (%d bytes, the maximum is %d).", parameter, length, bound),
-		detail.GetDescription())
-	assert.NotContains(t, detail.GetDescription(), value[:8], "the description must not repeat the value")
+		detail.Description())
+	assert.NotContains(t, detail.Description(), value[:8], "the description must not repeat the value")
 }
 
 // claimScopesOfBytes returns a scope of exactly n bytes made only of the claim scopes openid and
@@ -161,10 +161,10 @@ func TestValidateRequest_StateAndNonceBoundHoldsForImplicitRequests(t *testing.T
 				assert.NoError(t, err)
 				return
 			}
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Contains(t, detail.GetDescription(), "The '"+tc.wantRefusing+"' parameter is too long")
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Contains(t, detail.Description(), "The '"+tc.wantRefusing+"' parameter is too long")
 		})
 	}
 }
@@ -238,10 +238,10 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 	t.Run("bytes are counted, not characters", func(t *testing.T) {
 		filling := strings.Repeat("é", models.ScopeMaxBytes/2)
 		err := NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), filling)
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
-		assert.Equal(t, "invalid_scope", detail.GetCode())
-		assert.Contains(t, detail.GetDescription(), "Invalid scope format", "the bound admitted it, so the refusal is the format's")
+		assert.Equal(t, "invalid_scope", detail.Code())
+		assert.Contains(t, detail.Description(), "Invalid scope format", "the bound admitted it, so the refusal is the format's")
 
 		over := strings.Repeat("é", models.ScopeMaxBytes/2+1)
 		err = NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), over)
@@ -311,9 +311,9 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, request("wrongpassword", scope))
 
 		assert.Nil(t, result)
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
-		assert.Equal(t, "invalid_grant", detail.GetCode())
-		assert.Equal(t, "Invalid resource owner credentials.", detail.GetDescription())
+		assert.Equal(t, "invalid_grant", detail.Code())
+		assert.Equal(t, "Invalid resource owner credentials.", detail.Description())
 	})
 }

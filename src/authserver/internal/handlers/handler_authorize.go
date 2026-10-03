@@ -22,7 +22,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -51,7 +50,7 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	// carry iss and sub too. The typ denylist is the one logout applies; a refused kind is
 	// answered as a hint that does not parse, so the answer says nothing about which it was (#401).
 	if err != nil || nonIdTokenTypValues[jwtToken.GetStringClaim("typ")] {
-		return "", customerrors.NewErrorDetailWithHttpStatusCode(
+		return "", oauth.NewErrorDetailWithHTTPStatus(
 			"invalid_request",
 			"The id_token_hint is invalid.",
 			http.StatusBadRequest)
@@ -61,7 +60,7 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	// Use safe type assertion — a malformed iss claim (e.g. iss: 123) must not panic.
 	iss, ok := jwtToken.Claims["iss"].(string)
 	if !ok || iss != settings.Issuer {
-		return "", customerrors.NewErrorDetailWithHttpStatusCode(
+		return "", oauth.NewErrorDetailWithHTTPStatus(
 			"invalid_request",
 			"The id_token_hint was not issued by this server.",
 			http.StatusBadRequest)
@@ -71,7 +70,7 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	// Use safe type assertion — a malformed sub claim (e.g. sub: 123) must not panic.
 	sub, ok := jwtToken.Claims["sub"].(string)
 	if !ok || sub == "" {
-		return "", customerrors.NewErrorDetailWithHttpStatusCode(
+		return "", oauth.NewErrorDetailWithHTTPStatus(
 			"invalid_request",
 			"The id_token_hint does not contain a valid sub claim.",
 			http.StatusBadRequest)
@@ -253,7 +252,7 @@ func HandleAuthorizeGet(
 
 		var (
 			userSession *models.UserSession
-			refusal     *customerrors.ErrorDetail
+			refusal     *oauth.ErrorDetail
 		)
 
 		// The loads. decideAuthorizeRoute names the next fact it needs, or the route once it needs
@@ -348,9 +347,9 @@ func HandleAuthorizeGet(
 		// answerClientImmediately answers the client with an error now, whoever is at the browser.
 		// answerClientWithError clears the context before answering, and derives its own
 		// server_error fallback from this same input (#141).
-		answerClientImmediately := func(errorDetail *customerrors.ErrorDetail) {
+		answerClientImmediately := func(errorDetail *oauth.ErrorDetail) {
 			input := redirectErrorFromAuthContext(&authContext, client,
-				errorDetail.GetCode(), errorDetail.GetDescription())
+				errorDetail.Code(), errorDetail.Description())
 
 			// Carry a refusal this request has already been given, and only a refusal. The
 			// predicate is not read at all on a silent request; that is "nothing has refused yet"
@@ -378,7 +377,7 @@ func HandleAuthorizeGet(
 			// session store seals with an AEAD, so it is not a value the visitor can choose, and it
 			// is delivered at /auth/level1completed once level 1 credentials are verified.
 			// ParkDeferredError conforms and bounds the description before it is stored.
-			authContext.ParkDeferredError(refusal.GetCode(), refusal.GetDescription())
+			authContext.ParkDeferredError(refusal.Code(), refusal.Description())
 			saveAndRedirect("/auth/level1")
 
 		case authorizeRoutePromptNone:
@@ -396,7 +395,7 @@ func HandleAuthorizeGet(
 			// Answered at once, never deferred: this path has a valid session, so somebody is
 			// already authenticated, and a disabled user sent to the login page could not complete
 			// it anyway (#213).
-			answerClientImmediately(customerrors.NewErrorDetailWithHttpStatusCode("access_denied", userDisabledDescription, http.StatusBadRequest))
+			answerClientImmediately(oauth.NewErrorDetailWithHTTPStatus("access_denied", userDisabledDescription, http.StatusBadRequest))
 
 		case authorizeRouteSSO:
 			// The session already completed level 1, so the ceremony goes to /auth/level1completed,
@@ -552,7 +551,7 @@ func refuseUnaddressableAuthorizeRequest(w http.ResponseWriter, r *http.Request,
 // authorizeValidation is what validateAuthorizeRequest found: the first refusal, or nil when the
 // request was accepted, and the two values the validations produce on the way.
 type authorizeValidation struct {
-	refusal *customerrors.ErrorDetail
+	refusal *oauth.ErrorDetail
 	// prompt is the normalized prompt once ValidatePrompt has accepted it, so a request refused
 	// later, for its id_token_hint, still carries it into the parked ceremony.
 	prompt string
@@ -570,7 +569,7 @@ type authorizeValidation struct {
 // "%x20-21 / %x23-5B / %x5D-7E" and describes as "used to assist the client developer in
 // understanding the error that occurred": the audience is the integrator reading a redirect, not
 // the visitor, and the character set excludes pt-BR anyway. Translating one would not ship
-// non-ASCII, because customerrors.ConformErrorDescription enforces that set at both the parking
+// non-ASCII, because oauth.ConformErrorDescription enforces that set at both the parking
 // site and the emitter, so an accented sentence would reach the client as a row of question marks
 // instead. That is the failure a translation here buys (#213 decision 9).
 func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeValidator, tokenParser TokenParser,
@@ -580,7 +579,7 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 
 	// stop ends the validations on err: an ErrorDetail is the refusal, anything else a fault.
 	stop := func(err error) (authorizeValidation, error) {
-		var errorDetail *customerrors.ErrorDetail
+		var errorDetail *oauth.ErrorDetail
 		if errors.As(err, &errorDetail) {
 			validation.refusal = errorDetail
 			return validation, nil
@@ -1333,7 +1332,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database aut
 	// Below the redirect guard, deliberately. renderRedirectBlocked above puts the description on an
 	// HTML page, which is a user interface and not a protocol parameter, so the interstitial keeps the
 	// text as the validator wrote it and only what actually leaves as a redirect is filtered.
-	description := customerrors.ConformErrorDescription(input.description)
+	description := oauth.ConformErrorDescription(input.description)
 
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment,
 	// or in the form_post the request asked for; an explicit query is answered in the fragment too,

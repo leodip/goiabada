@@ -19,8 +19,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -441,7 +441,7 @@ func writeDCRError(w http.ResponseWriter, errorCode, description string, statusC
 
 	errorResp := oidc.DynamicClientRegistrationError{
 		Error:            errorCode,
-		ErrorDescription: customerrors.ConformErrorDescription(description),
+		ErrorDescription: oauth.ConformErrorDescription(description),
 	}
 	_ = json.NewEncoder(w).Encode(errorResp)
 }

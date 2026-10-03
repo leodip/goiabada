@@ -17,7 +17,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 11 answered for an AJAX request, at this handler group's seam. Stage 8 gave the page
@@ -177,7 +177,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			httpHelper.AssertExpectations(t)
 			require.NotNil(t, captured, "the handler answered nothing")
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
 					"expected JsonError's generic 500 arm, got a status-carrying %v", captured)
@@ -185,7 +185,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			}
 			require.True(t, errors.As(captured, &detail),
 				"expected an *ErrorDetail carrying a status, got %v", captured)
-			assert.Equal(t, testCase.wantStatus, detail.GetHttpStatusCode())
+			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
 		})
 	}
 }
@@ -226,11 +226,11 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 			router.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.True(t, errors.As(captured, &detail),
 				"expected an *ErrorDetail carrying 400, got %v", captured)
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
-			assert.Equal(t, "invalid_request_body", detail.GetCode())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+			assert.Equal(t, "invalid_request_body", detail.Code())
 		})
 	}
 }

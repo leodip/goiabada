@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // RepeatedParameter answers the first of names, in names' order, that values carries more than
@@ -41,7 +41,7 @@ func ValidateNoRepeatedParameters(values url.Values, names []string) error {
 	if name == "" {
 		return nil
 	}
-	return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+	return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 		fmt.Sprintf("The '%v' parameter was included more than once.", name),
 		http.StatusBadRequest)
 }

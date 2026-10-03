@@ -6,7 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,9 +47,9 @@ func TestHandleTokenPost_Refresh_Replay_ARecordWrittenWithNothingLiveIsAudited(t
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()
 			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "invalid_grant" &&
-					detail.GetDescription() == "This refresh token has been revoked."
+				detail, ok := err.(*oauth.ErrorDetail)
+				return ok && detail.Code() == "invalid_grant" &&
+					detail.Description() == "This refresh token has been revoked."
 			})).Return().Once()
 
 			endpoint.post(t, "grant_type=refresh_token&refresh_token=replayed")
@@ -84,10 +84,10 @@ func TestHandleTokenPost_Refresh_AFamilyRevokedInTheGapIsRefusedAsARevokedToken(
 			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, nil, issuance.ErrRefreshFamilyRevoked).Once()
 			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "invalid_grant" &&
-					detail.GetDescription() == "This refresh token has been revoked." &&
-					detail.GetHttpStatusCode() == http.StatusBadRequest
+				detail, ok := err.(*oauth.ErrorDetail)
+				return ok && detail.Code() == "invalid_grant" &&
+					detail.Description() == "This refresh token has been revoked." &&
+					detail.HTTPStatus() == http.StatusBadRequest
 			})).Return().Once()
 
 			endpoint.post(t, "grant_type=refresh_token&refresh_token=presented")

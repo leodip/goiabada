@@ -248,10 +248,6 @@ command itself and fails on a tree it changed.
 | `core/countries` | `All` | both-apps | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | own-package | — |
-| `core/customerrors` | `ConformErrorDescription` | both-apps | — |
-| `core/customerrors` | `ErrorDetail` | both-apps | — |
-| `core/customerrors` | `NewErrorDetail` | contract | One of the two neutral `ErrorDetail` constructors. `NewErrorDetailWithHttpStatusCode` beside it is `both-apps`, and the pair is one API that both processes compile. |
-| `core/customerrors` | `NewErrorDetailWithHttpStatusCode` | both-apps | — |
 | `core/errs` | `Errorf` | kernel | — |
 | `core/errs` | `Join` | both-apps | — |
 | `core/errs` | `New` | kernel | — |
@@ -404,11 +400,15 @@ command itself and fails on a tree it changed.
 | `core/middleware` | `MiddlewareSkipCsrf` | both-apps | — |
 | `core/middleware` | `ParseTrustedProxies` | both-apps | — |
 | `core/middleware` | `RequestTargetForLog` | own-package | — |
+| `core/oauth` | `ConformErrorDescription` | both-apps | — |
+| `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
 | `core/oauth` | `IsWellFormedSpaceDelimited` | kernel | — |
 | `core/oauth` | `Jwk` | both-apps | — |
 | `core/oauth` | `Jwks` | both-apps | — |
 | `core/oauth` | `JwtToken` | both-apps | — |
+| `core/oauth` | `NewErrorDetail` | own-package | — |
+| `core/oauth` | `NewErrorDetailWithHTTPStatus` | both-apps | — |
 | `core/oauth` | `SplitSpaceDelimited` | kernel | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
 | `core/sessionstore` | `Backend` | kernel | — |

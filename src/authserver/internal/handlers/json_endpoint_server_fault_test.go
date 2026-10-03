@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +50,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 		noCredentialFailures{})
 
 	reuse := &protocolvalidation.AuthCodeReusedError{
-		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
+		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 			http.StatusBadRequest),
 		Code: &models.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
 	}

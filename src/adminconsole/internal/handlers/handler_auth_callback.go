@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -133,8 +132,8 @@ func HandleAuthCallbackPost(
 			// session's own request. Both are the auth server's words passed through the
 			// browser, so they are conformed to RFC 6749's error_description characters and bound
 			// before they reach the log, and html/template escapes them on the page.
-			errorCode := customerrors.ConformErrorDescription(r.PostFormValue("error"))
-			errorDescription := customerrors.ConformErrorDescription(r.PostFormValue("error_description"))
+			errorCode := oauth.ConformErrorDescription(r.PostFormValue("error"))
+			errorDescription := oauth.ConformErrorDescription(r.PostFormValue("error_description"))
 			if errorCode != "" {
 				refuseSignInByAuthServer(httpHelper, w, r, errorCode, errorDescription)
 				return

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 const unsupportedResponseTypeText = "The authorization server does not support this response_type. Supported values: code, token, id_token, id_token token."
@@ -63,11 +63,11 @@ func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
 		t.Run("refuses "+responseType, func(t *testing.T) {
 			err := validator.ValidateRequest(request(responseType))
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "unsupported_response_type", detail.GetCode())
-			assert.Equal(t, unsupportedResponseTypeText, detail.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+			assert.Equal(t, "unsupported_response_type", detail.Code())
+			assert.Equal(t, unsupportedResponseTypeText, detail.Description())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 		})
 	}
 
@@ -78,11 +78,11 @@ func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
 		t.Run("refuses as malformed "+responseType, func(t *testing.T) {
 			err := validator.ValidateRequest(request(responseType))
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Equal(t, malformedText("response_type"), detail.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Equal(t, malformedText("response_type"), detail.Description())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 		})
 	}
 
@@ -92,9 +92,9 @@ func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
 
 		err := validator.ValidateRequest(input)
 
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
-		assert.Equal(t, "unsupported_response_type", detail.GetCode())
+		assert.Equal(t, "unsupported_response_type", detail.Code())
 	})
 
 	t.Run("a malformed type is refused before the implicit switch is read", func(t *testing.T) {
@@ -103,10 +103,10 @@ func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
 
 		err := validator.ValidateRequest(input)
 
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
-		assert.Equal(t, "invalid_request", detail.GetCode())
-		assert.Equal(t, malformedText("response_type"), detail.GetDescription())
+		assert.Equal(t, "invalid_request", detail.Code())
+		assert.Equal(t, malformedText("response_type"), detail.Description())
 	})
 
 	// The same spelling with the switch off is the control: it is a real implicit request, refused
@@ -117,18 +117,18 @@ func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
 
 		err := validator.ValidateRequest(input)
 
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
-		assert.Equal(t, "unauthorized_client", detail.GetCode())
+		assert.Equal(t, "unauthorized_client", detail.Code())
 	})
 
 	t.Run("an empty response_type is missing, not unsupported", func(t *testing.T) {
 		err := validator.ValidateRequest(request(""))
 
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
-		assert.Equal(t, "invalid_request", detail.GetCode())
-		assert.Equal(t, "The response_type parameter is missing.", detail.GetDescription())
+		assert.Equal(t, "invalid_request", detail.Code())
+		assert.Equal(t, "The response_type parameter is missing.", detail.Description())
 	})
 }
 
@@ -159,10 +159,10 @@ func TestValidateRequest_OpenidScopeIsFoundThroughTheSharedSplitter(t *testing.T
 		t.Run("refuses "+scope, func(t *testing.T) {
 			err := validator.ValidateRequest(request(scope))
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", detail.GetDescription())
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", detail.Description())
 		})
 	}
 }
@@ -226,11 +226,11 @@ func TestValidatePrompt_SelectAccountAndSeparators(t *testing.T) {
 				return
 			}
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, tc.wantCode, detail.GetCode())
-			assert.Equal(t, tc.wantMessage, detail.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+			assert.Equal(t, tc.wantCode, detail.Code())
+			assert.Equal(t, tc.wantMessage, detail.Description())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 			assert.Equal(t, "", result)
 		})
 	}

@@ -10,7 +10,6 @@ import (
 	"errors"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,11 +49,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "unauthorized_client", customErr.GetCode())
-		assert.Equal(t, "The client associated with the provided client_id does not support authorization code flow.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "unauthorized_client", customErr.Code())
+		assert.Equal(t, "The client associated with the provided client_id does not support authorization code flow.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Missing code parameter", func(t *testing.T) {
@@ -86,11 +85,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, "Missing required code parameter.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required code parameter.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Missing redirect_uri parameter", func(t *testing.T) {
@@ -123,11 +122,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, "Missing required redirect_uri parameter.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required redirect_uri parameter.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Missing code_verifier parameter when PKCE was used", func(t *testing.T) {
@@ -182,11 +181,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, "Missing required code_verifier parameter.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required code_verifier parameter.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Invalid code", func(t *testing.T) {
@@ -223,11 +222,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "Code is invalid.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "Code is invalid.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Mismatched redirect URI", func(t *testing.T) {
@@ -267,11 +266,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "Invalid redirect_uri.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "Invalid redirect_uri.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Mismatched client_id", func(t *testing.T) {
@@ -316,11 +315,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "The client_id provided does not match the client_id from code.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "The client_id provided does not match the client_id from code.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Disabled user", func(t *testing.T) {
@@ -374,11 +373,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		// writes AuditUserDisabled from.
 		var disabled *UserDisabledError
 		require.ErrorAs(t, err, &disabled)
-		var customErr *customerrors.ErrorDetail
+		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "Code is invalid.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "Code is invalid.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Expired code", func(t *testing.T) {
@@ -433,11 +432,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "Code has expired.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "Code has expired.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Invalid PKCE code verifier", func(t *testing.T) {
@@ -490,11 +489,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Missing client secret for non-public client", func(t *testing.T) {
@@ -549,12 +548,12 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for missing client credentials
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.GetDescription())
-		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.Description())
+		assert.Equal(t, http.StatusUnauthorized, customErr.HTTPStatus())
 	})
 
 	t.Run("Client authentication failed for non-public client", func(t *testing.T) {
@@ -615,12 +614,12 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for failed client authentication
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.GetDescription())
-		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.Description())
+		assert.Equal(t, http.StatusUnauthorized, customErr.HTTPStatus())
 	})
 
 	t.Run("Public client with unnecessary client secret", func(t *testing.T) {
@@ -676,11 +675,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.", customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Valid non-expired code", func(t *testing.T) {
@@ -882,9 +881,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		assert.Equal(t, codeEntity.Id, reused.Code.Id)
 		assert.Equal(t, "session-abc", reused.Code.SessionIdentifier)
 		assert.NotNil(t, reused.Detail)
-		assert.Equal(t, "invalid_grant", reused.Detail.GetCode())
-		assert.Equal(t, "Code is invalid.", reused.Detail.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, reused.Detail.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", reused.Detail.Code())
+		assert.Equal(t, "Code is invalid.", reused.Detail.Description())
+		assert.Equal(t, http.StatusBadRequest, reused.Detail.HTTPStatus())
 	})
 
 	t.Run("Reuse with correct credentials returns sentinel (confidential client + correct secret)", func(t *testing.T) {
@@ -1028,10 +1027,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_id must not yield revocation sentinel")
-		detail, ok := err.(*customerrors.ErrorDetail)
+		detail, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", detail.GetCode())
-		assert.Contains(t, detail.GetDescription(), "client_id")
+		assert.Equal(t, "invalid_grant", detail.Code())
+		assert.Contains(t, detail.Description(), "client_id")
 	})
 
 	t.Run("Reuse with wrong redirect_uri does NOT produce sentinel", func(t *testing.T) {
@@ -1070,10 +1069,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong redirect_uri must not yield revocation sentinel")
-		detail, ok := err.(*customerrors.ErrorDetail)
+		detail, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", detail.GetCode())
-		assert.Equal(t, "Invalid redirect_uri.", detail.GetDescription())
+		assert.Equal(t, "invalid_grant", detail.Code())
+		assert.Equal(t, "Invalid redirect_uri.", detail.Description())
 	})
 
 	t.Run("Reuse with confidential client and missing client_secret does NOT produce sentinel", func(t *testing.T) {
@@ -1119,9 +1118,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "missing client_secret must not yield revocation sentinel")
-		detail, ok := err.(*customerrors.ErrorDetail)
+		detail, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_client", detail.GetCode())
+		assert.Equal(t, "invalid_client", detail.Code())
 	})
 
 	t.Run("Reuse with confidential client and wrong client_secret does NOT produce sentinel", func(t *testing.T) {
@@ -1167,9 +1166,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_secret must not yield revocation sentinel")
-		detail, ok := err.(*customerrors.ErrorDetail)
+		detail, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_client", detail.GetCode())
+		assert.Equal(t, "invalid_client", detail.Code())
 	})
 
 	t.Run("Reuse with wrong PKCE code_verifier does NOT produce sentinel", func(t *testing.T) {
@@ -1210,10 +1209,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong code_verifier must not yield revocation sentinel")
-		detail, ok := err.(*customerrors.ErrorDetail)
+		detail, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", detail.GetCode())
-		assert.Equal(t, "Invalid code_verifier (PKCE).", detail.GetDescription())
+		assert.Equal(t, "invalid_grant", detail.Code())
+		assert.Equal(t, "Invalid code_verifier (PKCE).", detail.Description())
 	})
 
 	t.Run("Code-not-found (truly unknown) returns plain invalid_grant, not sentinel", func(t *testing.T) {
@@ -1250,10 +1249,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "unknown code must not yield revocation sentinel")
-		detail, ok := err.(*customerrors.ErrorDetail)
+		detail, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", detail.GetCode())
-		assert.Equal(t, "Code is invalid.", detail.GetDescription())
+		assert.Equal(t, "invalid_grant", detail.Code())
+		assert.Equal(t, "Code is invalid.", detail.Description())
 	})
 }
 
@@ -1391,11 +1390,11 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_request", customErr.GetCode())
-	assert.Equal(t, "The code_verifier parameter was provided, but PKCE was not used during authorization.", customErr.GetDescription())
-	assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_request", customErr.Code())
+	assert.Equal(t, "The code_verifier parameter was provided, but PKCE was not used during authorization.", customErr.Description())
+	assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) {
@@ -1511,11 +1510,11 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_request", customErr.GetCode())
-	assert.Equal(t, "Missing required code_verifier parameter.", customErr.GetDescription())
-	assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_request", customErr.Code())
+	assert.Equal(t, "Missing required code_verifier parameter.", customErr.Description())
+	assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
@@ -1575,11 +1574,11 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_grant", customErr.GetCode())
-	assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
-	assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_grant", customErr.Code())
+	assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.Description())
+	assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *testing.T) {
@@ -1708,11 +1707,11 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_PublicClient_Fails(t *testing.T) {
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
-		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	customErr, ok := err.(*oauth.ErrorDetail)
+	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
+		assert.Contains(t, customErr.Description(), "public clients are required to use PKCE")
 	}
 }
 
@@ -1726,10 +1725,10 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	customErr, ok := err.(*oauth.ErrorDetail)
+	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Contains(t, customErr.Description(), "public clients are required to use PKCE")
 	}
 }
 
@@ -1863,7 +1862,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, lookupErr)
-		_, isErrorDetail := err.(*customerrors.ErrorDetail)
+		_, isErrorDetail := err.(*oauth.ErrorDetail)
 		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 	})
 
@@ -1874,14 +1873,14 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 		// The wording a revoked code and a superseded generation already share. A message
 		// naming the mismatch would tell the presenter that the session exists and belongs
 		// to somebody else.
-		assert.Equal(t, "Code is invalid.", customErr.GetDescription())
+		assert.Equal(t, "Code is invalid.", customErr.Description())
 	})
 }
 
@@ -1991,18 +1990,18 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		require.True(t, ok)
 		// Matched the way HandleTokenPost matches it, by value against the sentinel, because
 		// that equality is what ties the audit row to the wire message (#241 decision 10).
 		assert.True(t, errors.Is(err, ErrCodeRedirectURIDeregistered))
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 		// Legible rather than the flat "Code is invalid." the refusals above it give. The
 		// presenter has already authenticated, and an administrator who rotated a callback
 		// needs to be able to tell this apart from a submitted value that differs from the
 		// code's, which returns "Invalid redirect_uri."
-		assert.Contains(t, customErr.GetDescription(), "no longer registered on the client")
+		assert.Contains(t, customErr.Description(), "no longer registered on the client")
 	})
 
 	t.Run("a client with no registrations left refuses every outstanding code", func(t *testing.T) {
@@ -2043,7 +2042,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, loadErr)
-		_, isErrorDetail := err.(*customerrors.ErrorDetail)
+		_, isErrorDetail := err.(*oauth.ErrorDetail)
 		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 	})
 
@@ -2061,9 +2060,9 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		require.True(t, ok)
-		assert.Equal(t, "invalid_client", customErr.GetCode())
+		assert.Equal(t, "invalid_client", customErr.Code())
 	})
 
 	t.Run("a wrong PKCE verifier is answered before the registration is read", func(t *testing.T) {
@@ -2078,9 +2077,9 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		require.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.Description())
 	})
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -33,17 +32,17 @@ const AuthorizationCodeNotSupportedErrorMsg = "The client associated with the pr
 func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, client *models.Client,
 	input *ValidateTokenRequestInput) (*AuthorizationCodeGrant, error) {
 	if !client.AuthorizationCodeEnabled {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			AuthorizationCodeNotSupportedErrorMsg, http.StatusBadRequest)
 	}
 
 	if len(input.Code) == 0 {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required code parameter.", http.StatusBadRequest)
 	}
 
 	if len(input.RedirectURI) == 0 {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required redirect_uri parameter.", http.StatusBadRequest)
 	}
 
@@ -68,14 +67,14 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 			return nil, err
 		}
 		if codeEntity == nil {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 				http.StatusBadRequest)
 		}
 		wasReused = true
 	}
 
 	if codeEntity.RedirectURI != input.RedirectURI {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Invalid redirect_uri.",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Invalid redirect_uri.",
 			http.StatusBadRequest)
 	}
 
@@ -90,7 +89,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	}
 
 	if codeEntity.Client.ClientIdentifier != input.ClientId {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The client_id provided does not match the client_id from code.",
 			http.StatusBadRequest)
 	}
@@ -119,7 +118,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// knows whether its own client is public and whether it sent a verifier, so this leaks
 	// nothing.
 	if client.IsPublic && (!codeEntity.CodeChallenge.Valid || codeEntity.CodeChallenge.String == "") {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"This code was issued without PKCE, and public clients are required to use PKCE. Please start a new authorization request with a code_challenge.",
 			http.StatusBadRequest)
 	}
@@ -128,7 +127,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	if codeEntity.CodeChallenge.Valid && codeEntity.CodeChallenge.String != "" {
 		// PKCE was used during authorization - verify the code_verifier
 		if len(input.CodeVerifier) == 0 {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				"Missing required code_verifier parameter.", http.StatusBadRequest)
 		}
 
@@ -143,20 +142,20 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 
 		codeChallenge := oauth.GeneratePKCECodeChallenge(input.CodeVerifier)
 		if codeEntity.CodeChallenge.String != codeChallenge {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 				"Invalid code_verifier (PKCE).", http.StatusBadRequest)
 		}
 	} else if len(input.CodeVerifier) > 0 {
 		// PKCE was not used during authorization but code_verifier was provided
 		// This is an error - strict mode
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The code_verifier parameter was provided, but PKCE was not used during authorization.", http.StatusBadRequest)
 	}
 	// If PKCE was not used and code_verifier was not provided, that's fine
 
 	if wasReused {
 		return nil, &AuthCodeReusedError{
-			Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
+			Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 				http.StatusBadRequest),
 			Code: codeEntity,
 		}
@@ -188,7 +187,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// ceremony that straddled the change, neither of which the revocation sweep can
 	// reach: the sweep can only act on rows that exist when it runs.
 	if codeEntity.AuthStateGeneration != codeEntity.User.AuthStateGeneration {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest)
 	}
 
@@ -196,7 +195,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// and the caller has proved it may redeem the code, so it knows when it was issued.
 	const authCodeExpirationInSeconds = 60
 	if time.Now().UTC().After(codeEntity.CreatedAt.Time.Add(time.Second * time.Duration(authCodeExpirationInSeconds))) {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code has expired.", http.StatusBadRequest)
 	}
 
@@ -204,7 +203,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// that session authorized, so a code marked here belongs to a grant that was
 	// explicitly cut off.
 	if codeEntity.Revoked {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest)
 	}
 
@@ -238,7 +237,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 			return nil, getUserSessionErr
 		}
 		if codeSession != nil && codeSession.UserId != codeEntity.UserId {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 				"Code is invalid.", http.StatusBadRequest)
 		}
 	}

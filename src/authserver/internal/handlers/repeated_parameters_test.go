@@ -22,8 +22,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // These cases are the handlers' half of #228: each shows an endpoint consulting
@@ -315,10 +315,10 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 func TestHandleTokenPost_ARepeatedParameterIsInvalidRequest(t *testing.T) {
 	refused := func(name string) func(error) bool {
 		return func(err error) bool {
-			detail, ok := err.(*customerrors.ErrorDetail)
-			return ok && detail.GetCode() == "invalid_request" &&
-				detail.GetHttpStatusCode() == http.StatusBadRequest &&
-				detail.GetDescription() == repeatDescription(name)
+			detail, ok := err.(*oauth.ErrorDetail)
+			return ok && detail.Code() == "invalid_request" &&
+				detail.HTTPStatus() == http.StatusBadRequest &&
+				detail.Description() == repeatDescription(name)
 		}
 	}
 
@@ -352,7 +352,7 @@ func TestHandleTokenPost_ARepeatedParameterIsInvalidRequest(t *testing.T) {
 			endpoint.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 				mock.MatchedBy(func(in *protocolvalidation.ValidateTokenRequestInput) bool {
 					return in.ClientId == "c" && in.ClientSecret == "s"
-				})).Return(nil, customerrors.NewErrorDetail("invalid_client", "stop")).Once()
+				})).Return(nil, oauth.NewErrorDetail("invalid_client", "stop")).Once()
 			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			req := httptest.NewRequest("POST", "/token"+tc.query,

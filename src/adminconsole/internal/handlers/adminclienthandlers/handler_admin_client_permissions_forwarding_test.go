@@ -16,7 +16,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // #225 at a handler's seam, rather than at HandleAPIErrorJson's. handlerhelpers'
@@ -119,7 +119,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 			httpHelper.AssertExpectations(t)
 			require.NotNil(t, captured, "the handler answered nothing")
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
 					"a server fault must not carry a status to the browser, got %v", captured)
@@ -127,10 +127,10 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 			}
 			require.True(t, errors.As(captured, &detail),
 				"expected an *ErrorDetail carrying a status, got %v", captured)
-			assert.Equal(t, testCase.wantStatus, detail.GetHttpStatusCode())
-			assert.Equal(t, testCase.wantCode, detail.GetCode())
+			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
+			assert.Equal(t, testCase.wantCode, detail.Code())
 			if testCase.wantMessage != "" {
-				assert.Equal(t, testCase.wantMessage, detail.GetDescription(),
+				assert.Equal(t, testCase.wantMessage, detail.Description(),
 					"the API's own sentence is what makes the failure actionable")
 			}
 		})
@@ -158,8 +158,8 @@ func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)
-	var detail *customerrors.ErrorDetail
+	var detail *oauth.ErrorDetail
 	require.True(t, errors.As(captured, &detail), "expected an *ErrorDetail carrying 400, got %v", captured)
-	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
-	assert.Equal(t, "invalid_request_body", detail.GetCode())
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+	assert.Equal(t, "invalid_request_body", detail.Code())
 }

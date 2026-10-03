@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -63,10 +63,10 @@ func expectBillingResolution(mockDB *mocks_data.Database) {
 
 func assertRefusedAsOneElement(t *testing.T, err error, description string) {
 	t.Helper()
-	var customErr *customerrors.ErrorDetail
+	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "invalid_scope", customErr.GetCode())
-	assert.Equal(t, description, customErr.GetDescription())
+	assert.Equal(t, "invalid_scope", customErr.Code())
+	assert.Equal(t, description, customErr.Description())
 }
 
 func TestValidateScopes_ScopeWhitespace(t *testing.T) {

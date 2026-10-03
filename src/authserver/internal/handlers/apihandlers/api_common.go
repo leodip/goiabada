@@ -8,8 +8,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // writeJSONError emits the admin/account API error envelope with the
@@ -104,7 +104,7 @@ func writeListSaveFailure(w http.ResponseWriter, r *http.Request, err error, att
 // writeValidationError emits a 400 Bad Request envelope from a validation
 // error. For *i18n.LocalizedError (the canonical UI/API path), error_code
 // is the catalog key and error_description is the message localized to
-// the request's locale. For legacy *customerrors.ErrorDetail, the code is
+// the request's locale. For legacy *oauth.ErrorDetail, the code is
 // the constant "VALIDATION_ERROR" and the description is the English text
 // already on the error. Consumers route on the HTTP status code.
 //
@@ -121,9 +121,9 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 		writeJSONError(w, localizedErr.Localize(r.Context()), localizedErr.Code, http.StatusBadRequest)
 		return
 	}
-	var errorDetail *customerrors.ErrorDetail
+	var errorDetail *oauth.ErrorDetail
 	if errors.As(err, &errorDetail) {
-		writeJSONError(w, errorDetail.GetDescription(), "VALIDATION_ERROR", http.StatusBadRequest)
+		writeJSONError(w, errorDetail.Description(), "VALIDATION_ERROR", http.StatusBadRequest)
 		return
 	}
 	writeJSONError(w, err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)

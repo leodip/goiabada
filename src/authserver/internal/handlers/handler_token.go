@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -272,9 +271,9 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// disabled client invalid_client. The disabled client was invalid_grant until #437 and had
 	// to be excluded here by value (#219); if a prelude refusal ever becomes invalid_grant
 	// again, it needs that exclusion back.
-	var errDetail *customerrors.ErrorDetail
+	var errDetail *oauth.ErrorDetail
 	if errors.As(err, &errDetail) &&
-		input.GrantType == oidc.GrantTypePassword && errDetail.GetCode() == "invalid_grant" {
+		input.GrantType == oidc.GrantTypePassword && errDetail.Code() == "invalid_grant" {
 
 		credentialFailures.RecordCredentialFailure(r)
 		auditLogger.Log(r.Context(), audit.AuditROPCAuthFailed, map[string]interface{}{
@@ -289,7 +288,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 		})
 	}
 
-	if errors.As(err, &errDetail) && errDetail.GetCode() == "invalid_scope" {
+	if errors.As(err, &errDetail) && errDetail.Code() == "invalid_scope" {
 		auditLogger.Log(r.Context(), audit.AuditTokenScopeDenied, map[string]interface{}{
 			// clientIdentifier, the string from the request, not the numeric clientId the
 			// issuance events use: the validator discards the client model on failure. See
@@ -336,7 +335,7 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, e
 
 	// RFC 6749 clients MUST NOT use more than one authentication method
 	if hasBasicAuth && hasPostAuth {
-		return "", "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return "", "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Client authentication failed: multiple authentication methods provided. "+
 				"Use either HTTP Basic authentication OR client_secret in the request body, but not both.",
 			http.StatusBadRequest)

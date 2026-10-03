@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Every row varies one thing from "one copy of each": the rule is RepeatedParameter's, and both
@@ -53,25 +53,25 @@ func TestValidateNoRepeatedParameters(t *testing.T) {
 		assert.NoError(t, ValidateNoRepeatedParameters(url.Values{"scope": {"openid"}, "state": {"s"}}, []string{"scope", "state"}))
 	})
 
-	refusal := func(t *testing.T, err error) *customerrors.ErrorDetail {
+	refusal := func(t *testing.T, err error) *oauth.ErrorDetail {
 		t.Helper()
-		var detail *customerrors.ErrorDetail
+		var detail *oauth.ErrorDetail
 		require.True(t, errors.As(err, &detail), "an ErrorDetail, which both endpoints answer as is")
-		assert.Equal(t, "invalid_request", detail.GetCode())
-		assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+		assert.Equal(t, "invalid_request", detail.Code())
+		assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 		return detail
 	}
 
 	t.Run("identical copies are invalid_request naming the parameter", func(t *testing.T) {
 		detail := refusal(t, ValidateNoRepeatedParameters(url.Values{"scope": {"openid", "openid"}}, []string{"scope"}))
-		assert.Equal(t, "The 'scope' parameter was included more than once.", detail.GetDescription())
+		assert.Equal(t, "The 'scope' parameter was included more than once.", detail.Description())
 	})
 
 	t.Run("differing copies are invalid_request naming the parameter and neither value", func(t *testing.T) {
 		detail := refusal(t, ValidateNoRepeatedParameters(
 			url.Values{"grant_type": {"client_credentials", "password"}}, []string{"code", "grant_type"}))
-		assert.Equal(t, "The 'grant_type' parameter was included more than once.", detail.GetDescription())
-		assert.NotContains(t, detail.GetDescription(), "client_credentials")
-		assert.NotContains(t, detail.GetDescription(), "password")
+		assert.Equal(t, "The 'grant_type' parameter was included more than once.", detail.Description())
+		assert.NotContains(t, detail.Description(), "client_credentials")
+		assert.NotContains(t, detail.Description(), "password")
 	})
 }

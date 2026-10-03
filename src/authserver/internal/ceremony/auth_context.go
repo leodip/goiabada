@@ -7,7 +7,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -158,7 +157,7 @@ type AuthContext struct {
 	//
 	// DeferredErrorCode != "" is the sentinel, and it is sound rather than merely convenient:
 	// the five deferrable validations have 23 error returns between them and not one carries
-	// an empty code, while the empty-code constructor customerrors.NewErrorDetail("", ...) is
+	// an empty code, while the empty-code constructor oauth.NewErrorDetail("", ...) is
 	// used only by ValidateClientAndRedirectURI, which answers a rendered page and never a
 	// redirect. An edit that introduces an empty-coded error on a deferrable path silently
 	// turns a parked error into no error at all, so it must mint a code instead.
@@ -219,7 +218,7 @@ func (ac *AuthContext) SetScope(scope string) {
 // HandleAuthorizeGet like a direct write (#437).
 func (ac *AuthContext) ParkDeferredError(code, description string) {
 	ac.DeferredErrorCode = code
-	ac.DeferredErrorDescription = customerrors.ConformErrorDescription(description)
+	ac.DeferredErrorDescription = oauth.ConformErrorDescription(description)
 	ac.AuthState = AuthStateRequiresLevel1
 }
 

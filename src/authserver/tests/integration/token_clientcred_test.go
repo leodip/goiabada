@@ -664,7 +664,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 // (#213).
 //
 // Thin on purpose. The character set itself is owned by TestConformErrorDescription in
-// src/core/customerrors; what is left for this tier is only that the filter is on the path.
+// src/core/oauth; what is left for this tier is only that the filter is on the path.
 func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testing.T) {
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 

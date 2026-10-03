@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -107,11 +107,11 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "unauthorized_client", customErr.GetCode())
-	assert.Contains(t, customErr.GetDescription(), "not authorized to use the resource owner password credentials")
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "unauthorized_client", customErr.Code())
+	assert.Contains(t, customErr.Description(), "not authorized to use the resource owner password credentials")
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
@@ -196,9 +196,9 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "unauthorized_client", customErr.GetCode())
+	assert.Equal(t, "unauthorized_client", customErr.Code())
 }
 
 func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
@@ -234,11 +234,11 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_request", customErr.GetCode())
-	assert.Equal(t, "Missing required username parameter.", customErr.GetDescription())
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_request", customErr.Code())
+	assert.Equal(t, "Missing required username parameter.", customErr.Description())
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
@@ -274,11 +274,11 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_request", customErr.GetCode())
-	assert.Equal(t, "Missing required password parameter.", customErr.GetDescription())
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_request", customErr.Code())
+	assert.Equal(t, "Missing required password parameter.", customErr.Description())
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
@@ -317,11 +317,11 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
-		assert.Contains(t, customErr.GetDescription(), "remove the client_secret from your request")
+	customErr, ok := err.(*oauth.ErrorDetail)
+	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
+		assert.Contains(t, customErr.Description(), "remove the client_secret from your request")
 	}
 	// The strict mock is the second assertion: the refusal answers before the resource
 	// owner's credentials are ever looked up, so no rate-limited guess is spent on it.
@@ -361,11 +361,11 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_grant", customErr.GetCode())
-	assert.Equal(t, "Invalid resource owner credentials.", customErr.GetDescription())
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_grant", customErr.Code())
+	assert.Equal(t, "Invalid resource owner credentials.", customErr.Description())
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 // TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup pins that the username
@@ -411,9 +411,9 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_grant", customErr.GetCode())
+	assert.Equal(t, "invalid_grant", customErr.Code())
 }
 
 // TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant pins the one
@@ -456,9 +456,9 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_grant", customErr.GetCode())
+	assert.Equal(t, "invalid_grant", customErr.Code())
 }
 
 func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
@@ -503,11 +503,11 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_grant", customErr.GetCode())
-	assert.Equal(t, "Invalid resource owner credentials.", customErr.GetDescription())
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_grant", customErr.Code())
+	assert.Equal(t, "Invalid resource owner credentials.", customErr.Description())
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
@@ -555,11 +555,11 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	// has just proved the password. The type is what the handler writes AuditUserDisabled from.
 	var disabled *UserDisabledError
 	require.ErrorAs(t, err, &disabled)
-	var customErr *customerrors.ErrorDetail
+	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "invalid_grant", customErr.GetCode())
-	assert.Equal(t, "The user account is disabled.", customErr.GetDescription())
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_grant", customErr.Code())
+	assert.Equal(t, "The user account is disabled.", customErr.Description())
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
@@ -605,11 +605,11 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_grant", customErr.GetCode())
-	assert.Contains(t, customErr.GetDescription(), "two-factor authentication")
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_grant", customErr.Code())
+	assert.Contains(t, customErr.Description(), "two-factor authentication")
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T) {
@@ -646,12 +646,12 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
 	// RFC 6749 Section 5.2: invalid_client for missing client credentials
-	assert.Equal(t, "invalid_client", customErr.GetCode())
-	assert.Contains(t, customErr.GetDescription(), "client_secret")
-	assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_client", customErr.Code())
+	assert.Contains(t, customErr.Description(), "client_secret")
+	assert.Equal(t, http.StatusUnauthorized, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
@@ -691,11 +691,11 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_client", customErr.GetCode())
-	assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.GetDescription())
-	assert.Equal(t, 401, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_client", customErr.Code())
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.Description())
+	assert.Equal(t, 401, customErr.HTTPStatus())
 }
 
 // TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCipher holds the client
@@ -737,7 +737,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCi
 
 	assert.Nil(t, result)
 	require.Error(t, err)
-	var errorDetail *customerrors.ErrorDetail
+	var errorDetail *oauth.ErrorDetail
 	assert.False(t, errors.As(err, &errorDetail), "a secret the cipher cannot open answered %v", err)
 }
 
@@ -1000,11 +1000,11 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_scope", customErr.GetCode())
-	assert.Contains(t, customErr.GetDescription(), "Invalid scope format")
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_scope", customErr.Code())
+	assert.Contains(t, customErr.Description(), "Invalid scope format")
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
@@ -1126,11 +1126,11 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
-	customErr, ok := err.(*customerrors.ErrorDetail)
+	customErr, ok := err.(*oauth.ErrorDetail)
 	assert.True(t, ok)
-	assert.Equal(t, "invalid_scope", customErr.GetCode())
-	assert.Contains(t, customErr.GetDescription(), "does not have permission")
-	assert.Equal(t, 400, customErr.GetHttpStatusCode())
+	assert.Equal(t, "invalid_scope", customErr.Code())
+	assert.Contains(t, customErr.Description(), "does not have permission")
+	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
 // The two rejections ROPC reaches before the user's own permissions are consulted: a resource that
@@ -1220,11 +1220,11 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*customerrors.ErrorDetail)
+			customErr, ok := err.(*oauth.ErrorDetail)
 			require.True(t, ok, "expected an ErrorDetail, got %v", err)
-			assert.Equal(t, "invalid_scope", customErr.GetCode())
-			assert.Equal(t, tc.wantDesc, customErr.GetDescription())
-			assert.Equal(t, 400, customErr.GetHttpStatusCode())
+			assert.Equal(t, "invalid_scope", customErr.Code())
+			assert.Equal(t, tc.wantDesc, customErr.Description())
+			assert.Equal(t, 400, customErr.HTTPStatus())
 		})
 	}
 }

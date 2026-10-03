@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -306,7 +306,7 @@ func TestAuthorizeParameters(t *testing.T) {
 // after it is refused, so a parked ceremony carries it as it always did. The handler cases show
 // each validation's refusal reaching the client (#437 seam 4).
 func TestValidateAuthorizeRequest(t *testing.T) {
-	requestRefusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", "The request is invalid.", http.StatusBadRequest)
+	requestRefusal := oauth.NewErrorDetailWithHTTPStatus("invalid_request", "The request is invalid.", http.StatusBadRequest)
 
 	testCases := []struct {
 		name            string
@@ -388,7 +388,7 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 				assert.Nil(t, validation.refusal)
 			} else {
 				require.NotNil(t, validation.refusal)
-				assert.Equal(t, tc.wantRefusalCode, validation.refusal.GetCode())
+				assert.Equal(t, tc.wantRefusalCode, validation.refusal.Code())
 			}
 			assert.Equal(t, tc.wantPrompt, validation.prompt)
 			assert.Equal(t, tc.wantHint, validation.hintSubject)

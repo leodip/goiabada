@@ -24,7 +24,7 @@ const (
 	// Email validator — used wherever an email address is validated outside
 	// the OAuth protocol path (account self-service, admin user CRUD, SMTP
 	// settings, registration). Errors that become an RFC 6749
-	// error_description stay in customerrors.ErrorDetail and are not
+	// error_description stay in oauth.ErrorDetail and are not
 	// represented here; see the authorize group at the end of this block for
 	// where that line falls on the authorization endpoint.
 	ErrCodeEmailRequired          = "validator.email.required"

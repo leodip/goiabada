@@ -16,7 +16,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 13 on an AJAX preflight read, which is where the console's own sweep left the shape it
@@ -24,7 +24,7 @@ import (
 //
 // The permission grid loads a resource before it does anything, and that read's guard called
 // httpHelper.JsonError(w, r, err) with the *apiclient.APIError untouched. JsonError preserves a
-// status only for a *customerrors.ErrorDetail, so an upstream 404 took the generic arm: HTTP 500,
+// status only for a *oauth.ErrorDetail, so an upstream 404 took the generic arm: HTTP 500,
 // a stack and a request id in the log, and a modal telling the administrator the server had broken
 // when what had happened is that somebody deleted the resource while their page was open. The guard
 // two calls further down, on GetGroupPermissions, was already going through the classifier, which is
@@ -124,7 +124,7 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 			httpHelper.AssertExpectations(t)
 			require.NotNil(t, captured, "the handler answered nothing")
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
 					"a server fault must not carry a status to the browser, got %v", captured)
@@ -132,10 +132,10 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 			}
 			require.True(t, errors.As(captured, &detail),
 				"expected an *ErrorDetail carrying a status, got %v", captured)
-			assert.Equal(t, testCase.wantStatus, detail.GetHttpStatusCode())
-			assert.Equal(t, testCase.wantCode, detail.GetCode())
+			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
+			assert.Equal(t, testCase.wantCode, detail.Code())
 			if testCase.wantMessage != "" {
-				assert.Equal(t, testCase.wantMessage, detail.GetDescription())
+				assert.Equal(t, testCase.wantMessage, detail.Description())
 			}
 		})
 	}

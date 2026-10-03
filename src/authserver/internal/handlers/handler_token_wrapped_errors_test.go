@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -78,7 +78,7 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 		"The user account is disabled.",
 	} {
 		t.Run(description, func(t *testing.T) {
-			disabled := &protocolvalidation.UserDisabledError{Detail: customerrors.NewErrorDetailWithHttpStatusCode(
+			disabled := &protocolvalidation.UserDisabledError{Detail: oauth.NewErrorDetailWithHTTPStatus(
 				"invalid_grant", description, http.StatusBadRequest)}
 
 			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
@@ -93,10 +93,10 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 
 			// The handler hands the wrapped error through as it arrived; the writer reads the
 			// detail out of it with errors.As, which is how it reaches the wire (#435).
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, *captured, &detail)
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
-			assert.Equal(t, description, detail.GetDescription())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+			assert.Equal(t, description, detail.Description())
 		})
 	}
 }
@@ -111,7 +111,7 @@ func TestHandleTokenPost_GenericRefusalWritesNoUserDisabledRow(t *testing.T) {
 		"The refresh token is invalid.",
 	} {
 		t.Run(description, func(t *testing.T) {
-			refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", description,
+			refusal := oauth.NewErrorDetailWithHTTPStatus("invalid_grant", description,
 				http.StatusBadRequest)
 
 			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t, refusal)
@@ -129,7 +129,7 @@ func TestHandleTokenPost_GenericRefusalWritesNoUserDisabledRow(t *testing.T) {
 // makes. Its audit row is the only record that a redemption was refused for that reason, so losing
 // the match makes the refusal indistinguishable from any other server fault in the log.
 func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T) {
-	refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+	refusal := oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 		"The redirect URI recorded on this authorization code is no longer registered on the client, so the code can no longer be redeemed.",
 		http.StatusBadRequest)
 	require.ErrorIs(t, refusal, protocolvalidation.ErrCodeRedirectURIDeregistered)
@@ -142,9 +142,9 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 
 	handler.ServeHTTP(rr, req)
 
-	var detail *customerrors.ErrorDetail
+	var detail *oauth.ErrorDetail
 	require.ErrorAs(t, *captured, &detail)
-	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 }
 
 // A wrapped *AuthCodeReusedError still reaches the revocation branch, which is asserted from the far
@@ -153,7 +153,7 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 // unwraps to its Detail as well.
 func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	reuse := &protocolvalidation.AuthCodeReusedError{
-		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
+		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 			http.StatusBadRequest),
 		Code: &models.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
 	}
@@ -179,11 +179,11 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	assert.Equal(t, int64(7), auditedCodeId, "the reuse row must name the replayed code")
 	// The same pointer: the handler hands the validator's own detail through unrebuilt, and the
 	// writer conforms the sentence on its way to the wire (#213, #435).
-	answered, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	answered, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
 	assert.Same(t, reuse.Detail, answered)
-	assert.Equal(t, http.StatusBadRequest, answered.GetHttpStatusCode())
-	assert.Equal(t, "invalid_grant", answered.GetCode())
-	assert.Equal(t, "Code is invalid.", answered.GetDescription())
+	assert.Equal(t, http.StatusBadRequest, answered.HTTPStatus())
+	assert.Equal(t, "invalid_grant", answered.Code())
+	assert.Equal(t, "Code is invalid.", answered.Description())
 	database.AssertExpectations(t)
 }

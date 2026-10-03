@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/boundedread"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -100,8 +99,8 @@ func newTokenEndpointError(statusCode int, body []byte) error {
 	}
 	return errs.WithStack(&TokenEndpointError{
 		StatusCode:       statusCode,
-		ErrorCode:        customerrors.ConformErrorDescription(answer.Error),
-		ErrorDescription: customerrors.ConformErrorDescription(answer.ErrorDescription),
+		ErrorCode:        oauth.ConformErrorDescription(answer.Error),
+		ErrorDescription: oauth.ConformErrorDescription(answer.ErrorDescription),
 	})
 }
 

@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // invalidGenerationMessage is returned when a refresh token's authentication generation
@@ -69,13 +69,13 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	}
 
 	if len(input.RefreshToken) == 0 {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required refresh_token parameter.", http.StatusBadRequest)
 	}
 
 	refreshTokenInfo, err := val.tokenParser.DecodeAndValidateTokenString(ctx, input.RefreshToken, true)
 	if err != nil {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The refresh token is invalid ("+err.Error()+").",
 			http.StatusBadRequest)
 	}
@@ -102,7 +102,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		// The message stays generic and does NOT say the row was missing. A caller
 		// cannot be told apart from an attacker here, and distinguishing "no such row"
 		// from "revoked" would confirm which JTIs were ever issued.
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidRefreshTokenMessage, http.StatusBadRequest)
 	}
 
@@ -149,7 +149,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	}
 
 	if tokenClientId != client.Id {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
 	}
 
@@ -171,7 +171,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// preserved session's tokens to the new generation while their codes stay on the old one, so
 	// reading the code here would reject exactly the tokens #106 decision 4 exists to keep working.
 	if refreshToken.AuthStateGeneration != tokenUser.AuthStateGeneration {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidGenerationMessage, http.StatusBadRequest)
 	}
 
@@ -182,7 +182,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// new family records the instant (#125). After the ownership check, so another client
 	// presenting it learns nothing about the token beyond that it is not theirs.
 	if isROPCToken && !refreshToken.AuthenticatedAt.Valid {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidRefreshTokenMessage, http.StatusBadRequest)
 	}
 
@@ -207,7 +207,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// Placed after the ownership check above so an unauthenticated presenter of someone
 	// else's token cannot learn from it that a session was ended (decision 7).
 	if !isROPCToken && refreshToken.Code.Revoked {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidTokenMessage, http.StatusBadRequest)
 	}
 
@@ -228,7 +228,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// unauthenticated presenter of someone else's token learns nothing from it.
 	if !isROPCToken && client.IsPublic &&
 		(!refreshToken.Code.CodeChallenge.Valid || refreshToken.Code.CodeChallenge.String == "") {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"This refresh token descends from an authorization code issued without PKCE, and public clients are required to use PKCE.",
 			http.StatusBadRequest)
 	}
@@ -259,7 +259,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			return nil, familyErr
 		}
 		if familyRevoked {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 				invalidRefreshTokenMessage, http.StatusBadRequest)
 		}
 	}
@@ -275,12 +275,12 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			return nil, getUserSessionErr
 		}
 		if userSession == nil {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", invalidTokenMessage,
 				http.StatusBadRequest)
 		}
 		isSessionValid := userSession.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
 		if !isSessionValid {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", invalidTokenMessage,
 				http.StatusBadRequest)
 		}
 
@@ -297,7 +297,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		// both ways a session stops backing a grant, and a third wording here would tell
 		// a presenter that the session exists and belongs to someone else.
 		if userSession.UserId != tokenUserId {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", invalidTokenMessage,
 				http.StatusBadRequest)
 		}
 	case issuance.TokenTypeOffline.String():
@@ -310,7 +310,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			return nil, errs.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim")
 		}
 		if time.Now().UTC().After(maxLifetime) {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 				"The refresh token is invalid because it has expired (offline_access_max_lifetime).",
 				http.StatusBadRequest)
 		}
@@ -344,7 +344,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 				return nil, getUserSessionErr
 			}
 			if codeSession != nil && codeSession.UserId != tokenUserId {
-				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 					invalidTokenMessage, http.StatusBadRequest)
 			}
 		}
@@ -364,7 +364,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			// reference has always documented. It answered invalid_grant until #425. The
 			// token is not spent, so the client can ask again within its grant.
 			if !slices.Contains(scopesFromOriginal, inputScopeStr) {
-				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 					fmt.Sprintf("Scope '%v' is not recognized. The original access token does not grant the '%v' permission.", inputScopeStr, inputScopeStr),
 					http.StatusBadRequest)
 			}
@@ -412,7 +412,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		}
 		if consent == nil {
 			return nil,
-				customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+				oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 					"The user has either not given consent to this client or the previously granted consent has been revoked.",
 					http.StatusBadRequest)
 		}
@@ -443,7 +443,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		// `scope` to leave the value out still refreshes.
 		if !oidc.IsClaimScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) &&
 			!permissions.IsResourceScope(inputScopeStr) {
-			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 				fmt.Sprintf("Scope '%v' is not recognized. It is not a scope this server issues.", inputScopeStr),
 				http.StatusBadRequest)
 		}
@@ -460,7 +460,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 
 			if !consentScopeExists {
 				return nil,
-					customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 						fmt.Sprintf("Scope '%v' is not recognized. The user has not consented to the '%v' permission.", inputScopeStr, inputScopeStr),
 						http.StatusBadRequest)
 			}
@@ -475,7 +475,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			}
 			if !userHasPermission {
 				return nil,
-					customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 						fmt.Sprintf("Scope '%v' is not recognized. The user does not have the '%v' permission.", inputScopeStr, inputScopeStr),
 						http.StatusBadRequest)
 			}

@@ -21,9 +21,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -89,7 +89,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		expectedError := &customerrors.ErrorDetail{} // Create an appropriate error
+		expectedError := &oauth.ErrorDetail{} // Create an appropriate error
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {

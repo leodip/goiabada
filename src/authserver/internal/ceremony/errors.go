@@ -1,6 +1,6 @@
 package ceremony
 
-import "github.com/leodip/goiabada/core/customerrors"
+import "github.com/leodip/goiabada/core/oauth"
 
 // ErrNoAuthContext is returned by GetAuthContext when the request's session holds no
 // authorization ceremony. It is returned by identity, so errors.Is matches it by pointer as well
@@ -9,4 +9,4 @@ import "github.com/leodip/goiabada/core/customerrors"
 // It declares the auth server's own failure: the admin console has no authorization ceremony and
 // never reads one, which is why #385 moved it out of core/customerrors, and #435 moved it with the
 // Store that returns it.
-var ErrNoAuthContext = customerrors.NewErrorDetail("no_auth_context", "no auth context in session")
+var ErrNoAuthContext = oauth.NewErrorDetail("no_auth_context", "no auth context in session")

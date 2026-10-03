@@ -20,10 +20,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 
 	"github.com/leodip/goiabada/core/logging/logtest"
 
@@ -147,7 +147,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
 
-		emailValidator.On("ValidateEmailAddress", "invalid-email").Return(customerrors.NewErrorDetail("", "Please enter a valid email address."))
+		emailValidator.On("ValidateEmailAddress", "invalid-email").Return(oauth.NewErrorDetail("", "Please enter a valid email address."))
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -479,7 +479,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
-		passwordValidator.On("ValidatePassword", mock.Anything, "short").Return(customerrors.NewErrorDetail("", "The minimum length for the password is 8 characters"))
+		passwordValidator.On("ValidatePassword", mock.Anything, "short").Return(oauth.NewErrorDetail("", "The minimum length for the password is 8 characters"))
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -783,7 +783,7 @@ func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing
 	}{
 		{
 			name: "a wrapped ErrorDetail",
-			err: errs.Wrap(customerrors.NewErrorDetail("", "Please enter a valid email address."),
+			err: errs.Wrap(oauth.NewErrorDetail("", "Please enter a valid email address."),
 				"validating the email address"),
 			want: "Please enter a valid email address.",
 		},

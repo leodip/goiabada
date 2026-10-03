@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	const redirectURI = "https://legit.example/cb"
 	const sessionIdentifier = "session-243"
 
-	maxAgeRefusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+	maxAgeRefusal := oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 		"The max_age parameter must be a non-negative integer.", http.StatusBadRequest)
 
 	type fixture struct {
@@ -106,7 +106,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "legit.example", location.Host)
 		assert.Equal(t, "invalid_request", location.Query().Get("error"))
-		assert.Equal(t, maxAgeRefusal.GetDescription(), location.Query().Get("error_description"))
+		assert.Equal(t, maxAgeRefusal.Description(), location.Query().Get("error_description"))
 		assert.Equal(t, "s1", location.Query().Get("state"))
 		assert.Nil(t, f.saved, "a request answered at once writes no auth context")
 	})
@@ -142,7 +142,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		require.NotNil(t, f.saved)
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, f.saved.AuthState)
 		assert.Equal(t, "invalid_request", f.saved.DeferredErrorCode)
-		assert.Equal(t, maxAgeRefusal.GetDescription(), f.saved.DeferredErrorDescription)
+		assert.Equal(t, maxAgeRefusal.Description(), f.saved.DeferredErrorDescription)
 		assert.Equal(t, "abc", f.saved.MaxAge, "the raw value stays on the context, as its wire shape requires")
 	})
 

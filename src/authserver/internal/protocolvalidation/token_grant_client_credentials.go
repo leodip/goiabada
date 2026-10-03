@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // ClientCredentialsGrant is a validated client credentials request: the authenticated client and
@@ -26,13 +26,13 @@ func (*ClientCredentialsGrant) GrantType() oidc.GrantType { return oidc.GrantTyp
 func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, client *models.Client,
 	input *ValidateTokenRequestInput) (*ClientCredentialsGrant, error) {
 	if !client.ClientCredentialsEnabled {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			"The client associated with the provided client_id does not support client credentials flow.",
 			http.StatusBadRequest)
 	}
 
 	if client.IsPublic {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			"A public client is not eligible for the client credentials flow. Please review the client configuration.",
 			http.StatusBadRequest)
 	}
@@ -110,7 +110,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 	for _, scopeStr := range oidc.SplitScope(scope) {
 
 		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				fmt.Sprintf("Id token scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr),
 				http.StatusBadRequest)
 		}
@@ -122,15 +122,15 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 
 		switch resolution.Outcome {
 		case permissions.ScopeMalformed:
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr),
 				http.StatusBadRequest)
 		case permissions.ScopeResourceUnknown:
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resolution.ResourceIdentifier),
 				http.StatusBadRequest)
 		case permissions.ScopePermissionUnknown:
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, resolution.ResourceIdentifier, resolution.PermissionIdentifier),
 				http.StatusBadRequest)
 		}
@@ -154,7 +154,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 		}
 
 		if !clientHasPermission {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Permission to access scope '%v' is not granted to the client.", scopeStr),
 				http.StatusBadRequest)
 		}

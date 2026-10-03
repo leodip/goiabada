@@ -19,8 +19,8 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The account picture page dropped a failed picture read and drew the account as having no
@@ -224,7 +224,7 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 			httpHelper.AssertExpectations(t)
 			require.NotNil(t, captured, "the handler answered nothing")
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
 					"expected JsonError's generic 500 arm, got a status-carrying %v", captured)
@@ -232,8 +232,8 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 			}
 			require.True(t, errors.As(captured, &detail),
 				"expected an *ErrorDetail carrying a status, got %v", captured)
-			assert.Equal(t, testCase.wantStatus, detail.GetHttpStatusCode())
-			assert.Equal(t, testCase.wantCode, detail.GetCode())
+			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
+			assert.Equal(t, testCase.wantCode, detail.Code())
 		})
 	}
 }
@@ -283,9 +283,9 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 	t.Run("one byte short it is the JSON 400 and nothing is forwarded", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			var detail *customerrors.ErrorDetail
-			return errors.As(err, &detail) && detail.GetCode() == "invalid_request_body" &&
-				detail.GetHttpStatusCode() == http.StatusBadRequest
+			var detail *oauth.ErrorDetail
+			return errors.As(err, &detail) && detail.Code() == "invalid_request_body" &&
+				detail.HTTPStatus() == http.StatusBadRequest
 		})).Return().Once()
 		apiClient := &uploadRecorder{}
 
@@ -344,7 +344,7 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 			httpHelper.AssertExpectations(t)
 			require.NotNil(t, captured, "the handler answered nothing")
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
 					"expected JsonError's generic 500 arm, got a status-carrying %v", captured)
@@ -352,7 +352,7 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 			}
 			require.True(t, errors.As(captured, &detail),
 				"expected an *ErrorDetail carrying a status, got %v", captured)
-			assert.Equal(t, testCase.wantStatus, detail.GetHttpStatusCode())
+			assert.Equal(t, testCase.wantStatus, detail.HTTPStatus())
 		})
 	}
 }

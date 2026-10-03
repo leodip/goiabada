@@ -955,7 +955,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 // still names the scope that was refused (#213).
 //
 // Thin on purpose: the character set is owned by TestConformErrorDescription in
-// src/core/customerrors, and what is left here is that the filter is on this wire path.
+// src/core/oauth, and what is left here is that the filter is on this wire path.
 //
 // It drives an authenticated browser where its neighbours in this file are cookieless. That changes
 // nothing today, since the validations run above the session lookup, and it keeps the case correct

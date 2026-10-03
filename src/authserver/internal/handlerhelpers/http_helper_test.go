@@ -16,7 +16,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -337,7 +337,7 @@ func TestJsonError(t *testing.T) {
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
-	err := customerrors.NewErrorDetail("test_error", "Test error description")
+	err := oauth.NewErrorDetail("test_error", "Test error description")
 	httpHelper.JsonError(w, req, err)
 
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))

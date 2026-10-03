@@ -3,7 +3,7 @@ package protocolvalidation
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // RFC 7636 section 4.1 defines code_verifier as 43*128unreserved and section 4.2 defines
@@ -48,7 +48,7 @@ const pkceCharsetText = "A-Z, a-z, 0-9, '-', '.', '_' and '~'"
 // outside RFC 7636 section 4.2's set, at the authorization endpoint: invalid_request, as the length
 // refusals beside it are.
 func codeChallengeCharsetRefusal() error {
-	return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+	return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 		"The code_challenge parameter is incorrect. It may only contain "+pkceCharsetText+".",
 		http.StatusBadRequest)
 }
@@ -57,7 +57,7 @@ func codeChallengeCharsetRefusal() error {
 // section 4.1's set, at the token endpoint. RFC 7636 section 4.6 answers a verifier that cannot
 // match with invalid_grant, and a value that is not a verifier at all cannot.
 func codeVerifierMalformedRefusal() error {
-	return customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+	return oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 		"The code_verifier parameter is incorrect. It should be 43 to 128 characters long and may only contain "+pkceCharsetText+".",
 		http.StatusBadRequest)
 }

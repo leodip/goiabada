@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -346,7 +345,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(
-			customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				"Implicit flow does not support response_mode=query. Use response_mode=fragment (the default for implicit flow) or response_mode=form_post.",
 				http.StatusBadRequest))
 
@@ -461,7 +460,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		validationError := customerrors.NewErrorDetail("", "Invalid response type")
+		validationError := oauth.NewErrorDetail("", "Invalid response type")
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(validationError)
 
 		handler.ServeHTTP(rr, req)
@@ -520,7 +519,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		validationError := customerrors.NewErrorDetail("", "Invalid scope")
+		validationError := oauth.NewErrorDetail("", "Invalid scope")
 		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(validationError)
 
 		handler.ServeHTTP(rr, req)
@@ -575,7 +574,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(oauth.NewErrorDetail("", "Invalid scope"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -643,7 +642,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(oauth.NewErrorDetail("", "Invalid scope"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -704,7 +703,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(oauth.NewErrorDetail("", "Invalid scope"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -1015,7 +1014,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		validationError := customerrors.NewErrorDetail("invalid_request", "Invalid response type")
+		validationError := oauth.NewErrorDetail("invalid_request", "Invalid response type")
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(validationError)
 
 		handler.ServeHTTP(rr, req)
@@ -2316,7 +2315,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// Validator returns error because implicit flow is disabled
-		validationError := customerrors.NewErrorDetail("unauthorized_client", "This client is not authorized for the implicit grant flow.")
+		validationError := oauth.NewErrorDetail("unauthorized_client", "This client is not authorized for the implicit grant flow.")
 		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *protocolvalidation.ValidateRequestInput) bool {
 			return input.ResponseType == "token" && input.ImplicitGrantEnabled == false
 		})).Return(validationError)
@@ -2438,11 +2437,11 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 				return
 			}
 			assert.Empty(t, sub)
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Equal(t, "The id_token_hint is invalid.", detail.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Equal(t, "The id_token_hint is invalid.", detail.Description())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 		})
 	}
 }
@@ -3592,7 +3591,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		// validator's error is dispatched (#108).
 		stubClientProvenanceLookup(database)
 
-		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
+		validationError := oauth.NewErrorDetailWithHTTPStatus("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) bool {
 			return input.HasRequest == true && input.HasRequestURI == false
 		})).Return(validationError)
@@ -3641,7 +3640,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		// validator's error is dispatched (#108).
 		stubClientProvenanceLookup(database)
 
-		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_uri_not_supported", "The request_uri parameter is not supported.", http.StatusBadRequest)
+		validationError := oauth.NewErrorDetailWithHTTPStatus("request_uri_not_supported", "The request_uri parameter is not supported.", http.StatusBadRequest)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) bool {
 			return input.HasRequest == false && input.HasRequestURI == true
 		})).Return(validationError)
@@ -3689,7 +3688,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		// validator's error is dispatched (#108).
 		stubClientProvenanceLookup(database)
 
-		validationError := customerrors.NewErrorDetailWithHttpStatusCode("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
+		validationError := oauth.NewErrorDetailWithHTTPStatus("request_not_supported", "The request parameter is not supported.", http.StatusBadRequest)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.MatchedBy(func(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) bool {
 			return input.HasRequest == true
 		})).Return(validationError)
@@ -3877,7 +3876,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			authorizeValidator.On("ValidateRequest",
 				mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid bogus").Return(
-				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
 
 			// Maybe, for the reason the session lookup below is Maybe: the registration read is
@@ -4001,7 +4000,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			authorizeValidator.On("ValidateRequest",
 				mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil).Maybe()
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid bogus").Return(
-				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest)).Maybe()
 
 			lookupErr := errors.New("the session store is unreachable")
@@ -4087,7 +4086,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	authorizeValidator.On("ValidateRequest",
 		mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 	authorizeValidator.On("ValidateScopes", mock.Anything, "openid 💣").Return(
-		customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+		oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 			"Invalid scope format: '💣'.", http.StatusBadRequest))
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
@@ -4190,7 +4189,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			authorizeValidator.On("ValidateRequest",
 				mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid bogus").Return(
-				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+				oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
 
 			// Strictly sequential, which is the whole fixture: the first read is consumed .Once()

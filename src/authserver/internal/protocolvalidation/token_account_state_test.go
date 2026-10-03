@@ -16,7 +16,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -45,11 +44,11 @@ type wantRefusal struct {
 func assertRefusal(t *testing.T, err error, want wantRefusal) {
 	t.Helper()
 
-	var detail *customerrors.ErrorDetail
+	var detail *oauth.ErrorDetail
 	require.ErrorAs(t, err, &detail)
-	assert.Equal(t, want.code, detail.GetCode())
-	assert.Equal(t, want.description, detail.GetDescription())
-	assert.Equal(t, want.status, detail.GetHttpStatusCode())
+	assert.Equal(t, want.code, detail.Code())
+	assert.Equal(t, want.description, detail.Description())
+	assert.Equal(t, want.status, detail.HTTPStatus())
 
 	var disabled *UserDisabledError
 	assert.Equal(t, want.userDisabled, errors.As(err, &disabled),

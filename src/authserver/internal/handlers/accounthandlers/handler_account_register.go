@@ -18,9 +18,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
@@ -156,12 +156,12 @@ func HandleAccountRegisterPost(
 			// to default and answer a 500 page rather than redrawing the form with the reason
 			// (#279 decision 6).
 			var localizedErr *i18n.LocalizedError
-			var errorDetail *customerrors.ErrorDetail
+			var errorDetail *oauth.ErrorDetail
 			switch {
 			case errors.As(err, &localizedErr):
 				renderError(localizedErr.Localize(r.Context()))
 			case errors.As(err, &errorDetail):
-				renderError(errorDetail.GetDescription())
+				renderError(errorDetail.Description())
 			default:
 				pageRenderer.InternalServerError(w, r, err)
 			}

@@ -9,7 +9,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -66,11 +65,11 @@ func TestValidateTokenRequest(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, "Missing required client_id parameter.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required client_id parameter.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Client does not exist", func(t *testing.T) {
@@ -87,12 +86,12 @@ func TestValidateTokenRequest(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "Client does not exist.", customErr.GetDescription())
-		assert.Equal(t, 401, customErr.GetHttpStatusCode())
-		assert.Equal(t, `Basic realm="goiabada"`, customErr.GetWWWAuthenticate())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "Client does not exist.", customErr.Description())
+		assert.Equal(t, 401, customErr.HTTPStatus())
+		assert.Equal(t, `Basic realm="goiabada"`, customErr.WWWAuthenticate())
 	})
 
 	t.Run("Client is disabled", func(t *testing.T) {
@@ -114,12 +113,12 @@ func TestValidateTokenRequest(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "Client is disabled.", customErr.GetDescription())
-		assert.Equal(t, 401, customErr.GetHttpStatusCode())
-		assert.Equal(t, `Basic realm="goiabada"`, customErr.GetWWWAuthenticate())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "Client is disabled.", customErr.Description())
+		assert.Equal(t, 401, customErr.HTTPStatus())
+		assert.Equal(t, `Basic realm="goiabada"`, customErr.WWWAuthenticate())
 	})
 
 	// The rows below consult oidc's grant table through the exported method; the table's own rows
@@ -135,11 +134,11 @@ func TestValidateTokenRequest(t *testing.T) {
 			result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, input)
 
 			assert.Nil(t, result)
-			var customErr *customerrors.ErrorDetail
+			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)
-			assert.Equal(t, "unsupported_grant_type", customErr.GetCode())
-			assert.Equal(t, "Unsupported grant_type.", customErr.GetDescription())
-			assert.Equal(t, 400, customErr.GetHttpStatusCode())
+			assert.Equal(t, "unsupported_grant_type", customErr.Code())
+			assert.Equal(t, "Unsupported grant_type.", customErr.Description())
+			assert.Equal(t, 400, customErr.HTTPStatus())
 		})
 	}
 
@@ -154,9 +153,9 @@ func TestValidateTokenRequest(t *testing.T) {
 			result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, input)
 
 			assert.Nil(t, result)
-			var customErr *customerrors.ErrorDetail
+			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)
-			assert.NotEqual(t, "unsupported_grant_type", customErr.GetCode())
+			assert.NotEqual(t, "unsupported_grant_type", customErr.Code())
 		})
 	}
 
@@ -168,10 +167,10 @@ func TestValidateTokenRequest(t *testing.T) {
 		result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, input)
 
 		assert.Nil(t, result)
-		var customErr *customerrors.ErrorDetail
+		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, "Missing required client_id parameter.", customErr.GetDescription())
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required client_id parameter.", customErr.Description())
 	})
 }
 
@@ -250,9 +249,9 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					return
 				}
 				assert.Nil(t, result)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-					assert.Equal(t, "invalid_grant", customErr.GetCode())
+				customErr, ok := err.(*oauth.ErrorDetail)
+				if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+					assert.Equal(t, "invalid_grant", customErr.Code())
 				}
 			})
 		}
@@ -348,9 +347,9 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					return
 				}
 				assert.Nil(t, result)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-					assert.Equal(t, "invalid_grant", customErr.GetCode())
+				customErr, ok := err.(*oauth.ErrorDetail)
+				if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+					assert.Equal(t, "invalid_grant", customErr.Code())
 				}
 			})
 		}
@@ -419,9 +418,9 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					return
 				}
 				assert.Nil(t, result)
-				customErr, ok := err.(*customerrors.ErrorDetail)
-				if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-					assert.Equal(t, "invalid_grant", customErr.GetCode())
+				customErr, ok := err.(*oauth.ErrorDetail)
+				if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+					assert.Equal(t, "invalid_grant", customErr.Code())
 				}
 			})
 		}
@@ -490,12 +489,12 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*customerrors.ErrorDetail)
-			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-				assert.Equal(t, "invalid_grant", customErr.GetCode())
+			customErr, ok := err.(*oauth.ErrorDetail)
+			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_grant", customErr.Code())
 				// Generic on purpose: the message must not tell a caller that the session was
 				// terminated, which is the disclosure position the neighbouring checks take.
-				assert.Equal(t, "Code is invalid.", customErr.GetDescription())
+				assert.Equal(t, "Code is invalid.", customErr.Description())
 			}
 		})
 
@@ -575,11 +574,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*customerrors.ErrorDetail)
-			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+			customErr, ok := err.(*oauth.ErrorDetail)
+			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				// PKCE, not the revoked check. If this reads "Code is invalid." the revoked
 				// check has moved ahead of PKCE, which is what decision 7 forbids.
-				assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
+				assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.Description())
 			}
 		})
 
@@ -620,11 +619,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*customerrors.ErrorDetail)
-			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+			customErr, ok := err.(*oauth.ErrorDetail)
+			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 				// Client authentication, not the revoked check. An unauthenticated presenter
 				// of a stolen code must not learn that its session was terminated.
-				assert.Equal(t, "invalid_client", customErr.GetCode())
+				assert.Equal(t, "invalid_client", customErr.Code())
 			}
 		})
 
@@ -673,11 +672,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*customerrors.ErrorDetail)
-			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-				assert.Equal(t, "invalid_client", customErr.GetCode())
+			customErr, ok := err.(*oauth.ErrorDetail)
+			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_client", customErr.Code())
 				assert.Equal(t, "Client authentication failed. Please review your client_secret.",
-					customErr.GetDescription())
+					customErr.Description())
 			}
 		})
 
@@ -794,9 +793,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*customerrors.ErrorDetail)
-			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-				assert.Equal(t, "invalid_grant", customErr.GetCode())
+			customErr, ok := err.(*oauth.ErrorDetail)
+			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_grant", customErr.Code())
 			}
 		})
 
@@ -864,11 +863,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			customErr, ok := err.(*customerrors.ErrorDetail)
-			if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-				assert.Equal(t, "invalid_request", customErr.GetCode())
+			customErr, ok := err.(*oauth.ErrorDetail)
+			if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+				assert.Equal(t, "invalid_request", customErr.Code())
 				assert.Equal(t, "The refresh token is invalid because it does not belong to the client.",
-					customErr.GetDescription())
+					customErr.Description())
 			}
 		})
 	})

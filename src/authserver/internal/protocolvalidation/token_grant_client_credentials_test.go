@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -45,11 +45,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "unauthorized_client", customErr.GetCode())
-		assert.Equal(t, "The client associated with the provided client_id does not support client credentials flow.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "unauthorized_client", customErr.Code())
+		assert.Equal(t, "The client associated with the provided client_id does not support client credentials flow.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Public client not eligible for client credentials", func(t *testing.T) {
@@ -72,11 +72,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "unauthorized_client", customErr.GetCode())
-		assert.Equal(t, "A public client is not eligible for the client credentials flow. Please review the client configuration.", customErr.GetDescription())
-		assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		assert.Equal(t, "unauthorized_client", customErr.Code())
+		assert.Equal(t, "A public client is not eligible for the client credentials flow. Please review the client configuration.", customErr.Description())
+		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
 
 	t.Run("Missing client secret", func(t *testing.T) {
@@ -99,12 +99,12 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for missing client credentials
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.GetDescription())
-		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.Description())
+		assert.Equal(t, http.StatusUnauthorized, customErr.HTTPStatus())
 	})
 
 	t.Run("Valid client credentials request", func(t *testing.T) {
@@ -184,10 +184,10 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.GetDescription())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.Description())
 	})
 
 	t.Run("Valid scope", func(t *testing.T) {
@@ -272,10 +272,10 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_scope", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "Invalid scope format")
+		assert.Equal(t, "invalid_scope", customErr.Code())
+		assert.Contains(t, customErr.Description(), "Invalid scope format")
 	})
 
 	t.Run("Scope not granted to client", func(t *testing.T) {
@@ -316,10 +316,10 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_scope", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "Permission to access scope 'resource:read' is not granted to the client")
+		assert.Equal(t, "invalid_scope", customErr.Code())
+		assert.Contains(t, customErr.Description(), "Permission to access scope 'resource:read' is not granted to the client")
 	})
 
 	t.Run("ID token scope in client credentials", func(t *testing.T) {
@@ -357,10 +357,10 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "Id token scopes (such as 'openid') are not supported in the client credentials flow")
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Contains(t, customErr.Description(), "Id token scopes (such as 'openid') are not supported in the client credentials flow")
 	})
 
 	t.Run("Non-existent resource in scope", func(t *testing.T) {
@@ -399,10 +399,10 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_scope", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "Could not find a resource with identifier 'non_existent_resource'")
+		assert.Equal(t, "invalid_scope", customErr.Code())
+		assert.Contains(t, customErr.Description(), "Could not find a resource with identifier 'non_existent_resource'")
 	})
 
 	t.Run("Non-existent permission in scope", func(t *testing.T) {
@@ -442,10 +442,10 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_scope", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "The resource identified by 'resource' doesn't grant the 'non_existent_permission' permission")
+		assert.Equal(t, "invalid_scope", customErr.Code())
+		assert.Contains(t, customErr.Description(), "The resource identified by 'resource' doesn't grant the 'non_existent_permission' permission")
 	})
 
 	t.Run("Multiple valid scopes", func(t *testing.T) {
@@ -582,12 +582,12 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		}
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*customerrors.ErrorDetail)
-		if !assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
+		customErr, ok := err.(*oauth.ErrorDetail)
+		if !assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
 			return
 		}
-		assert.Equal(t, wantCode, customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), wantDesc)
+		assert.Equal(t, wantCode, customErr.Code())
+		assert.Contains(t, customErr.Description(), wantDesc)
 	}
 
 	ownershipCases := []struct {
@@ -841,7 +841,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 			assert.Nil(t, result)
 			assert.EqualError(t, err, "database is down")
-			_, isErrorDetail := err.(*customerrors.ErrorDetail)
+			_, isErrorDetail := err.(*oauth.ErrorDetail)
 			assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 		})
 	}
