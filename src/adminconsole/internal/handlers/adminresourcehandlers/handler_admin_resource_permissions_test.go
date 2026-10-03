@@ -14,8 +14,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // The permission form asks this endpoint whether a value is acceptable before it saves, and the
@@ -42,7 +42,7 @@ func validatePermissionResponse(t *testing.T, identifier string, description str
 
 	handler := HandleAdminResourceValidatePermissionPost(
 		handlerhelpers.NewHttpHelper(nil),
-		validators.NewIdentifierValidator(),
+		inputvalidation.NewIdentifierValidator(),
 	)
 	handler.ServeHTTP(rec, req)
 
@@ -88,7 +88,7 @@ func TestValidatePermissionPost_DescriptionAngleBrackets(t *testing.T) {
 	}
 }
 
-// The identifier reached ValidateIdentifier sanitized, so "valid<b" arrived as "valid" and this
+// The identifier reached IdentifierValidator.Validate sanitized, so "valid<b" arrived as "valid" and this
 // endpoint reported a well-formed identifier the user had not typed. It is now checked raw.
 func TestValidatePermissionPost_TheIdentifierIsValidatedRaw(t *testing.T) {
 	invalidFormat := i18n.NewLocalizedError(i18n.ErrCodeIdentifierInvalidFormat, nil).Localize(context.Background())
@@ -105,7 +105,7 @@ func TestValidatePermissionPost_TheIdentifierIsValidatedRaw(t *testing.T) {
 // it, which is the one thing the type switch this replaced could not see through.
 type wrappingIdentifierValidator struct{ err error }
 
-func (v *wrappingIdentifierValidator) ValidateIdentifier(identifier string, enforceMinLength bool) error {
+func (v *wrappingIdentifierValidator) Validate(identifier string, enforceMinLength bool) error {
 	return v.err
 }
 

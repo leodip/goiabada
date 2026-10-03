@@ -797,7 +797,7 @@ func uniqueEmail(addr string) string {
 	if !found {
 		panic("uniqueEmail: " + addr + " is not an address")
 	}
-	// The API rejects an address over 60 bytes (validators.email_validator), and
+	// The API rejects an address over 60 bytes (accountvalidation.EmailValidator), and
 	// fixtures reach that endpoint, so the run added here is short and the
 	// longest address in the tier stays well inside the limit.
 	return local + "-" + strings.ToLower(fake.LetterN(8)) + "@" + domain

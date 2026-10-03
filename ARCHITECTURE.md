@@ -103,6 +103,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/hashutil` | kernel | — |
 | `core/hostport` | kernel | — |
 | `core/i18n` | kernel | — |
+| `core/inputvalidation` | kernel | — |
 | `core/internal` | kernel | — |
 | `core/locales` | kernel | — |
 | `core/localzone` | kernel | — |
@@ -113,7 +114,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/sessionstore` | kernel | — |
 | `core/testutil` | kernel | — |
 | `core/timezones` | kernel | — |
-| `core/validators` | kernel | — |
 
 Notes on rows that are not self-evident:
 
@@ -349,10 +349,11 @@ closed the other, `core/oauth`, and the rows stayed `yes`, which is why the tabl
 reachability rather than counting edges.
 
 **#344 severed that edge, and the five rows above are `no` because of it.** It moved the seven
-validators that touch a database or a country table to the auth server and left `core/validators`
-holding `identifier_validator.go` and `angle_brackets_validator.go`, which import `strings`,
-`regexp` and `core/i18n`. Ninety packages left the admin console's production closure with them,
-including `core/data`, all four drivers and `go-sqlbuilder`.
+validators that touch a database or a country table to the auth server and left `core/validators`,
+`core/inputvalidation` since #442, holding `identifier_validator.go` and
+`angle_brackets_validator.go`, which import `strings`, `regexp` and `core/i18n`. Ninety packages
+left the admin console's production closure with them, including `core/data`, all four drivers and
+`go-sqlbuilder`.
 
 These rows read #353 until then, on the argument that `core/data/database.go` was the only
 production file in `core` importing an engine package and so the single cut point; #353 made that

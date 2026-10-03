@@ -1,4 +1,4 @@
-package validators
+package inputvalidation
 
 import (
 	"strings"
@@ -21,7 +21,7 @@ const (
 		"consecutive dashes or underscores."
 )
 
-func TestValidateIdentifier(t *testing.T) {
+func TestIdentifierValidator_Validate(t *testing.T) {
 	validator := NewIdentifierValidator()
 
 	tests := []struct {
@@ -64,7 +64,7 @@ func TestValidateIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateIdentifier(tt.identifier, tt.enforceMinLength)
+			err := validator.Validate(tt.identifier, tt.enforceMinLength)
 			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
@@ -83,7 +83,7 @@ func TestValidateIdentifier(t *testing.T) {
 	}
 }
 
-func TestValidateIdentifierEdgeCases(t *testing.T) {
+func TestIdentifierValidator_ValidateEdgeCases(t *testing.T) {
 	validator := NewIdentifierValidator()
 
 	tests := []struct {
@@ -111,7 +111,7 @@ func TestValidateIdentifierEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.ValidateIdentifier(tt.identifier, tt.enforceMinLength)
+			err := validator.Validate(tt.identifier, tt.enforceMinLength)
 			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {

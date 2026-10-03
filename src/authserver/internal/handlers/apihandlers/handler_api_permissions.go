@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // permissionsDatabase is what the permission endpoints need: the resource that owns a permission
@@ -81,7 +81,7 @@ func HandleAPIPermissionsByResourceGet(
 // Replaces the full set of permission definitions for a resource.
 func HandleAPIResourcePermissionsPut(
 	database permissionsDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -146,14 +146,14 @@ func HandleAPIResourcePermissionsPut(
 
 			// The identifier is validated as it was sent, trimmed and nothing else. It used to be
 			// run through the HTML sanitizer first, which meant "valid<b" was stored as "valid":
-			// the sanitizer dropped everything from the "<" onwards and ValidateIdentifier then
+			// the sanitizer dropped everything from the "<" onwards and IdentifierValidator.Validate then
 			// saw a name the caller never asked for. It is now refused instead (#275).
 			if len(rawIdentifier) == 0 {
 				writeJSONError(w, "Permission identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
-			if validateIdentifierErr := identifierValidator.ValidateIdentifier(rawIdentifier, true); validateIdentifierErr != nil {
+			if validateIdentifierErr := identifierValidator.Validate(rawIdentifier, true); validateIdentifierErr != nil {
 				writeValidationError(w, r, validateIdentifierErr)
 				return
 			}

@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 func (s *Server) initRoutes(root chi.Router) {
@@ -37,7 +37,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	tokenParser := oauthclient.NewJWKSTokenParser(authBase, s.authServerHTTPClient, builtin.AdminConsoleClientIdentifier, middleware.SettingsReader{})
 	tokenClient := s.tokenClient
 
-	identifierValidator := validators.NewIdentifierValidator()
+	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := oauthclient.NewAuthHelper(s.sessionStore, builtin.AdminConsoleSessionName, baseURL, s.cfg.AuthServer.BaseURL)

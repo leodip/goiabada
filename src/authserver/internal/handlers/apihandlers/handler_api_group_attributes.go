@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // groupAttributesDatabase is what the group attribute endpoints need: the group and the
@@ -122,7 +122,7 @@ func HandleAPIGroupAttributeGet(
 
 func HandleAPIGroupAttributeCreatePost(
 	database groupAttributesDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
@@ -147,7 +147,7 @@ func HandleAPIGroupAttributeCreatePost(
 		}
 
 		// Validate key format
-		err = identifierValidator.ValidateIdentifier(createReq.Key, false)
+		err = identifierValidator.Validate(createReq.Key, false)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -210,7 +210,7 @@ func HandleAPIGroupAttributeCreatePost(
 
 func HandleAPIGroupAttributeUpdatePut(
 	database groupAttributesDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
@@ -258,7 +258,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		}
 
 		// Validate key format
-		err = identifierValidator.ValidateIdentifier(updateReq.Key, false)
+		err = identifierValidator.Validate(updateReq.Key, false)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return

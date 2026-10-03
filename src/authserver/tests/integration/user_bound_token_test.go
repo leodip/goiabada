@@ -30,7 +30,7 @@ import (
 // carry it, across every issuance path.
 
 // newUserSubjectValidAsClientIdentifier returns a UUID that also satisfies
-// ValidateIdentifier, so a client can genuinely be created with this string as its
+// IdentifierValidator.Validate, so a client can genuinely be created with this string as its
 // identifier through the admin API rather than only by direct database insert.
 //
 // The identifier regex is ^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$ with a 38 character

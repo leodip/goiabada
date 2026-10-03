@@ -8,7 +8,7 @@ import (
 )
 
 // ValidateNoAngleBrackets is the error half of a rule core still owns: it asks
-// validators.ContainsAngleBrackets and turns a true into a localized refusal.
+// inputvalidation.ContainsAngleBrackets and turns a true into a localized refusal.
 // The exhaustive table for the two characters is core's, beside the predicate;
 // what is tested here is the wrapping (#385 decision 17).
 func TestValidateNoAngleBrackets_AcceptsAValueWithoutThem(t *testing.T) {

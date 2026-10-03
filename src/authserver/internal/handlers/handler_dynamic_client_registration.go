@@ -20,9 +20,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/securerandom"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // dynamicClientRegistrationDatabase is what RFC 7591 registration needs: the client and redirect
@@ -247,7 +247,7 @@ func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 	// 3.2.2 defines invalid_client_metadata for a rejected metadata value, and the caller
 	// answers with it. The message is English like the handler's other refusals: DCR errors
 	// are protocol responses and are not localized.
-	if validators.ContainsAngleBrackets(req.ClientName) {
+	if inputvalidation.ContainsAngleBrackets(req.ClientName) {
 		return errs.Errorf("client_name cannot contain the characters < or >")
 	}
 

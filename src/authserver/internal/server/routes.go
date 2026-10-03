@@ -21,7 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // initRoutes registers the application's routes on the branches initMiddleware returns
@@ -43,7 +43,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	profileValidator := accountvalidation.NewProfileValidator(s.database)
 	addressValidator := accountvalidation.NewAddressValidator()
 	phoneValidator := accountvalidation.NewPhoneValidator()
-	identifierValidator := validators.NewIdentifierValidator()
+	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
 	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database)

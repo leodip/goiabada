@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // groupsDatabase is what the group endpoints need: the group row and the member count that
@@ -66,7 +66,7 @@ func HandleAPIGroupsGet(
 
 func HandleAPIGroupCreatePost(
 	database groupsDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
@@ -98,7 +98,7 @@ func HandleAPIGroupCreatePost(
 		}
 
 		// Validate identifier format
-		err = identifierValidator.ValidateIdentifier(createReq.GroupIdentifier, true)
+		err = identifierValidator.Validate(createReq.GroupIdentifier, true)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -189,7 +189,7 @@ func HandleAPIGroupGet(
 
 func HandleAPIGroupUpdatePut(
 	database groupsDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
@@ -243,7 +243,7 @@ func HandleAPIGroupUpdatePut(
 		}
 
 		// Validate identifier format
-		err = identifierValidator.ValidateIdentifier(updateReq.GroupIdentifier, true)
+		err = identifierValidator.Validate(updateReq.GroupIdentifier, true)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return

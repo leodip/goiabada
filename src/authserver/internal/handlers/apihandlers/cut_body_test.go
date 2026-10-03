@@ -15,7 +15,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -123,7 +123,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 				database.On("GetResourceById", mock.Anything, mock.Anything, int64(1)).Return(&models.Resource{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleAPIResourcePermissionsPut(database, validators.NewIdentifierValidator(), mocks_handlers.NewAuditLogger(t))
+				return HandleAPIResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), mocks_handlers.NewAuditLogger(t))
 			},
 		},
 	}

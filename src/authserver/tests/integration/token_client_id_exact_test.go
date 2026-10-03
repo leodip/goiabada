@@ -79,7 +79,7 @@ func TestToken_ClientIdCaseVariantIsRefused(t *testing.T) {
 // compares the identifier it got back against the one it was asked for and returns nothing when the
 // engine folded the two together. Nothing on the request path trims first, either:
 // ValidateTokenRequest checks only that client_id is non-empty before handing the value to the
-// lookup, and ValidateIdentifier runs at registration, never on a lookup.
+// lookup, and IdentifierValidator.Validate runs at registration, never on a lookup.
 //
 // SQL Server is the only engine on which this case could fail, so its result is the check suite's.
 // Here it holds because SQLite compares the bytes.
