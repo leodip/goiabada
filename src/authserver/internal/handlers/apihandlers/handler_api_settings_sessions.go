@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -33,7 +33,7 @@ func HandleSettingsSessionsGet() http.HandlerFunc {
 
 // settingsSessionsDatabase is what the session settings endpoint needs: the settings write.
 type settingsSessionsDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // HandleSettingsSessionsPut - PUT /api/v1/admin/settings/sessions

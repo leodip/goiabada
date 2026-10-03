@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // valueAtTheBound is one value of exactly the bound's bytes.
@@ -47,12 +47,12 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 	columns := []struct {
 		name string
 		max  int
-		set  func(*models.Code, string)
-		get  func(*models.Code) string
+		set  func(*record.Code, string)
+		get  func(*record.Code) string
 	}{
-		{"state", models.StateMaxBytes, func(c *models.Code, v string) { c.State = v }, func(c *models.Code) string { return c.State }},
-		{"nonce", models.NonceMaxBytes, func(c *models.Code, v string) { c.Nonce = v }, func(c *models.Code) string { return c.Nonce }},
-		{"scope", models.ScopeMaxBytes, func(c *models.Code, v string) { c.Scope = v }, func(c *models.Code) string { return c.Scope }},
+		{"state", record.StateMaxBytes, func(c *record.Code, v string) { c.State = v }, func(c *record.Code) string { return c.State }},
+		{"nonce", record.NonceMaxBytes, func(c *record.Code, v string) { c.Nonce = v }, func(c *record.Code) string { return c.Nonce }},
+		{"scope", record.ScopeMaxBytes, func(c *record.Code, v string) { c.Scope = v }, func(c *record.Code) string { return c.Scope }},
 	}
 
 	for _, column := range columns {
@@ -61,7 +61,7 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 				client := createTestClient(t)
 				user := createTestUser(t)
 				random := fake.LetterN(6)
-				code := &models.Code{
+				code := &record.Code{
 					ClientId:          client.Id,
 					UserId:            user.Id,
 					Code:              "testcode_" + random,
@@ -90,15 +90,15 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 	// A sign-in that uses all three at their bounds writes them in one row, which is a different
 	// claim from three rows that each hold one: SQL Server moves variable-length columns out of the
 	// row page when they add up to more than a page, and MySQL's row size limit is on the sum.
-	states := valuesAtTheBound(t, models.StateMaxBytes)
-	nonces := valuesAtTheBound(t, models.NonceMaxBytes)
-	scopes := valuesAtTheBound(t, models.ScopeMaxBytes)
+	states := valuesAtTheBound(t, record.StateMaxBytes)
+	nonces := valuesAtTheBound(t, record.NonceMaxBytes)
+	scopes := valuesAtTheBound(t, record.ScopeMaxBytes)
 	for i, tc := range states {
 		t.Run("all three together/"+tc.name, func(t *testing.T) {
 			client := createTestClient(t)
 			user := createTestUser(t)
 			random := fake.LetterN(6)
-			code := &models.Code{
+			code := &record.Code{
 				ClientId:          client.Id,
 				UserId:            user.Id,
 				Code:              "testcode_" + random,
@@ -131,12 +131,12 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 // a refresh token descended from the code, and the one the password grant issues, both carry the
 // scope granted.
 func TestCreateRefreshToken_AScopeAtTheBoundRoundTrips(t *testing.T) {
-	for _, tc := range valuesAtTheBound(t, models.ScopeMaxBytes) {
+	for _, tc := range valuesAtTheBound(t, record.ScopeMaxBytes) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := createTestClient(t)
 			user := createTestUser(t)
 			code := createTestCode(t, client.Id, user.Id)
-			refreshToken := &models.RefreshToken{
+			refreshToken := &record.RefreshToken{
 				CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 				UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
 				ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
@@ -150,7 +150,7 @@ func TestCreateRefreshToken_AScopeAtTheBoundRoundTrips(t *testing.T) {
 			}
 
 			err := database.CreateRefreshToken(context.Background(), nil, refreshToken)
-			require.NoError(t, err, "a refresh token carrying a %d-byte scope was refused by the column", models.ScopeMaxBytes)
+			require.NoError(t, err, "a refresh token carrying a %d-byte scope was refused by the column", record.ScopeMaxBytes)
 
 			stored, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 			require.NoError(t, err)
@@ -163,11 +163,11 @@ func TestCreateRefreshToken_AScopeAtTheBoundRoundTrips(t *testing.T) {
 // TestCreateUserConsent_AScopeAtTheBoundRoundTrips covers the third: the consent the user gave, from
 // which a later refresh is checked.
 func TestCreateUserConsent_AScopeAtTheBoundRoundTrips(t *testing.T) {
-	for _, tc := range valuesAtTheBound(t, models.ScopeMaxBytes) {
+	for _, tc := range valuesAtTheBound(t, record.ScopeMaxBytes) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := createTestClient(t)
 			user := createTestUser(t)
-			consent := &models.UserConsent{
+			consent := &record.UserConsent{
 				UserId:    user.Id,
 				ClientId:  client.Id,
 				Scope:     tc.value,
@@ -175,7 +175,7 @@ func TestCreateUserConsent_AScopeAtTheBoundRoundTrips(t *testing.T) {
 			}
 
 			err := database.CreateUserConsent(context.Background(), nil, consent)
-			require.NoError(t, err, "a consent carrying a %d-byte scope was refused by the column", models.ScopeMaxBytes)
+			require.NoError(t, err, "a consent carrying a %d-byte scope was refused by the column", record.ScopeMaxBytes)
 
 			stored, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 			require.NoError(t, err)

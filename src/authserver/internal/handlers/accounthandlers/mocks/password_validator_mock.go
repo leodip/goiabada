@@ -10,7 +10,7 @@
 package mocks_accounthandlers
 
 import (
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -51,7 +51,7 @@ func (_m *PasswordValidator) EXPECT() *PasswordValidator_Expecter {
 }
 
 // ValidatePassword provides a mock function for the type PasswordValidator
-func (_mock *PasswordValidator) ValidatePassword(policy models.PasswordPolicy, password string) error {
+func (_mock *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string) error {
 	ret := _mock.Called(policy, password)
 
 	if len(ret) == 0 {
@@ -59,7 +59,7 @@ func (_mock *PasswordValidator) ValidatePassword(policy models.PasswordPolicy, p
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(models.PasswordPolicy, string) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(record.PasswordPolicy, string) error); ok {
 		r0 = returnFunc(policy, password)
 	} else {
 		r0 = ret.Error(0)
@@ -73,17 +73,17 @@ type PasswordValidator_ValidatePassword_Call struct {
 }
 
 // ValidatePassword is a helper method to define mock.On call
-//   - policy models.PasswordPolicy
+//   - policy record.PasswordPolicy
 //   - password string
 func (_e *PasswordValidator_Expecter) ValidatePassword(policy any, password any) *PasswordValidator_ValidatePassword_Call {
 	return &PasswordValidator_ValidatePassword_Call{Call: _e.mock.On("ValidatePassword", policy, password)}
 }
 
-func (_c *PasswordValidator_ValidatePassword_Call) Run(run func(policy models.PasswordPolicy, password string)) *PasswordValidator_ValidatePassword_Call {
+func (_c *PasswordValidator_ValidatePassword_Call) Run(run func(policy record.PasswordPolicy, password string)) *PasswordValidator_ValidatePassword_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 models.PasswordPolicy
+		var arg0 record.PasswordPolicy
 		if args[0] != nil {
-			arg0 = args[0].(models.PasswordPolicy)
+			arg0 = args[0].(record.PasswordPolicy)
 		}
 		var arg1 string
 		if args[1] != nil {
@@ -102,7 +102,7 @@ func (_c *PasswordValidator_ValidatePassword_Call) Return(err error) *PasswordVa
 	return _c
 }
 
-func (_c *PasswordValidator_ValidatePassword_Call) RunAndReturn(run func(policy models.PasswordPolicy, password string) error) *PasswordValidator_ValidatePassword_Call {
+func (_c *PasswordValidator_ValidatePassword_Call) RunAndReturn(run func(policy record.PasswordPolicy, password string) error) *PasswordValidator_ValidatePassword_Call {
 	_c.Call.Return(run)
 	return _c
 }

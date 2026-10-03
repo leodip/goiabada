@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // The association loaders in commondb had no direct data-layer tests: they are
@@ -16,9 +16,9 @@ import (
 
 // createUserWithGivenName creates an enabled user with a controlled given name,
 // which GetGroupMembersPaginated orders by.
-func createUserWithGivenName(t *testing.T, givenName string) *models.User {
+func createUserWithGivenName(t *testing.T, givenName string) *record.User {
 	t.Helper()
-	user := &models.User{
+	user := &record.User{
 		Enabled:   true,
 		Subject:   fake.UUID(),
 		Username:  "u" + fake.LetterN(12),
@@ -83,7 +83,7 @@ func TestUsersLoadPermissions(t *testing.T) {
 	createTestUserPermissionWithUserAndPermission(t, userA.Id, permissionA.Id)
 	createTestUserPermissionWithUserAndPermission(t, userB.Id, permissionB.Id)
 
-	users := []models.User{*userA, *userB, *userC}
+	users := []record.User{*userA, *userB, *userC}
 
 	if err := database.UsersLoadPermissions(context.Background(), nil, users); err != nil {
 		t.Fatalf("UsersLoadPermissions failed: %v", err)
@@ -104,7 +104,7 @@ func TestUsersLoadPermissions_NilAndEmptySlices(t *testing.T) {
 	if err := database.UsersLoadPermissions(context.Background(), nil, nil); err != nil {
 		t.Errorf("UsersLoadPermissions(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UsersLoadPermissions(context.Background(), nil, []models.User{}); err != nil {
+	if err := database.UsersLoadPermissions(context.Background(), nil, []record.User{}); err != nil {
 		t.Errorf("UsersLoadPermissions(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -157,7 +157,7 @@ func TestUsersLoadGroups(t *testing.T) {
 	createTestUserGroupWithUserAndGroup(t, userA.Id, groupA.Id)
 	createTestUserGroupWithUserAndGroup(t, userB.Id, groupB.Id)
 
-	users := []models.User{*userA, *userB}
+	users := []record.User{*userA, *userB}
 
 	if err := database.UsersLoadGroups(context.Background(), nil, users); err != nil {
 		t.Fatalf("UsersLoadGroups failed: %v", err)
@@ -175,7 +175,7 @@ func TestUsersLoadGroups_NilAndEmptySlices(t *testing.T) {
 	if err := database.UsersLoadGroups(context.Background(), nil, nil); err != nil {
 		t.Errorf("UsersLoadGroups(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UsersLoadGroups(context.Background(), nil, []models.User{}); err != nil {
+	if err := database.UsersLoadGroups(context.Background(), nil, []record.User{}); err != nil {
 		t.Errorf("UsersLoadGroups(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -371,7 +371,7 @@ func TestGroupsLoadPermissions(t *testing.T) {
 	createTestGroupPermission(t, groupA.Id, permissionA.Id)
 	createTestGroupPermission(t, groupB.Id, permissionB.Id)
 
-	groups := []models.Group{*groupA, *groupB, *groupC}
+	groups := []record.Group{*groupA, *groupB, *groupC}
 
 	if err := database.GroupsLoadPermissions(context.Background(), nil, groups); err != nil {
 		t.Fatalf("GroupsLoadPermissions failed: %v", err)
@@ -392,7 +392,7 @@ func TestGroupsLoadPermissions_NilAndEmptySlices(t *testing.T) {
 	if err := database.GroupsLoadPermissions(context.Background(), nil, nil); err != nil {
 		t.Errorf("GroupsLoadPermissions(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.GroupsLoadPermissions(context.Background(), nil, []models.Group{}); err != nil {
+	if err := database.GroupsLoadPermissions(context.Background(), nil, []record.Group{}); err != nil {
 		t.Errorf("GroupsLoadPermissions(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -403,7 +403,7 @@ func TestGroupsLoadAttributes(t *testing.T) {
 	attributeA := createTestGroupAttribute(t, groupA.Id)
 	attributeB := createTestGroupAttribute(t, groupB.Id)
 
-	groups := []models.Group{*groupA, *groupB}
+	groups := []record.Group{*groupA, *groupB}
 
 	if err := database.GroupsLoadAttributes(context.Background(), nil, groups); err != nil {
 		t.Fatalf("GroupsLoadAttributes failed: %v", err)
@@ -421,7 +421,7 @@ func TestGroupsLoadAttributes_NilAndEmptySlices(t *testing.T) {
 	if err := database.GroupsLoadAttributes(context.Background(), nil, nil); err != nil {
 		t.Errorf("GroupsLoadAttributes(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.GroupsLoadAttributes(context.Background(), nil, []models.Group{}); err != nil {
+	if err := database.GroupsLoadAttributes(context.Background(), nil, []record.Group{}); err != nil {
 		t.Errorf("GroupsLoadAttributes(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -524,7 +524,7 @@ func TestGetGroupMembersPaginated(t *testing.T) {
 	userA := createUserWithGivenName(t, "Aaa"+suffix)
 	userB := createUserWithGivenName(t, "Bbb"+suffix)
 	userC := createUserWithGivenName(t, "Ccc"+suffix)
-	for _, u := range []*models.User{userA, userB, userC} {
+	for _, u := range []*record.User{userA, userB, userC} {
 		createTestUserGroupWithUserAndGroup(t, u.Id, group.Id)
 	}
 
@@ -625,7 +625,7 @@ func TestUserSessionClientsLoadClients(t *testing.T) {
 	sessionClientA := createTestUserSessionClientWithIds(t, userSession.Id, clientA.Id)
 	sessionClientB := createTestUserSessionClientWithIds(t, userSession.Id, clientB.Id)
 
-	sessionClients := []models.UserSessionClient{*sessionClientA, *sessionClientB}
+	sessionClients := []record.UserSessionClient{*sessionClientA, *sessionClientB}
 
 	if err := database.UserSessionClientsLoadClients(context.Background(), nil, sessionClients); err != nil {
 		t.Fatalf("UserSessionClientsLoadClients failed: %v", err)
@@ -647,7 +647,7 @@ func TestUserSessionClientsLoadClients_NilAndEmptySlices(t *testing.T) {
 	if err := database.UserSessionClientsLoadClients(context.Background(), nil, nil); err != nil {
 		t.Errorf("UserSessionClientsLoadClients(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UserSessionClientsLoadClients(context.Background(), nil, []models.UserSessionClient{}); err != nil {
+	if err := database.UserSessionClientsLoadClients(context.Background(), nil, []record.UserSessionClient{}); err != nil {
 		t.Errorf("UserSessionClientsLoadClients(empty) should be a no-op, got: %v", err)
 	}
 }

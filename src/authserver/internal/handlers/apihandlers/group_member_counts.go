@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -20,7 +20,7 @@ type groupMemberCounter interface {
 // swallowed a failed count and published 0, which renders a group as empty when the server never
 // learned how many members it has; the other two answered 500. A page never shows a number the
 // server did not compute, so every caller answers 500 on the error (#425 decision 4).
-func countGroupMembers(ctx context.Context, database groupMemberCounter, groups []models.Group) (map[int64]int, error) {
+func countGroupMembers(ctx context.Context, database groupMemberCounter, groups []record.Group) (map[int64]int, error) {
 	counts := make(map[int64]int, len(groups))
 	for _, group := range groups {
 		count, err := database.CountGroupMembers(ctx, nil, group.Id)

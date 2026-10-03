@@ -30,7 +30,7 @@
 -- compare with != rather than <, so -1 never matches and each seeded session is re-prompted exactly
 -- once and then promoted like any other.
 --
--- The drop is last, and it is what makes this migration and models.UserSession losing the field one
+-- The drop is last, and it is what makes this migration and record.UserSession losing the field one
 -- commit: with the field kept and the column gone every session query names a column that is not
 -- there, and with the field gone and the column kept every insert omits a NOT NULL column with no
 -- default on three engines. Nothing indexes or constrains the column on any engine, which is

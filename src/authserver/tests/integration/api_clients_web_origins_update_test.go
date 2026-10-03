@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/securerandom"
@@ -26,7 +26,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "weborig-succ-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -42,9 +42,9 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	// Seed existing web origins
 	originA := "https://a.example.com"
 	originB := "https://b.example.com"
-	err = database.CreateWebOrigin(context.Background(), nil, &models.WebOrigin{ClientId: client.Id, Origin: originA})
+	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientId: client.Id, Origin: originA})
 	assert.NoError(t, err)
-	err = database.CreateWebOrigin(context.Background(), nil, &models.WebOrigin{ClientId: client.Id, Origin: originB})
+	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientId: client.Id, Origin: originB})
 	assert.NoError(t, err)
 
 	// Desired: keep A (with spaces and uppercase to test trimming+lowercasing), remove B, add C
@@ -99,7 +99,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "weborig-noauthcode-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -141,7 +141,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "weborig-canon-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -224,7 +224,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a client with auth code enabled
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "weborig-valid-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -327,7 +327,7 @@ func getClientWebOrigins(t *testing.T, accessToken string, clientId int64) []str
 func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "weborig-bound-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
@@ -360,9 +360,9 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 }
 
 // newWebOriginsClient creates a client for a web-origins save and removes it when the test ends.
-func newWebOriginsClient(t *testing.T, prefix string) *models.Client {
+func newWebOriginsClient(t *testing.T, prefix string) *record.Client {
 	t.Helper()
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         prefix + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
@@ -407,7 +407,7 @@ func TestAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newWebOriginsClient(t, "weborig-outdated-")
 	require.NoError(t, database.CreateWebOrigin(context.Background(), nil,
-		&models.WebOrigin{ClientId: client.Id, Origin: "https://a.example.com"}))
+		&record.WebOrigin{ClientId: client.Id, Origin: "https://a.example.com"}))
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 
 	loadedByBoth := getClientWebOrigins(t, accessToken, client.Id)
@@ -460,7 +460,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	}
 
 	// Invalid body
-	client2 := &models.Client{
+	client2 := &record.Client{
 		ClientIdentifier:         "weborig-bad-body-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -503,7 +503,7 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 	accessToken := createClientCredentialsTokenWithoutRouteScope(t)
 
 	// Create a target client with auth code enabled
-	target := &models.Client{
+	target := &record.Client{
 		ClientIdentifier:         "weborig-target-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,

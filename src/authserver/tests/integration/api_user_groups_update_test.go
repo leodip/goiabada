@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@groups-update.test"),
@@ -35,23 +35,23 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test groups
-	groups := make([]*models.Group, 3)
+	groups := make([]*record.Group, 3)
 	for i := 0; i < 3; i++ {
-		groups[i] = &models.Group{
+		groups[i] = &record.Group{
 			GroupIdentifier:  "update-group-" + strconv.Itoa(i+1),
 			Description:      "Update Group " + strconv.Itoa(i+1),
 			IncludeInIdToken: i%2 == 0, // alternate true/false
 		}
 		err = database.CreateGroup(context.Background(), nil, groups[i])
 		assert.NoError(t, err)
-		defer func(group *models.Group) {
+		defer func(group *record.Group) {
 			_ = database.DeleteGroup(context.Background(), nil, group.Id)
 		}(groups[i])
 	}
 
 	// Setup: Initially assign user to group 0 and group 1
 	for i := 0; i < 2; i++ {
-		userGroup := &models.UserGroup{
+		userGroup := &record.UserGroup{
 			UserId:  testUser.Id,
 			GroupId: groups[i].Id,
 		}
@@ -115,7 +115,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@empty-groups.test"),
@@ -129,7 +129,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 	}()
 
 	// Setup: Create test group and assign user to it
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "remove-all-group",
 		Description:     "Group to be removed",
 	}
@@ -139,7 +139,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
-	userGroup := &models.UserGroup{
+	userGroup := &record.UserGroup{
 		UserId:  testUser.Id,
 		GroupId: testGroup.Id,
 	}
@@ -181,7 +181,7 @@ func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@invalid-group.test"),
@@ -261,7 +261,7 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@invalid-body.test"),
@@ -292,7 +292,7 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 
 func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-update.test"),
@@ -358,7 +358,7 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			testUser := &models.User{
+			testUser := &record.User{
 				Subject:    fake.UUID(),
 				Enabled:    true,
 				Email:      uniqueEmail("testuser@groups-bound.test"),
@@ -415,9 +415,9 @@ func getUserGroupIds(t *testing.T, accessToken string, userId int64) []int64 {
 }
 
 // createUserForGroupsSave creates an enabled user for one save case and removes it afterwards.
-func createUserForGroupsSave(t *testing.T) *models.User {
+func createUserForGroupsSave(t *testing.T) *record.User {
 	t.Helper()
-	user := &models.User{
+	user := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@groups-expected.test"),
@@ -469,8 +469,8 @@ func TestAPIUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, groupB.Id) })
 	groupC := createTestGroup(t)
 	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, groupC.Id) })
-	for _, g := range []*models.Group{groupA, groupB} {
-		require.NoError(t, database.CreateUserGroup(context.Background(), nil, &models.UserGroup{UserId: user.Id, GroupId: g.Id}))
+	for _, g := range []*record.Group{groupA, groupB} {
+		require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserId: user.Id, GroupId: g.Id}))
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
 

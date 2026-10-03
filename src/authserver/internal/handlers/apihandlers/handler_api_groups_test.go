@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +54,7 @@ func TestCountGroupMembers_CountsEveryGroup(t *testing.T) {
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(0, nil).Once()
 
-	counts, err := countGroupMembers(context.Background(), database, []models.Group{{Id: 5}, {Id: 6}})
+	counts, err := countGroupMembers(context.Background(), database, []record.Group{{Id: 5}, {Id: 6}})
 
 	require.NoError(t, err)
 	assert.Equal(t, map[int64]int{5: 2, 6: 0}, counts)
@@ -68,7 +68,7 @@ func TestCountGroupMembers_StopsAtTheFirstFailureAndNamesTheGroup(t *testing.T) 
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(0, errCountFailed).Once()
 
-	counts, err := countGroupMembers(context.Background(), database, []models.Group{{Id: 5}, {Id: 6}, {Id: 7}})
+	counts, err := countGroupMembers(context.Background(), database, []record.Group{{Id: 5}, {Id: 6}, {Id: 7}})
 
 	require.ErrorIs(t, err, errCountFailed)
 	assert.Contains(t, err.Error(), "unable to count the members of group 6")
@@ -89,7 +89,7 @@ func TestCountGroupMembers_NoGroupsIsAnEmptyMap(t *testing.T) {
 func TestHandleGroupsGet_AFailedCountAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAllGroups", mock.Anything, mock.Anything).
-		Return([]models.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
+		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(0, errCountFailed).Once()
 
@@ -104,7 +104,7 @@ func TestHandleGroupsGet_AFailedCountAnswers500(t *testing.T) {
 func TestHandleGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAllGroups", mock.Anything, mock.Anything).
-		Return([]models.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
+		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(7, nil).Once()
 
@@ -128,7 +128,7 @@ func TestHandleGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
 func TestHandleGroupGet_AFailedCountAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetGroupById", mock.Anything, mock.Anything, int64(5)).
-		Return(&models.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
+		Return(&record.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 
 	capture := logtest.CaptureSlog(t)

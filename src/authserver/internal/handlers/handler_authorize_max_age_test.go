@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +71,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		f.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
+			&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
 		f.authorizeValidator.On("ValidateUnsupportedRequestParameters",
 			mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 		stubRegisteredRedirectURI(f.database, redirectURI)
@@ -88,7 +88,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	t.Run("a session holder's malformed max_age is refused at once, the session judged without it", func(t *testing.T) {
 		f := arrange(t, "max_age=abc")
 
-		userSession := &models.UserSession{Id: 7, UserId: 1}
+		userSession := &record.UserSession{Id: 7, UserId: 1}
 		f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
 			Return(userSession, nil)
 		// nil, not 0: a value ValidateRequest is about to refuse must not decide the session, and
@@ -130,8 +130,8 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	t.Run("an anonymous browser's malformed max_age is parked and the visitor sent to log in", func(t *testing.T) {
 		f := arrange(t, "max_age=abc")
 		f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
-			Return((*models.UserSession)(nil), nil)
-		f.userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil),
+			Return((*record.UserSession)(nil), nil)
+		f.userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil),
 			testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(false)
 		refuseMaxAge(f, "abc")
 
@@ -154,8 +154,8 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		f.authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-		userSession := &models.UserSession{Id: 7, UserId: 1, AcrLevel: models.AcrLevel1,
-			User: models.User{Id: 1, Enabled: true}}
+		userSession := &record.UserSession{Id: 7, UserId: 1, AcrLevel: record.AcrLevel1,
+			User: record.User{Id: 1, Enabled: true}}
 		f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
 			Return(userSession, nil)
 		f.database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)

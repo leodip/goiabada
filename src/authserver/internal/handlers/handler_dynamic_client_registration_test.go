@@ -14,8 +14,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/errs"
@@ -268,7 +268,7 @@ func sizedRedirectURI(t *testing.T, fill string, n int) string {
 	return uri
 }
 
-// The redirect URI bounds are storage's (models.RedirectURIsMaxPerClient, RedirectURIMaxBytes) and
+// The redirect URI bounds are storage's (record.RedirectURIsMaxPerClient, RedirectURIMaxBytes) and
 // every refusal is the "check redirect_uris" one, so each row is one list varied from an accepted
 // one by the thing under test (#428).
 func TestValidateDCRRedirectURIs_Bounds(t *testing.T) {
@@ -331,7 +331,7 @@ func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest,
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
 	HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
@@ -374,11 +374,11 @@ func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsIn
 	mocks_data.ExpectRunInTransaction(database, dcrTx, note)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).Id = 42
+			args.Get(2).(*record.Client).Id = 42
 			note("client")
 		}).Return(nil).Once()
 	for _, uri := range confidentialTwoURIRegistration.RedirectURIs {
-		database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.MatchedBy(func(r *models.RedirectURI) bool {
+		database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.MatchedBy(func(r *record.RedirectURI) bool {
 			return r.ClientId == 42 && r.URI == uri
 		})).Run(func(mock.Arguments) { note("redirect uri") }).Return(nil).Once()
 	}
@@ -443,7 +443,7 @@ func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublic
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	mocks_data.ExpectRunInTransaction(database, dcrTx)
-	database.On("CreateClient", mock.Anything, dcrTx, mock.MatchedBy(func(c *models.Client) bool {
+	database.On("CreateClient", mock.Anything, dcrTx, mock.MatchedBy(func(c *record.Client) bool {
 		return c.IsPublic && c.PKCERequired != nil && *c.PKCERequired && !c.ClientCredentialsEnabled
 	})).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
@@ -490,7 +490,7 @@ func TestHandleDynamicClientRegistrationPost_AuditsTheClientIPWithoutItsPort(t *
 // Every refusal is decided before the transaction opens, so none reaches RunInTransaction: the
 // strict mock has no expectation for it and would fail the case if it were called (#428).
 func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(t *testing.T) {
-	manyURIs := make([]string, models.RedirectURIsMaxPerClient+1)
+	manyURIs := make([]string, record.RedirectURIsMaxPerClient+1)
 	for i := range manyURIs {
 		manyURIs[i] = fmt.Sprintf("https://client.example.com/%d", i)
 	}
@@ -519,7 +519,7 @@ func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(
 			RedirectURIs: manyURIs,
 		}, oidc.DCRErrorInvalidRedirectURI},
 		{"a redirect URI one byte past the length", oidc.DynamicClientRegistrationRequest{
-			RedirectURIs: []string{"https://client.example.com/" + strings.Repeat("a", models.RedirectURIMaxBytes+1-len("https://client.example.com/"))},
+			RedirectURIs: []string{"https://client.example.com/" + strings.Repeat("a", record.RedirectURIMaxBytes+1-len("https://client.example.com/"))},
 		}, oidc.DCRErrorInvalidRedirectURI},
 		{"a redirect URI listed twice", oidc.DynamicClientRegistrationRequest{
 			RedirectURIs: []string{"https://client.example.com/cb", "https://client.example.com/cb"},

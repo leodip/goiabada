@@ -12,8 +12,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
@@ -33,10 +33,10 @@ import (
 // restartFixture is a confidential level 1 client and a user who holds a password and an enrolled
 // authenticator, so the browser can hold a session whose methods are "pwd otp".
 type restartFixture struct {
-	client       *models.Client
+	client       *record.Client
 	clientSecret string
-	redirectURI  *models.RedirectURI
-	user         *models.User
+	redirectURI  *record.RedirectURI
+	user         *record.User
 	password     string
 	otpSecret    string
 	adminToken   string
@@ -48,17 +48,17 @@ func newRestartFixture(t *testing.T, consentRequired bool) *restartFixture {
 	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "restart-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          consentRequired,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	user, password, otpSecret := createRestartUser(t)
@@ -76,7 +76,7 @@ func newRestartFixture(t *testing.T, consentRequired bool) *restartFixture {
 }
 
 // createRestartUser is an enabled user with a password and an enrolled authenticator.
-func createRestartUser(t *testing.T) (*models.User, string, string) {
+func createRestartUser(t *testing.T) (*record.User, string, string) {
 	t.Helper()
 
 	password := fake.Password(10)
@@ -87,7 +87,7 @@ func createRestartUser(t *testing.T) (*models.User, string, string) {
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: email})
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              email,
@@ -121,7 +121,7 @@ func (f *restartFixture) signInWithPasswordAndOtp(t *testing.T, httpClient *http
 	t.Helper()
 
 	resp := loadPage(t, httpClient, f.authorizeURL("openid", fake.LetterN(8), fake.LetterN(43),
-		models.AcrLevel2Mandatory.String()))
+		record.AcrLevel2Mandatory.String()))
 	defer func() { _ = resp.Body.Close() }()
 	resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/level1"))
 	defer func() { _ = resp.Body.Close() }()
@@ -231,13 +231,13 @@ func (f *restartFixture) assertOnlyPasswordWasEarned(t *testing.T, idClaims, acc
 		"the id token's amr names only what the second pass verified")
 	assert.Equal(t, []interface{}{"pwd"}, accessClaims["amr"],
 		"the access token's amr names only what the second pass verified")
-	assert.Equal(t, models.AcrLevel1.String(), idClaims["acr"])
+	assert.Equal(t, record.AcrLevel1.String(), idClaims["acr"])
 
 	sessions := sessionsThroughAdminAPI(t, f.adminToken, f.user.Id)
 	require.Len(t, sessions, 1, "the second pass creates exactly one session")
 	assert.Equal(t, "pwd", sessions[0].AuthMethods,
 		"the session the second pass created carries only the password it verified")
-	assert.Equal(t, models.AcrLevel1.String(), sessions[0].AcrLevel)
+	assert.Equal(t, record.AcrLevel1.String(), sessions[0].AcrLevel)
 }
 
 // TestRestartRoute1_TheSecondPassEarnsOnlyWhatItVerified carries otp into a ceremony by SSO and

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@permissions.test"),
@@ -128,7 +128,7 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user without permissions
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@no-permissions.test"),
@@ -161,7 +161,7 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 
 func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-permissions.test"),
@@ -194,7 +194,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@permissions-put.test"),
@@ -271,7 +271,7 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@remove-all-permissions.test"),
@@ -351,7 +351,7 @@ func TestAPIUserPermissionsPut_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@perm-not-found.test"),
@@ -383,7 +383,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@invalid-body.test"),
@@ -414,7 +414,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 
 func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-put.test"),
@@ -442,8 +442,8 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 }
 
 // Helper function to create a user permission
-func createTestUserPermission(t *testing.T, userId, permissionId int64) *models.UserPermission {
-	userPermission := &models.UserPermission{
+func createTestUserPermission(t *testing.T, userId, permissionId int64) *record.UserPermission {
+	userPermission := &record.UserPermission{
 		UserId:       userId,
 		PermissionId: permissionId,
 	}
@@ -470,9 +470,9 @@ func getUserPermissionIds(t *testing.T, accessToken string, userId int64) []int6
 }
 
 // newPermissionsTestUser creates a user for one save test and deletes it after.
-func newPermissionsTestUser(t *testing.T, emailPrefix string) *models.User {
+func newPermissionsTestUser(t *testing.T, emailPrefix string) *record.User {
 	t.Helper()
-	user := &models.User{
+	user := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail(emailPrefix + "@user-permissions.test"),

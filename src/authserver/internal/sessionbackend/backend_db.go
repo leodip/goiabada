@@ -11,7 +11,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
@@ -26,10 +26,10 @@ import (
 // Exported, unlike most ports here, because the endpoint that puts this backend on the wire lives
 // in apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
 type BrowserSessionDatabase interface {
-	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error
+	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error
 	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
-	GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*models.BrowserSession, error)
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*record.BrowserSession, error)
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
 	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
 }
@@ -98,7 +98,7 @@ func (b *dbBackend) Create(ctx context.Context, id string, data []byte, authenti
 	// from this instant without reading anything back.
 	expiresAt := sessionstore.ExpiresAt(now, now, authenticated, idleTimeout, maxLifetime)
 
-	browserSession := &models.BrowserSession{
+	browserSession := &record.BrowserSession{
 		Owner:         b.owner,
 		SessionId:     id,
 		SessionIdHash: hashutil.HashString(id),

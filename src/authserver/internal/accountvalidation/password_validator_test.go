@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,7 +15,7 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 	validator := NewPasswordValidator()
 
 	t.Run("PasswordPolicyLow", func(t *testing.T) {
-		policy := models.PasswordPolicyLow
+		policy := record.PasswordPolicyLow
 
 		t.Run("ValidPassword", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "123456")
@@ -60,7 +60,7 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 	})
 
 	t.Run("PasswordPolicyMedium", func(t *testing.T) {
-		policy := models.PasswordPolicyMedium
+		policy := record.PasswordPolicyMedium
 
 		t.Run("ValidPassword", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "Passw0rd")
@@ -87,7 +87,7 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 	})
 
 	t.Run("PasswordPolicyHigh", func(t *testing.T) {
-		policy := models.PasswordPolicyHigh
+		policy := record.PasswordPolicyHigh
 
 		t.Run("ValidPassword", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "P@ssw0rd123")
@@ -119,8 +119,8 @@ func TestPasswordValidator_MaximumIsWithinBcrypt(t *testing.T) {
 	overBcrypt := "Aa1!" + strings.Repeat("a", passwordhash.MaxPasswordBytes+1-4)
 	require.Len(t, overBcrypt, passwordhash.MaxPasswordBytes+1)
 
-	for _, policy := range []models.PasswordPolicy{
-		models.PasswordPolicyNone, models.PasswordPolicyLow, models.PasswordPolicyMedium, models.PasswordPolicyHigh,
+	for _, policy := range []record.PasswordPolicy{
+		record.PasswordPolicyNone, record.PasswordPolicyLow, record.PasswordPolicyMedium, record.PasswordPolicyHigh,
 	} {
 		t.Run(policy.String(), func(t *testing.T) {
 			err := validator.ValidatePassword(policy, overBcrypt)

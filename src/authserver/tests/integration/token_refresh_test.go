@@ -14,8 +14,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -94,11 +94,11 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
 		ClientSecretEncrypted:    clientSecretEncrypted,
@@ -260,13 +260,13 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -343,13 +343,13 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 	wrongClientSecretEncrypted, err := dataCipher.Encrypt(wrongClientSecret)
 	assert.NoError(t, err)
 
-	wrongClient := &models.Client{
+	wrongClient := &record.Client{
 		ClientIdentifier:         "wrong-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		ClientSecretEncrypted:    wrongClientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, wrongClient)
@@ -436,19 +436,19 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Create a redirect URI for the client
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -459,7 +459,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -570,18 +570,18 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -591,7 +591,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

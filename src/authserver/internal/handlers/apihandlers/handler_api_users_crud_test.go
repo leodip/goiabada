@@ -17,8 +17,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/errs"
@@ -93,7 +93,7 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
-				Return(&models.User{Id: userId}, nil).Once()
+				Return(&record.User{Id: userId}, nil).Once()
 
 			// Set on the disabling rows, which are the ones that open a transaction.
 			var stub *mocks_data.RunInTransactionStub
@@ -111,11 +111,11 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 					database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 						Return(int64(4), nil).Once()
 					database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).
-						Return([]*models.RefreshToken{}, nil).Once()
+						Return([]*record.RefreshToken{}, nil).Once()
 					database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, int64(4)).
 						Return(nil).Once()
 					database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).
-						Return([]models.UserSession{}, nil).Once()
+						Return([]record.UserSession{}, nil).Once()
 				}
 			}
 
@@ -131,7 +131,7 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 
 			// The response re-reads the user.
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
-				Return(&models.User{Id: userId, Enabled: tc.requestedEnabled}, nil).Once()
+				Return(&record.User{Id: userId, Enabled: tc.requestedEnabled}, nil).Once()
 
 			rr := httptest.NewRecorder()
 			handler := HandleUserEnabledPut(database, auditLogger)
@@ -180,7 +180,7 @@ func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
 	stub := mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).Return(true, nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
@@ -210,7 +210,7 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
 
 	var savedHash string
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, userId, mock.Anything).
@@ -227,14 +227,14 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 		}).Return().Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
-		Return(&models.User{Id: userId, Enabled: true}, nil).Once()
+		Return(&record.User{Id: userId, Enabled: true}, nil).Once()
 
 	body, err := json.Marshal(map[string]string{"newPassword": newPassword})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setChiURLParam(req, "id", "42")
-	ctx := reqctx.WithSettings(req.Context(), &models.Settings{PasswordPolicy: models.PasswordPolicyLow})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{PasswordPolicy: record.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": adminSubject, "auth_time": float64(1)})
 
@@ -271,7 +271,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	user := &models.User{Id: userId, Enabled: true, OTPEnabled: true}
+	user := &record.User{Id: userId, Enabled: true, OTPEnabled: true}
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
 
 	var calls []string
@@ -289,7 +289,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 
 	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
-		Return(&models.User{Id: userId, Enabled: true}, nil).Once()
+		Return(&record.User{Id: userId, Enabled: true}, nil).Once()
 
 	body, err := json.Marshal(map[string]bool{"enabled": false})
 	require.NoError(t, err)
@@ -340,11 +340,11 @@ func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp", SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPFromName: "Acme"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPFromName: "Acme"}))
 
 	// The handler mutates this model in place before writing it, so it is what the
 	// assertions below read.
-	createdUser := &models.User{Id: 7, Email: "newuser@example.com"}
+	createdUser := &record.User{Id: 7, Email: "newuser@example.com"}
 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(createdUser, nil)
@@ -422,7 +422,7 @@ func TestHandleUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp"}))
 
 	// The pre-check passes: at this instant nobody holds the address.
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "taken@example.com").Return(nil, nil)
@@ -476,7 +476,7 @@ func TestHandleUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp"}))
 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "fresh@example.com").Return(nil, nil)
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(nil,
@@ -602,15 +602,15 @@ func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "TestApp", SMTPEnabled: tc.smtpEnabled,
-				PasswordPolicy: models.PasswordPolicyLow}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: tc.smtpEnabled,
+				PasswordPolicy: record.PasswordPolicyLow}))
 
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
 
 			// createdUser is what the handler mutates on the email arm, so the assertions below
 			// read the hash off the input the handler actually passed rather than off a value
 			// this test chose.
-			createdUser := &models.User{Id: 7, Email: "newuser@example.com"}
+			createdUser := &record.User{Id: 7, Email: "newuser@example.com"}
 			var gotPasswordHash string
 			if tc.wantCreated {
 				userCreator.On("CreateUser", mock.Anything, mock.Anything).

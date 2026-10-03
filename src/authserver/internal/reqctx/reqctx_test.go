@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -34,7 +34,7 @@ func TestReqctx_RoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("settings", func(t *testing.T) {
-		want := &models.Settings{Issuer: "https://issuer.example"}
+		want := &record.Settings{Issuer: "https://issuer.example"}
 		got, ok := SettingsFrom(WithSettings(ctx, want))
 		require.True(t, ok)
 		assert.Same(t, want, got)
@@ -93,7 +93,7 @@ func TestReqctx_EmptyContextHoldsNothing(t *testing.T) {
 	}
 }
 
-// A nil *models.Settings stored under the key is still a value of the asserted type, so a bare
+// A nil *record.Settings stored under the key is still a value of the asserted type, so a bare
 // checked assertion would answer true and hand the caller a pointer it cannot dereference.
 func TestReqctx_SettingsFromRefusesTypedNil(t *testing.T) {
 	got, ok := SettingsFrom(WithSettings(context.Background(), nil))
@@ -115,7 +115,7 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 	token := oauth.JwtToken{TokenBase64: "t"}
 
 	cases := map[string]context.Context{
-		"settings":          WithSettings(ctx, &models.Settings{}),
+		"settings":          WithSettings(ctx, &record.Settings{}),
 		"sessionIdentifier": WithSessionIdentifier(ctx, "session-1"),
 		"bearer":            WithBearerToken(ctx, token),
 		"validated":         WithValidatedToken(ctx, token),

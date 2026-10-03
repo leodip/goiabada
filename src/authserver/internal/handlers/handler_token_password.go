@@ -5,8 +5,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // respondPassword issues a validated resource owner password credentials grant (RFC 6749 section
@@ -19,7 +19,7 @@ import (
 // ID token whenever the browser was logged in as somebody else. ROPC is a direct credential
 // exchange with no session of its own (#106).
 func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
-	settings *models.Settings, grant *protocolvalidation.PasswordGrant) {
+	settings *record.Settings, grant *protocolvalidation.PasswordGrant) {
 
 	tokenResponse, err := tr.issuer.IssuePasswordGrant(r.Context(), settings, &issuance.ROPCGrantInput{
 		Client: grant.Client,

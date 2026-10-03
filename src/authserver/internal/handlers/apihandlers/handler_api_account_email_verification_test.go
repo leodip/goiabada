@@ -16,7 +16,7 @@ import (
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +43,7 @@ func (u unusedRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, l
 type verificationEnv struct {
 	handler  http.Handler
 	database *mocks_data.Database
-	user     *models.User
+	user     *record.User
 }
 
 const (
@@ -67,7 +67,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	encrypted, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Id:                             7,
 		Enabled:                        true,
 		Email:                          "someone@example.com",
@@ -112,7 +112,7 @@ func (e *verificationEnv) post(t *testing.T, submitted string) *httptest.Respons
 	req.RemoteAddr = "203.0.113.7:5000"
 	// The handler reads SMTPEnabled straight off the context and panics on the type
 	// assertion without it, and middleware.Settings puts it there in production.
-	ctx := reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": verificationSubject})
 
@@ -218,7 +218,7 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 	handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL)
 
-	user := &models.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
+	user := &record.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 		mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -233,7 +233,7 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -266,14 +266,14 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 	pending, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
 
-	send := func(t *testing.T, user *models.User, database *mocks_data.Database, pageRenderer *mocks_handlers.PageRenderer,
+	send := func(t *testing.T, user *record.User, database *mocks_data.Database, pageRenderer *mocks_handlers.PageRenderer,
 		emailSender *mocks_accounthandlers.EmailSender, auditLogger *mocks_handlers.AuditLogger) api.AccountEmailVerificationSendResponse {
 		t.Helper()
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 		req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
 		rr := httptest.NewRecorder()
 		HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 			testDataCipher, testAdminConsoleBaseURL).ServeHTTP(rr, req)
@@ -293,7 +293,7 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 	} {
 		t.Run("a code issued four minutes ago refuses the send, with "+tc.name, func(t *testing.T) {
 			// Past the minute the cooldown used to be, so this is the five minutes refusing.
-			user := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+			user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
 				EmailVerificationCodeEncrypted: tc.code,
 				EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Add(-4 * time.Minute), Valid: true}}
 
@@ -311,7 +311,7 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 	}
 
 	t.Run("a code issued over five minutes ago, none pending, lets the send through", func(t *testing.T) {
-		user := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+		user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
 			EmailVerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC().Add(-5*time.Minute - time.Second), Valid: true}}
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
@@ -337,7 +337,7 @@ func sendVerification(t *testing.T, database *mocks_data.Database, pageRenderer 
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
 	rr := httptest.NewRecorder()
 	HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL).ServeHTTP(rr, req)
@@ -355,7 +355,7 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	user := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
+	user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
 	var stored []byte
 	var issuedAt, issuedNotAfter time.Time
@@ -392,12 +392,12 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		reread *models.User
+		reread *record.User
 		check  func(t *testing.T, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name: "a concurrent send claimed the code",
-			reread: &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+			reread: &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
 				EmailVerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}},
 			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -410,7 +410,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 		},
 		{
 			name:   "a concurrent verification verified the address",
-			reread: &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com", EmailVerified: true},
+			reread: &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com", EmailVerified: true},
 			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 				var resp api.AccountEmailVerificationSendResponse
@@ -421,7 +421,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 		},
 		{
 			name:   "a concurrent email change moved the address",
-			reread: &models.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com"},
+			reread: &record.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com"},
 			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
 				var body map[string]string
@@ -432,7 +432,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			first := &models.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
+			first := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(first, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(tc.reread, nil).Once()
 			database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
@@ -456,7 +456,7 @@ func verifyDirect(t *testing.T, database *mocks_data.Database, auditLogger *mock
 	body, err := json.Marshal(api.VerifyAccountEmailRequest{VerificationCode: submitted})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification", bytes.NewReader(body))
-	ctx := reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true})
 	req = setTokenContextWithClaims(req.WithContext(ctx), map[string]interface{}{"sub": verificationSubject})
 	rr := httptest.NewRecorder()
 	HandleAccountEmailVerificationPost(database, auditLogger, credentials, testDataCipher).ServeHTTP(rr, req)
@@ -465,11 +465,11 @@ func verifyDirect(t *testing.T, database *mocks_data.Database, auditLogger *mock
 
 // pendingCodeUser is an account holding someone@example.com, unverified, with verificationCode
 // pending and issued a moment ago.
-func pendingCodeUser(t *testing.T) *models.User {
+func pendingCodeUser(t *testing.T) *record.User {
 	t.Helper()
 	encrypted, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
-	return &models.User{Id: 7, Subject: verificationSubject, Enabled: true, Email: "someone@example.com",
+	return &record.User{Id: 7, Subject: verificationSubject, Enabled: true, Email: "someone@example.com",
 		EmailVerificationCodeEncrypted: encrypted,
 		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true}}
 }
@@ -507,19 +507,19 @@ func TestHandleAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite(t
 func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
-		reread     func(user *models.User) *models.User
+		reread     func(user *record.User) *record.User
 		wantStatus int
 	}{
 		{
 			name: "a twin submission verified the address first",
-			reread: func(user *models.User) *models.User {
-				return &models.User{Id: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
+			reread: func(user *record.User) *record.User {
+				return &record.User{Id: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
 			},
 			wantStatus: http.StatusOK,
 		},
 		{
 			name: "a new send replaced the code",
-			reread: func(user *models.User) *models.User {
+			reread: func(user *record.User) *record.User {
 				replaced := *user
 				replaced.EmailVerificationCodeEncrypted = []byte("another code's ciphertext")
 				return &replaced
@@ -528,8 +528,8 @@ func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) 
 		},
 		{
 			name: "an email change moved the address, verified meanwhile",
-			reread: func(user *models.User) *models.User {
-				return &models.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com", EmailVerified: true}
+			reread: func(user *record.User) *record.User {
+				return &record.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com", EmailVerified: true}
 			},
 			wantStatus: http.StatusBadRequest,
 		},

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -350,20 +350,20 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
 			tokenParser := mocks_handlers.NewTokenParser(t)
 			var calls []string
-			record := func(name string) func(mock.Arguments) {
+			recordCall := func(name string) func(mock.Arguments) {
 				return func(mock.Arguments) { calls = append(calls, name) }
 			}
 
 			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).
-				Run(record("ValidateUnsupportedRequestParameters")).Return(nil).Maybe()
+				Run(recordCall("ValidateUnsupportedRequestParameters")).Return(nil).Maybe()
 			authorizeValidator.On("ValidateRequest", mock.Anything).
-				Run(record("ValidateRequest")).Return(tc.requestErr).Maybe()
+				Run(recordCall("ValidateRequest")).Return(tc.requestErr).Maybe()
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").
-				Run(record("ValidateScopes")).Return(tc.scopesErr).Maybe()
+				Run(recordCall("ValidateScopes")).Return(tc.scopesErr).Maybe()
 			authorizeValidator.On("ValidatePrompt", "login").
-				Run(record("ValidatePrompt")).Return("login", nil).Maybe()
+				Run(recordCall("ValidatePrompt")).Return("login", nil).Maybe()
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "not-a-token", false).
-				Run(record("DecodeAndValidateTokenString")).Return(nil, errors.New("malformed")).Maybe()
+				Run(recordCall("DecodeAndValidateTokenString")).Return(nil, errors.New("malformed")).Maybe()
 
 			// ValidateScopes is handed the scope as sent, never the request's normalized copy, whose
 			// spaces would hide a malformed one (#244): the copy below differs, so a call with it
@@ -374,7 +374,7 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			}
 
 			validation, err := validateAuthorizeRequest(context.Background(), authorizeValidator, tokenParser,
-				&models.Settings{Issuer: "https://test-issuer.com"}, params,
+				&record.Settings{Issuer: "https://test-issuer.com"}, params,
 				&protocolvalidation.ValidateRequestInput{Scope: "the normalized copy"})
 
 			assert.Equal(t, tc.wantCalls, calls)
@@ -406,8 +406,8 @@ type silentWorld struct {
 	disabled           bool
 	subject            string
 	hint               string
-	target             models.AcrLevel
-	sessionAcr         models.AcrLevel
+	target             record.AcrLevel
+	sessionAcr         record.AcrLevel
 	sessionOtpGen      int64
 	userOtpGen         int64
 	otpEnabled         bool
@@ -440,11 +440,11 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 		case silentFactSession:
 			facts.sessionLoaded = true
 			if !world.noSession {
-				facts.session = &models.UserSession{
+				facts.session = &record.UserSession{
 					UserId:              7,
 					AcrLevel:            world.sessionAcr,
 					OtpConfigGeneration: world.sessionOtpGen,
-					User: models.User{
+					User: record.User{
 						Id:                  7,
 						Subject:             world.subject,
 						Enabled:             !world.disabled,
@@ -465,7 +465,7 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 		case silentFactConsent:
 			facts.consentLoaded = true
 			if world.consentScope != nil {
-				facts.consent = &models.UserConsent{UserId: 7, Scope: *world.consentScope}
+				facts.consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
 			}
 		default:
 			require.FailNow(t, "an unknown fact", "%v", need)
@@ -491,8 +491,8 @@ func TestDecideSilentAuthentication(t *testing.T) {
 	passing := silentWorld{
 		valid:          true,
 		subject:        "sub-1",
-		target:         models.AcrLevel1,
-		sessionAcr:     models.AcrLevel1,
+		target:         record.AcrLevel1,
+		sessionAcr:     record.AcrLevel1,
 		effectiveScope: "openid profile",
 	}
 	with := func(edit func(*silentWorld)) silentWorld {
@@ -582,14 +582,14 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		},
 		{
 			name:            "a hint mismatch is asked before the step-up rule",
-			world:           with(func(w *silentWorld) { w.hint = "sub-2"; w.target = models.AcrLevel2Mandatory }),
+			world:           with(func(w *silentWorld) { w.hint = "sub-2"; w.target = record.AcrLevel2Mandatory }),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "The current session user does not match the id_token_hint",
 			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name:            "a target above the session's level",
-			world:           with(func(w *silentWorld) { w.target = models.AcrLevel2Optional; w.otpEnabled = true }),
+			world:           with(func(w *silentWorld) { w.target = record.AcrLevel2Optional; w.otpEnabled = true }),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Higher authentication level required",
 			wantReads:       []silentFact{session, validity},
@@ -604,8 +604,8 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		{
 			name: "a mandatory target with no authenticator, before the changed configuration",
 			world: with(func(w *silentWorld) {
-				w.target = models.AcrLevel2Mandatory
-				w.sessionAcr = models.AcrLevel2Mandatory
+				w.target = record.AcrLevel2Mandatory
+				w.sessionAcr = record.AcrLevel2Mandatory
 				w.sessionOtpGen, w.userOtpGen = 2, 3
 			}),
 			wantCode:        oidc.ErrorInteractionRequired,
@@ -615,8 +615,8 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		{
 			name: "the authenticator changed since the session answered level 2",
 			world: with(func(w *silentWorld) {
-				w.target = models.AcrLevel2Optional
-				w.sessionAcr = models.AcrLevel2Optional
+				w.target = record.AcrLevel2Optional
+				w.sessionAcr = record.AcrLevel2Optional
 				w.otpEnabled = true
 				w.sessionOtpGen, w.userOtpGen = 2, 3
 			}),
@@ -628,7 +628,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			// The level 2 question is not asked of a level 1 target.
 			name: "a changed authenticator does not refuse a level 1 target",
 			world: with(func(w *silentWorld) {
-				w.sessionAcr = models.AcrLevel2Optional
+				w.sessionAcr = record.AcrLevel2Optional
 				w.sessionOtpGen, w.userOtpGen = 2, 3
 			}),
 			wantReads: []silentFact{session, validity, scope},
@@ -636,8 +636,8 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		{
 			name: "a mandatory target satisfied by an enrolled session passes",
 			world: with(func(w *silentWorld) {
-				w.target = models.AcrLevel2Mandatory
-				w.sessionAcr = models.AcrLevel2Mandatory
+				w.target = record.AcrLevel2Mandatory
+				w.sessionAcr = record.AcrLevel2Mandatory
 				w.otpEnabled = true
 			}),
 			wantReads: []silentFact{session, validity, scope},

@@ -13,8 +13,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -63,9 +63,9 @@ func createHttpClientWithUserAgent(t *testing.T, userAgent string) *http.Client 
 
 // offlineGrant is what an offline_access ceremony yields, plus the pieces later steps need.
 type offlineGrant struct {
-	client       *models.Client
+	client       *record.Client
 	clientSecret string
-	user         *models.User
+	user         *record.User
 	password     string
 	redirectURI  string
 	accessToken  string
@@ -317,7 +317,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "revoke-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		Enabled:                  true,
@@ -327,21 +327,21 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 		// (one without offline_access) skip consent and SSO straight through, which is how the
 		// session-bound bearer below is obtained.
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: "https://example.com/callback"}
+	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: "https://example.com/callback"}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(12)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        strings.ToLower(fake.LetterN(12)) + "@example.com",
@@ -472,7 +472,7 @@ func (g *offlineGrant) refresh(t *testing.T) map[string]interface{} {
 // was issued. The link itself comes from the shared builder, so this fixture cannot drift from the
 // shape the handler redirects to; and the code hash is seeded beside the encrypted code because that
 // is what the link is looked up by now (#112).
-func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
+func resetPasswordFor(t *testing.T, user *record.User, newPassword string) {
 	t.Helper()
 
 	code := fake.LetterN(32)

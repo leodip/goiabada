@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 )
 
@@ -61,12 +61,12 @@ type EmailValidator interface {
 
 // PasswordValidator holds a chosen password to the configured policy.
 type PasswordValidator interface {
-	ValidatePassword(policy models.PasswordPolicy, password string) error
+	ValidatePassword(policy record.PasswordPolicy, password string) error
 }
 
 // UserCreator creates the user row and its default permissions in one transaction.
 type UserCreator interface {
-	CreateUser(ctx context.Context, input *usercreation.Input) (*models.User, error)
+	CreateUser(ctx context.Context, input *usercreation.Input) (*record.User, error)
 }
 
 // AfterResponse runs work a handler hands off so that its response does not wait for it. The job

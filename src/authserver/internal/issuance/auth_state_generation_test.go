@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,8 +24,8 @@ import (
 // What these cannot prove: that a real JWT round-trips the claim through a real HTTP
 // exchange and that the middleware then enforces it. Stage 5's integration tests do that.
 
-func generationTestSettings() *models.Settings {
-	return &models.Settings{
+func generationTestSettings() *record.Settings {
+	return &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -37,8 +37,8 @@ func generationTestSettings() *models.Settings {
 
 // generationTestCode builds a redeemable code with its Client and User already attached,
 // so no database is needed.
-func generationTestCode(scope string, sessionIdentifier string, codeGeneration int64, userGeneration int64) *models.Code {
-	return &models.Code{
+func generationTestCode(scope string, sessionIdentifier string, codeGeneration int64, userGeneration int64) *record.Code {
+	return &record.Code{
 		Id:                  1,
 		ClientId:            1,
 		UserId:              1,
@@ -48,12 +48,12 @@ func generationTestCode(scope string, sessionIdentifier string, codeGeneration i
 		AcrLevel:            "urn:goiabada:level1",
 		AuthMethods:         "pwd",
 		AuthStateGeneration: codeGeneration,
-		Client: models.Client{
+		Client: record.Client{
 			Id:                       1,
 			ClientIdentifier:         "test-client",
 			TokenExpirationInSeconds: 900,
 		},
-		User: models.User{
+		User: record.User{
 			Id:                  1,
 			Subject:             fake.UUID(),
 			Username:            "testuser",
@@ -96,9 +96,9 @@ func TestAccessToken_SidEmission(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		code    *models.Code
+		code    *record.Code
 		scope   string
-		parent  *models.RefreshToken
+		parent  *record.RefreshToken
 		wantSid bool
 	}{
 		{
@@ -123,14 +123,14 @@ func TestAccessToken_SidEmission(t *testing.T) {
 			name:    "refresh of a session-bound token, emits sid",
 			code:    generationTestCode("openid profile", sid, 0, 0),
 			scope:   "openid profile",
-			parent:  &models.RefreshToken{RefreshTokenType: TokenTypeRefresh.String()},
+			parent:  &record.RefreshToken{RefreshTokenType: TokenTypeRefresh.String()},
 			wantSid: true,
 		},
 		{
 			name:    "refresh of an offline token, no sid",
 			code:    generationTestCode("openid offline_access", sid, 0, 0),
 			scope:   "openid offline_access",
-			parent:  &models.RefreshToken{RefreshTokenType: TokenTypeOffline.String()},
+			parent:  &record.RefreshToken{RefreshTokenType: TokenTypeOffline.String()},
 			wantSid: false,
 		},
 		{
@@ -143,7 +143,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 			name:    "refresh of an offline grant, request down-scoped away offline_access, no sid",
 			code:    generationTestCode("openid offline_access", sid, 0, 0),
 			scope:   "openid",
-			parent:  &models.RefreshToken{RefreshTokenType: TokenTypeOffline.String()},
+			parent:  &record.RefreshToken{RefreshTokenType: TokenTypeOffline.String()},
 			wantSid: false,
 		},
 	}
@@ -198,7 +198,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// read of either wrong source is visible: the preserved session's token was
 		// promoted to 7 while its code stayed at 3, and the user has since reached 9.
 		code := generationTestCode("openid", sid, 3, 9)
-		parent := &models.RefreshToken{RefreshTokenType: TokenTypeRefresh.String(), AuthStateGeneration: 7}
+		parent := &record.RefreshToken{RefreshTokenType: TokenTypeRefresh.String(), AuthStateGeneration: 7}
 		tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
@@ -216,8 +216,8 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// generation rather than the request laundering itself forward. The
 		// handler-to-issuer seam is pinned separately in handler_token's ROPC test.
 		input := &ROPCGrantInput{
-			Client: &models.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
-			User:   &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 7},
+			Client: &record.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
+			User:   &record.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 7},
 			Scope:  "openid",
 		}
 		tokenStr, err := issuer.generateROPCAccessToken(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", nil)
@@ -234,11 +234,11 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// reloads the user, so reading input.User here stamps a grant authenticated at 7
 		// with the current 9 and launders it forward.
 		input := &ROPCGrantInput{
-			Client: &models.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
-			User:   &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
+			Client: &record.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
+			User:   &record.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
 			Scope:  "openid",
 		}
-		parent := &models.RefreshToken{RefreshTokenType: TokenTypeOffline.String(), AuthStateGeneration: 7}
+		parent := &record.RefreshToken{RefreshTokenType: TokenTypeOffline.String(), AuthStateGeneration: 7}
 		tokenStr, err := issuer.generateROPCAccessToken(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
@@ -246,8 +246,8 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 
 	t.Run("implicit takes the AuthContext's generation", func(t *testing.T) {
 		input := &ImplicitGrantInput{
-			Client:              &models.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
-			User:                &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
+			Client:              &record.Client{Id: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
+			User:                &record.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
 			Scope:               "openid",
 			AcrLevel:            "urn:goiabada:level1",
 			AuthMethods:         "pwd",
@@ -271,7 +271,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 // refresh tokens, by capturing the model handed to CreateCode and CreateRefreshToken.
 //
 // Nothing else in the plan would notice a missing stamp: stage 3's validator tests build
-// models.Code{AuthStateGeneration: N} fixtures directly and never traverse issuance, and
+// record.Code{AuthStateGeneration: N} fixtures directly and never traverse issuance, and
 // stage 1b's data tests exercise the narrow write methods rather than the issuers.
 //
 // The failure a missing stamp produces is severe and quiet. The row lands at the column
@@ -297,11 +297,11 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		issuer := NewCodeIssuer(mockDB)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 
-		var captured *models.Code
+		var captured *record.Code
 		mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.Code) }).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.Code) }).
 			Return(nil)
 
 		input := &CreateCodeInput{SessionIdentifier: sid}
@@ -326,9 +326,9 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		// code 7 against a user already at 9.
 		code := generationTestCode("openid offline_access", sid, 7, 9)
 
-		var captured *models.RefreshToken
+		var captured *record.RefreshToken
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
 		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", nil)
@@ -344,7 +344,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		// Three-way conflict on purpose: parent 7, code 3, user 9. A read of either wrong
 		// source is therefore visible rather than only one of them.
 		code := generationTestCode("openid offline_access", sid, 3, 9)
-		parent := &models.RefreshToken{
+		parent := &record.RefreshToken{
 			RefreshTokenJti:      "parent-jti",
 			FirstRefreshTokenJti: "first-jti",
 			RefreshTokenType:     TokenTypeOffline.String(),
@@ -352,9 +352,9 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			MaxLifetime:          sqlNullTime(now.Add(24 * time.Hour)),
 		}
 
-		var captured *models.RefreshToken
+		var captured *record.RefreshToken
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
 		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent)
@@ -368,14 +368,14 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		input := &ROPCGrantInput{
-			Client: &models.Client{Id: 1, ClientIdentifier: "test-client"},
-			User:   &models.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 7},
+			Client: &record.Client{Id: 1, ClientIdentifier: "test-client"},
+			User:   &record.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 7},
 			Scope:  "openid",
 		}
 
-		var captured *models.RefreshToken
+		var captured *record.RefreshToken
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
 		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", nil)
@@ -391,11 +391,11 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		// The refresh path reloads the user, so this fixture puts the reloaded user at 9
 		// while the grant was authenticated at 7.
 		input := &ROPCGrantInput{
-			Client: &models.Client{Id: 1, ClientIdentifier: "test-client"},
-			User:   &models.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 9},
+			Client: &record.Client{Id: 1, ClientIdentifier: "test-client"},
+			User:   &record.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 9},
 			Scope:  "openid",
 		}
-		parent := &models.RefreshToken{
+		parent := &record.RefreshToken{
 			RefreshTokenJti:      "parent-jti",
 			FirstRefreshTokenJti: "first-jti",
 			RefreshTokenType:     TokenTypeOffline.String(),
@@ -403,9 +403,9 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			MaxLifetime:          sqlNullTime(now.Add(24 * time.Hour)),
 		}
 
-		var captured *models.RefreshToken
+		var captured *record.RefreshToken
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
 		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", parent)

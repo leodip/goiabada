@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/securerandom"
@@ -23,7 +23,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:      "auth-client-" + strings.ToLower(fake.LetterN(10)),
 		Enabled:               true,
 		ConsentRequired:       false,
@@ -202,9 +202,9 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 }
 
 // helper to create a public client directly in DB
-func createPublicClient(t *testing.T) *models.Client {
+func createPublicClient(t *testing.T) *record.Client {
 	t.Helper()
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "pub-client-" + strings.ToLower(fake.LetterN(10)),
 		Enabled:                  true,
 		ConsentRequired:          false,

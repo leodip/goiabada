@@ -8,7 +8,7 @@ import (
 	"time"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
@@ -21,8 +21,8 @@ import (
 
 var fixedNow = time.Date(2026, time.September, 13, 12, 0, 0, 0, time.UTC)
 
-func testSettings() *models.Settings {
-	return &models.Settings{
+func testSettings() *record.Settings {
+	return &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 2 * 60 * 60,
 		UserSessionMaxLifetimeInSeconds: 90 * 60,
 	}
@@ -53,7 +53,7 @@ func TestDatabaseBackend_Load(t *testing.T) {
 
 	t.Run("maps a row", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		row := &models.BrowserSession{
+		row := &record.BrowserSession{
 			Data:          "ciphertext",
 			LastAccessed:  fixedNow.Add(-time.Minute),
 			ExpiresAt:     fixedNow.Add(time.Hour),
@@ -62,12 +62,12 @@ func TestDatabaseBackend_Load(t *testing.T) {
 		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(row, nil)
 
-		record, err := testBackend(database, owner).Load(context.Background(), id)
+		stored, err := testBackend(database, owner).Load(context.Background(), id)
 
 		require.NoError(t, err)
-		assert.Equal(t, []byte("ciphertext"), record.Data)
-		assert.Equal(t, row.LastAccessed, record.LastAccessed)
-		assert.Equal(t, row.ExpiresAt, record.ExpiresAt)
+		assert.Equal(t, []byte("ciphertext"), stored.Data)
+		assert.Equal(t, row.LastAccessed, stored.LastAccessed)
+		assert.Equal(t, row.ExpiresAt, stored.ExpiresAt)
 	})
 
 	t.Run("maps an absent row to not found", func(t *testing.T) {
@@ -75,9 +75,9 @@ func TestDatabaseBackend_Load(t *testing.T) {
 		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(nil, nil)
 
-		record, err := testBackend(database, owner).Load(context.Background(), id)
+		stored, err := testBackend(database, owner).Load(context.Background(), id)
 
-		assert.Nil(t, record)
+		assert.Nil(t, stored)
 		assert.ErrorIs(t, err, sessionstore.ErrNotFound)
 	})
 
@@ -87,9 +87,9 @@ func TestDatabaseBackend_Load(t *testing.T) {
 		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(nil, cause)
 
-		record, err := testBackend(database, owner).Load(context.Background(), id)
+		stored, err := testBackend(database, owner).Load(context.Background(), id)
 
-		assert.Nil(t, record)
+		assert.Nil(t, stored)
 		requireWrappedCause(t, err, cause)
 	})
 }
@@ -110,7 +110,7 @@ func TestDatabaseBackend_Create(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *models.BrowserSession) bool {
+			database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *record.BrowserSession) bool {
 				return row.Owner == owner &&
 					row.SessionId == id &&
 					row.SessionIdHash == hashutil.HashString(id) &&
@@ -150,7 +150,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 	t.Run("authenticated reads created at", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
-			Return(&models.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
+			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().UpdateBrowserSessionData(mock.Anything, (*sql.Tx)(nil), owner, hash, "ciphertext", fixedNow, wantExpiry).
 			Return(true, nil)
 
@@ -163,7 +163,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 	t.Run("absent write is not found", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
-			Return(&models.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
+			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().UpdateBrowserSessionData(mock.Anything, (*sql.Tx)(nil), owner, hash, "ciphertext", fixedNow, wantExpiry).
 			Return(false, nil)
 
@@ -234,7 +234,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 	t.Run("authenticated reads created at", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
-			Return(&models.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
+			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().TouchBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow, wantExpiry).Return(true, nil)
 
 		expiresAt, err := testBackend(database, owner).Touch(settingsContext(), id, true)
@@ -246,7 +246,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 	t.Run("absent write is not found", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
-			Return(&models.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
+			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().TouchBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow, wantExpiry).Return(false, nil)
 
 		_, err := testBackend(database, owner).Touch(settingsContext(), id, true)
@@ -337,7 +337,7 @@ func TestDatabaseBackend_InvalidCreatedAtFallsBackToNow(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 			database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
-				Return(&models.BrowserSession{CreatedAt: sql.NullTime{Valid: false}}, nil)
+				Return(&record.BrowserSession{CreatedAt: sql.NullTime{Valid: false}}, nil)
 			tc.write(database)
 
 			expiresAt, err := tc.call(testBackend(database, owner))
@@ -476,7 +476,7 @@ func TestDatabaseBackend_OnlyDigestsReachStringArguments(t *testing.T) {
 	})
 	t.Run("create carries the digest in the model", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *models.BrowserSession) bool {
+		database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *record.BrowserSession) bool {
 			return row.SessionId == id && row.SessionIdHash == digest
 		})).Return(nil)
 		_, _ = testBackend(database, owner).Create(settingsContext(), id, []byte("data"), false)
@@ -508,7 +508,7 @@ func TestDatabaseBackend_ConstructorsFixEveryOperationOwner(t *testing.T) {
 			})
 			t.Run("create", func(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
-				database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *models.BrowserSession) bool {
+				database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *record.BrowserSession) bool {
 					return row.Owner == tc.owner
 				})).Return(nil)
 				_, _ = tc.new(database).Create(settingsContext(), "id", []byte("data"), false)

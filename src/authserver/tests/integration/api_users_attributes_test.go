@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +19,7 @@ func TestAPIUserAttributesGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@attributes.test"),
@@ -82,7 +82,7 @@ func TestAPIUserAttributesGet_EmptyAttributes(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user without attributes
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@empty-attrs.test"),
@@ -152,7 +152,7 @@ func TestAPIUserAttributesGet_InvalidId(t *testing.T) {
 
 func TestAPIUserAttributesGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-attrs.test"),
@@ -185,7 +185,7 @@ func TestAPIUserAttributeGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-get.test"),
@@ -267,7 +267,7 @@ func TestAPIUserAttributeGet_InvalidId(t *testing.T) {
 
 func TestAPIUserAttributeGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user and attribute
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-attr.test"),
@@ -305,7 +305,7 @@ func TestAPIUserAttributeCreatePost_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-create.test"),
@@ -368,7 +368,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-validation.test"),
@@ -484,7 +484,7 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-update.test"),
@@ -564,7 +564,7 @@ func TestAPIUserAttributeUpdatePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user and attribute
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-update-validation.test"),
@@ -666,7 +666,7 @@ func TestAPIUserAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user and attribute
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-invalid-body.test"),
@@ -702,7 +702,7 @@ func TestAPIUserAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 
 func TestAPIUserAttributeUpdatePut_Unauthorized(t *testing.T) {
 	// Setup: Create test user and attribute
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-unauth-update.test"),
@@ -740,7 +740,7 @@ func TestAPIUserAttributeDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-delete.test"),
@@ -819,7 +819,7 @@ func TestAPIUserAttributeDelete_InvalidId(t *testing.T) {
 
 func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user and attribute
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-delete-unauth.test"),
@@ -857,8 +857,8 @@ func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 }
 
 // Helper function to create a test user attribute
-func createTestUserAttribute(t *testing.T, userId int64, key, value string) *models.UserAttribute {
-	attr := &models.UserAttribute{
+func createTestUserAttribute(t *testing.T, userId int64, key, value string) *record.UserAttribute {
+	attr := &record.UserAttribute{
 		Key:                  key,
 		Value:                value,
 		IncludeInIdToken:     true,
@@ -875,7 +875,7 @@ func createTestUserAttribute(t *testing.T, userId int64, key, value string) *mod
 func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-angle.test"),
@@ -928,7 +928,7 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@attr-verbatim.test"),

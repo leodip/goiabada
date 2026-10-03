@@ -6,7 +6,7 @@ import (
 
 // PublicSettingsResponse is what /api/public/settings answers. That endpoint needs no
 // authentication, so this type is the entire boundary between an anonymous caller and the 32
-// fields of models.Settings, among them the legacy AES encryption key and the encrypted SMTP
+// fields of record.Settings, among them the legacy AES encryption key and the encrypted SMTP
 // password. The auth server's handler_public_settings_test.go holds that boundary in two
 // directions: an allowlist of the fields below, and a case filling the model with recognizable
 // secrets and asserting none of them reach the body.

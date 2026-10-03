@@ -14,7 +14,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -319,14 +319,14 @@ func createAuthenticatedHttpClient(t *testing.T) *http.Client {
 
 // navigateToPasswordScreen starts an auth flow and navigates to the password screen
 // Returns the HTTP response for the password page
-func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *models.Client, redirectUri string) *http.Response {
+func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *record.Client, redirectUri string) *http.Response {
 	return navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectUri, "")
 }
 
 // navigateToPasswordScreenWithUILocales is the same as navigateToPasswordScreen
 // but appends an ui_locales query parameter (space-separated BCP 47 tags) when
 // non-empty, exercising the OIDC hint preservation across the redirect chain.
-func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client, client *models.Client, redirectUri, uiLocales string) *http.Response {
+func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client, client *record.Client, redirectUri, uiLocales string) *http.Response {
 	requestCodeChallenge := fake.LetterN(43)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
@@ -363,7 +363,7 @@ func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client
 
 // navigateToOtpScreen starts an auth flow, authenticates with password, and navigates to OTP screen
 // Returns the HTTP response for the OTP page
-func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.Client, user *models.User,
+func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *record.Client, user *record.User,
 	password string, redirectUri string) *http.Response {
 
 	requestCodeChallenge := fake.LetterN(43)
@@ -417,8 +417,8 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *models.C
 
 // navigateToConsentScreen completes auth flow and navigates to consent screen
 // Returns the HTTP response for the consent page
-func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *models.Client,
-	user *models.User, password string, redirectUri string) *http.Response {
+func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *record.Client,
+	user *record.User, password string, redirectUri string) *http.Response {
 
 	requestCodeChallenge := fake.LetterN(43)
 	requestState := fake.LetterN(8)

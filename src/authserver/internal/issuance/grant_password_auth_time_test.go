@@ -8,7 +8,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,20 +24,20 @@ import (
 // the grant writes captured.
 type ropcGrantFixture struct {
 	issuer    *TokenIssuer
-	settings  *models.Settings
+	settings  *record.Settings
 	input     *ROPCGrantInput
 	publicKey []byte
-	written   **models.RefreshToken
+	written   **record.RefreshToken
 }
 
 func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
-	user := &models.User{Id: 1, Subject: fake.UUID(), Email: "user@example.com", Enabled: true}
-	client := &models.Client{Id: 1, ClientIdentifier: "ropc-client"}
+	user := &record.User{Id: 1, Subject: fake.UUID(), Email: "user@example.com", Enabled: true}
+	client := &record.Client{Id: 1, ClientIdentifier: "ropc-client"}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
@@ -46,14 +46,14 @@ func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
-	var written *models.RefreshToken
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
-		Run(func(args mock.Arguments) { written = args.Get(2).(*models.RefreshToken) }).
+	var written *record.RefreshToken
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).
+		Run(func(args mock.Arguments) { written = args.Get(2).(*record.RefreshToken) }).
 		Return(nil)
 
 	return ropcGrantFixture{
 		issuer: NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil),
-		settings: &models.Settings{
+		settings: &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
@@ -127,8 +127,8 @@ func TestMintROPCRefreshTokens_ATokenWithNoInstantIsRefused(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &models.Settings{},
-		&models.RefreshToken{
+	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &record.Settings{},
+		&record.RefreshToken{
 			RefreshTokenJti: "pre-000051-jti",
 			UserId:          sql.NullInt64{Int64: 1, Valid: true},
 			ClientId:        sql.NullInt64{Int64: 1, Valid: true},

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +20,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test groups
-	testGroup1 := &models.Group{
+	testGroup1 := &record.Group{
 		GroupIdentifier:      "test-group-1",
 		Description:          "Test Group 1",
 		IncludeInIdToken:     true,
@@ -32,7 +32,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
 	}()
 
-	testGroup2 := &models.Group{
+	testGroup2 := &record.Group{
 		GroupIdentifier:      "test-group-2",
 		Description:          "Test Group 2",
 		IncludeInIdToken:     false,
@@ -163,7 +163,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group with all enhanced fields
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier:      "enhanced-test-group",
 		Description:          "Enhanced Test Group",
 		IncludeInIdToken:     true,
@@ -241,9 +241,9 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 		{"mixed-group-4", false, false}, // Neither token
 	}
 
-	var createdGroups []*models.Group
+	var createdGroups []*record.Group
 	for _, tc := range testCases {
-		group := &models.Group{
+		group := &record.Group{
 			GroupIdentifier:      tc.identifier,
 			Description:          "Test Group for " + tc.identifier,
 			IncludeInIdToken:     tc.includeInIdToken,
@@ -301,7 +301,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	}()
 
 	// Setup: Create test users
-	testUser1 := &models.User{
+	testUser1 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser1@membercount.test"),
@@ -315,7 +315,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
 	}()
 
-	testUser2 := &models.User{
+	testUser2 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser2@membercount.test"),
@@ -330,7 +330,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	}()
 
 	// Setup: Add users to group
-	userGroup1 := &models.UserGroup{
+	userGroup1 := &record.UserGroup{
 		UserId:  testUser1.Id,
 		GroupId: testGroup.Id,
 	}
@@ -340,7 +340,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
 	}()
 
-	userGroup2 := &models.UserGroup{
+	userGroup2 := &record.UserGroup{
 		UserId:  testUser2.Id,
 		GroupId: testGroup.Id,
 	}

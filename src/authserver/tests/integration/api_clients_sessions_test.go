@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "test-client-sessions-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Test Client for Sessions",
@@ -35,7 +35,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// Create a user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@client-sessions-success.test"),
@@ -57,10 +57,10 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 
 	// Link sessions to client
 	now := time.Now().UTC()
-	usc1 := &models.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
+	usc1 := &record.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 	err = database.CreateUserSessionClient(context.Background(), nil, usc1)
 	assert.NoError(t, err)
-	usc2 := &models.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
+	usc2 := &record.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 	err = database.CreateUserSessionClient(context.Background(), nil, usc2)
 	assert.NoError(t, err)
 
@@ -104,7 +104,7 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a client without linked sessions
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "test-client-empty-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Empty Client",
@@ -181,7 +181,7 @@ func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
 
 func TestAPIClientSessionsGet_Unauthorized(t *testing.T) {
 	// Create a client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "test-client-unauth-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Client",
@@ -209,7 +209,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "test-client-valid-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Client",
@@ -224,7 +224,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// User
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@client-valid-sessions.test"),
@@ -237,7 +237,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	// Valid session
-	valid := &models.UserSession{
+	valid := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-30 * time.Minute),
 		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
@@ -255,7 +255,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
 
 	// Expired session
-	expired := &models.UserSession{
+	expired := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-25 * time.Hour),
 		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
@@ -274,9 +274,9 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 
 	// Link both to client
 	now := time.Now().UTC()
-	err = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: valid.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: valid.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
 	assert.NoError(t, err)
-	err = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: expired.Id, ClientId: testClient.Id, Started: now.Add(-26 * time.Hour), LastAccessed: now.Add(-25 * time.Hour)})
+	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: expired.Id, ClientId: testClient.Id, Started: now.Add(-26 * time.Hour), LastAccessed: now.Add(-25 * time.Hour)})
 	assert.NoError(t, err)
 
 	// Call endpoint
@@ -298,7 +298,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "test-client-page-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Client",
@@ -313,7 +313,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// User
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@client-page.test"),
@@ -327,10 +327,10 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 
 	// Create many valid sessions (e.g., 120)
 	total := 120
-	sessions := make([]*models.UserSession, 0, total)
+	sessions := make([]*record.UserSession, 0, total)
 	now := time.Now().UTC()
 	for i := 0; i < total; i++ {
-		s := &models.UserSession{
+		s := &record.UserSession{
 			SessionIdentifier: fake.UUID(),
 			Started:           now.Add(-time.Hour),
 			LastAccessed:      now.Add(-time.Minute * 5),
@@ -347,7 +347,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 		assert.NoError(t, sessionErr)
 		sessions = append(sessions, s)
 		// Link to client
-		usc := &models.UserSessionClient{UserSessionId: s.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
+		usc := &record.UserSessionClient{UserSessionId: s.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 		sessionErr = database.CreateUserSessionClient(context.Background(), nil, usc)
 		assert.NoError(t, sessionErr)
 	}
@@ -391,7 +391,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "test-client-owners-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Client",
@@ -403,7 +403,7 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// Two sessions for the first person, one for the second.
-	first := &models.User{
+	first := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("first@client-owners.test"),
@@ -419,7 +419,7 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 	require.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
 
-	second := &models.User{
+	second := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("second@client-owners.test"),
@@ -436,7 +436,7 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 		session := createTestUserSession(t, userId, fake.UUID())
 		defer func(id int64) { _ = database.DeleteUserSession(context.Background(), nil, id) }(session.Id)
 
-		err = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
+		err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
 			UserSessionId: session.Id, ClientId: testClient.Id,
 			Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute),
 		})

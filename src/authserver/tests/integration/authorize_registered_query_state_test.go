@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +41,7 @@ const registeredQueryStateEscaped = "csrf+a%2Bb%2Fc%3D"
 // code redirect against a client whose registered redirect URI already carries a "state", and
 // compares the emitted Location as a string.
 //
-// The unit tests around writeResponseParams hand-build a models.Code, so they assume a
+// The unit tests around writeResponseParams hand-build a record.Code, so they assume a
 // query-bearing redirect URI can be registered and then matched back by
 // ValidateClientAndRedirectURI at all. This is the only tier that shows it (#146, decision 9).
 func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) {
@@ -146,18 +146,18 @@ func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 // newRegisteredQueryClient creates a client whose only registered redirect URI carries a query, plus
 // a user able to complete a level1 ceremony for it. It lives here rather than in
 // fixture_helpers_test.go because this file is its only reader.
-func newRegisteredQueryClient(t *testing.T) (*models.Client, *models.User, string) {
-	client := &models.Client{
+func newRegisteredQueryClient(t *testing.T) (*record.Client, *record.User, string) {
+	client := &record.Client{
 		ClientIdentifier:         "registered-query-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      registeredQueryRedirectURI,
 	})
@@ -167,7 +167,7 @@ func newRegisteredQueryClient(t *testing.T) (*models.Client, *models.User, strin
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

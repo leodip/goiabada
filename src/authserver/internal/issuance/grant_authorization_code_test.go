@@ -10,7 +10,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,7 +20,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -40,7 +40,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                1,
 		ClientId:          1,
 		UserId:            1,
@@ -51,14 +51,14 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd:otp_mandatory",
 		AuthMethods:       "pwd otp",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
 		TokenExpirationInSeconds:                900,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:                  1,
 		UpdatedAt:           sql.NullTime{Time: time.Now().Add(-1 * time.Minute), Valid: true},
 		Subject:             sub,
@@ -82,13 +82,13 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 		AddressRegion:       "Test Region",
 		AddressPostalCode:   "12345",
 		AddressCountry:      "Test Country",
-		Groups: []models.Group{
+		Groups: []record.Group{
 			{GroupIdentifier: "group1", IncludeInIdToken: true, IncludeInAccessToken: true},
 			{GroupIdentifier: "group2", IncludeInIdToken: true, IncludeInAccessToken: false},
 			{GroupIdentifier: "group3", IncludeInIdToken: false, IncludeInAccessToken: true},
 			{GroupIdentifier: "group4", IncludeInIdToken: true, IncludeInAccessToken: true},
 		},
-		Attributes: []models.UserAttribute{
+		Attributes: []record.UserAttribute{
 			{Key: "attr1", Value: "value1", IncludeInIdToken: true, IncludeInAccessToken: true},
 			{Key: "attr2", Value: "value2", IncludeInIdToken: true, IncludeInAccessToken: false},
 			{Key: "attr3", Value: "value3", IncludeInIdToken: false, IncludeInAccessToken: true},
@@ -104,8 +104,8 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -270,7 +270,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -290,7 +290,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                2,
 		ClientId:          2,
 		UserId:            2,
@@ -301,11 +301,11 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:               2,
 		ClientIdentifier: "minimal-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      2,
 		Subject: sub,
 		Email:   "minimal@example.com",
@@ -318,14 +318,14 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 		Id:           1,
 		UserId:       1,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -404,7 +404,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -423,7 +423,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                3,
 		ClientId:          3,
 		UserId:            3,
@@ -434,7 +434,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 		AcrLevel:          "urn:goiabada:pwd:otp_ifpossible",
 		AuthMethods:       "pwd otp",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      3,
 		ClientIdentifier:                        "mixed-client",
 		TokenExpirationInSeconds:                1500,
@@ -443,7 +443,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
 		IncludeOpenIDConnectClaimsInIdToken:     "on",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            3,
 		Subject:       sub,
 		Email:         "mixed@example.com",
@@ -452,11 +452,11 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 		GivenName:     "Mixed",
 		FamilyName:    "User",
 		UpdatedAt:     sql.NullTime{Time: now.Add(-24 * time.Hour), Valid: true},
-		Groups: []models.Group{
+		Groups: []record.Group{
 			{GroupIdentifier: "group1", IncludeInIdToken: true, IncludeInAccessToken: true},
 			{GroupIdentifier: "group2", IncludeInIdToken: false, IncludeInAccessToken: true},
 		},
-		Attributes: []models.UserAttribute{
+		Attributes: []record.UserAttribute{
 			{Key: "attr1", Value: "value1", IncludeInIdToken: true, IncludeInAccessToken: true},
 			{Key: "attr2", Value: "value2", IncludeInIdToken: true, IncludeInAccessToken: false},
 		},
@@ -470,14 +470,14 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 		Id:           1,
 		UserId:       3,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -582,7 +582,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -601,7 +601,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                4,
 		ClientId:          4,
 		UserId:            4,
@@ -612,7 +612,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      4,
 		ClientIdentifier:                        "custom-client",
 		TokenExpirationInSeconds:                1200,
@@ -620,7 +620,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 		RefreshTokenOfflineMaxLifetimeInSeconds: 6000,
 		IncludeOpenIDConnectClaimsInAccessToken: "off",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      4,
 		Subject: sub,
 		Email:   "custom@example.com",
@@ -633,8 +633,8 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -700,7 +700,7 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -719,7 +719,7 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                5,
 		ClientId:          5,
 		UserId:            5,
@@ -730,11 +730,11 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:               5,
 		ClientIdentifier: "custom-scope-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      5,
 		Subject: sub,
 		Email:   "custom@example.com",
@@ -747,14 +747,14 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 		Id:           1,
 		UserId:       5,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)

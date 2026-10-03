@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *models.WebOrigin) error {
+func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error {
 
 	if webOrigin.ClientId == 0 {
 		return errs.New("client id must be greater than 0")
@@ -21,7 +21,7 @@ func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *m
 	originalCreatedAt := webOrigin.CreatedAt
 	webOrigin.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
-	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
 		For(d.Flavor)
 
 	insertBuilder := webOriginStruct.WithoutTag("pk").InsertInto("web_origins", webOrigin)
@@ -37,7 +37,7 @@ func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *m
 }
 
 func (d *Database) getWebOriginCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	webOriginStruct *sqlbuilder.Struct) (*models.WebOrigin, error) {
+	webOriginStruct *sqlbuilder.Struct) (*record.WebOrigin, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -46,7 +46,7 @@ func (d *Database) getWebOriginCommon(ctx context.Context, tx *sql.Tx, selectBui
 	}
 	defer func() { _ = rows.Close() }()
 
-	var webOrigin models.WebOrigin
+	var webOrigin record.WebOrigin
 	if rows.Next() {
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
@@ -62,9 +62,9 @@ func (d *Database) getWebOriginCommon(ctx context.Context, tx *sql.Tx, selectBui
 	return nil, nil
 }
 
-func (d *Database) GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error) {
+func (d *Database) GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*record.WebOrigin, error) {
 
-	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
 		For(d.Flavor)
 
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
@@ -78,9 +78,9 @@ func (d *Database) GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId
 	return webOrigin, nil
 }
 
-func (d *Database) GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.WebOrigin, error) {
+func (d *Database) GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.WebOrigin, error) {
 
-	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
 		For(d.Flavor)
 
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
@@ -93,9 +93,9 @@ func (d *Database) GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clie
 	}
 	defer func() { _ = rows.Close() }()
 
-	var webOrigins []models.WebOrigin
+	var webOrigins []record.WebOrigin
 	for rows.Next() {
-		var webOrigin models.WebOrigin
+		var webOrigin record.WebOrigin
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -111,9 +111,9 @@ func (d *Database) GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clie
 	return webOrigins, nil
 }
 
-func (d *Database) GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]models.WebOrigin, error) {
+func (d *Database) GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]record.WebOrigin, error) {
 
-	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
+	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
 		For(d.Flavor)
 
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
@@ -125,9 +125,9 @@ func (d *Database) GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]models.W
 	}
 	defer func() { _ = rows.Close() }()
 
-	var webOrigins []models.WebOrigin
+	var webOrigins []record.WebOrigin
 	for rows.Next() {
-		var webOrigin models.WebOrigin
+		var webOrigin record.WebOrigin
 		addr := webOriginStruct.Addr(&webOrigin)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -183,7 +183,7 @@ func (d *Database) WebOriginExists(ctx context.Context, tx *sql.Tx, origin strin
 
 func (d *Database) DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
+	clientStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("web_origins")

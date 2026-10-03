@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -111,15 +111,15 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 
 				clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 				require.NoError(t, err)
-				clients := map[string]*models.Client{
+				clients := map[string]*record.Client{
 					"client1": {Id: 1, ClientIdentifier: "client1", Enabled: true,
 						AuthorizationCodeEnabled: true, ClientSecretEncrypted: clientSecretEncrypted},
 					"client2": {Id: 2, ClientIdentifier: "client2", Enabled: true,
 						AuthorizationCodeEnabled: true, IsPublic: true},
 				}
 
-				user := models.User{Id: 7, Enabled: a.userEnabled, AuthStateGeneration: 3}
-				refreshToken := &models.RefreshToken{
+				user := record.User{Id: 7, Enabled: a.userEnabled, AuthStateGeneration: 3}
+				refreshToken := &record.RefreshToken{
 					RefreshTokenJti: "the_jti", FirstRefreshTokenJti: familyJti, AuthStateGeneration: 3, Revoked: a.tokenRevoked,
 				}
 				if ropc {
@@ -129,7 +129,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 					refreshToken.AuthenticatedAt = sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true}
 				} else {
 					refreshToken.CodeId = sql.NullInt64{Int64: 11, Valid: true}
-					refreshToken.Code = models.Code{Id: 11, ClientId: 1, UserId: 7, User: user}
+					refreshToken.Code = record.Code{Id: 11, ClientId: 1, UserId: 7, User: user}
 				}
 
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, a.clientIdentifier).
@@ -150,7 +150,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 					mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil).Maybe()
 				}
 
-				grant, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{},
+				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 					&ValidateTokenRequestInput{
 						GrantType:    "refresh_token",
 						ClientId:     a.clientIdentifier,

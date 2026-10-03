@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a client directly in DB to delete
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "del-client-" + fake.LetterN(8),
 		Description:      "to delete",
 		Enabled:          true,
@@ -112,7 +112,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a client and assign a permission
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "perm-client-" + fake.LetterN(8),
 		Enabled:          true,
 		IsPublic:         true,
@@ -123,7 +123,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
 	// Call GET client permissions by id
@@ -155,7 +155,7 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 	accessToken := createClientCredentialsTokenWithoutRouteScope(t)
 
 	// Create a target client to attempt deleting
-	target := &models.Client{
+	target := &record.Client{
 		ClientIdentifier: "target-del-" + fake.LetterN(6),
 		Enabled:          true,
 		IsPublic:         true,
@@ -175,7 +175,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create client
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "cascade-client-" + fake.LetterN(6),
 		Enabled:          true,
 		IsPublic:         true,
@@ -186,14 +186,14 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	// Create permission and assign to client
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
 	// Create user and consent to the client
-	user := &models.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email()}
+	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email()}
 	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
-	consent := &models.UserConsent{ClientId: client.Id, UserId: user.Id, Scope: "openid"}
+	consent := &record.UserConsent{ClientId: client.Id, UserId: user.Id, Scope: "openid"}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
 

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error {
+func (d *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error {
 
 	if clientLogo.ClientId == 0 {
 		return errs.New("can't create client logo with client_id 0")
@@ -23,7 +23,7 @@ func (d *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo 
 	clientLogo.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	clientLogo.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	clientLogoStruct := sqlbuilder.NewStruct(new(models.ClientLogo)).
+	clientLogoStruct := sqlbuilder.NewStruct(new(record.ClientLogo)).
 		For(d.Flavor)
 
 	insertBuilder := clientLogoStruct.WithoutTag("pk").InsertInto("client_logos", clientLogo)
@@ -39,7 +39,7 @@ func (d *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo 
 	return nil
 }
 
-func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error {
+func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error {
 
 	if clientLogo.Id == 0 {
 		return errs.New("can't update client logo with id 0")
@@ -48,7 +48,7 @@ func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo 
 	originalUpdatedAt := clientLogo.UpdatedAt
 	clientLogo.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	clientLogoStruct := sqlbuilder.NewStruct(new(models.ClientLogo)).
+	clientLogoStruct := sqlbuilder.NewStruct(new(record.ClientLogo)).
 		For(d.Flavor)
 
 	updateBuilder := clientLogoStruct.WithoutTag("pk").WithoutTag("dont-update").Update("client_logos", clientLogo)
@@ -64,9 +64,9 @@ func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo 
 	return nil
 }
 
-func (d *Database) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error) {
+func (d *Database) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error) {
 
-	clientLogoStruct := sqlbuilder.NewStruct(new(models.ClientLogo)).
+	clientLogoStruct := sqlbuilder.NewStruct(new(record.ClientLogo)).
 		For(d.Flavor)
 
 	selectBuilder := clientLogoStruct.SelectFrom("client_logos")
@@ -79,7 +79,7 @@ func (d *Database) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clie
 	}
 	defer func() { _ = rows.Close() }()
 
-	var clientLogo models.ClientLogo
+	var clientLogo record.ClientLogo
 	if rows.Next() {
 		addr := clientLogoStruct.Addr(&clientLogo)
 		err = rows.Scan(addr...)
@@ -97,7 +97,7 @@ func (d *Database) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clie
 
 func (d *Database) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error {
 
-	clientLogoStruct := sqlbuilder.NewStruct(new(models.ClientLogo)).
+	clientLogoStruct := sqlbuilder.NewStruct(new(record.ClientLogo)).
 		For(d.Flavor)
 
 	deleteBuilder := clientLogoStruct.DeleteFrom("client_logos")

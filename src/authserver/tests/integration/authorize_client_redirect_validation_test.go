@@ -9,7 +9,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,7 +58,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotExist(t *testing.T)
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          false,
 	}
@@ -90,7 +90,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthorizationCodeFlow(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: false,
@@ -123,7 +123,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthoriza
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsMissing(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -156,7 +156,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsMissing(t *testing.
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotHaveRedirectURI(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -206,7 +206,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotHaveRedirectURI(t *
 func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *testing.T) {
 	const nonAbsoluteURI = "//evil.example/cb"
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -217,7 +217,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 		t.Fatal(err)
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{ClientId: client.Id, URI: nonAbsoluteURI})
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: nonAbsoluteURI})
 	if err != nil {
 		t.Fatal(err)
 	}

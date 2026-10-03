@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -27,8 +27,8 @@ const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resou
 // PasswordGrant is a validated resource owner password credentials request: the client, the user
 // whose password was just checked, and the scope granted to them.
 type PasswordGrant struct {
-	Client *models.Client
-	User   *models.User
+	Client *record.Client
+	User   *record.User
 	Scope  string
 }
 
@@ -36,8 +36,8 @@ func (*PasswordGrant) GrantType() oidc.GrantType { return oidc.GrantTypePassword
 
 // validatePasswordGrant validates a resource owner password credentials request (RFC 6749
 // section 4.3.2) for a client ValidateTokenRequest has already found and found enabled.
-func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *models.Settings,
-	client *models.Client, input *ValidateTokenRequestInput) (*PasswordGrant, error) {
+func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *record.Settings,
+	client *record.Client, input *ValidateTokenRequestInput) (*PasswordGrant, error) {
 	// RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 
@@ -133,14 +133,14 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 // OIDC scopes (openid, profile, email, etc.) and offline_access are allowed.
 // Resource scopes (resource:permission) require the user to have the permission.
 // Note: consent_required is BYPASSED for ROPC - user providing credentials = implicit consent.
-func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string, user *models.User) (string, error) {
+func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string, user *record.User) (string, error) {
 	if len(scope) == 0 {
 		// Default to openid scope if none provided
 		return "openid", nil
 	}
 
 	// The token endpoint has normalized the scope, so this counts what the refresh token row
-	// stores (models.ScopeMaxBytes). Here and not above the password check: everything before this
+	// stores (record.ScopeMaxBytes). Here and not above the password check: everything before this
 	// line is the caller proving the grant, and a request that has not proved it is told nothing
 	// about its scope, so a wrong password with an over-long scope is still invalid_grant and is
 	// still charged to the rate limiter (#137, #219, #437).

@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -125,7 +125,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
-		user := &models.User{Id: 1, Subject: sub, Enabled: false}
+		user := &record.User{Id: 1, Subject: sub, Enabled: false}
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -164,15 +164,15 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		birthDate := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		group1 := models.Group{Id: 1, GroupIdentifier: "group1", IncludeInIdToken: true}
-		groupAttr := models.GroupAttribute{Key: "groupAttr", Value: "groupValue", IncludeInIdToken: true}
-		group1.Attributes = []models.GroupAttribute{groupAttr}
+		group1 := record.Group{Id: 1, GroupIdentifier: "group1", IncludeInIdToken: true}
+		groupAttr := record.GroupAttribute{Key: "groupAttr", Value: "groupValue", IncludeInIdToken: true}
+		group1.Attributes = []record.GroupAttribute{groupAttr}
 
-		group2 := models.Group{Id: 2, GroupIdentifier: "group2", IncludeInIdToken: true}
+		group2 := record.Group{Id: 2, GroupIdentifier: "group2", IncludeInIdToken: true}
 
-		userAttr := models.UserAttribute{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}
+		userAttr := record.UserAttribute{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}
 
-		user := &models.User{
+		user := &record.User{
 			Id:                  1,
 			Subject:             sub,
 			Enabled:             true,
@@ -198,8 +198,8 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			AddressPostalCode:   "12345",
 			AddressCountry:      "Test Country",
 			UpdatedAt:           sql.NullTime{Time: time.Now(), Valid: true},
-			Groups:              []models.Group{group1, group2},
-			Attributes:          []models.UserAttribute{userAttr},
+			Groups:              []record.Group{group1, group2},
+			Attributes:          []record.UserAttribute{userAttr},
 		}
 
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
@@ -276,7 +276,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req := userInfoRequestForScopes(t, sub, "email")
 		rr := httptest.NewRecorder()
 
-		user := &models.User{
+		user := &record.User{
 			Id:            1,
 			Subject:       sub,
 			Enabled:       true,
@@ -287,8 +287,8 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			FamilyName:    "User",
 			AddressLine1:  "123 Test St",
 			UpdatedAt:     sql.NullTime{Time: time.Now(), Valid: true},
-			Groups:        []models.Group{{Id: 1, GroupIdentifier: "group1", IncludeInIdToken: true}},
-			Attributes:    []models.UserAttribute{{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}},
+			Groups:        []record.Group{{Id: 1, GroupIdentifier: "group1", IncludeInIdToken: true}},
+			Attributes:    []record.UserAttribute{{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}},
 		}
 
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
@@ -330,7 +330,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		updatedAt := time.Now()
-		user := &models.User{
+		user := &record.User{
 			Id:            1,
 			Subject:       sub,
 			Enabled:       true,
@@ -378,29 +378,29 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req := userInfoRequestForScopes(t, sub, "groups attributes")
 		rr := httptest.NewRecorder()
 
-		idTokenGroup := models.Group{
+		idTokenGroup := record.Group{
 			Id: 1, GroupIdentifier: "id-token-group",
 			IncludeInIdToken: true, IncludeInAccessToken: false,
-			Attributes: []models.GroupAttribute{
+			Attributes: []record.GroupAttribute{
 				{Key: "idTokenGroupAttr", Value: "idTokenGroupValue",
 					IncludeInIdToken: true, IncludeInAccessToken: false},
 			},
 		}
-		accessTokenGroup := models.Group{
+		accessTokenGroup := record.Group{
 			Id: 2, GroupIdentifier: "access-token-group",
 			IncludeInIdToken: false, IncludeInAccessToken: true,
-			Attributes: []models.GroupAttribute{
+			Attributes: []record.GroupAttribute{
 				{Key: "accessTokenGroupAttr", Value: "accessTokenGroupValue",
 					IncludeInIdToken: false, IncludeInAccessToken: true},
 			},
 		}
 
-		user := &models.User{
+		user := &record.User{
 			Id:      1,
 			Subject: sub,
 			Enabled: true,
-			Groups:  []models.Group{idTokenGroup, accessTokenGroup},
-			Attributes: []models.UserAttribute{
+			Groups:  []record.Group{idTokenGroup, accessTokenGroup},
+			Attributes: []record.UserAttribute{
 				{Key: "idTokenAttr", Value: "idTokenValue",
 					IncludeInIdToken: true, IncludeInAccessToken: false},
 				{Key: "accessTokenAttr", Value: "accessTokenValue",
@@ -443,7 +443,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req := userInfoRequestForScopes(t, sub, "profile")
 		rr := httptest.NewRecorder()
 
-		user := &models.User{
+		user := &record.User{
 			Id:        1,
 			Subject:   sub,
 			Enabled:   true,
@@ -520,7 +520,7 @@ func isUserInfoInvalidToken(err error, description string) bool {
 func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 	tests := []struct {
 		name        string
-		user        *models.User
+		user        *record.User
 		description string
 	}{
 		{
@@ -530,7 +530,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 		},
 		{
 			name:        "the account is disabled",
-			user:        &models.User{Id: 1, Subject: "user123", Enabled: false},
+			user:        &record.User{Id: 1, Subject: "user123", Enabled: false},
 			description: "The user account is disabled.",
 		},
 	}

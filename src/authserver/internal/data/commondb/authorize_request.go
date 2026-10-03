@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -16,7 +16,7 @@ import (
 // session methods state: no row carries one, so it can only be a caller bug, and matching on it
 // would either return another request's row or sweep rows the caller never named.
 
-func (d *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest) error {
+func (d *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *record.AuthorizeRequest) error {
 
 	if authorizeRequest.HandleHash == "" {
 		return errs.New("can't create an authorize request with an empty handle hash")
@@ -33,7 +33,7 @@ func (d *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, autho
 	authorizeRequest.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	authorizeRequest.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(models.AuthorizeRequest)).
+	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
 		For(d.Flavor)
 
 	insertBuilder := authorizeRequestStruct.WithoutTag("pk").InsertInto("authorize_requests", authorizeRequest)
@@ -65,13 +65,13 @@ func (d *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, autho
 // propagates instead of collapsing into nil, including rows.Err(), where a driver reports a fault
 // it deferred to the result set.
 func (d *Database) GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string,
-	now time.Time) (*models.AuthorizeRequest, error) {
+	now time.Time) (*record.AuthorizeRequest, error) {
 
 	if handleHash == "" {
 		return nil, errs.New("can't get an authorize request with an empty handle hash")
 	}
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(models.AuthorizeRequest)).
+	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
 		For(d.Flavor)
 
 	selectBuilder := authorizeRequestStruct.SelectFrom("authorize_requests")
@@ -87,7 +87,7 @@ func (d *Database) GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.
 	}
 	defer func() { _ = rows.Close() }()
 
-	var authorizeRequest models.AuthorizeRequest
+	var authorizeRequest record.AuthorizeRequest
 	if rows.Next() {
 		addr := authorizeRequestStruct.Addr(&authorizeRequest)
 		err = rows.Scan(addr...)
@@ -124,7 +124,7 @@ func (d *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, author
 		return false, errs.New("can't claim the authorize request with id 0")
 	}
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(models.AuthorizeRequest)).
+	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
 		For(d.Flavor)
 
 	deleteBuilder := authorizeRequestStruct.DeleteFrom("authorize_requests")
@@ -149,7 +149,7 @@ func (d *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, author
 // rather than what makes a request expire.
 func (d *Database) DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error {
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(models.AuthorizeRequest)).
+	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
 		For(d.Flavor)
 
 	deleteBuilder := authorizeRequestStruct.DeleteFrom("authorize_requests")

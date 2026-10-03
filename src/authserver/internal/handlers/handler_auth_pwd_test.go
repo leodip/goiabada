@@ -11,9 +11,9 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -106,7 +106,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
 		req = req.WithContext(ctx)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "my-app",
 			DisplayName:      "",
 			ShowLogo:         false,
@@ -116,7 +116,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx = reqctx.WithSettings(ctx, settings)
@@ -160,7 +160,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "another-app",
 			DisplayName:      "",
 			ShowLogo:         false,
@@ -170,7 +170,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "another-app").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: false,
 		}
 		ctx := req.Context()
@@ -217,9 +217,9 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").
-			Return(&models.Client{ClientIdentifier: "my-app"}, nil)
+			Return(&record.Client{ClientIdentifier: "my-app"}, nil)
 
-		ctx := reqctx.WithSettings(req.Context(), &models.Settings{})
+		ctx := reqctx.WithSettings(req.Context(), &record.Settings{})
 		req = req.WithContext(ctx)
 
 		var rendered map[string]interface{}
@@ -423,7 +423,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "my-app",
 			DisplayName:      "",
 			ShowLogo:         false,
@@ -433,7 +433,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -473,12 +473,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -530,12 +530,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -577,12 +577,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -649,12 +649,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -703,12 +703,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		settings := &models.Settings{SMTPEnabled: true}
+		settings := &record.Settings{SMTPEnabled: true}
 		req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 
 		// No GetUserByEmail expectation: the mock fails the test if the lookup is reached.
@@ -749,18 +749,18 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
-		user := &models.User{
+		user := &record.User{
 			Id:           1,
 			Email:        "test@example.com",
 			PasswordHash: passwordHash,
@@ -857,18 +857,18 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
-		disabledUser := &models.User{
+		disabledUser := &record.User{
 			Id:           2,
 			Email:        "disabled@example.com",
 			PasswordHash: passwordHash,
@@ -915,8 +915,8 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	passwordHash, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	knownAccount := func() *models.User {
-		return &models.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}
+	knownAccount := func() *record.User {
+		return &record.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}
 	}
 
 	// newHandler wires one handler and its limiter together, the way routes.go does. The
@@ -925,7 +925,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	//
 	// account is what GetUserByEmail answers with. A nil one is the address that names no
 	// account, which is its own rejection branch with its own recording call.
-	newHandler := func(t *testing.T, account *models.User) (http.Handler, *mocks_data.Database, *ceremony.AuthContext) {
+	newHandler := func(t *testing.T, account *record.User) (http.Handler, *mocks_data.Database, *ceremony.AuthContext) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
 		database := mocks_data.NewDatabase(t)
@@ -941,7 +941,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// Only the accepted-password case reaches it, and this table covers both outcomes.
 		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(account, nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
@@ -961,7 +961,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = "203.0.113.7:5000"
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
 		return rr.Code

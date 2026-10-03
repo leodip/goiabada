@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreatePermission(t *testing.T) {
 	resource := createTestResource(t)
-	permission := &models.Permission{
+	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
@@ -140,7 +140,7 @@ func TestPermissionsLoadResources(t *testing.T) {
 	permission1 := createTestPermission(t, resource1)
 	permission2 := createTestPermission(t, resource2)
 
-	permissions := []models.Permission{*permission1, *permission2}
+	permissions := []record.Permission{*permission1, *permission2}
 
 	err := database.PermissionsLoadResources(context.Background(), nil, permissions)
 	if err != nil {
@@ -210,8 +210,8 @@ func TestDeletePermission(t *testing.T) {
 	}
 }
 
-func createTestPermission(t *testing.T, resource *models.Resource) *models.Permission {
-	permission := &models.Permission{
+func createTestPermission(t *testing.T, resource *record.Resource) *record.Permission {
+	permission := &record.Permission{
 		PermissionIdentifier: "test_permission" + fake.LetterN(6),
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,

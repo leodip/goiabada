@@ -14,9 +14,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/pquerna/otp/totp"
@@ -106,14 +106,14 @@ func currentOtpCode(t *testing.T) string {
 // otpTestUser is a user part way through an enrollment: the server has issued otpTestKeyURL to them
 // and recorded it, which is the only state the enable branch can now succeed from. Without the
 // pending pair every case here would stop at OTP_ENROLLMENT_NOT_PENDING before reaching the claim.
-func otpTestUser(t *testing.T, password string) *models.User {
+func otpTestUser(t *testing.T, password string) *record.User {
 	t.Helper()
 	hash, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	ciphertext, issuedAt := pendingEnrollment(t, otpTestKeyURL, time.Now().UTC())
 	// OTPEnabled false: the OTP_ALREADY_ENABLED check above the claim is what makes this the only
 	// state the enable branch is ever reached in, which is why requireOTPEnabled is passed false.
-	return &models.User{
+	return &record.User{
 		Id: 77, Enabled: true, PasswordHash: hash, OTPEnabled: false,
 		OtpEnrollmentSecretEncrypted: ciphertext,
 		OtpEnrollmentIssuedAt:        issuedAt,
@@ -487,7 +487,7 @@ func descriptionOf(t *testing.T, rr *httptest.ResponseRecorder) string {
 // settings the handler reads out of the request context.
 func enrollmentGetRequest(subject string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/account/otp/enrollment", nil)
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "Goiabada"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Goiabada"}))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 
@@ -756,24 +756,24 @@ func TestHandleAccountOTPPut_OversizedBodyIsRefused(t *testing.T) {
 func TestHandleAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *testing.T) {
 	testCases := []struct {
 		name    string
-		prepare func(*testing.T, *models.User)
+		prepare func(*testing.T, *record.User)
 	}{
 		{
 			name: "none was ever issued",
-			prepare: func(t *testing.T, u *models.User) {
+			prepare: func(t *testing.T, u *record.User) {
 				u.OtpEnrollmentSecretEncrypted, u.OtpEnrollmentIssuedAt = nil, sql.NullTime{}
 			},
 		},
 		{
 			name: "the one issued has expired",
-			prepare: func(t *testing.T, u *models.User) {
+			prepare: func(t *testing.T, u *record.User) {
 				u.OtpEnrollmentSecretEncrypted, u.OtpEnrollmentIssuedAt = pendingEnrollment(
 					t, otpTestKeyURL, time.Now().UTC().Add(-otpEnrollmentLifetime-time.Second))
 			},
 		},
 		{
 			name: "ciphertext with no issue time, which no writer produces",
-			prepare: func(t *testing.T, u *models.User) {
+			prepare: func(t *testing.T, u *record.User) {
 				u.OtpEnrollmentIssuedAt = sql.NullTime{}
 			},
 		},

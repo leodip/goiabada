@@ -13,8 +13,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // These cases are the handler's half of the #437 bounds on state, nonce and scope: the
@@ -33,14 +33,14 @@ func newBoundedAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 		protocolvalidation.NewAuthorizeValidator(e.database), mocks_handlers.NewAuditLogger(t),
 		mocks_handlers.NewPermissionChecker(t), mocks_handlers.NewTokenParser(t), testBaseURL)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true,
-		DefaultAcrLevel: models.AcrLevel1,
+		DefaultAcrLevel: record.AcrLevel1,
 	}
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 	e.database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com"}}
+			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: "https://example.com"}}
 		}).Return(nil)
 	stubRegisteredRedirectURI(e.database, "https://example.com")
 	return e
@@ -81,7 +81,7 @@ func distinctScopes(n int) string {
 
 func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *testing.T) {
 	overlongScope := distinctScopes(300)
-	require.Greater(t, len(overlongScope), models.ScopeMaxBytes)
+	require.Greater(t, len(overlongScope), record.ScopeMaxBytes)
 
 	cases := []struct {
 		name            string
@@ -92,24 +92,24 @@ func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *te
 	}{
 		{
 			name:            "state",
-			overrides:       map[string]string{"state": strings.Repeat("s", models.StateMaxBytes+1)},
+			overrides:       map[string]string{"state": strings.Repeat("s", record.StateMaxBytes+1)},
 			wantCode:        "invalid_request",
-			wantDescription: fmt.Sprintf("The 'state' parameter is too long (%d bytes, the maximum is %d).", models.StateMaxBytes+1, models.StateMaxBytes),
+			wantDescription: fmt.Sprintf("The 'state' parameter is too long (%d bytes, the maximum is %d).", record.StateMaxBytes+1, record.StateMaxBytes),
 			// RFC 6749 4.1.2.1: the refusal carries "the exact value received", however long.
-			wantState: strings.Repeat("s", models.StateMaxBytes+1),
+			wantState: strings.Repeat("s", record.StateMaxBytes+1),
 		},
 		{
 			name:            "nonce",
-			overrides:       map[string]string{"nonce": strings.Repeat("n", models.NonceMaxBytes+1)},
+			overrides:       map[string]string{"nonce": strings.Repeat("n", record.NonceMaxBytes+1)},
 			wantCode:        "invalid_request",
-			wantDescription: fmt.Sprintf("The 'nonce' parameter is too long (%d bytes, the maximum is %d).", models.NonceMaxBytes+1, models.NonceMaxBytes),
+			wantDescription: fmt.Sprintf("The 'nonce' parameter is too long (%d bytes, the maximum is %d).", record.NonceMaxBytes+1, record.NonceMaxBytes),
 			wantState:       "s",
 		},
 		{
 			name:            "scope",
 			overrides:       map[string]string{"scope": overlongScope},
 			wantCode:        "invalid_scope",
-			wantDescription: fmt.Sprintf("The 'scope' parameter is too long (%d bytes, the maximum is %d).", len(overlongScope), models.ScopeMaxBytes),
+			wantDescription: fmt.Sprintf("The 'scope' parameter is too long (%d bytes, the maximum is %d).", len(overlongScope), record.ScopeMaxBytes),
 			wantState:       "s",
 		},
 	}
@@ -155,8 +155,8 @@ func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *te
 // scope is three times the bound in repeated, single-space-separated values is the one-value scope
 // it collapses to, and is not refused.
 func TestHandleAuthorizeGet_AValueAtTheBoundProceeds(t *testing.T) {
-	state := strings.Repeat("s", models.StateMaxBytes)
-	nonce := strings.Repeat("n", models.NonceMaxBytes)
+	state := strings.Repeat("s", record.StateMaxBytes)
+	nonce := strings.Repeat("n", record.NonceMaxBytes)
 
 	cases := []struct {
 		name      string
@@ -173,7 +173,7 @@ func TestHandleAuthorizeGet_AValueAtTheBoundProceeds(t *testing.T) {
 		},
 		{
 			name:      "a raw scope over the bound that normalizes under it",
-			overrides: map[string]string{"scope": strings.TrimSuffix(strings.Repeat("openid ", 3*models.ScopeMaxBytes/len("openid ")), " ")},
+			overrides: map[string]string{"scope": strings.TrimSuffix(strings.Repeat("openid ", 3*record.ScopeMaxBytes/len("openid ")), " ")},
 			check: func(t *testing.T, ac *ceremony.AuthContext) {
 				assert.Equal(t, "openid", ac.Scope)
 			},

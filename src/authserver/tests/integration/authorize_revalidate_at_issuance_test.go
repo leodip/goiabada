@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,9 +33,9 @@ import (
 // mutate the world and then let it finish.
 type parkedCeremony struct {
 	httpClient  *http.Client
-	client      *models.Client
-	redirectURI *models.RedirectURI
-	user        *models.User
+	client      *record.Client
+	redirectURI *record.RedirectURI
+	user        *record.User
 	consentURL  string
 	consentPage *http.Response
 	state       string
@@ -68,14 +68,14 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "revalidate-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		// The consent screen is what holds the ceremony still between /auth/completed and
 		// /auth/issue, which is the whole window these cases are about.
 		ConsentRequired:       true,
-		DefaultAcrLevel:       models.AcrLevel1,
+		DefaultAcrLevel:       record.AcrLevel1,
 		ClientSecretEncrypted: clientSecretEncrypted,
 	}
 	if responseType != "code" {
@@ -85,7 +85,7 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
-	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	assert.NoError(t, err)
 
@@ -93,7 +93,7 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -114,7 +114,7 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == parts[1] {
 				grantErr = database.CreateUserPermission(context.Background(), nil,
-					&models.UserPermission{UserId: user.Id, PermissionId: permissions[i].Id})
+					&record.UserPermission{UserId: user.Id, PermissionId: permissions[i].Id})
 				assert.NoError(t, grantErr)
 				granted = true
 				break

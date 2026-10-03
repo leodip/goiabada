@@ -9,8 +9,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
@@ -27,12 +27,12 @@ type authCompletedDatabase interface {
 	authorizeDatabase
 	revocation.Database
 
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
-	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
-	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
+	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 func HandleAuthCompletedGet(
@@ -108,7 +108,7 @@ func HandleAuthCompletedGet(
 		// The session this ceremony actually bound to, which is what the ACR below is taken
 		// against. It is the bumped row on the reuse arm and the freshly created row on the
 		// create arm, never the ambient one the browser happened to carry (#133).
-		var boundSession *models.UserSession
+		var boundSession *record.UserSession
 
 		switch plan.arm {
 		case completionArmRestart:
@@ -240,7 +240,7 @@ type completionFacts struct {
 	raisesPrivilege bool
 	// otpConfigGenerationCaptured says the ceremony captured the user's OTP config generation.
 	otpConfigGenerationCaptured bool
-	target                      models.AcrLevel
+	target                      record.AcrLevel
 }
 
 // completionPlan is decideCompletion's answer: the arm, and what that arm does beyond its core
@@ -336,10 +336,10 @@ func bindReusedSession(
 	database authCompletedDatabase,
 	auditLogger AuditLogger,
 	authContext *ceremony.AuthContext,
-	client *models.Client,
+	client *record.Client,
 	sessionIdentifier string,
-	targetAcrLevel models.AcrLevel,
-) (*models.UserSession, error) {
+	targetAcrLevel record.AcrLevel,
+) (*record.UserSession, error) {
 	// Rotate the browser session's identifier before the privilege is committed.
 	//
 	// The order is the whole of it. BumpUserSession opens its own transaction and commits before
@@ -420,10 +420,10 @@ func bindNewSession(
 	database authCompletedDatabase,
 	auditLogger AuditLogger,
 	authContext *ceremony.AuthContext,
-	client *models.Client,
-	userSession *models.UserSession,
-	targetAcrLevel models.AcrLevel,
-) (*models.UserSession, error) {
+	client *record.Client,
+	userSession *record.UserSession,
+	targetAcrLevel record.AcrLevel,
+) (*record.UserSession, error) {
 	// The browser changed hands, so the session it was carrying is ended rather than left behind.
 	// StartNewUserSession below does not do this: it sweeps sibling sessions of the NEW user, so
 	// the previous user's row is never a candidate and would survive orphaned, its refresh tokens
@@ -491,7 +491,7 @@ func bindNewSession(
 	// it was last seen from. Nothing it authorized is revoked, which is the policy for a same-user
 	// re-login: its session-bound refresh tokens stop as they would on expiry and its offline grants
 	// survive (#133, #243). A foreign session was terminated above and is not passed.
-	var replacing *models.UserSession
+	var replacing *record.UserSession
 	if plan.replaceOwnSession {
 		replacing = userSession
 	}

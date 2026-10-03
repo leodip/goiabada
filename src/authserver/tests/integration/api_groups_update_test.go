@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -323,7 +323,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group with specific initial values
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier:      "test-bool-group-" + fake.LetterN(8),
 		Description:          "Test boolean flags",
 		IncludeInIdToken:     false,
@@ -385,7 +385,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	}()
 
 	// Setup: Create test user and add to group
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@updatemembercount.test"),
@@ -399,7 +399,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
-	userGroup := &models.UserGroup{
+	userGroup := &record.UserGroup{
 		UserId:  testUser.Id,
 		GroupId: testGroup.Id,
 	}

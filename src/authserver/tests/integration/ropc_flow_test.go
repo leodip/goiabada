@@ -7,17 +7,17 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Helper function to create a client with ROPC enabled
-func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.Client {
+func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *record.Client {
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "ropc-client-" + fake.LetterN(8),
 		Enabled:          true,
 		IsPublic:         isPublic,
@@ -29,7 +29,7 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 		// field after this call, as the two inline clients further down this file do.
 		AuthorizationCodeEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	if !isPublic && clientSecret != "" {
@@ -41,7 +41,7 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -52,11 +52,11 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 }
 
 // Helper function to create a user for ROPC tests
-func createROPCUser(t *testing.T, password string) *models.User {
+func createROPCUser(t *testing.T, password string) *record.User {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.Nil(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -74,7 +74,7 @@ func createROPCUser(t *testing.T, password string) *models.User {
 // TestROPC_Success tests a successful ROPC flow with a public client
 func TestROPC_Success(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	// Create client and user
 	password := fake.Password(12)
@@ -114,7 +114,7 @@ func TestROPC_Success(t *testing.T) {
 // TestROPC_ConfidentialClient tests ROPC with a confidential client
 func TestROPC_ConfidentialClient(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	// Create confidential client and user
 	clientSecret := fake.Password(32)
@@ -146,17 +146,17 @@ func TestROPC_ConfidentialClient(t *testing.T) {
 // TestROPC_GlobalDisabled tests that ROPC fails when globally disabled
 func TestROPC_GlobalDisabled(t *testing.T) {
 	// Ensure ROPC is globally disabled
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = false })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = false })
 
 	// Create client with ROPC set to nil (follows global setting) and user
 	password := fake.Password(12)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client-" + fake.LetterN(8),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Follow global setting
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
@@ -183,17 +183,17 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 // TestROPC_ClientOverrideDisabled tests that client-level override can disable ROPC
 func TestROPC_ClientOverrideDisabled(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	// Create client with ROPC disabled at client level
 	ropcDisabled := false
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-disabled-client-" + fake.LetterN(8),
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
@@ -222,7 +222,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 // TestROPC_MissingUsername tests that missing username returns error
 func TestROPC_MissingUsername(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	client := createROPCClient(t, "", true)
 
@@ -245,7 +245,7 @@ func TestROPC_MissingUsername(t *testing.T) {
 // TestROPC_MissingPassword tests that missing password returns error
 func TestROPC_MissingPassword(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, "somepassword")
@@ -269,7 +269,7 @@ func TestROPC_MissingPassword(t *testing.T) {
 // TestROPC_InvalidCredentials tests that invalid password returns error
 func TestROPC_InvalidCredentials(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
@@ -296,7 +296,7 @@ func TestROPC_InvalidCredentials(t *testing.T) {
 // Note: For security reasons, the error message doesn't reveal whether the user exists
 func TestROPC_UserNotFound(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	client := createROPCClient(t, "", true)
 
@@ -321,7 +321,7 @@ func TestROPC_UserNotFound(t *testing.T) {
 // TestROPC_DisabledUser tests that disabled user cannot authenticate
 func TestROPC_DisabledUser(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
@@ -329,7 +329,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 	// Create disabled user
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.Nil(t, err)
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      false, // Disabled
 		Email:        fake.Email(),
@@ -358,7 +358,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 // TestROPC_WithOfflineAccess tests ROPC with offline_access scope
 func TestROPC_WithOfflineAccess(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
@@ -392,7 +392,7 @@ func TestROPC_WithOfflineAccess(t *testing.T) {
 // TestROPC_ConfidentialClient_MissingSecret tests that confidential client requires secret
 func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	// Create confidential client
 	clientSecret := fake.Password(32)
@@ -422,7 +422,7 @@ func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 // TestROPC_ConfidentialClient_InvalidSecret tests that invalid client secret fails
 func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	// Create confidential client
 	clientSecret := fake.Password(32)
@@ -455,7 +455,7 @@ func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 // This is a security feature - ROPC cannot securely support a second authentication factor
 func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
@@ -463,7 +463,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	// Create user with 2FA (OTP) enabled
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.Nil(t, err)
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              fake.Email(),
@@ -496,7 +496,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 // TestROPC_WithResourcePermissions tests ROPC with resource permissions
 func TestROPC_WithResourcePermissions(t *testing.T) {
 	// Enable ROPC globally
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	// Create resource and permission
 	resource := createResourceWithId(t, "testapi-"+fake.LetterN(8))
@@ -537,7 +537,7 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 // any unknown permission is: the authserver resource has no userinfo permission since #449, so no
 // user can hold it and there is no special answer for it any more.
 func TestROPC_ExplicitUserinfoScopeIsRefused(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
@@ -566,7 +566,7 @@ func TestROPC_ExplicitUserinfoScopeIsRefused(t *testing.T) {
 // exactly the case that failed. A test that also requested a resource scope could pass for the
 // wrong reason if the user happened to hold it.
 func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)
@@ -625,11 +625,11 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 	testCases := []struct {
 		name string
 		// disable turns ROPC off the way this case is about.
-		disable func(t *testing.T, client *models.Client)
+		disable func(t *testing.T, client *record.Client)
 	}{
 		{
 			name: "the client's own override is turned off",
-			disable: func(t *testing.T, client *models.Client) {
+			disable: func(t *testing.T, client *record.Client) {
 				ropcDisabled := false
 				client.ResourceOwnerPasswordCredentialsEnabled = &ropcDisabled
 				assert.Nil(t, database.UpdateClient(context.Background(), nil, client))
@@ -637,18 +637,18 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 		},
 		{
 			name: "the client inherits and the global switch is turned off",
-			disable: func(t *testing.T, client *models.Client) {
+			disable: func(t *testing.T, client *record.Client) {
 				client.ResourceOwnerPasswordCredentialsEnabled = nil
 				assert.Nil(t, database.UpdateClient(context.Background(), nil, client))
 
-				changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = false })
+				changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = false })
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+			changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 			clientSecret := fake.Password(32)
 			password := fake.Password(12)

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,10 +29,10 @@ import (
 // reference". This shape is the reason these tests exist: the auth-code flow
 // instead sets only code_id, so those rows are swept up by the codes cascade and
 // never exercise the users/clients foreign keys directly.
-func createROPCRefreshToken(t *testing.T, userId, clientId int64) *models.RefreshToken {
+func createROPCRefreshToken(t *testing.T, userId, clientId int64) *record.RefreshToken {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	refreshToken := &models.RefreshToken{
+	refreshToken := &record.RefreshToken{
 		UserId:            sql.NullInt64{Int64: userId, Valid: true},
 		ClientId:          sql.NullInt64{Int64: clientId, Valid: true},
 		RefreshTokenJti:   fake.UUID(),
@@ -51,10 +51,10 @@ func createROPCRefreshToken(t *testing.T, userId, clientId int64) *models.Refres
 
 // createCodeLinkedRefreshToken mirrors the auth-code flow: code_id set, user_id
 // and client_id left NULL.
-func createCodeLinkedRefreshToken(t *testing.T, codeId int64) *models.RefreshToken {
+func createCodeLinkedRefreshToken(t *testing.T, codeId int64) *record.RefreshToken {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	refreshToken := &models.RefreshToken{
+	refreshToken := &record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: codeId, Valid: true},
 		RefreshTokenJti:   fake.UUID(),
 		SessionIdentifier: fake.UUID(),
@@ -223,13 +223,13 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
-	clientPermission := &models.ClientPermission{
+	clientPermission := &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permission.Id,
 	}
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission), "CreateClientPermission")
 
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:   user.Id,
 		ClientId: client.Id,
 		Scope:    "openid profile",

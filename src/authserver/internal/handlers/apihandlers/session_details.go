@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // sessionDetailsDatabase is what buildSessionDetails needs: the clients a session authorized.
 type sessionDetailsDatabase interface {
-	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]models.Client, error)
+	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 }
 
 // buildSessionDetails is the one loop behind all three session list endpoints: filter to the
@@ -31,12 +31,12 @@ type sessionDetailsDatabase interface {
 func buildSessionDetails(
 	ctx context.Context,
 	database sessionDetailsDatabase,
-	sessions []models.UserSession,
-	settings *models.Settings,
+	sessions []record.UserSession,
+	settings *record.Settings,
 	currentSid string,
 ) ([]api.UserSessionDetailResponse, error) {
 
-	valid := make([]models.UserSession, 0, len(sessions))
+	valid := make([]record.UserSession, 0, len(sessions))
 	for _, session := range sessions {
 		// Invalid sessions are omitted rather than reported: the endpoints list what is live,
 		// and the background worker deletes the rest within its sweep interval (#373 decision 2).
@@ -74,7 +74,7 @@ func buildSessionDetails(
 // The union it hands over is bounded by the deployment's client count and by nothing else, so
 // GetClientsByIds is the one that decides how many ids a single statement may bind; an id list
 // longer than that is read in several statements there rather than refused by the engine (#373).
-func loadSessionClients(ctx context.Context, database sessionDetailsDatabase, sessions []models.UserSession) error {
+func loadSessionClients(ctx context.Context, database sessionDetailsDatabase, sessions []record.UserSession) error {
 	clientIds := make([]int64, 0)
 	seen := make(map[int64]bool)
 	for _, session := range sessions {
@@ -94,7 +94,7 @@ func loadSessionClients(ctx context.Context, database sessionDetailsDatabase, se
 		return errs.Wrap(err, "unable to get clients by ids")
 	}
 
-	clientsById := make(map[int64]models.Client, len(clients))
+	clientsById := make(map[int64]record.Client, len(clients))
 	for _, client := range clients {
 		clientsById[client.Id] = client
 	}

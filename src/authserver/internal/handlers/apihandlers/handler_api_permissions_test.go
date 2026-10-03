@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -31,8 +31,8 @@ import (
 func TestHandlePermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	system := &models.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
-	stored := []models.Permission{
+	system := &record.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
+	stored := []record.Permission{
 		{Id: 10, PermissionIdentifier: "userinfo", ResourceId: 1, Description: "Created by an administrator"},
 		{Id: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
 		{Id: 12, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceId: 1, Description: "Manage"},
@@ -40,8 +40,8 @@ func TestHandlePermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *t
 	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(stored, nil).Once()
 	database.On("PermissionsLoadResources", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) {
-			for i := range args.Get(2).([]models.Permission) {
-				args.Get(2).([]models.Permission)[i].Resource = *system
+			for i := range args.Get(2).([]record.Permission) {
+				args.Get(2).([]record.Permission)[i].Resource = *system
 			}
 		}).Return(nil).Once()
 
@@ -73,13 +73,13 @@ func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.
 	handler := HandleResourcePermissionsPut(database, identifierValidator, auditLogger)
 
 	// System-level resource (authserver)
-	resource := &models.Resource{
+	resource := &record.Resource{
 		Id:                 1,
 		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 	}
 
 	// Return existing permissions that are MISSING the "manage" built-in permission
-	existingPerms := []models.Permission{
+	existingPerms := []record.Permission{
 		{Id: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
 		// "manage" is intentionally missing
 		{Id: 13, PermissionIdentifier: builtin.AdminReadPermissionIdentifier, ResourceId: 1, Description: "Admin read"},
@@ -136,8 +136,8 @@ var resourcePermsTx = &sql.Tx{}
 const resourcePermsId = int64(7)
 
 // resourcePermsStored is the resource's stored permissions in the cases below: read, write, admin.
-func resourcePermsStored() []models.Permission {
-	return []models.Permission{
+func resourcePermsStored() []record.Permission {
+	return []record.Permission{
 		{Id: 31, ResourceId: resourcePermsId, PermissionIdentifier: "read", Description: "Read"},
 		{Id: 32, ResourceId: resourcePermsId, PermissionIdentifier: "write", Description: "Write"},
 		{Id: 33, ResourceId: resourcePermsId, PermissionIdentifier: "admin", Description: "Admin"},
@@ -145,7 +145,7 @@ func resourcePermsStored() []models.Permission {
 }
 
 // loadedEntries is permissions as a caller that read them sends them back as its loaded list.
-func loadedEntries(permissions []models.Permission) []api.ResourcePermissionUpsert {
+func loadedEntries(permissions []record.Permission) []api.ResourcePermissionUpsert {
 	out := make([]api.ResourcePermissionUpsert, 0, len(permissions))
 	for _, p := range permissions {
 		out = append(out, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
@@ -182,17 +182,17 @@ func serveResourcePerms(database *mocks_data.Database, auditLogger *mocks_handle
 // expectResourcePermsResource registers the resource read the save makes first.
 func expectResourcePermsResource(database *mocks_data.Database, resourceIdentifier string) {
 	database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), resourcePermsId).
-		Return(&models.Resource{Id: resourcePermsId, ResourceIdentifier: resourceIdentifier}, nil).Once()
+		Return(&record.Resource{Id: resourcePermsId, ResourceIdentifier: resourceIdentifier}, nil).Once()
 }
 
 // expectResourcePermsChecked registers the read of the stored rows step 1 refuses against,
 // outside the transaction.
-func expectResourcePermsChecked(database *mocks_data.Database, stored []models.Permission) {
+func expectResourcePermsChecked(database *mocks_data.Database, stored []record.Permission) {
 	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), resourcePermsId).Return(stored, nil).Once()
 }
 
 // expectResourcePermsRead registers the read of the stored rows on the save's transaction.
-func expectResourcePermsRead(database *mocks_data.Database, stored []models.Permission) {
+func expectResourcePermsRead(database *mocks_data.Database, stored []record.Permission) {
 	database.On("GetPermissionsByResourceId", mock.Anything, resourcePermsTx, resourcePermsId).Return(stored, nil).Once()
 }
 
@@ -227,16 +227,16 @@ func TestHandleResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testi
 	expectResourcePermsRead(database, resourcePermsStored())
 	database.On("DeletePermission", mock.Anything, resourcePermsTx, int64(33)).
 		Run(func(mock.Arguments) { order = append(order, "delete") }).Return(nil).Once()
-	var updated []models.Permission
+	var updated []record.Permission
 	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			updated = append(updated, *args.Get(2).(*models.Permission))
+			updated = append(updated, *args.Get(2).(*record.Permission))
 			order = append(order, "update")
 		}).Return(nil).Once()
-	var created []models.Permission
+	var created []record.Permission
 	database.On("CreatePermission", mock.Anything, resourcePermsTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			created = append(created, *args.Get(2).(*models.Permission))
+			created = append(created, *args.Get(2).(*record.Permission))
 			order = append(order, "create")
 		}).Return(nil).Once()
 	audits := expectResourcePermsAudit(t, auditLogger, &order)
@@ -250,7 +250,7 @@ func TestHandleResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testi
 	assert.Equal(t, "read", updated[0].PermissionIdentifier)
 	assert.Equal(t, "Read everything", updated[0].Description)
 	require.Len(t, created, 1)
-	assert.Equal(t, models.Permission{ResourceId: resourcePermsId, PermissionIdentifier: "audit", Description: "Audit"}, created[0])
+	assert.Equal(t, record.Permission{ResourceId: resourcePermsId, PermissionIdentifier: "audit", Description: "Audit"}, created[0])
 	assert.Equal(t, 1, *audits)
 	assert.Equal(t, []string{"begin", "delete", "update", "create", "commit", "audit"}, order)
 	database.AssertExpectations(t)
@@ -266,7 +266,7 @@ func TestHandleResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T) {
 	expectResourcePermsChecked(database, stored)
 	mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
 	expectResourcePermsRead(database, stored)
-	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.MatchedBy(func(p *models.Permission) bool {
+	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.MatchedBy(func(p *record.Permission) bool {
 		return p.Id == 33 && p.PermissionIdentifier == "manage" && p.Description == "Admin"
 	})).Return(nil).Once()
 	expectResourcePermsAudit(t, auditLogger, nil)
@@ -340,7 +340,7 @@ func TestHandleResourcePermissionsPut_AUniqueKeyRaceAnswersConflict(t *testing.T
 func TestHandleResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 	variants := []struct {
 		name     string
-		checked  []models.Permission
+		checked  []record.Permission
 		expected []api.ResourcePermissionUpsert
 	}{
 		{name: "a save dropping every stored permission", checked: resourcePermsStored(), expected: loadedEntries(resourcePermsStored())},
@@ -437,20 +437,20 @@ func TestHandleResourcePermissionsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 func TestHandleResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	variants := []struct {
 		name   string
-		stored func() []models.Permission
+		stored func() []record.Permission
 	}{
-		{name: "another save added a permission", stored: func() []models.Permission {
-			return append(resourcePermsStored(), models.Permission{Id: 34, ResourceId: resourcePermsId, PermissionIdentifier: "export", Description: "Export"})
+		{name: "another save added a permission", stored: func() []record.Permission {
+			return append(resourcePermsStored(), record.Permission{Id: 34, ResourceId: resourcePermsId, PermissionIdentifier: "export", Description: "Export"})
 		}},
-		{name: "another save dropped a permission", stored: func() []models.Permission {
+		{name: "another save dropped a permission", stored: func() []record.Permission {
 			return resourcePermsStored()[:2]
 		}},
-		{name: "another save changed a description", stored: func() []models.Permission {
+		{name: "another save changed a description", stored: func() []record.Permission {
 			stored := resourcePermsStored()
 			stored[1].Description = "Write anything"
 			return stored
 		}},
-		{name: "another save renamed a permission", stored: func() []models.Permission {
+		{name: "another save renamed a permission", stored: func() []record.Permission {
 			stored := resourcePermsStored()
 			stored[1].PermissionIdentifier = "edit"
 			return stored
@@ -489,7 +489,7 @@ func TestHandleResourcePermissionsPut_ALoadedListEqualAsASetProceeds(t *testing.
 
 	variants := []struct {
 		name     string
-		stored   []models.Permission
+		stored   []record.Permission
 		expected []api.ResourcePermissionUpsert
 		wanted   []api.ResourcePermissionUpsert
 	}{
@@ -532,9 +532,9 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 		return wanted
 	}
 
-	builtIns := make([]models.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
+	builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-		builtIns = append(builtIns, models.Permission{Id: int64(40 + i), ResourceId: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
+		builtIns = append(builtIns, record.Permission{Id: int64(40 + i), ResourceId: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
 	}
 	without := func(i int) []api.ResourcePermissionUpsert {
 		wanted := loadedEntries(builtIns)
@@ -549,7 +549,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 	type refusedSave struct {
 		name               string
 		resourceIdentifier string
-		stored             []models.Permission
+		stored             []record.Permission
 		body               string
 		wantStatus         int
 		wantCode           string

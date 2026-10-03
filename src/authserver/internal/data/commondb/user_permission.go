@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error {
+func (d *Database) CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error {
 
 	if userPermission.UserId == 0 {
 		return errs.New("can't create userPermission with user_id 0")
@@ -27,7 +27,7 @@ func (d *Database) CreateUserPermission(ctx context.Context, tx *sql.Tx, userPer
 	userPermission.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userPermission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+	userPermissionStruct := sqlbuilder.NewStruct(new(record.UserPermission)).
 		For(d.Flavor)
 
 	insertBuilder := userPermissionStruct.WithoutTag("pk").InsertInto("users_permissions", userPermission)
@@ -43,7 +43,7 @@ func (d *Database) CreateUserPermission(ctx context.Context, tx *sql.Tx, userPer
 	return nil
 }
 
-func (d *Database) UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error {
+func (d *Database) UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error {
 
 	if userPermission.Id == 0 {
 		return errs.New("can't update userPermission with id 0")
@@ -52,7 +52,7 @@ func (d *Database) UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPer
 	originalUpdatedAt := userPermission.UpdatedAt
 	userPermission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+	userPermissionStruct := sqlbuilder.NewStruct(new(record.UserPermission)).
 		For(d.Flavor)
 
 	updateBuilder := userPermissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users_permissions", userPermission)
@@ -69,7 +69,7 @@ func (d *Database) UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPer
 }
 
 func (d *Database) getUserPermissionCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userPermissionStruct *sqlbuilder.Struct) (*models.UserPermission, error) {
+	userPermissionStruct *sqlbuilder.Struct) (*record.UserPermission, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -78,7 +78,7 @@ func (d *Database) getUserPermissionCommon(ctx context.Context, tx *sql.Tx, sele
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userPermission models.UserPermission
+	var userPermission record.UserPermission
 	if rows.Next() {
 		addr := userPermissionStruct.Addr(&userPermission)
 		err = rows.Scan(addr...)
@@ -94,9 +94,9 @@ func (d *Database) getUserPermissionCommon(ctx context.Context, tx *sql.Tx, sele
 	return nil, nil
 }
 
-func (d *Database) GetUserPermissionById(ctx context.Context, tx *sql.Tx, userPermissionId int64) (*models.UserPermission, error) {
+func (d *Database) GetUserPermissionById(ctx context.Context, tx *sql.Tx, userPermissionId int64) (*record.UserPermission, error) {
 
-	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+	userPermissionStruct := sqlbuilder.NewStruct(new(record.UserPermission)).
 		For(d.Flavor)
 
 	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
@@ -110,16 +110,16 @@ func (d *Database) GetUserPermissionById(ctx context.Context, tx *sql.Tx, userPe
 	return userPermission, nil
 }
 
-func (d *Database) GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]models.UserPermission, error) {
+func (d *Database) GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]record.UserPermission, error) {
 
 	if len(userIds) == 0 {
 		return nil, nil
 	}
 
-	var userPermissions []models.UserPermission
+	var userPermissions []record.UserPermission
 
 	err := forEachIdBatch(userIds, func(batch []int64) error {
-		userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+		userPermissionStruct := sqlbuilder.NewStruct(new(record.UserPermission)).
 			For(d.Flavor)
 
 		selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
@@ -133,7 +133,7 @@ func (d *Database) GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, 
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var userPermission models.UserPermission
+			var userPermission record.UserPermission
 			addr := userPermissionStruct.Addr(&userPermission)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -155,9 +155,9 @@ func (d *Database) GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, 
 	return userPermissions, nil
 }
 
-func (d *Database) GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserPermission, error) {
+func (d *Database) GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error) {
 
-	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+	userPermissionStruct := sqlbuilder.NewStruct(new(record.UserPermission)).
 		For(d.Flavor)
 
 	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
@@ -170,9 +170,9 @@ func (d *Database) GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, u
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userPermissions []models.UserPermission
+	var userPermissions []record.UserPermission
 	for rows.Next() {
-		var userPermission models.UserPermission
+		var userPermission record.UserPermission
 		addr := userPermissionStruct.Addr(&userPermission)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -188,9 +188,9 @@ func (d *Database) GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, u
 	return userPermissions, nil
 }
 
-func (d *Database) GetUserPermissionByUserIdAndPermissionId(ctx context.Context, tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error) {
+func (d *Database) GetUserPermissionByUserIdAndPermissionId(ctx context.Context, tx *sql.Tx, userId, permissionId int64) (*record.UserPermission, error) {
 
-	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+	userPermissionStruct := sqlbuilder.NewStruct(new(record.UserPermission)).
 		For(d.Flavor)
 
 	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
@@ -205,7 +205,7 @@ func (d *Database) GetUserPermissionByUserIdAndPermissionId(ctx context.Context,
 	return userPermission, nil
 }
 
-func (d *Database) GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error) {
+func (d *Database) GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]record.User, int, error) {
 
 	if permissionId <= 0 {
 		return nil, 0, errs.New("permissionId must be greater than 0")
@@ -219,7 +219,7 @@ func (d *Database) GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.
 		pageSize = 10
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -238,9 +238,9 @@ func (d *Database) GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.
 	}
 	defer func() { _ = rows.Close() }()
 
-	var users []models.User
+	var users []record.User
 	for rows.Next() {
-		var user models.User
+		var user record.User
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -281,7 +281,7 @@ func (d *Database) GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.
 
 func (d *Database) DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+	clientStruct := sqlbuilder.NewStruct(new(record.UserPermission)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("users_permissions")

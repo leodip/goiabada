@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -51,9 +51,9 @@ func HandleAuthLevel1Get(
 type authLevel1Database interface {
 	authorizeDatabase
 
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 func HandleAuthLevel1CompletedGet(
@@ -140,7 +140,7 @@ func HandleAuthLevel1CompletedGet(
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		var reusableSession *models.UserSession
+		var reusableSession *record.UserSession
 		if userSessionManager.HasValidUserSession(userSession,
 			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
 			authContext.RequestedMaxAge()) && authContext.OwnsSession(userSession) {

@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/stretchr/testify/assert"
@@ -90,7 +90,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "client permissions",
 			param: "id",
 			stub: func(database *mocks_data.Database) {
-				database.On("GetClientById", mock.Anything, mock.Anything, int64(1)).Return(&models.Client{Id: 1}, nil).Once()
+				database.On("GetClientById", mock.Anything, mock.Anything, int64(1)).Return(&record.Client{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
 				return HandleClientPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
@@ -100,7 +100,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "group permissions",
 			param: "id",
 			stub: func(database *mocks_data.Database) {
-				database.On("GetGroupById", mock.Anything, mock.Anything, int64(1)).Return(&models.Group{Id: 1}, nil).Once()
+				database.On("GetGroupById", mock.Anything, mock.Anything, int64(1)).Return(&record.Group{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
 				return HandleGroupPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
@@ -110,7 +110,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "user permissions",
 			param: "id",
 			stub: func(database *mocks_data.Database) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil).Once()
+				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
 				return HandleUserPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
@@ -120,7 +120,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "resource permissions",
 			param: "resourceId",
 			stub: func(database *mocks_data.Database) {
-				database.On("GetResourceById", mock.Anything, mock.Anything, int64(1)).Return(&models.Resource{Id: 1}, nil).Once()
+				database.On("GetResourceById", mock.Anything, mock.Anything, int64(1)).Return(&record.Resource{Id: 1}, nil).Once()
 			},
 			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
 				return HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), mocks_handlers.NewAuditLogger(t))

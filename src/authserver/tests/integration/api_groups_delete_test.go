@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +44,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Setup: Create test user and add to group
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@groupdelete.test"),
@@ -58,7 +58,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
-	userGroup := &models.UserGroup{
+	userGroup := &record.UserGroup{
 		UserId:  testUser.Id,
 		GroupId: testGroup.Id,
 	}
@@ -182,7 +182,7 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 	// Note: We won't defer deletion since we're testing the delete endpoint
 
 	// Setup: Create test permission and group-permission relationship
-	testPermission := &models.Permission{
+	testPermission := &record.Permission{
 		PermissionIdentifier: "test-permission-for-group-delete",
 		Description:          "Test permission for group deletion",
 		ResourceId:           1, // Assuming resource with ID 1 exists
@@ -193,7 +193,7 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 		_ = database.DeletePermission(context.Background(), nil, testPermission.Id)
 	}()
 
-	groupPermission := &models.GroupPermission{
+	groupPermission := &record.GroupPermission{
 		GroupId:      testGroup.Id,
 		PermissionId: testPermission.Id,
 	}

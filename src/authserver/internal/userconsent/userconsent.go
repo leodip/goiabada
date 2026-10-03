@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // Database is what recording a consent needs: the row a user holds for a client, the two writes that
@@ -27,10 +27,10 @@ import (
 // Exported, unlike the per-file ports #386 left in the handler packages, because it is this
 // package's own port and the consent handler's port embeds it to hand the capability on (#387).
 type Database interface {
-	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
+	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
+	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
+	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
 }
 
 // Record saves scope as the whole of the user's consent to the client and returns the row saved.
@@ -47,8 +47,8 @@ type Database interface {
 // the transaction it ran in, so the loser rolls back and runs again (data.RunInTransactionRetryingConflict).
 // The second attempt reads the row the winner committed and rewrites it, which is what a save that
 // had arrived a moment later would have done: the last writer's scope is the one that stays (#249).
-func Record(ctx context.Context, db Database, userId, clientId int64, scope string) (*models.UserConsent, error) {
-	var saved *models.UserConsent
+func Record(ctx context.Context, db Database, userId, clientId int64, scope string) (*record.UserConsent, error) {
+	var saved *record.UserConsent
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		consent, err := db.GetConsentByUserIdAndClientId(ctx, tx, userId, clientId)
 		if err != nil {
@@ -56,7 +56,7 @@ func Record(ctx context.Context, db Database, userId, clientId int64, scope stri
 		}
 
 		if consent == nil {
-			consent = &models.UserConsent{UserId: userId, ClientId: clientId}
+			consent = &record.UserConsent{UserId: userId, ClientId: clientId}
 		}
 		consent.Scope = scope
 		consent.GrantedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}

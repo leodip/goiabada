@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,12 +112,12 @@ func TestToken_AuthCode_AccountStateReadAfterPKCE(t *testing.T) {
 func TestToken_Refresh_AccountStateReadAfterOwnership(t *testing.T) {
 	// Any public client: it authenticates with nothing, so an attacker holding a stolen refresh
 	// token can always present it under one.
-	otherClient := &models.Client{
+	otherClient := &record.Client{
 		ClientIdentifier:         "other-public-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, otherClient))
 

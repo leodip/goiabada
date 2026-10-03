@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -24,9 +24,9 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 
 	// Create three users; grant permission to two
 	randSuffix := fake.LetterN(6)
-	u1 := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annperm1-" + randSuffix, Email: "annperm1-" + randSuffix + "@test.com", GivenName: "A1", FamilyName: "T"}
-	u2 := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annperm2-" + randSuffix, Email: "annperm2-" + randSuffix + "@test.com", GivenName: "A2", FamilyName: "T"}
-	u3 := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annperm3-" + randSuffix, Email: "annperm3-" + randSuffix + "@test.com", GivenName: "A3", FamilyName: "T"}
+	u1 := &record.User{Subject: fake.UUID(), Enabled: true, Username: "annperm1-" + randSuffix, Email: "annperm1-" + randSuffix + "@test.com", GivenName: "A1", FamilyName: "T"}
+	u2 := &record.User{Subject: fake.UUID(), Enabled: true, Username: "annperm2-" + randSuffix, Email: "annperm2-" + randSuffix + "@test.com", GivenName: "A2", FamilyName: "T"}
+	u3 := &record.User{Subject: fake.UUID(), Enabled: true, Username: "annperm3-" + randSuffix, Email: "annperm3-" + randSuffix + "@test.com", GivenName: "A3", FamilyName: "T"}
 	assert.NoError(t, database.CreateUser(context.Background(), nil, u1))
 	assert.NoError(t, database.CreateUser(context.Background(), nil, u2))
 	assert.NoError(t, database.CreateUser(context.Background(), nil, u3))
@@ -138,7 +138,7 @@ func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) 
 	require.NotNil(t, authRes, "the seed creates the authserver resource")
 	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	require.NoError(t, err)
-	var manageAccount *models.Permission
+	var manageAccount *record.Permission
 	for i := range perms {
 		if perms[i].PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
 			manageAccount = &perms[i]
@@ -148,11 +148,11 @@ func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) 
 	userinfoNamed := createTestPermission(t, authRes.Id, "userinfo", "Created by an administrator")
 	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.Id) })
 
-	for _, perm := range []*models.Permission{manageAccount, userinfoNamed} {
+	for _, perm := range []*record.Permission{manageAccount, userinfoNamed} {
 		t.Run(perm.PermissionIdentifier, func(t *testing.T) {
 			randSuffix := fake.LetterN(8)
-			holder := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annauth-" + randSuffix, Email: "annauth-" + randSuffix + "@test.com", GivenName: "A", FamilyName: "T"}
-			other := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annauth-other-" + randSuffix, Email: "annauth-other-" + randSuffix + "@test.com", GivenName: "B", FamilyName: "T"}
+			holder := &record.User{Subject: fake.UUID(), Enabled: true, Username: "annauth-" + randSuffix, Email: "annauth-" + randSuffix + "@test.com", GivenName: "A", FamilyName: "T"}
+			other := &record.User{Subject: fake.UUID(), Enabled: true, Username: "annauth-other-" + randSuffix, Email: "annauth-other-" + randSuffix + "@test.com", GivenName: "B", FamilyName: "T"}
 			require.NoError(t, database.CreateUser(context.Background(), nil, holder))
 			require.NoError(t, database.CreateUser(context.Background(), nil, other))
 			t.Cleanup(func() {

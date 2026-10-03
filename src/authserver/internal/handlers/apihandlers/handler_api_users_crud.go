@@ -18,9 +18,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -42,11 +42,11 @@ type usersCrudDatabase interface {
 	revocation.Database
 
 	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleUserGet - GET /api/v1/admin/users/{id}

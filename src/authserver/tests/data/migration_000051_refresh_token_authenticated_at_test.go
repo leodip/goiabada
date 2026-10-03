@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -66,9 +66,9 @@ func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string 
 	t.Helper()
 	random := fake.LetterN(6)
 
-	client := &models.Client{ClientIdentifier: "mig51_client_" + random, Description: "Migration 000051 test client"}
+	client := &record.Client{ClientIdentifier: "mig51_client_" + random, Description: "Migration 000051 test client"}
 	require.NoError(t, h.DB.CreateClient(context.Background(), nil, client), "seed client")
-	user := &models.User{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random}
+	user := &record.User{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random}
 	require.NoError(t, h.DB.CreateUser(context.Background(), nil, user), "seed user")
 
 	falseLit, _ := boolLiterals000031()

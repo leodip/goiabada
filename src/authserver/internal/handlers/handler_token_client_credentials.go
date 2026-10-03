@@ -4,14 +4,14 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // respondClientCredentials issues a validated client credentials grant (RFC 6749 section 4.4.3) and
 // answers with its access token.
 func (tr tokenResponder) respondClientCredentials(w http.ResponseWriter, r *http.Request,
-	settings *models.Settings, grant *protocolvalidation.ClientCredentialsGrant) {
+	settings *record.Settings, grant *protocolvalidation.ClientCredentialsGrant) {
 
 	tokenResponse, err := tr.issuer.IssueClientCredentialsGrant(r.Context(), settings, grant.Client, grant.Scope)
 	if err != nil {

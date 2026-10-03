@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,7 +16,7 @@ import (
 func TestSettings(t *testing.T) {
 	t.Run("Successful retrieval of settings", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		expectedSettings := &models.Settings{
+		expectedSettings := &record.Settings{
 			Id:      1,
 			AppName: "TestApp",
 		}
@@ -27,7 +27,7 @@ func TestSettings(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
 
-		var contextSettings *models.Settings
+		var contextSettings *record.Settings
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			contextSettings, _ = reqctx.SettingsFrom(r.Context())
 		})).ServeHTTP(rr, req)

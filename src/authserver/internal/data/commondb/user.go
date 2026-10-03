@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
 
 	now := time.Now().UTC()
 
@@ -21,7 +21,7 @@ func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *models.User
 	user.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	user.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	insertBuilder := userStruct.WithoutTag("pk").InsertInto("users", user)
@@ -37,7 +37,7 @@ func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *models.User
 	return nil
 }
 
-func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
 
 	if user.Id == 0 {
 		return errs.New("can't update user with id 0")
@@ -46,7 +46,7 @@ func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User
 	originalUpdatedAt := user.UpdatedAt
 	user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	updateBuilder := userStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users", user)
@@ -63,7 +63,7 @@ func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User
 }
 
 func (d *Database) getUserCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userStruct *sqlbuilder.Struct) (*models.User, error) {
+	userStruct *sqlbuilder.Struct) (*record.User, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -72,7 +72,7 @@ func (d *Database) getUserCommon(ctx context.Context, tx *sql.Tx, selectBuilder 
 	}
 	defer func() { _ = rows.Close() }()
 
-	var user models.User
+	var user record.User
 	if rows.Next() {
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
@@ -88,16 +88,16 @@ func (d *Database) getUserCommon(ctx context.Context, tx *sql.Tx, selectBuilder 
 	return nil, nil
 }
 
-func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]models.User, error) {
+func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error) {
 
 	if len(userIds) == 0 {
 		return nil, nil
 	}
 
-	users := make(map[int64]models.User)
+	users := make(map[int64]record.User)
 
 	err := forEachIdBatch(userIds, func(batch []int64) error {
-		userStruct := sqlbuilder.NewStruct(new(models.User)).
+		userStruct := sqlbuilder.NewStruct(new(record.User)).
 			For(d.Flavor)
 
 		selectBuilder := userStruct.SelectFrom("users")
@@ -111,7 +111,7 @@ func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int6
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var user models.User
+			var user record.User
 			addr := userStruct.Addr(&user)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -133,9 +133,9 @@ func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int6
 	return users, nil
 }
 
-func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error) {
+func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -149,7 +149,7 @@ func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*
 	return user, nil
 }
 
-func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error {
+func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []record.User) error {
 
 	if users == nil {
 		return nil
@@ -176,12 +176,12 @@ func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users [
 	}
 
 	// Create a map for faster permission lookups
-	permissionMap := make(map[int64]models.Permission)
+	permissionMap := make(map[int64]record.Permission)
 	for _, permission := range permissions {
 		permissionMap[permission.Id] = permission
 	}
 
-	permissionsByUserId := make(map[int64][]models.Permission)
+	permissionsByUserId := make(map[int64][]record.Permission)
 	for _, userPermission := range userPermissions {
 		if permission, ok := permissionMap[userPermission.PermissionId]; ok {
 			permissionsByUserId[userPermission.UserId] = append(permissionsByUserId[userPermission.UserId], permission)
@@ -195,7 +195,7 @@ func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users [
 	return nil
 }
 
-func (d *Database) UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *record.User) error {
 
 	if user == nil {
 		return nil
@@ -211,7 +211,7 @@ func (d *Database) UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *mod
 	return nil
 }
 
-func (d *Database) UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error {
 
 	if user == nil {
 		return nil
@@ -238,7 +238,7 @@ func (d *Database) UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *mo
 
 }
 
-func (d *Database) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []models.User) error {
+func (d *Database) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []record.User) error {
 
 	if users == nil {
 		return nil
@@ -264,9 +264,9 @@ func (d *Database) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []mode
 		return err
 	}
 
-	groupsByUserId := make(map[int64][]models.Group)
+	groupsByUserId := make(map[int64][]record.Group)
 	for _, userGroup := range userGroups {
-		var group models.Group
+		var group record.Group
 		for _, g := range groups {
 			if g.Id == userGroup.GroupId {
 				group = g
@@ -283,7 +283,7 @@ func (d *Database) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []mode
 	return nil
 }
 
-func (d *Database) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (d *Database) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error {
 
 	if user == nil {
 		return nil
@@ -309,9 +309,9 @@ func (d *Database) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.
 	return nil
 }
 
-func (d *Database) GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*models.User, error) {
+func (d *Database) GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*record.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -325,9 +325,9 @@ func (d *Database) GetUserByUsername(ctx context.Context, tx *sql.Tx, username s
 	return user, nil
 }
 
-func (d *Database) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error) {
+func (d *Database) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -351,9 +351,9 @@ func (d *Database) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject str
 	return user, nil
 }
 
-func (d *Database) GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error) {
+func (d *Database) GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -383,7 +383,7 @@ func (d *Database) GetUserByEmail(ctx context.Context, tx *sql.Tx, email string)
 // Locating the row is not authenticating it. The caller still compares the submitted
 // code against the encrypted column in constant time and checks the code's expiry; this
 // only says which row to compare against.
-func (d *Database) GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error) {
+func (d *Database) GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.User, error) {
 
 	// The dormant value is '' on every user with no code outstanding, so an empty
 	// codeHash reaching the query would match one of them and hand the caller somebody
@@ -394,7 +394,7 @@ func (d *Database) GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.
 		return nil, nil
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -474,7 +474,7 @@ func searchUserLikeClauses(sb *sqlbuilder.SelectBuilder, query string) []string 
 	return clauses
 }
 
-func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error) {
+func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]record.User, int, error) {
 
 	if page < 1 {
 		page = 1
@@ -484,7 +484,7 @@ func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query s
 		pageSize = 10
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -512,9 +512,9 @@ func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query s
 	}
 	defer func() { _ = rows.Close() }()
 
-	var users []models.User
+	var users []record.User
 	for rows.Next() {
-		var user models.User
+		var user record.User
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -599,7 +599,7 @@ func (d *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) err
 			return deleteRefreshTokensErr
 		}
 
-		userStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+		userStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 			For(d.Flavor)
 
 		deleteBuilder := userStruct.DeleteFrom("users")
@@ -1355,7 +1355,7 @@ func (d *Database) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int6
 // and it does not bite here.
 //
 // Deliberately not part of UpdateUser: both columns are tagged dont-update, because the full-row
-// write is what would let one enrolment request erase another's issuance. See models.User.
+// write is what would let one enrolment request erase another's issuance. See record.User.
 func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64,
 	secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
 

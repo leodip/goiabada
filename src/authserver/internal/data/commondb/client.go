@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *models.
 	client.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	client.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
 		For(d.Flavor)
 
 	insertBuilder := clientStruct.WithoutTag("pk").InsertInto("clients", client)
@@ -35,7 +35,7 @@ func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *models.
 	return nil
 }
 
-func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
 	if client.Id == 0 {
 		return errs.New("can't update client with id 0")
@@ -44,7 +44,7 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *models.
 	originalUpdatedAt := client.UpdatedAt
 	client.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
 		For(d.Flavor)
 
 	updateBuilder := clientStruct.WithoutTag("pk").WithoutTag("dont-update").Update("clients", client)
@@ -199,7 +199,7 @@ func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int
 }
 
 func (d *Database) getClientCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	clientStruct *sqlbuilder.Struct) (*models.Client, error) {
+	clientStruct *sqlbuilder.Struct) (*record.Client, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -208,7 +208,7 @@ func (d *Database) getClientCommon(ctx context.Context, tx *sql.Tx, selectBuilde
 	}
 	defer func() { _ = rows.Close() }()
 
-	var client models.Client
+	var client record.Client
 	if rows.Next() {
 		addr := clientStruct.Addr(&client)
 		err = rows.Scan(addr...)
@@ -224,9 +224,9 @@ func (d *Database) getClientCommon(ctx context.Context, tx *sql.Tx, selectBuilde
 	return nil, nil
 }
 
-func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error) {
+func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
 		For(d.Flavor)
 
 	selectBuilder := clientStruct.SelectFrom("clients")
@@ -240,9 +240,9 @@ func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64
 	return client, nil
 }
 
-func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
+func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error) {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
 		For(d.Flavor)
 
 	selectBuilder := clientStruct.SelectFrom("clients")
@@ -261,7 +261,7 @@ func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, 
 	return client, nil
 }
 
-func (d *Database) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (d *Database) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
 	if client == nil {
 		return nil
@@ -276,7 +276,7 @@ func (d *Database) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, clien
 	return nil
 }
 
-func (d *Database) ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (d *Database) ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
 	if client == nil {
 		return nil
@@ -291,16 +291,16 @@ func (d *Database) ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client 
 	return nil
 }
 
-func (d *Database) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
+func (d *Database) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error) {
 
 	if len(clientIds) == 0 {
-		return []models.Client{}, nil
+		return []record.Client{}, nil
 	}
 
-	clients := make([]models.Client, 0, len(clientIds))
+	clients := make([]record.Client, 0, len(clientIds))
 
 	err := forEachIdBatch(clientIds, func(batch []int64) error {
-		clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+		clientStruct := sqlbuilder.NewStruct(new(record.Client)).
 			For(d.Flavor)
 
 		selectBuilder := clientStruct.SelectFrom("clients")
@@ -316,7 +316,7 @@ func (d *Database) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var client models.Client
+			var client record.Client
 			addr := clientStruct.Addr(&client)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -338,7 +338,7 @@ func (d *Database) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []
 	return clients, nil
 }
 
-func (d *Database) ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (d *Database) ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
 	if client == nil {
 		return nil
@@ -362,9 +362,9 @@ func (d *Database) ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client
 	return nil
 }
 
-func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Client, error) {
+func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error) {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
 		For(d.Flavor)
 
 	selectBuilder := clientStruct.SelectFrom("clients")
@@ -376,9 +376,9 @@ func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Clie
 	}
 	defer func() { _ = rows.Close() }()
 
-	clients := make([]models.Client, 0)
+	clients := make([]record.Client, 0)
 	for rows.Next() {
-		var client models.Client
+		var client record.Client
 		addr := clientStruct.Addr(&client)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -411,7 +411,7 @@ func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64)
 			return err
 		}
 
-		clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+		clientStruct := sqlbuilder.NewStruct(new(record.Client)).
 			For(d.Flavor)
 
 		deleteBuilder := clientStruct.DeleteFrom("clients")

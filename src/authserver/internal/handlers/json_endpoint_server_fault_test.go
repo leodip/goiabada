@@ -10,8 +10,8 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
@@ -52,7 +52,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 	reuse := &protocolvalidation.AuthCodeReusedError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 			http.StatusBadRequest),
-		Code: &models.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
+		Code: &record.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
 	}
 	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, reuse)
@@ -61,7 +61,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(
 		"grant_type=authorization_code&code=abc&redirect_uri=http://example.com&client_id=test_client"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req = withSettings(req, &models.Settings{})
+	req = withSettings(req, &record.Settings{})
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

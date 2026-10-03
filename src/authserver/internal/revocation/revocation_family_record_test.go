@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,7 +36,7 @@ func expectClientFamilyRecords(db *mocks_data.Database, families ...string) {
 // no issuer writes one and recording an empty jti is refused as a caller bug.
 func TestRevokeClientGrants_RecordsEachFamilyOnceWhateverItsMembersState(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	tokens := []*models.RefreshToken{
+	tokens := []*record.RefreshToken{
 		{Id: 1, RefreshTokenJti: "a-1", FirstRefreshTokenJti: "fam-all-revoked", Revoked: true},
 		{Id: 2, RefreshTokenJti: "a-2", FirstRefreshTokenJti: "fam-all-revoked", Revoked: true},
 		{Id: 3, RefreshTokenJti: "b-1", FirstRefreshTokenJti: "fam-live"},
@@ -86,9 +86,9 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		first := mocks_data.ExpectRunInTransaction(db, revokeTx)
 		second := mocks_data.ExpectRunInTransaction(db, revokeTx)
 		db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
-		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
 		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
-			Return([]*models.RefreshToken{token}, nil).Twice()
+			Return([]*record.RefreshToken{token}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, lostTheKey).Once()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
@@ -115,7 +115,7 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		mocks_data.ExpectRunInTransaction(db, revokeTx)
 		db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
 		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
-			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}}, nil).Twice()
+			Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, lostTheKey).Twice()
 

@@ -24,8 +24,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -79,10 +79,10 @@ func (e *authorizePostEndpoint) passesTheGate() {
 }
 
 // parks registers the insert and returns what it was handed.
-func (e *authorizePostEndpoint) parks() **models.AuthorizeRequest {
-	var stored *models.AuthorizeRequest
+func (e *authorizePostEndpoint) parks() **record.AuthorizeRequest {
+	var stored *record.AuthorizeRequest
 	e.database.On("CreateAuthorizeRequest", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { stored = args.Get(2).(*models.AuthorizeRequest) }).Return(nil).Once()
+		Run(func(args mock.Arguments) { stored = args.Get(2).(*record.AuthorizeRequest) }).Return(nil).Once()
 	return &stored
 }
 
@@ -313,7 +313,7 @@ func (e *authorizeEndpoint) consumes(handle string, form url.Values, claimed boo
 	tx := &sql.Tx{}
 	mocks_data.ExpectRunInTransaction(e.database, tx)
 	e.database.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, hashutil.HashString(handle), mock.Anything).
-		Return(&models.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: form.Encode(),
+		Return(&record.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: form.Encode(),
 			ExpiresAt: time.Now().UTC().Add(time.Minute)}, nil).Once()
 	e.database.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(claimed, nil).Once()
 }

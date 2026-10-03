@@ -6,15 +6,15 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // authLevel2Database is what the level 2 hop needs: the client and the user whose OTP enrolment
 // decides the path.
 type authLevel2Database interface {
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
 func HandleAuthLevel2Get(
@@ -106,14 +106,14 @@ func HandleAuthLevel2Get(
 //   - level2_mandatory always asks; a user with no authenticator enrols at /auth/otp.
 //   - Any other target never reaches this hop, since /auth/level1completed sends only a target above
 //     level 1 here, and is answered with an error.
-func decideLevel2Arm(target models.AcrLevel, userHasOTP bool) (ceremony.AuthState, string, error) {
+func decideLevel2Arm(target record.AcrLevel, userHasOTP bool) (ceremony.AuthState, string, error) {
 	switch target {
-	case models.AcrLevel2Optional:
+	case record.AcrLevel2Optional:
 		if userHasOTP {
 			return ceremony.AuthStateLevel2OTP, "/auth/otp", nil
 		}
 		return ceremony.AuthStateAuthenticationCompleted, "/auth/completed", nil
-	case models.AcrLevel2Mandatory:
+	case record.AcrLevel2Mandatory:
 		return ceremony.AuthStateLevel2OTP, "/auth/otp", nil
 	default:
 		return "", "", errs.New("invalid targetAcrLevel: " + target.String())

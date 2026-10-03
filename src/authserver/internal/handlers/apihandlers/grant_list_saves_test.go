@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -65,19 +65,19 @@ var grantSaves = []grantSave{
 		name:       "user permissions",
 		path:       "/api/v1/admin/users/5/permissions",
 		ownerRead:  "GetUserById",
-		owner:      &models.User{Id: grantOwnerId},
+		owner:      &record.User{Id: grantOwnerId},
 		readMethod: "GetUserPermissionsByUserId",
 		storedRows: func(rows []grantRow) any {
-			out := make([]models.UserPermission, 0, len(rows))
+			out := make([]record.UserPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, models.UserPermission{Id: r.id, UserId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.UserPermission{Id: r.id, UserId: grantOwnerId, PermissionId: r.permissionId})
 			}
 			return out
 		},
 		createMethod: "CreateUserPermission",
 		deleteMethod: "DeleteUserPermission",
 		created: func(arg any) (int64, int64) {
-			up := arg.(*models.UserPermission)
+			up := arg.(*record.UserPermission)
 			return up.UserId, up.PermissionId
 		},
 		addedEvent:   audit.EventAddedUserPermission,
@@ -97,19 +97,19 @@ var grantSaves = []grantSave{
 		name:       "group permissions",
 		path:       "/api/v1/admin/groups/5/permissions",
 		ownerRead:  "GetGroupById",
-		owner:      &models.Group{Id: grantOwnerId, GroupIdentifier: "admins"},
+		owner:      &record.Group{Id: grantOwnerId, GroupIdentifier: "admins"},
 		readMethod: "GetGroupPermissionsByGroupId",
 		storedRows: func(rows []grantRow) any {
-			out := make([]models.GroupPermission, 0, len(rows))
+			out := make([]record.GroupPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, models.GroupPermission{Id: r.id, GroupId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.GroupPermission{Id: r.id, GroupId: grantOwnerId, PermissionId: r.permissionId})
 			}
 			return out
 		},
 		createMethod: "CreateGroupPermission",
 		deleteMethod: "DeleteGroupPermission",
 		created: func(arg any) (int64, int64) {
-			gp := arg.(*models.GroupPermission)
+			gp := arg.(*record.GroupPermission)
 			return gp.GroupId, gp.PermissionId
 		},
 		addedEvent:   audit.EventAddedGroupPermission,
@@ -131,19 +131,19 @@ var grantSaves = []grantSave{
 		ownerRead: "GetClientById",
 		// Client permissions are configurable only with the client credentials flow enabled;
 		// handler_api_client_permissions_test.go owns the refusal when it is not.
-		owner:      &models.Client{Id: grantOwnerId, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
+		owner:      &record.Client{Id: grantOwnerId, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
 		readMethod: "GetClientPermissionsByClientId",
 		storedRows: func(rows []grantRow) any {
-			out := make([]models.ClientPermission, 0, len(rows))
+			out := make([]record.ClientPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, models.ClientPermission{Id: r.id, ClientId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.ClientPermission{Id: r.id, ClientId: grantOwnerId, PermissionId: r.permissionId})
 			}
 			return out
 		},
 		createMethod: "CreateClientPermission",
 		deleteMethod: "DeleteClientPermission",
 		created: func(arg any) (int64, int64) {
-			cp := arg.(*models.ClientPermission)
+			cp := arg.(*record.ClientPermission)
 			return cp.ClientId, cp.PermissionId
 		},
 		consolidatedEvent: audit.EventUpdatedClientPermissions,
@@ -179,7 +179,7 @@ func (s grantSave) expectOwner(database *mocks_data.Database) {
 func expectPermissionsExist(database *mocks_data.Database, permissionIds ...int64) {
 	for _, id := range permissionIds {
 		database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), id).
-			Return(&models.Permission{Id: id, PermissionIdentifier: "p"}, nil).Once()
+			Return(&record.Permission{Id: id, PermissionIdentifier: "p"}, nil).Once()
 	}
 }
 
@@ -567,7 +567,7 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 				save.expectOwner(database)
 				if variant.missing != 0 {
 					database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), variant.missing).
-						Return((*models.Permission)(nil), nil).Once()
+						Return((*record.Permission)(nil), nil).Once()
 				}
 
 				rr := save.serve(database, auditLogger, variant.body)

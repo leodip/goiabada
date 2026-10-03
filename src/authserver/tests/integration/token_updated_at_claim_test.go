@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,7 @@ import (
 // OIDC claims for that token type -- the access token's setting is seeded off, which is why this
 // divergence could sit unnoticed.
 func TestToken_UpdatedAt_RidesWithTheProfileScope(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.IncludeOpenIDConnectClaimsInIdToken = true
 		settings.IncludeOpenIDConnectClaimsInAccessToken = true
 	})

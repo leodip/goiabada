@@ -14,8 +14,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
@@ -28,8 +28,8 @@ import (
 // dynamicClientRegistrationDatabase is what RFC 7591 registration needs: the client and redirect
 // URIs it creates, and the transaction that makes them one write.
 type dynamicClientRegistrationDatabase interface {
-	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
+	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -98,7 +98,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 9. Create client model
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:      clientIdentifier,
 			ClientSecretEncrypted: clientSecretEncrypted,
 			Description:           req.ClientName,
@@ -119,8 +119,8 @@ func HandleDynamicClientRegistrationPost(
 			CreatedViaDCR:                           true,
 			AuthorizationCodeEnabled:                containsGrantType(req.GrantTypes, oidc.GrantTypeAuthorizationCode),
 			ClientCredentialsEnabled:                containsGrantType(req.GrantTypes, oidc.GrantTypeClientCredentials),
-			DefaultAcrLevel:                         models.AcrLevel2Optional,
-			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         record.AcrLevel2Optional,
+			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
 			// Token expiration settings use global defaults from settings
 			TokenExpirationInSeconds:                settings.TokenExpirationInSeconds,
 			RefreshTokenOfflineIdleTimeoutInSeconds: settings.RefreshTokenOfflineIdleTimeoutInSeconds,
@@ -146,7 +146,7 @@ func HandleDynamicClientRegistrationPost(
 				return errs.Wrap(err, "DCR: unable to create the client")
 			}
 			for _, uri := range req.RedirectURIs {
-				redirectURI := &models.RedirectURI{
+				redirectURI := &record.RedirectURI{
 					ClientId: client.Id,
 					URI:      uri,
 				}
@@ -266,8 +266,8 @@ func validateDCRRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 	// The bounds are the admin API's too, since they are facts about storage rather than about
 	// the door, and every refusal here is invalid_redirect_uri, so an integrator learns the one
 	// thing to change is redirect_uris (#428). RFC 7591 sets no bound of its own.
-	if len(req.RedirectURIs) > models.RedirectURIsMaxPerClient {
-		return errs.Errorf("redirect_uris cannot hold more than %d entries", models.RedirectURIsMaxPerClient)
+	if len(req.RedirectURIs) > record.RedirectURIsMaxPerClient {
+		return errs.Errorf("redirect_uris cannot hold more than %d entries", record.RedirectURIsMaxPerClient)
 	}
 
 	// Validate each redirect URI
@@ -277,8 +277,8 @@ func validateDCRRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 	for _, uri := range req.RedirectURIs {
 		// Bytes, before parsing, so an overlong value is never parsed, and not echoed: the
 		// refusal names the bound instead of repeating a value that broke it.
-		if len(uri) > models.RedirectURIMaxBytes {
-			return errs.Errorf("a redirect_uri cannot exceed %d bytes", models.RedirectURIMaxBytes)
+		if len(uri) > record.RedirectURIMaxBytes {
+			return errs.Errorf("a redirect_uri cannot exceed %d bytes", record.RedirectURIMaxBytes)
 		}
 		// A repeat would be stored as a second row, and a save removing the URI would then
 		// leave the other copy live at sign-in. Matching at the authorization endpoint is

@@ -6,7 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,7 +30,7 @@ func TestAuditSwitches_AnswersFromTheRequestsSettings(t *testing.T) {
 
 	for _, want := range combinations {
 		mockDB := mocks_data.NewDatabase(t)
-		ctx := reqctx.WithSettings(context.Background(), &models.Settings{
+		ctx := reqctx.WithSettings(context.Background(), &record.Settings{
 			AuditLogsInConsoleEnabled:  want.Console,
 			AuditLogsInDatabaseEnabled: want.Database,
 		})
@@ -59,7 +59,7 @@ func TestAuditSwitches_ReadsTheRowWhenTheContextHasNoSettings(t *testing.T) {
 	for _, tc := range contexts {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			mockDB.On("GetSettingsById", tc.ctx, mock.Anything, int64(1)).Return(&models.Settings{
+			mockDB.On("GetSettingsById", tc.ctx, mock.Anything, int64(1)).Return(&record.Settings{
 				AuditLogsInConsoleEnabled:  true,
 				AuditLogsInDatabaseEnabled: false,
 			}, nil).Once()

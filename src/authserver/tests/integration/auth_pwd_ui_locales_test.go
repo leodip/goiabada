@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,10 +26,10 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 		DisplayName:      "Test app",
 		ShowDisplayName:  true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // =============================================================================
@@ -40,20 +40,20 @@ func readResponseBody(t *testing.T, resp *http.Response) string {
 }
 
 // createTestClientAndRedirectURI creates a basic test client and redirect URI
-func createTestClientAndRedirectURI(t *testing.T) (*models.Client, *models.RedirectURI) {
-	client := &models.Client{
+func createTestClientAndRedirectURI(t *testing.T) (*record.Client, *record.RedirectURI) {
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -66,13 +66,13 @@ func createTestClientAndRedirectURI(t *testing.T) (*models.Client, *models.Redir
 }
 
 // createSessionWithAcrLevel1AndPassword creates a session at ACR level 1 and returns the password for re-auth tests
-func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User, string) {
-	client := &models.Client{
+func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User, string) {
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -80,7 +80,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -96,7 +96,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

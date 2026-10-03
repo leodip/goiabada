@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/gender"
@@ -20,8 +20,8 @@ import (
 
 // accountProfileDatabase is what the account profile endpoints need: the caller's own user row.
 type accountProfileDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleAccountProfileGet - GET /api/v1/account/profile

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error {
+func (d *Database) CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *Database) CreateResource(ctx context.Context, tx *sql.Tx, resource *mod
 	resource.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	resource.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
+	resourceStruct := sqlbuilder.NewStruct(new(record.Resource)).
 		For(d.Flavor)
 
 	insertBuilder := resourceStruct.WithoutTag("pk").InsertInto("resources", resource)
@@ -35,7 +35,7 @@ func (d *Database) CreateResource(ctx context.Context, tx *sql.Tx, resource *mod
 	return nil
 }
 
-func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error {
+func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error {
 
 	if resource.Id == 0 {
 		return errs.New("can't update resource with id 0")
@@ -44,7 +44,7 @@ func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *mod
 	originalUpdatedAt := resource.UpdatedAt
 	resource.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
+	resourceStruct := sqlbuilder.NewStruct(new(record.Resource)).
 		For(d.Flavor)
 
 	updateBuilder := resourceStruct.WithoutTag("pk").WithoutTag("dont-update").Update("resources", resource)
@@ -61,7 +61,7 @@ func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *mod
 }
 
 func (d *Database) getResourceCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	resourceStruct *sqlbuilder.Struct) (*models.Resource, error) {
+	resourceStruct *sqlbuilder.Struct) (*record.Resource, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -70,7 +70,7 @@ func (d *Database) getResourceCommon(ctx context.Context, tx *sql.Tx, selectBuil
 	}
 	defer func() { _ = rows.Close() }()
 
-	var resource models.Resource
+	var resource record.Resource
 	if rows.Next() {
 		addr := resourceStruct.Addr(&resource)
 		err = rows.Scan(addr...)
@@ -86,9 +86,9 @@ func (d *Database) getResourceCommon(ctx context.Context, tx *sql.Tx, selectBuil
 	return nil, nil
 }
 
-func (d *Database) GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error) {
+func (d *Database) GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error) {
 
-	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
+	resourceStruct := sqlbuilder.NewStruct(new(record.Resource)).
 		For(d.Flavor)
 
 	selectBuilder := resourceStruct.SelectFrom("resources")
@@ -102,9 +102,9 @@ func (d *Database) GetResourceById(ctx context.Context, tx *sql.Tx, resourceId i
 	return resource, nil
 }
 
-func (d *Database) GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error) {
+func (d *Database) GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error) {
 
-	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
+	resourceStruct := sqlbuilder.NewStruct(new(record.Resource)).
 		For(d.Flavor)
 
 	selectBuilder := resourceStruct.SelectFrom("resources")
@@ -124,16 +124,16 @@ func (d *Database) GetResourceByResourceIdentifier(ctx context.Context, tx *sql.
 	return resource, nil
 }
 
-func (d *Database) GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]models.Resource, error) {
+func (d *Database) GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error) {
 
 	if len(resourceIds) == 0 {
 		return nil, nil
 	}
 
-	var resources []models.Resource
+	var resources []record.Resource
 
 	err := forEachIdBatch(resourceIds, func(batch []int64) error {
-		resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
+		resourceStruct := sqlbuilder.NewStruct(new(record.Resource)).
 			For(d.Flavor)
 
 		selectBuilder := resourceStruct.SelectFrom("resources")
@@ -147,7 +147,7 @@ func (d *Database) GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceId
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var resource models.Resource
+			var resource record.Resource
 			addr := resourceStruct.Addr(&resource)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -169,8 +169,8 @@ func (d *Database) GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceId
 	return resources, nil
 }
 
-func (d *Database) GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Resource, error) {
-	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
+func (d *Database) GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Resource, error) {
+	resourceStruct := sqlbuilder.NewStruct(new(record.Resource)).
 		For(d.Flavor)
 
 	selectBuilder := resourceStruct.SelectFrom("resources")
@@ -182,9 +182,9 @@ func (d *Database) GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Re
 	}
 	defer func() { _ = rows.Close() }()
 
-	var resources []models.Resource
+	var resources []record.Resource
 	for rows.Next() {
-		var resource models.Resource
+		var resource record.Resource
 		addr := resourceStruct.Addr(&resource)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -202,7 +202,7 @@ func (d *Database) GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Re
 
 func (d *Database) DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Resource)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Resource)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("resources")

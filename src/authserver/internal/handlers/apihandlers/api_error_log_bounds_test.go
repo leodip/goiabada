@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +80,7 @@ func TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, rawEvent, rawRequestId).
-		Return([]models.AuditLog(nil), 0, errs.New("engine is down"))
+		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
@@ -112,7 +112,7 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
 
 	database := mocks_data.NewDatabase(t)
 	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
-		Return([]models.User(nil), 0, errs.New("engine is down"))
+		Return([]record.User(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
@@ -137,7 +137,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, event, filterId).
-		Return([]models.AuditLog(nil), 0, errs.New("engine is down"))
+		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
@@ -162,7 +162,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 // the first error record and into the annotation branch.
 func searchThatSucceeds(database *mocks_data.Database, rawQuery string) {
 	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
-		Return([]models.User{{Id: 42}}, 1, nil)
+		Return([]record.User{{Id: 42}}, 1, nil)
 }
 
 func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t *testing.T) {
@@ -195,7 +195,7 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails(t 
 
 	database := mocks_data.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
-	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).Return(&models.Group{Id: 7}, nil)
+	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).Return(&record.Group{Id: 7}, nil)
 	database.On("UsersLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Return(errs.New("engine is down"))
 

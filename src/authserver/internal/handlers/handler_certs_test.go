@@ -9,7 +9,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -27,20 +27,20 @@ func TestHandleCertsGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		nextKey := models.KeyPair{
-			State:        models.KeyStateNext.String(),
+		nextKey := record.KeyPair{
+			State:        record.KeyStateNext.String(),
 			PublicKeyJWK: []byte(`{"kid":"next-kid","kty":"RSA","alg":"RS256","use":"sig","n":"next-n","e":"AQAB"}`),
 		}
-		currentKey := models.KeyPair{
-			State:        models.KeyStateCurrent.String(),
+		currentKey := record.KeyPair{
+			State:        record.KeyStateCurrent.String(),
 			PublicKeyJWK: []byte(`{"kid":"current-kid","kty":"RSA","alg":"RS256","use":"sig","n":"current-n","e":"AQAB"}`),
 		}
-		previousKey := models.KeyPair{
-			State:        models.KeyStatePrevious.String(),
+		previousKey := record.KeyPair{
+			State:        record.KeyStatePrevious.String(),
 			PublicKeyJWK: []byte(`{"kid":"previous-kid","kty":"RSA","alg":"RS256","use":"sig","n":"previous-n","e":"AQAB"}`),
 		}
 
-		allKeys := []models.KeyPair{nextKey, currentKey, previousKey}
+		allKeys := []record.KeyPair{nextKey, currentKey, previousKey}
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
@@ -70,12 +70,12 @@ func TestHandleCertsGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		currentKey := models.KeyPair{
-			State:        models.KeyStateCurrent.String(),
+		currentKey := record.KeyPair{
+			State:        record.KeyStateCurrent.String(),
 			PublicKeyJWK: []byte(`{"kid":"current-kid","kty":"RSA","alg":"RS256","use":"sig","n":"current-n","e":"AQAB"}`),
 		}
 
-		allKeys := []models.KeyPair{currentKey}
+		allKeys := []record.KeyPair{currentKey}
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
@@ -126,12 +126,12 @@ func TestHandleCertsGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		invalidKey := models.KeyPair{
+		invalidKey := record.KeyPair{
 			State:        "invalid",
 			PublicKeyJWK: []byte(`{"kid":"invalid-kid","kty":"RSA","alg":"RS256","use":"sig","n":"invalid-n","e":"AQAB"}`),
 		}
 
-		allKeys := []models.KeyPair{invalidKey}
+		allKeys := []record.KeyPair{invalidKey}
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
@@ -156,12 +156,12 @@ func TestHandleCertsGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		invalidJSONKey := models.KeyPair{
-			State:        models.KeyStateCurrent.String(),
+		invalidJSONKey := record.KeyPair{
+			State:        record.KeyStateCurrent.String(),
 			PublicKeyJWK: []byte(`invalid json`),
 		}
 
-		allKeys := []models.KeyPair{invalidJSONKey}
+		allKeys := []record.KeyPair{invalidJSONKey}
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
@@ -186,7 +186,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
+		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{}, nil)
 
 		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(jwks oauth.Jwks) bool {
 			return len(jwks.Keys) == 0

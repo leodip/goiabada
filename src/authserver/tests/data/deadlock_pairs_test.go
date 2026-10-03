@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -135,7 +135,7 @@ type pausedBeforeTokenUpdate struct {
 	b *barrier
 }
 
-func (d pausedBeforeTokenUpdate) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d pausedBeforeTokenUpdate) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 	d.b.arriveBefore(tx)
 	return d.Database.UpdateRefreshToken(ctx, tx, refreshToken)
 }
@@ -185,7 +185,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	type issuanceOut struct {
 		live bool
-		code *models.Code
+		code *record.Code
 		err  error
 	}
 	issuing := goBlocked(t, "issuance", sweepTx, func(reached func()) issuanceOut {

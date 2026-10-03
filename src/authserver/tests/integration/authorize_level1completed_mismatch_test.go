@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,12 +17,12 @@ import (
 // the other ten use (#248 part 1). The refusal leaves the ceremony where it was, so the password
 // form rendered before it still posts and the sign-in completes with a code.
 func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -30,7 +30,7 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -46,7 +46,7 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

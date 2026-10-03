@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -21,12 +21,12 @@ import (
 // groupAttributesDatabase is what the group attribute endpoints need: the group and the
 // attributes hanging off it.
 type groupAttributesDatabase interface {
-	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error
+	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
 	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error
-	GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error)
-	GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error)
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
-	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error
+	GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error)
+	GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error)
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
 }
 
 func HandleGroupAttributesGet(
@@ -177,7 +177,7 @@ func HandleGroupAttributeCreatePost(
 		}
 
 		// Create group attribute
-		groupAttribute := &models.GroupAttribute{
+		groupAttribute := &record.GroupAttribute{
 			Key:                  createReq.Key,
 			Value:                createReq.Value,
 			IncludeInIdToken:     createReq.IncludeInIdToken,

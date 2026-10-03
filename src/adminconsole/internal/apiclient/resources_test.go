@@ -11,7 +11,7 @@ import (
 
 // The resource family's decode half, and with permissions_test.go, client_permissions_test.go and
 // group_permissions_test.go the permission family's. Every method of both used to rebuild the
-// response into a models.Permission or a models.Resource, field by field, and each rebuild was a
+// response into a record.Permission or a record.Resource, field by field, and each rebuild was a
 // list of the fields somebody remembered: a field added to the response and forgotten in the loop
 // reached the handlers as its zero value with nothing going red. They hand the decoded response
 // back now, so this is the seam where the console's view of a resource is pinned (#350).
@@ -21,7 +21,7 @@ import (
 // two modules edit together would let a shape change pass both.
 
 // resourceBodyFields is one resource, lowerCamelCase, including the flag decision 10 put on the
-// wire. The rebuild could not carry it at all: models.Resource has no such field, only a method.
+// wire. The rebuild could not carry it at all: record.Resource has no such field, only a method.
 const resourceBodyFields = `"id":2,"resourceIdentifier":"api","description":"The API",` +
 	`"isSystemLevelResource":true`
 

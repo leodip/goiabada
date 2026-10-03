@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
 
-func getUserAccessTokenWithAccountScope_EmailVerification(t *testing.T) (string, *models.User) {
+func getUserAccessTokenWithAccountScope_EmailVerification(t *testing.T) (string, *record.User) {
 	return getUserAccessTokenWithAccountScope_Email(t)
 }
 
@@ -23,7 +23,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
@@ -56,7 +56,7 @@ func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	// First send
@@ -83,7 +83,7 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Enable SMTP
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	// Mark user as verified
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
@@ -108,7 +108,7 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = false })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = false })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
@@ -139,7 +139,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	// Trigger send to generate code
 	sendURL := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
@@ -172,7 +172,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "WRONG"})
@@ -188,7 +188,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	// Manually set a code that is already expired
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
@@ -214,7 +214,7 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Enable SMTP
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
@@ -235,7 +235,7 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 
 func TestAPIAccountEmailVerification_VerifySMTPDisabled(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = false })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = false })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "ABC123"})
@@ -251,7 +251,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Enable SMTP
-	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	req, err := http.NewRequest("POST", url, nil)

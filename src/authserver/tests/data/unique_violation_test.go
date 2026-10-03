@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // TestCreateUser_DuplicateEmailIsErrUniqueViolation is the tier this part of #279 exists for.
@@ -31,7 +31,7 @@ func TestCreateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 
 	// Everything else about the second user is fresh, so the email is the only key it can
 	// collide on.
-	second := &models.User{
+	second := &record.User{
 		Enabled: true,
 		Subject: fake.UUID(),
 		Email:   first.Email,
@@ -101,7 +101,7 @@ func TestCreateWebOrigin_ADuplicateOriginIsErrUniqueViolation(t *testing.T) {
 	client := createTestClient(t)
 	first := createTestWebOrigin(t, client.Id)
 
-	second := &models.WebOrigin{Origin: first.Origin, ClientId: client.Id}
+	second := &record.WebOrigin{Origin: first.Origin, ClientId: client.Id}
 	err := database.CreateWebOrigin(context.Background(), nil, second)
 	if err == nil {
 		_ = database.DeleteWebOrigin(context.Background(), nil, second.Id)
@@ -121,7 +121,7 @@ func TestCreatePermission_ADuplicateIdentifierIsErrUniqueViolation(t *testing.T)
 	resource := createTestResource(t)
 	first := createTestPermission(t, resource)
 
-	second := &models.Permission{
+	second := &record.Permission{
 		PermissionIdentifier: first.PermissionIdentifier,
 		Description:          "duplicate",
 		ResourceId:           resource.Id,
@@ -151,7 +151,7 @@ func TestCreatePermission_ADuplicateIdentifierIsErrUniqueViolation(t *testing.T)
 // primary result code, SQLITE_CONSTRAINT, and PostgreSQL both the same SQLSTATE class, 23, so a
 // classifier written one level too coarse on either engine passes the case above and fails here.
 func TestInsert_AnUnrelatedConstraintIsNotErrUniqueViolation(t *testing.T) {
-	attribute := &models.UserAttribute{
+	attribute := &record.UserAttribute{
 		Key:    "probe" + fake.LetterN(6),
 		Value:  fake.LetterN(8),
 		UserId: 999999999, // no such user
@@ -181,7 +181,7 @@ func TestCreateUser_DuplicateEmailInsideATransactionIsErrUniqueViolation(t *test
 	first := createTestUser(t)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
 
-	second := &models.User{
+	second := &record.User{
 		Enabled: true,
 		Subject: fake.UUID(),
 		Email:   first.Email,

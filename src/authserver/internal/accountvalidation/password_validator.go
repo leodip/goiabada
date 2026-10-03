@@ -4,7 +4,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -23,7 +23,7 @@ func NewPasswordValidator() *PasswordValidator {
 
 // ValidatePassword checks password against policy. The caller reads the policy off its settings,
 // so this reads nothing from the request (#433).
-func (val *PasswordValidator) ValidatePassword(policy models.PasswordPolicy, password string) error {
+func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string) error {
 	minLength := 1
 	mustIncludeLowerCase := false
 	mustIncludeUpperCase := false
@@ -31,14 +31,14 @@ func (val *PasswordValidator) ValidatePassword(policy models.PasswordPolicy, pas
 	mustIncludeASpecialChar := false
 
 	switch policy {
-	case models.PasswordPolicyLow:
+	case record.PasswordPolicyLow:
 		minLength = 6
-	case models.PasswordPolicyMedium:
+	case record.PasswordPolicyMedium:
 		minLength = 8
 		mustIncludeLowerCase = true
 		mustIncludeUpperCase = true
 		mustIncludeANumber = true
-	case models.PasswordPolicyHigh:
+	case record.PasswordPolicyHigh:
 		minLength = 10
 		mustIncludeLowerCase = true
 		mustIncludeUpperCase = true

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateUserSessionClient(t *testing.T) {
@@ -13,7 +13,7 @@ func TestCreateUserSessionClient(t *testing.T) {
 	userSession := createTestUserSession(t, user.Id)
 	client := createTestClient(t)
 
-	userSessionClient := &models.UserSessionClient{
+	userSessionClient := &record.UserSessionClient{
 		UserSessionId: userSession.Id,
 		ClientId:      client.Id,
 		Started:       time.Now().UTC().Truncate(time.Millisecond),
@@ -61,7 +61,7 @@ func TestUpdateUserSessionClient(t *testing.T) {
 	newClient := createTestClient(t)
 
 	// Update all properties
-	updatedUserSessionClient := &models.UserSessionClient{
+	updatedUserSessionClient := &record.UserSessionClient{
 		Id:            originalUserSessionClient.Id,
 		UserSessionId: newUserSession.Id,
 		ClientId:      newClient.Id,
@@ -183,15 +183,15 @@ func TestDeleteUserSessionClient(t *testing.T) {
 	}
 }
 
-func createTestUserSessionClient(t *testing.T) *models.UserSessionClient {
+func createTestUserSessionClient(t *testing.T) *record.UserSessionClient {
 	user := createTestUser(t)
 	userSession := createTestUserSession(t, user.Id)
 	client := createTestClient(t)
 	return createTestUserSessionClientWithIds(t, userSession.Id, client.Id)
 }
 
-func createTestUserSessionClientWithIds(t *testing.T, userSessionId, clientId int64) *models.UserSessionClient {
-	userSessionClient := &models.UserSessionClient{
+func createTestUserSessionClientWithIds(t *testing.T, userSessionId, clientId int64) *record.UserSessionClient {
+	userSessionClient := &record.UserSessionClient{
 		UserSessionId: userSessionId,
 		ClientId:      clientId,
 		Started:       time.Now().UTC(),

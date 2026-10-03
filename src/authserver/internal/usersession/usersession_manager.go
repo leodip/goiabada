@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
@@ -18,15 +18,15 @@ import (
 // userSessionManagerDatabase is what the session manager needs: the session row and the clients
 // it authorized, and the transaction that changes them together.
 type userSessionManagerDatabase interface {
-	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
-	CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error
+	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
+	CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
-	UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error
-	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
+	UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error
+	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 // sessionCleanupTimeout bounds the compensating delete once abandonUserSession has detached it
@@ -66,7 +66,7 @@ func NewManager(sessionStore userSessionStore, sessionName string, database user
 // session lifetimes are the caller's settings, and requestedMaxAgeInSeconds is the client's
 // max_age, nil when it sent none. It reads nothing from a context, so a caller that holds the
 // settings passes the two values it means (#433).
-func (u *Manager) HasValidUserSession(userSession *models.UserSession, idleTimeoutInSeconds int,
+func (u *Manager) HasValidUserSession(userSession *record.UserSession, idleTimeoutInSeconds int,
 	maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool {
 
 	if userSession == nil {
@@ -117,10 +117,10 @@ func (u *Manager) HasValidUserSession(userSession *models.UserSession, idleTimeo
 // gone either way and each is owed its audit event. Every other failure rolled them back and
 // returns none.
 func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
-	userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
+	userId int64, clientId int64, authMethods string, acrLevel record.AcrLevel,
 	authStateGeneration int64, otpConfigGeneration *int64,
 	authenticatedAt *time.Time, ipAddress string,
-	replacing *models.UserSession) (*models.UserSession, []models.UserSession, error) {
+	replacing *record.UserSession) (*record.UserSession, []record.UserSession, error) {
 
 	if authenticatedAt == nil || authenticatedAt.IsZero() {
 		return nil, nil, errs.New("no credential instant captured; refusing to mint a session whose auth_time would be invented")
@@ -143,7 +143,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	// and nothing below reads them back: the sweep keys on UserAgent and IpAddress (#281).
 	deviceName, deviceType, deviceOS := useragent.Labels(r)
 
-	userSession := &models.UserSession{
+	userSession := &record.UserSession{
 		SessionIdentifier: uuid.New(),
 		Started:           utcNow,
 		LastAccessed:      utcNow,
@@ -161,7 +161,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		OtpConfigGeneration: observedOtpConfigGeneration,
 	}
 
-	userSession.Clients = append(userSession.Clients, models.UserSessionClient{
+	userSession.Clients = append(userSession.Clients, record.UserSessionClient{
 		Started:      utcNow,
 		LastAccessed: utcNow,
 		ClientId:     clientId,
@@ -191,9 +191,9 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	// committed session row that no cookie named, sometimes having already deleted the session the
 	// browser did have (#198). Only the browser-store write below is left after the commit, and it
 	// is compensated rather than prevented: see abandonUserSession.
-	var removed []models.UserSession
+	var removed []record.UserSession
 	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-		var removedThisAttempt []models.UserSession
+		var removedThisAttempt []record.UserSession
 
 		if createUserSessionErr := u.database.CreateUserSession(r.Context(), tx, userSession); createUserSessionErr != nil {
 			return createUserSessionErr
@@ -323,7 +323,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 // browser-store write staged inside the transaction, which it cannot be while a rerun can double
 // the Set-Cookie. Revisit if the store gains a two-phase write that can be prepared before the
 // commit and completed after it (#198).
-func (u *Manager) abandonUserSession(ctx context.Context, userSession *models.UserSession, cause error) error {
+func (u *Manager) abandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error {
 	// The caller's VALUES, deliberately not the caller's cancellation, because the cancellation
 	// and the failure this compensates for are the same event: net/http cancels a request's
 	// context the instant the client disconnects, and a disconnected client is exactly why a
@@ -371,9 +371,9 @@ func (u *Manager) abandonUserSession(ctx context.Context, userSession *models.Us
 // decide "absent" again and insert the same pair a second time. The body is otherwise safe to run
 // twice, since it builds every value it writes from what it has just read.
 func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-	authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error) {
+	authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
 
-	var bumped *models.UserSession
+	var bumped *record.UserSession
 	err := data.RunInTransactionRetryingConflict(ctx, u.database, func(tx *sql.Tx) error {
 		userSession, err := u.database.GetUserSessionBySessionIdentifier(ctx, tx, sessionIdentifier)
 		if err != nil {
@@ -425,7 +425,7 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 			}
 		}
 		if !clientFound {
-			userSession.Clients = append(userSession.Clients, models.UserSessionClient{
+			userSession.Clients = append(userSession.Clients, record.UserSessionClient{
 				Started:      utcNow,
 				LastAccessed: utcNow,
 				ClientId:     clientId,
@@ -486,7 +486,7 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 //
 // It is built from the same two predicates BumpUserSession applies, so the decider and
 // the writer cannot drift apart.
-func WillRaisePrivilege(userSession *models.UserSession, authMethods string, acrLevel models.AcrLevel) bool {
+func WillRaisePrivilege(userSession *record.UserSession, authMethods string, acrLevel record.AcrLevel) bool {
 	if userSession == nil {
 		return false
 	}
@@ -506,12 +506,12 @@ func raisesAuthMethods(current, incoming string) bool {
 // This is used during step-up authentication: when a user with a level1 session
 // authenticates with OTP for a level2 client, the session's ACR should be upgraded.
 //
-// Uses models.AcrLevel.IsHigherThan() as the single source of truth for ACR comparison.
+// Uses record.AcrLevel.IsHigherThan() as the single source of truth for ACR comparison.
 // A level outside the three answers false on either side, which IsHigherThan alone does not:
 // an unrecognized current level has priority 0, so any known level would be higher than it,
 // and a session row carrying a value this server never wrote would be raised rather than
 // left as found. Priority 0 is what marks the value unrecognized (#433).
-func shouldUpgradeAcrLevel(currentAcr, newAcr models.AcrLevel) bool {
+func shouldUpgradeAcrLevel(currentAcr, newAcr record.AcrLevel) bool {
 	if currentAcr.Priority() == 0 || newAcr.Priority() == 0 {
 		return false // Unknown ACR, fail safe
 	}

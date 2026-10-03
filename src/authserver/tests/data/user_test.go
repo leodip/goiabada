@@ -13,7 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/hashutil"
 )
@@ -175,7 +175,7 @@ func TestGetUserByEmail(t *testing.T) {
 
 func TestSearchUsersPaginated(t *testing.T) {
 	// Create multiple users
-	users := make([]*models.User, 5)
+	users := make([]*record.User, 5)
 	for i := 0; i < 5; i++ {
 		users[i] = createTestUser(t)
 	}
@@ -311,9 +311,9 @@ func TestSearchUsersPaginated(t *testing.T) {
 
 // createSearchUser creates a user with both of the columns the search cases vary, given_name and
 // username. The other searched columns get values that cannot collide with a tag.
-func createSearchUser(t *testing.T, givenName string, username string) *models.User {
+func createSearchUser(t *testing.T, givenName string, username string) *record.User {
 	t.Helper()
-	user := &models.User{
+	user := &record.User{
 		Enabled:   true,
 		Subject:   fake.UUID(),
 		Username:  username,
@@ -346,7 +346,7 @@ func assertSearchFindsExactly(t *testing.T, query string, wantId int64) {
 	}
 }
 
-func userIds(users []models.User) map[int64]bool {
+func userIds(users []record.User) map[int64]bool {
 	ids := make(map[int64]bool, len(users))
 	for _, user := range users {
 		ids[user.Id] = true
@@ -433,12 +433,12 @@ func TestDeleteUser(t *testing.T) {
 
 // createTestUser seeds a user on the package's shared handle. createTestUserOn takes the handle,
 // which is what lets a test run against a fixture database of its own (#139 stage 8).
-func createTestUser(t *testing.T) *models.User {
+func createTestUser(t *testing.T) *record.User {
 	return createTestUserOn(t, database)
 }
 
-func createTestUserOn(t *testing.T, db data.Database) *models.User {
-	user := &models.User{
+func createTestUserOn(t *testing.T, db data.Database) *record.User {
+	user := &record.User{
 		Enabled:                              fake.Bool(),
 		Subject:                              fake.UUID(),
 		Username:                             fake.Username(),
@@ -482,7 +482,7 @@ func createTestUserOn(t *testing.T, db data.Database) *models.User {
 	return user
 }
 
-func compareUsers(t *testing.T, expected, actual *models.User) {
+func compareUsers(t *testing.T, expected, actual *record.User) {
 	if actual.Id != expected.Id {
 		t.Errorf("ID mismatch: expected %d, got %d", expected.Id, actual.Id)
 	}
@@ -937,7 +937,7 @@ func TestTrySetUserEmail_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T
 // createEnrolledTestUser returns a saved user with OTP on, which the consumed-step
 // tests need explicitly: createTestUser randomises OTPEnabled, so a test relying on
 // it would pass or fail by coin toss once requireOTPEnabled is in the predicate.
-func createEnrolledTestUser(t *testing.T) *models.User {
+func createEnrolledTestUser(t *testing.T) *record.User {
 	t.Helper()
 	user := createTestUser(t)
 	user.OTPEnabled = true
@@ -1386,7 +1386,7 @@ func codeHashOf(t *testing.T, code string) string {
 // createUserWithResetCode returns a saved user carrying an outstanding forgot-password
 // code, plus the hash the reset link would find it by. createTestUser leaves the hash at
 // its empty default, so an ordinary test user is a dormant row for these lookups.
-func createUserWithResetCode(t *testing.T) (*models.User, string) {
+func createUserWithResetCode(t *testing.T) (*record.User, string) {
 	t.Helper()
 	user := createTestUser(t)
 	// Enabled, because the claim requires it (#404) and createTestUser randomises it.
@@ -1447,7 +1447,7 @@ func TestGetUserByForgotPasswordCodeHash_EmptyNeverMatches(t *testing.T) {
 	// Three users with no outstanding code, so the '' value is present several times
 	// over. The plain (non-UNIQUE) index on this column is what makes that legal, and
 	// this is the case that would find a UNIQUE one.
-	dormant := make([]*models.User, 0, 3)
+	dormant := make([]*record.User, 0, 3)
 	for i := 0; i < 3; i++ {
 		u := createTestUser(t)
 		if u.ForgotPasswordCodeHash != "" {
@@ -1873,7 +1873,7 @@ func passwordHashStored(t *testing.T, userId int64) string {
 // createRecoverableTestUser returns a saved user forgot-password may issue a code to: enabled,
 // with a verified address and no code outstanding. createTestUser randomises the first two, so
 // a test relying on them would pass or fail by coin toss.
-func createRecoverableTestUser(t *testing.T) *models.User {
+func createRecoverableTestUser(t *testing.T) *record.User {
 	t.Helper()
 	user := createTestUser(t)
 	user.Enabled = true
@@ -1937,11 +1937,11 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 
 	declines := []struct {
 		name   string
-		mutate func(t *testing.T, user *models.User) string
+		mutate func(t *testing.T, user *record.User) string
 	}{
 		{
 			name: "a disabled account",
-			mutate: func(t *testing.T, user *models.User) string {
+			mutate: func(t *testing.T, user *record.User) string {
 				disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
 				if err != nil || !disabled {
 					t.Fatalf("the disable must take effect: disabled=%v err=%v", disabled, err)
@@ -1953,7 +1953,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			// TrySetUserEmail clears the verified flag, which is the route by which an address
 			// stops being verified; it is the email change landing under the request.
 			name: "an address no longer verified",
-			mutate: func(t *testing.T, user *models.User) string {
+			mutate: func(t *testing.T, user *record.User) string {
 				fresh, err := database.GetUserById(context.Background(), nil, user.Id)
 				if err != nil {
 					t.Fatalf("Failed to reload user: %v", err)
@@ -1969,7 +1969,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			// The address changed and was verified again before the store: the mail would go
 			// to the address the request looked up, which is no longer the account's.
 			name: "an account re-addressed and verified again",
-			mutate: func(t *testing.T, user *models.User) string {
+			mutate: func(t *testing.T, user *record.User) string {
 				looked := user.Email
 				current, err := database.GetUserById(context.Background(), nil, user.Id)
 				if err != nil {
@@ -2221,10 +2221,10 @@ func TestGetUserBySubjectIsCaseSensitive(t *testing.T) {
 }
 
 // createUserWithEmail is the minimum a users row needs, at a chosen address.
-func createUserWithEmail(t *testing.T, email string) *models.User {
+func createUserWithEmail(t *testing.T, email string) *record.User {
 	t.Helper()
 
-	user := &models.User{
+	user := &record.User{
 		Enabled:      true,
 		Subject:      fake.UUID(),
 		Username:     "case_" + fake.LetterN(10),
@@ -2247,7 +2247,7 @@ func TestSearchUsersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx := beginTx(t)
 
 	givenName := "TxSearch" + fake.LetterN(12)
-	user := &models.User{
+	user := &record.User{
 		Enabled:   true,
 		Subject:   fake.UUID(),
 		Username:  "u" + fake.LetterN(12),

@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -173,7 +173,7 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 // emailCaseReader is what the `migrate to` pre-flight reads through the opened database: the
 // stored addresses, beside each one as the engine's own LOWER() reduces it.
 type emailCaseReader interface {
-	ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error)
+	ScanEmailCase(ctx context.Context) ([]record.EmailCaseRow, error)
 }
 
 // runMigrate is the whole of the `migrate` subcommand: the arguments that followed the word

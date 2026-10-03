@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
 	// Create an extra client and a couple of sessions linked to it for richer output
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "acct-sess-client-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Account Sessions Client",
@@ -43,8 +43,8 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 	}()
 
 	now := time.Now().UTC()
-	_ = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
-	_ = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	_ = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	_ = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -78,7 +78,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 	for _, s := range out.Sessions {
 		byIdentifier[s.SessionIdentifier] = s.UserAgent
 	}
-	for _, fixture := range []*models.UserSession{s1, s2} {
+	for _, fixture := range []*record.UserSession{s1, s2} {
 		agent, present := byIdentifier[fixture.SessionIdentifier]
 		require.True(t, present, "fixture session %s missing from the response", fixture.SessionIdentifier)
 		assert.Equal(t, testSessionUserAgent, agent)
@@ -89,7 +89,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	valid := &models.UserSession{
+	valid := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-30 * time.Minute),
 		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
@@ -106,7 +106,7 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
 
-	expired := &models.UserSession{
+	expired := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-25 * time.Hour),
 		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
@@ -166,7 +166,7 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	// Create another user and a session for them
-	other := &models.User{Subject: fake.UUID(), Enabled: true, Email: "other-" + fake.UUID()[:8] + "@acctsess.test"}
+	other := &record.User{Subject: fake.UUID(), Enabled: true, Email: "other-" + fake.UUID()[:8] + "@acctsess.test"}
 	err := database.CreateUser(context.Background(), nil, other)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, other.Id) }()

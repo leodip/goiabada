@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 )
 
@@ -92,18 +92,18 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 // createTokenOfCode makes a refresh token descending from one code. sessionIdentifier is the
 // token's OWN column, which an offline token leaves empty: the sid its grant came from lives on
 // the codes row, and the sid-scoped sweep reaches it through that join alone.
-func createTokenOfCode(t *testing.T, clientId, userId, codeId int64, sessionIdentifier string) *models.RefreshToken {
+func createTokenOfCode(t *testing.T, clientId, userId, codeId int64, sessionIdentifier string) *record.RefreshToken {
 	return createTokenOfCodeOn(t, database, clientId, userId, codeId, sessionIdentifier)
 }
 
 // createTokenOfCodeOn takes the handle, for the reason createTestUserOn does.
-func createTokenOfCodeOn(t *testing.T, db data.Database, clientId, userId, codeId int64, sessionIdentifier string) *models.RefreshToken {
+func createTokenOfCodeOn(t *testing.T, db data.Database, clientId, userId, codeId int64, sessionIdentifier string) *record.RefreshToken {
 	t.Helper()
 	tokenType := "Refresh"
 	if sessionIdentifier == "" {
 		tokenType = "Offline"
 	}
-	token := &models.RefreshToken{
+	token := &record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: codeId, Valid: true},
 		UserId:            sql.NullInt64{Int64: userId, Valid: true},
 		ClientId:          sql.NullInt64{Int64: clientId, Valid: true},

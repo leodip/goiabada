@@ -11,7 +11,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -52,7 +52,7 @@ func TestHandleRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
 			handler := HandleRegisterGet(pageRenderer)
 
 			req := httptest.NewRequest(http.MethodGet, "/account/register"+tc.query, nil)
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: true}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: true}))
 			rr := httptest.NewRecorder()
 
 			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html",
@@ -81,7 +81,7 @@ func TestHandleRegisterPost_TheRedrawnFormKeepsOnlyAWellFormedCeremony(t *testin
 
 			req := httptest.NewRequest(http.MethodPost, "/account/register"+tc.query, strings.NewReader(""))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: true}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: true}))
 			rr := httptest.NewRecorder()
 
 			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html",

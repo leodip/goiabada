@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -42,7 +42,7 @@ func logoutRequest(t *testing.T, clientIdentifier string) *http.Request {
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/logout-request", bytes.NewReader(body))
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": "the-user", "sid": logoutSid})
-	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Issuer: "https://auth.example.com"}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://auth.example.com"}))
 }
 
 // requireErrorOnTheRecord asserts one 500 whose record carries the failure the handler caught.
@@ -76,7 +76,7 @@ func assertNothingAfterTheClient(t *testing.T, database *mocks_data.Database) {
 func TestHandleAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAllClients", mock.Anything, mock.Anything).
-		Return([]models.Client{{Id: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
+		Return([]record.Client{{Id: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Return(errLogoutLookupFailed).Once()
 
@@ -122,10 +122,10 @@ func TestHandleAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.T) 
 // session.
 func stubResolvedClient(database *mocks_data.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
-		Return(&models.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
+		Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: logoutPostLogoutUri}}
+			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: logoutPostLogoutUri}}
 		}).Return(nil).Once()
 }
 

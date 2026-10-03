@@ -1,6 +1,6 @@
 package ceremony
 
-import "github.com/leodip/goiabada/authserver/internal/models"
+import "github.com/leodip/goiabada/authserver/internal/record"
 
 // StepUp is what a ceremony still owes before a session satisfies its target level, and why.
 type StepUp int
@@ -20,8 +20,8 @@ const (
 // TargetRequiresSecondFactor reports whether a ceremony aiming at target has to answer the level 2
 // question, which is every level above level 1. A level outside the three answers false, as
 // IsHigherThan ranks it below level 1.
-func TargetRequiresSecondFactor(target models.AcrLevel) bool {
-	return target.IsHigherThan(models.AcrLevel1)
+func TargetRequiresSecondFactor(target record.AcrLevel) bool {
+	return target.IsHigherThan(record.AcrLevel1)
 }
 
 // StepUpOwed is the one "does this session satisfy the target level" rule, read by
@@ -41,7 +41,7 @@ func TargetRequiresSecondFactor(target models.AcrLevel) bool {
 // no re-prompt (#242 decision 1).
 //
 // A session ACR that does not parse is returned as an error; each caller decides what that answers.
-func StepUpOwed(target models.AcrLevel, session *models.UserSession) (StepUp, error) {
+func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, error) {
 	if session == nil {
 		if TargetRequiresSecondFactor(target) {
 			return StepUpLevel, nil
@@ -49,7 +49,7 @@ func StepUpOwed(target models.AcrLevel, session *models.UserSession) (StepUp, er
 		return StepUpNone, nil
 	}
 
-	sessionAcrLevel, err := models.AcrLevelFromString(session.AcrLevel.String())
+	sessionAcrLevel, err := record.AcrLevelFromString(session.AcrLevel.String())
 	if err != nil {
 		return StepUpNone, err
 	}

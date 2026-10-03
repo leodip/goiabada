@@ -9,12 +9,12 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -25,7 +25,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -60,7 +60,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 }
 
 func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -71,7 +71,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -107,7 +107,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 	pkceRequired := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -119,7 +119,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -155,7 +155,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 
 func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 	pkceRequired := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -167,7 +167,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -203,7 +203,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 
 func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 	pkceRequired := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -215,7 +215,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -262,7 +262,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 
 	for _, testCase := range testCases {
 		pkceRequired := true
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "test-client-" + fake.LetterN(8),
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -274,7 +274,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		redirectUri := &models.RedirectURI{
+		redirectUri := &record.RedirectURI{
 			ClientId: client.Id,
 			URI:      fake.URL(),
 		}
@@ -322,7 +322,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 // not the deferral reaching another case: authentication changes nothing here. The redirect is
 // withdrawn from this failure altogether, for every request, not postponed.
 func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -333,7 +333,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -381,7 +381,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 // the status assertion above while still handing the browser to a client-chosen host, and a redirect
 // to /auth/level1 would mean the error was parked instead of answered.
 func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogIn(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -392,7 +392,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -440,7 +440,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 // The title is not re-asserted here. It is the same key the client and redirect_uri page uses and
 // TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale already owns it.
 func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLocale(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -451,7 +451,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -490,7 +490,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 }
 
 func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -501,7 +501,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -542,7 +542,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 }
 
 func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -553,7 +553,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -595,7 +595,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 }
 
 func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -606,7 +606,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -651,7 +651,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 }
 
 func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -662,7 +662,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -702,7 +702,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 // The authserver resource has no userinfo permission since #449, so an explicit request for it
 // is answered as any unknown permission is, where it used to have a refusal of its own.
 func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -713,7 +713,7 @@ func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -757,7 +757,7 @@ func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
 }
 
 func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -768,7 +768,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -826,7 +826,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 }
 
 func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -837,7 +837,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -880,7 +880,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 }
 
 func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -891,7 +891,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -901,7 +901,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		t.Fatal(err)
 	}
 
-	resource := &models.Resource{
+	resource := &record.Resource{
 		ResourceIdentifier: "test-resource-" + fake.LetterN(8),
 		Description:        "Test Resource",
 	}

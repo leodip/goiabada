@@ -12,7 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -45,7 +45,7 @@ func HandleSettingsGeneralGet() http.HandlerFunc {
 
 // settingsGeneralDatabase is what the general settings endpoint needs: the settings write.
 type settingsGeneralDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // HandleSettingsGeneralPut - PUT /api/v1/admin/settings/general
@@ -119,7 +119,7 @@ func HandleSettingsGeneralPut(
 		}
 
 		// Validation: Password policy
-		passwordPolicy, err := models.PasswordPolicyFromString(strings.TrimSpace(req.PasswordPolicy))
+		passwordPolicy, err := record.PasswordPolicyFromString(strings.TrimSpace(req.PasswordPolicy))
 		if err != nil {
 			writeJSONError(w, "Invalid password policy", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

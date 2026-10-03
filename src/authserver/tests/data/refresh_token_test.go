@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateRefreshToken(t *testing.T) {
@@ -231,11 +231,11 @@ func TestDeleteRefreshToken(t *testing.T) {
 	}
 }
 
-func createTestRefreshToken(t *testing.T) *models.RefreshToken {
+func createTestRefreshToken(t *testing.T) *record.RefreshToken {
 	client := createTestClient(t)
 	user := createTestUser(t)
 	code := createTestCode(t, client.Id, user.Id)
-	refreshToken := &models.RefreshToken{
+	refreshToken := &record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
@@ -255,7 +255,7 @@ func createTestRefreshToken(t *testing.T) *models.RefreshToken {
 	return refreshToken
 }
 
-func compareRefreshTokens(t *testing.T, expected, actual *models.RefreshToken) {
+func compareRefreshTokens(t *testing.T, expected, actual *record.RefreshToken) {
 	if actual.Id != expected.Id {
 		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
 	}
@@ -309,7 +309,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 	user := createTestUser(t)
 	code := createTestCode(t, client.Id, user.Id)
 
-	rt1 := &models.RefreshToken{
+	rt1 := &record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
 		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Refresh",
@@ -321,7 +321,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 		t.Fatalf("Failed to create rt1: %v", err)
 	}
 
-	rt2 := &models.RefreshToken{
+	rt2 := &record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
 		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Offline",
@@ -335,7 +335,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 
 	// Unrelated refresh token under a different code (must not be returned).
 	otherCode := createTestCode(t, client.Id, user.Id)
-	rtOther := &models.RefreshToken{
+	rtOther := &record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: otherCode.Id, Valid: true},
 		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Refresh",
@@ -380,7 +380,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 
 	// Two codes share the same session identifier (e.g., user federated to two clients
 	// during the same SSO session, or one online + one offline exchange).
-	codeA := &models.Code{
+	codeA := &record.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		Code:                "code_a_" + fake.LetterN(6),
@@ -402,7 +402,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		t.Fatalf("Failed to create codeA: %v", err)
 	}
 
-	codeB := &models.Code{
+	codeB := &record.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		Code:                "code_b_" + fake.LetterN(6),
@@ -425,7 +425,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	}
 
 	// Online refresh token (carries session_identifier on the row).
-	rtOnline := &models.RefreshToken{
+	rtOnline := &record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: codeA.Id, Valid: true},
 		RefreshTokenJti:   fake.UUID(),
 		SessionIdentifier: sessionId,
@@ -439,7 +439,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	}
 
 	// Offline refresh token (empty session_identifier on the row, but its code carries it).
-	rtOffline := &models.RefreshToken{
+	rtOffline := &record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: codeB.Id, Valid: true},
 		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Offline",
@@ -452,7 +452,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	}
 
 	// Unrelated refresh token under a different session must not appear.
-	unrelatedCode := &models.Code{
+	unrelatedCode := &record.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		Code:                "code_c_" + fake.LetterN(6),
@@ -473,7 +473,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	if err := database.CreateCode(context.Background(), nil, unrelatedCode); err != nil {
 		t.Fatalf("Failed to create unrelatedCode: %v", err)
 	}
-	rtUnrelated := &models.RefreshToken{
+	rtUnrelated := &record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: unrelatedCode.Id, Valid: true},
 		RefreshTokenJti:  fake.UUID(),
 		RefreshTokenType: "Refresh",
@@ -693,8 +693,8 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	user := createTestUser(t)
 	otherUser := createTestUser(t)
 
-	newCode := func(sessionId string) *models.Code {
-		code := &models.Code{
+	newCode := func(sessionId string) *record.Code {
+		code := &record.Code{
 			ClientId:            client.Id,
 			UserId:              user.Id,
 			Code:                "code_" + fake.LetterN(8),
@@ -718,7 +718,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 		return code
 	}
 
-	newToken := func(rt *models.RefreshToken) *models.RefreshToken {
+	newToken := func(rt *record.RefreshToken) *record.RefreshToken {
 		rt.RefreshTokenJti = fake.UUID()
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
@@ -732,7 +732,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	// Shape 1: session-bound, session still alive.
 	liveSession := createTestUserSession(t, user.Id)
 	boundCode := newCode(liveSession.SessionIdentifier)
-	sessionBound := newToken(&models.RefreshToken{
+	sessionBound := newToken(&record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: boundCode.Id, Valid: true},
 		SessionIdentifier: liveSession.SessionIdentifier,
 		RefreshTokenType:  "Refresh",
@@ -741,7 +741,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	// Shape 2: offline, session still alive. Offline rows carry no session identifier of
 	// their own; theirs lives on the code.
 	offlineLiveCode := newCode(liveSession.SessionIdentifier)
-	offlineLive := newToken(&models.RefreshToken{
+	offlineLive := newToken(&record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: offlineLiveCode.Id, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
@@ -750,7 +750,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	// Shape 3: offline whose session row is GONE. The decisive row.
 	reapedSession := createTestUserSession(t, user.Id)
 	reapedCode := newCode(reapedSession.SessionIdentifier)
-	offlineReaped := newToken(&models.RefreshToken{
+	offlineReaped := newToken(&record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: reapedCode.Id, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
@@ -760,7 +760,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	}
 
 	// Shape 4: ROPC, linked straight to the user with no code.
-	ropc := newToken(&models.RefreshToken{
+	ropc := newToken(&record.RefreshToken{
 		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
 		RefreshTokenType: "Offline",
@@ -769,7 +769,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 
 	// Negative: a token belonging to somebody else, in both linkage shapes. These vary
 	// only the user, so neither can pass with the predicate removed.
-	otherCode := &models.Code{
+	otherCode := &record.Code{
 		ClientId: client.Id, UserId: otherUser.Id,
 		Code: "code_o_" + fake.LetterN(8), CodeHash: "hash_o_" + fake.LetterN(8),
 		CodeChallenge: sql.NullString{String: "chal_o", Valid: true}, CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
@@ -781,11 +781,11 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	if err := database.CreateCode(context.Background(), nil, otherCode); err != nil {
 		t.Fatalf("Failed to create the other user's code: %v", err)
 	}
-	otherViaCode := newToken(&models.RefreshToken{
+	otherViaCode := newToken(&record.RefreshToken{
 		CodeId:           sql.NullInt64{Int64: otherCode.Id, Valid: true},
 		RefreshTokenType: "Refresh",
 	})
-	otherDirect := newToken(&models.RefreshToken{
+	otherDirect := newToken(&record.RefreshToken{
 		UserId:           sql.NullInt64{Int64: otherUser.Id, Valid: true},
 		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
 		RefreshTokenType: "Offline",
@@ -872,7 +872,7 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 	otherClient := createTestClient(t)
 	user := createTestUser(t)
 
-	newToken := func(rt *models.RefreshToken) *models.RefreshToken {
+	newToken := func(rt *record.RefreshToken) *record.RefreshToken {
 		rt.RefreshTokenJti = fake.UUID()
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
@@ -886,7 +886,7 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 	// Shape 1: authorization code flow. The client is on the code; generateRefreshToken
 	// writes code_id and leaves the token's own client_id null.
 	code := createTestCode(t, client.Id, user.Id)
-	viaCode := newToken(&models.RefreshToken{
+	viaCode := newToken(&record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 		SessionIdentifier: code.SessionIdentifier,
 		RefreshTokenType:  "Refresh",
@@ -894,7 +894,7 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 
 	// Shape 2: ROPC. generateRefreshTokenForROPC does the reverse, writing user_id and
 	// client_id straight onto the token with no code at all.
-	ropc := newToken(&models.RefreshToken{
+	ropc := newToken(&record.RefreshToken{
 		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
 		RefreshTokenType: "Offline",
@@ -904,12 +904,12 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 	// Negatives: the same two shapes for a different client. Each varies only the
 	// client, so neither can pass with its branch's predicate removed.
 	otherCode := createTestCode(t, otherClient.Id, user.Id)
-	otherViaCode := newToken(&models.RefreshToken{
+	otherViaCode := newToken(&record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: otherCode.Id, Valid: true},
 		SessionIdentifier: otherCode.SessionIdentifier,
 		RefreshTokenType:  "Refresh",
 	})
-	otherRopc := newToken(&models.RefreshToken{
+	otherRopc := newToken(&record.RefreshToken{
 		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:         sql.NullInt64{Int64: otherClient.Id, Valid: true},
 		RefreshTokenType: "Offline",
@@ -995,7 +995,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 	tx := beginTx(t)
 
 	random := fake.LetterN(6)
-	code := &models.Code{
+	code := &record.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		Code:                "txcode_" + random,
@@ -1015,7 +1015,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 	if err := database.CreateCode(context.Background(), tx, code); err != nil {
 		t.Fatalf("CreateCode in a transaction: %v", err)
 	}
-	refreshToken := &models.RefreshToken{
+	refreshToken := &record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 		SessionIdentifier: code.SessionIdentifier,
 		RefreshTokenJti:   fake.UUID(),
@@ -1072,7 +1072,7 @@ func TestPromoteRefreshTokenGenerations(t *testing.T) {
 		t.Fatalf("PromoteRefreshTokenGenerations failed: %v", err)
 	}
 
-	reload := func(id int64) *models.RefreshToken {
+	reload := func(id int64) *record.RefreshToken {
 		rt, err := database.GetRefreshTokenById(context.Background(), nil, id)
 		if err != nil {
 			t.Fatalf("Failed to reload refresh token %d: %v", id, err)
@@ -1222,10 +1222,10 @@ type familyTokenSpec struct {
 	Revoked           bool
 }
 
-func seedFamilyToken(t *testing.T, spec familyTokenSpec) *models.RefreshToken {
+func seedFamilyToken(t *testing.T, spec familyTokenSpec) *record.RefreshToken {
 	t.Helper()
 
-	rt := &models.RefreshToken{
+	rt := &record.RefreshToken{
 		RefreshTokenJti:      fake.UUID(),
 		FirstRefreshTokenJti: spec.FamilyJti,
 		SessionIdentifier:    spec.SessionIdentifier,
@@ -1254,11 +1254,11 @@ func seedFamilyToken(t *testing.T, spec familyTokenSpec) *models.RefreshToken {
 // seedCodeOnSession creates a used authorization code bound to a chosen session
 // identifier, so a test can put two independent families on one browser session.
 // createTestCode generates its own session identifier and cannot express that.
-func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *models.Code {
+func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *record.Code {
 	t.Helper()
 
 	random := fake.LetterN(6)
-	code := &models.Code{
+	code := &record.Code{
 		ClientId:            clientId,
 		UserId:              userId,
 		Code:                "famcode_" + random,

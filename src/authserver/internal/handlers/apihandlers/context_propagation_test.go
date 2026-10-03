@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ func TestHandleUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
-		Return([]models.User{{Id: 1, Subject: "sub-1", Email: "ada@example.com"}}, 1, nil).Once()
+		Return([]record.User{{Id: 1, Subject: "sub-1", Email: "ada@example.com"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleUsersSearchGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/users/search?query=ada"))
@@ -57,7 +57,7 @@ func TestHandleUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *tes
 	database := mocks_data.NewDatabase(t)
 
 	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
-		Return([]models.User{{Id: 1, Subject: "sub-1"}}, 1, nil).Once()
+		Return([]record.User{{Id: 1, Subject: "sub-1"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleUsersSearchGet(database).ServeHTTP(rr,
@@ -79,7 +79,7 @@ func apiSessionsRequest(userId string) *http.Request {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", userId)
 	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-	ctx = reqctx.WithSettings(ctx, &models.Settings{
+	ctx = reqctx.WithSettings(ctx, &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	})
@@ -93,9 +93,9 @@ func TestHandleUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetUserById", theApiRequestsContext(), mock.Anything, int64(7)).
-		Return(&models.User{Id: 7, Subject: "sub-7"}, nil).Once()
+		Return(&record.User{Id: 7, Subject: "sub-7"}, nil).Once()
 	database.On("GetUserSessionsByUserId", theApiRequestsContext(), mock.Anything, int64(7)).
-		Return([]models.UserSession{}, nil).Once()
+		Return([]record.UserSession{}, nil).Once()
 	database.On("UserSessionsLoadClients", theApiRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
@@ -141,7 +141,7 @@ func TestHandleClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllClients", theApiRequestsContext(), mock.Anything).
-		Return([]models.Client{{Id: 3, ClientIdentifier: "portal"}}, nil).Once()
+		Return([]record.Client{{Id: 3, ClientIdentifier: "portal"}}, nil).Once()
 	database.On("ClientLoadRedirectURIs", theApiRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 	database.On("ClientLoadWebOrigins", theApiRequestsContext(), mock.Anything, mock.Anything).
@@ -182,7 +182,7 @@ func TestHandlePermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetPermissionsByResourceId", theApiRequestsContext(), mock.Anything, int64(4)).
-		Return([]models.Permission{{Id: 11, PermissionIdentifier: "read", ResourceId: 4}}, nil).Once()
+		Return([]record.Permission{{Id: 11, PermissionIdentifier: "read", ResourceId: 4}}, nil).Once()
 	database.On("PermissionsLoadResources", theApiRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 

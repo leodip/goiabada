@@ -8,7 +8,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -17,10 +17,10 @@ import (
 // userCreatorDatabase is what user creation needs: the user row and the default permission it is
 // given, in one transaction.
 type userCreatorDatabase interface {
-	CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
-	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
-	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
+	CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -43,9 +43,9 @@ type Input struct {
 	FamilyName    string
 }
 
-func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*models.User, error) {
+func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*record.User, error) {
 
-	user := &models.User{
+	user := &record.User{
 		Subject:       uuid.New(),
 		Enabled:       true,
 		Email:         input.Email,
@@ -71,7 +71,7 @@ func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*models.User, 
 		return nil, err
 	}
 
-	var accountPermission *models.Permission
+	var accountPermission *record.Permission
 	for idx, permission := range permissions {
 		if permission.PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
 			accountPermission = &permissions[idx]
@@ -83,7 +83,7 @@ func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*models.User, 
 		return nil, errs.New("unable to find the account permission")
 	}
 
-	user.Permissions = []models.Permission{*accountPermission}
+	user.Permissions = []record.Permission{*accountPermission}
 
 	// The user row and its account permission land in one transaction, opened through
 	// RunInTransaction so a deadlock reruns the body (#301). The body is safe to rerun: the id
@@ -95,7 +95,7 @@ func (uc *Creator) CreateUser(ctx context.Context, input *Input) (*models.User, 
 		}
 
 		for _, permission := range user.Permissions {
-			createUserPermissionErr := uc.database.CreateUserPermission(ctx, tx, &models.UserPermission{
+			createUserPermissionErr := uc.database.CreateUserPermission(ctx, tx, &record.UserPermission{
 				UserId:       user.Id,
 				PermissionId: permission.Id,
 			})

@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -310,21 +310,21 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 			"the same invariant and be unusable by WebOriginExists", phase, webOriginsIndex000034)
 
 	// Enforced, not merely declared.
-	dup := &models.WebOrigin{Origin: "https://dup.example.com", ClientId: clientAId}
+	dup := &record.WebOrigin{Origin: "https://dup.example.com", ClientId: clientAId}
 	assert.Errorf(t, h.DB.CreateWebOrigin(context.Background(), nil, dup),
 		"[%s] a second row with the same origin for the same client must be refused", phase)
 
 	// And enforced no more widely than that.
-	spare := &models.WebOrigin{Origin: "https://spare.example.com", ClientId: clientBId}
+	spare := &record.WebOrigin{Origin: "https://spare.example.com", ClientId: clientBId}
 	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, spare),
 		"[%s] an origin no client lists yet must still be insertable", phase)
 	require.NoErrorf(t, h.DB.DeleteWebOrigin(context.Background(), nil, spare.Id), "[%s] clean up the spare row", phase)
 }
 
-func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *models.Client {
+func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *record.Client {
 	t.Helper()
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: identifier,
 		Description:      "Migration 000034 test client",
 	}
@@ -339,7 +339,7 @@ func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *models.Cl
 func seedWebOrigin000034(t *testing.T, h *isolatedDB, clientId int64, raw string) int64 {
 	t.Helper()
 
-	webOrigin := &models.WebOrigin{Origin: raw, ClientId: clientId}
+	webOrigin := &record.WebOrigin{Origin: raw, ClientId: clientId}
 	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, webOrigin), "seed web origin %q", raw)
 	return webOrigin.Id
 }

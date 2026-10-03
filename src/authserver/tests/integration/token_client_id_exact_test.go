@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,15 +16,15 @@ import (
 // string on some of them. Created through the data layer, the way token_general_test.go already
 // does, because what is under test is how the token endpoint compares the identifier and not how
 // it was stored.
-func createClientForClientIdComparison(t *testing.T) *models.Client {
+func createClientForClientIdComparison(t *testing.T) *record.Client {
 	t.Helper()
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         strings.ToLower("test-client-" + fake.LetterN(8)),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)

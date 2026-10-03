@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -49,12 +49,12 @@ func (d *Database) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.
 		return false, nil
 	}
 
-	revocation := &models.RefreshTokenFamilyRevocation{
+	revocation := &record.RefreshTokenFamilyRevocation{
 		FirstRefreshTokenJti: firstRefreshTokenJti,
 		Reason:               reason,
 		RevokedAt:            time.Now().UTC(),
 	}
-	insertBuilder := sqlbuilder.NewStruct(new(models.RefreshTokenFamilyRevocation)).
+	insertBuilder := sqlbuilder.NewStruct(new(record.RefreshTokenFamilyRevocation)).
 		For(d.Flavor).
 		InsertInto("refresh_token_family_revocations", revocation)
 

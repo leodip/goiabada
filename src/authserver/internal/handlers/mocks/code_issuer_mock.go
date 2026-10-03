@@ -13,7 +13,7 @@ import (
 	"context"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -54,23 +54,23 @@ func (_m *CodeIssuer) EXPECT() *CodeIssuer_Expecter {
 }
 
 // IssueAuthCodeTx provides a mock function for the type CodeIssuer
-func (_mock *CodeIssuer) IssueAuthCodeTx(ctx context.Context, input *issuance.CreateCodeInput) (*models.Code, error) {
+func (_mock *CodeIssuer) IssueAuthCodeTx(ctx context.Context, input *issuance.CreateCodeInput) (*record.Code, error) {
 	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IssueAuthCodeTx")
 	}
 
-	var r0 *models.Code
+	var r0 *record.Code
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *issuance.CreateCodeInput) (*models.Code, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *issuance.CreateCodeInput) (*record.Code, error)); ok {
 		return returnFunc(ctx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *issuance.CreateCodeInput) *models.Code); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *issuance.CreateCodeInput) *record.Code); ok {
 		r0 = returnFunc(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.Code)
+			r0 = ret.Get(0).(*record.Code)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *issuance.CreateCodeInput) error); ok {
@@ -111,12 +111,12 @@ func (_c *CodeIssuer_IssueAuthCodeTx_Call) Run(run func(ctx context.Context, inp
 	return _c
 }
 
-func (_c *CodeIssuer_IssueAuthCodeTx_Call) Return(code *models.Code, err error) *CodeIssuer_IssueAuthCodeTx_Call {
+func (_c *CodeIssuer_IssueAuthCodeTx_Call) Return(code *record.Code, err error) *CodeIssuer_IssueAuthCodeTx_Call {
 	_c.Call.Return(code, err)
 	return _c
 }
 
-func (_c *CodeIssuer_IssueAuthCodeTx_Call) RunAndReturn(run func(ctx context.Context, input *issuance.CreateCodeInput) (*models.Code, error)) *CodeIssuer_IssueAuthCodeTx_Call {
+func (_c *CodeIssuer_IssueAuthCodeTx_Call) RunAndReturn(run func(ctx context.Context, input *issuance.CreateCodeInput) (*record.Code, error)) *CodeIssuer_IssueAuthCodeTx_Call {
 	_c.Call.Return(run)
 	return _c
 }

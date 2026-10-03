@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error {
 
 	if code.ClientId == 0 {
 		return errs.New("client id must be greater than 0")
@@ -27,7 +27,7 @@ func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code
 	code.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	code.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	codeStruct := sqlbuilder.NewStruct(new(models.Code)).
+	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
 		For(d.Flavor)
 
 	insertBuilder := codeStruct.WithoutTag("pk").InsertInto("codes", code)
@@ -43,7 +43,7 @@ func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code
 	return nil
 }
 
-func (d *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+func (d *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error {
 
 	if code.Id == 0 {
 		return errs.New("can't update code with id 0")
@@ -52,7 +52,7 @@ func (d *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *models.Code
 	originalUpdatedAt := code.UpdatedAt
 	code.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	codeStruct := sqlbuilder.NewStruct(new(models.Code)).
+	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
 		For(d.Flavor)
 
 	updateBuilder := codeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("codes", code)
@@ -210,7 +210,7 @@ func (d *Database) RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, client
 }
 
 func (d *Database) getCodeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	codeStruct *sqlbuilder.Struct) (*models.Code, error) {
+	codeStruct *sqlbuilder.Struct) (*record.Code, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -219,7 +219,7 @@ func (d *Database) getCodeCommon(ctx context.Context, tx *sql.Tx, selectBuilder 
 	}
 	defer func() { _ = rows.Close() }()
 
-	var code models.Code
+	var code record.Code
 	if rows.Next() {
 		addr := codeStruct.Addr(&code)
 		err = rows.Scan(addr...)
@@ -235,9 +235,9 @@ func (d *Database) getCodeCommon(ctx context.Context, tx *sql.Tx, selectBuilder 
 	return nil, nil
 }
 
-func (d *Database) GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*models.Code, error) {
+func (d *Database) GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error) {
 
-	codeStruct := sqlbuilder.NewStruct(new(models.Code)).
+	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
 		For(d.Flavor)
 
 	selectBuilder := codeStruct.SelectFrom("codes")
@@ -251,7 +251,7 @@ func (d *Database) GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*
 	return code, nil
 }
 
-func (d *Database) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+func (d *Database) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error {
 
 	if code == nil {
 		return nil
@@ -268,7 +268,7 @@ func (d *Database) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.
 	return nil
 }
 
-func (d *Database) CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+func (d *Database) CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error {
 
 	if code == nil {
 		return nil
@@ -285,8 +285,8 @@ func (d *Database) CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Co
 	return nil
 }
 
-func (d *Database) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
-	codeStruct := sqlbuilder.NewStruct(new(models.Code)).
+func (d *Database) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error) {
+	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
 		For(d.Flavor)
 
 	selectBuilder := codeStruct.SelectFrom("codes")
@@ -303,7 +303,7 @@ func (d *Database) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash s
 
 func (d *Database) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Code)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Code)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("codes")

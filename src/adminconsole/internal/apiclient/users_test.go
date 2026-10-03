@@ -13,7 +13,7 @@ import (
 
 // Seam 2 for the user family (#350).
 //
-// The console used to decode api.UserResponse and rebuild a models.User from it, so a json tag
+// The console used to decode api.UserResponse and rebuild a record.User from it, so a json tag
 // renamed in core/api emptied one field of that rebuild and every page below it. It now hands the
 // decoded response to the handlers and the templates read the response's own field names, which
 // removes the rebuild and leaves exactly one place where a renamed tag is still invisible: the

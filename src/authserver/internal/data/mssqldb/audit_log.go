@@ -8,7 +8,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -59,7 +59,7 @@ func requestIdIsByteExact(b interface{ Var(arg any) string }, requestId string) 
 // statement. And its `=` pads, so a request-id filter needs requestIdIsByteExact in the page query
 // and the count query alike, where commondb drops the folded rows after the scan (#328).
 func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
-	requestId string) ([]models.AuditLog, int, error) {
+	requestId string) ([]record.AuditLog, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -72,7 +72,7 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 
 	offset := commondb.PageOffset(page, pageSize)
 
-	auditLogStruct := sqlbuilder.NewStruct(new(models.AuditLog)).
+	auditLogStruct := sqlbuilder.NewStruct(new(record.AuditLog)).
 		For(sqlbuilder.SQLServer)
 
 	selectBuilder := auditLogStruct.SelectFrom("audit_logs")
@@ -96,9 +96,9 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 	}
 	defer func() { _ = rows.Close() }()
 
-	var auditLogs []models.AuditLog
+	var auditLogs []record.AuditLog
 	for rows.Next() {
-		var auditLog models.AuditLog
+		var auditLog record.AuditLog
 		addr := auditLogStruct.Addr(&auditLog)
 		err = rows.Scan(addr...)
 		if err != nil {

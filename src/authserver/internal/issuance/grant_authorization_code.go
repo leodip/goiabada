@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -37,8 +37,8 @@ var ErrCodeNotClaimed = errors.New("the authorization code was no longer unused 
 // case the session is already gone and its grants already swept. Reuse protection is not weakened:
 // a genuine LATER replay of a used code is detected by the validator and cascaded by the token
 // handler (#77).
-func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *models.Settings,
-	code *models.Code) (*oauth.TokenResponse, error) {
+func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings,
+	code *record.Code) (*oauth.TokenResponse, error) {
 
 	claimed, err := t.database.MarkCodeAsUsed(ctx, nil, code.Id)
 	if err != nil {
@@ -55,8 +55,8 @@ func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings 
 }
 
 // mintAuthorizationCodeTokens mints a claimed code's tokens and inserts its first refresh token.
-func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings *models.Settings,
-	code *models.Code) (*oauth.TokenResponse, error) {
+func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings *record.Settings,
+	code *record.Code) (*oauth.TokenResponse, error) {
 
 	err := t.database.CodeLoadClient(ctx, nil, code)
 	if err != nil {

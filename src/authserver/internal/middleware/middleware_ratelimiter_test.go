@@ -22,7 +22,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
@@ -111,7 +111,7 @@ func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*R
 // the trip it audits is correlated to it (#328).
 func limiterRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
-	ctx := reqctx.WithSettings(req.Context(), &models.Settings{AppName: "Goiabada"})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Goiabada"})
 	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, limiterRequestId)
 	return req.WithContext(ctx)
 }
@@ -1969,16 +1969,16 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 				}
 
 				warnings := 0
-				for _, record := range logs.Records() {
-					if record.Message != "rate limit reached" {
+				for _, logRecord := range logs.Records() {
+					if logRecord.Message != "rate limit reached" {
 						continue
 					}
 					warnings++
-					if record.Level != slog.LevelWarn {
-						t.Errorf("the trip was logged at %v, want WARN", record.Level)
+					if logRecord.Level != slog.LevelWarn {
+						t.Errorf("the trip was logged at %v, want WARN", logRecord.Level)
 					}
-					if !reflect.DeepEqual(record.Attrs, c.warned) {
-						t.Errorf("warning attributes = %#v, want %#v", record.Attrs, c.warned)
+					if !reflect.DeepEqual(logRecord.Attrs, c.warned) {
+						t.Errorf("warning attributes = %#v, want %#v", logRecord.Attrs, c.warned)
 					}
 				}
 				if warnings != 2 {

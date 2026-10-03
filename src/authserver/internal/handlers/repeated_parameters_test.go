@@ -19,8 +19,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -70,14 +70,14 @@ func (e *authorizeEndpoint) expectsPage(message string) {
 func (e *authorizeEndpoint) passesDeliveryChecks() {
 	e.validator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
+		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
 	stubRegisteredRedirectURI(e.database, "https://example.com")
 }
 
 func (e *authorizeEndpoint) get(t *testing.T, query string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest("GET", "/authorize?"+query, nil)
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 	e.handler.ServeHTTP(rr, req)
 	return rr
@@ -87,7 +87,7 @@ func (e *authorizeEndpoint) post(t *testing.T, query, body string) *httptest.Res
 	t.Helper()
 	req := httptest.NewRequest("POST", "/authorize?"+query, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 	e.handler.ServeHTTP(rr, req)
 	return rr

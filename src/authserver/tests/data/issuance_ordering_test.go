@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,12 +16,12 @@ import (
 // issuanceOutcome is what one authorization ceremony's transaction came to: the code it minted,
 // and the error if any, ErrIssuingSessionGone for a refusal.
 type issuanceOutcome struct {
-	code *models.Code
+	code *record.Code
 	err  error
 }
 
 // ceremonyCodeInput is the code a ceremony for this client, user and session asks the issuer for.
-func ceremonyCodeInput(client *models.Client, user *models.User, sessionIdentifier string) *issuance.CreateCodeInput {
+func ceremonyCodeInput(client *record.Client, user *record.User, sessionIdentifier string) *issuance.CreateCodeInput {
 	return &issuance.CreateCodeInput{
 		ClientId:          client.ClientIdentifier,
 		UserId:            user.Id,
@@ -190,7 +190,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 // in the order it issues them. The real function owns and commits its own transaction, so an
 // ordering that needs the termination HELD OPEN across the other party's arrival cannot call it;
 // the ordering that does not is driven through the real function.
-func terminationStatements(db data.Database, tx *sql.Tx, session *models.UserSession) error {
+func terminationStatements(db data.Database, tx *sql.Tx, session *record.UserSession) error {
 	if err := db.DeleteUserSession(context.Background(), tx, session.Id); err != nil {
 		return err
 	}

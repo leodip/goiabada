@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,13 +87,13 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 	t.Helper()
 	random := fake.LetterN(6)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "mig26_client_" + random,
 		Description:      "Migration 000026 test client",
 	}
 	require.NoError(t, h.DB.CreateClient(context.Background(), nil, client), "seed client")
 
-	user := &models.User{
+	user := &record.User{
 		Enabled:  true,
 		Subject:  fake.UUID(),
 		Username: "mig26_" + random,
@@ -105,7 +105,7 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 	// declares codes.code_challenge and codes.code_challenge_method NOT NULL where the
 	// other three allow NULL. AuthenticatedAt, because a zero time.Time reaches MySQL
 	// as '0000-00-00', which it rejects outright.
-	code := &models.Code{
+	code := &record.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		CodeHash:            "mig26_hash_" + random,

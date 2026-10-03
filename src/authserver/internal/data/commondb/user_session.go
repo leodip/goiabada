@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+func (d *Database) CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error {
 
 	if userSession.UserId == 0 {
 		return errs.New("user id must be greater than 0")
@@ -23,7 +23,7 @@ func (d *Database) CreateUserSession(ctx context.Context, tx *sql.Tx, userSessio
 	userSession.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 		For(d.Flavor)
 
 	insertBuilder := userSessionStruct.WithoutTag("pk").InsertInto("user_sessions", userSession)
@@ -39,7 +39,7 @@ func (d *Database) CreateUserSession(ctx context.Context, tx *sql.Tx, userSessio
 	return nil
 }
 
-func (d *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+func (d *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error {
 
 	if userSession.Id == 0 {
 		return errs.New("can't update userSession with id 0")
@@ -48,7 +48,7 @@ func (d *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSessio
 	originalUpdatedAt := userSession.UpdatedAt
 	userSession.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 		For(d.Flavor)
 
 	updateBuilder := userSessionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_sessions", userSession)
@@ -65,7 +65,7 @@ func (d *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSessio
 }
 
 func (d *Database) getUserSessionCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
+	userSessionStruct *sqlbuilder.Struct) (*record.UserSession, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -74,7 +74,7 @@ func (d *Database) getUserSessionCommon(ctx context.Context, tx *sql.Tx, selectB
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userSession models.UserSession
+	var userSession record.UserSession
 	if rows.Next() {
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
@@ -90,9 +90,9 @@ func (d *Database) getUserSessionCommon(ctx context.Context, tx *sql.Tx, selectB
 	return nil, nil
 }
 
-func (d *Database) GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
+func (d *Database) GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error) {
 
-	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -106,13 +106,13 @@ func (d *Database) GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessi
 	return userSession, nil
 }
 
-func (d *Database) GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
+func (d *Database) GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error) {
 
 	if sessionIdentifier == "" {
 		return nil, nil
 	}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -126,7 +126,7 @@ func (d *Database) GetUserSessionBySessionIdentifier(ctx context.Context, tx *sq
 	return userSession, nil
 }
 
-func (d *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
+func (d *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]record.UserSession, int, error) {
 	if clientId <= 0 {
 		return nil, 0, errs.New("client id must be greater than 0")
 	}
@@ -139,7 +139,7 @@ func (d *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *s
 		pageSize = 10
 	}
 
-	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -159,9 +159,9 @@ func (d *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *s
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userSessions []models.UserSession
+	var userSessions []record.UserSession
 	for rows.Next() {
-		var userSession models.UserSession
+		var userSession record.UserSession
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -200,7 +200,7 @@ func (d *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *s
 	return userSessions, total, nil
 }
 
-func (d *Database) UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error {
+func (d *Database) UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error {
 
 	if userSessions == nil {
 		return nil
@@ -216,7 +216,7 @@ func (d *Database) UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSe
 		return errs.Wrap(err, "unable to load users")
 	}
 
-	usersById := make(map[int64]models.User)
+	usersById := make(map[int64]record.User)
 	for _, user := range users {
 		usersById[user.Id] = user
 	}
@@ -232,7 +232,7 @@ func (d *Database) UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSe
 	return nil
 }
 
-func (d *Database) UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error {
+func (d *Database) UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error {
 	if userSessions == nil {
 		return nil
 	}
@@ -247,7 +247,7 @@ func (d *Database) UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, user
 		return errs.Wrap(err, "unable to load userSessionClients")
 	}
 
-	userSessionClientsByUserSessionId := make(map[int64][]models.UserSessionClient)
+	userSessionClientsByUserSessionId := make(map[int64][]record.UserSessionClient)
 	for _, userSessionClient := range userSessionClients {
 		userSessionClientsByUserSessionId[userSessionClient.UserSessionId] = append(userSessionClientsByUserSessionId[userSessionClient.UserSessionId], userSessionClient)
 	}
@@ -259,7 +259,7 @@ func (d *Database) UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-func (d *Database) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+func (d *Database) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error {
 
 	if userSession == nil {
 		return nil
@@ -275,7 +275,7 @@ func (d *Database) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userS
 	return nil
 }
 
-func (d *Database) UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+func (d *Database) UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error {
 
 	if userSession == nil {
 		return nil
@@ -292,9 +292,9 @@ func (d *Database) UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSess
 	return nil
 }
 
-func (d *Database) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error) {
+func (d *Database) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error) {
 
-	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
@@ -307,9 +307,9 @@ func (d *Database) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, user
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userSessions []models.UserSession
+	var userSessions []record.UserSession
 	for rows.Next() {
-		var userSession models.UserSession
+		var userSession record.UserSession
 		addr := userSessionStruct.Addr(&userSession)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -327,7 +327,7 @@ func (d *Database) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, user
 
 func (d *Database) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error {
 
-	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
+	userSessionStruct := sqlbuilder.NewStruct(new(record.UserSession)).
 		For(d.Flavor)
 
 	deleteBuilder := userSessionStruct.DeleteFrom("user_sessions")

@@ -584,7 +584,7 @@ WHERE (phone_number_country_uniqueid = 'ATF_0'
        AND (phone_number_country_callingcode IS NULL
             OR phone_number_country_callingcode NOT IN ('+1', '+262')));
 
--- Repair pre-existing NULLs in the plain-string phone columns (models.User
+-- Repair pre-existing NULLs in the plain-string phone columns (record.User
 -- scans them as Go string, which cannot hold SQL NULL -> GetUserById errors).
 UPDATE users SET phone_number = '' WHERE phone_number IS NULL;
 UPDATE users SET phone_number_country_uniqueid = '' WHERE phone_number_country_uniqueid IS NULL;

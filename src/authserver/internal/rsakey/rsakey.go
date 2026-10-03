@@ -22,7 +22,7 @@ import (
 )
 
 // Material is one generated key pair in every encoding a signing key is stored in. Each field
-// fills the models.KeyPair column of the same name.
+// fills the record.KeyPair column of the same name.
 type Material struct {
 	// PrivateKeyPEM is the private key as PKCS#1 DER under the "RSA PRIVATE KEY" label, which is
 	// the label PKCS#1 bytes carry. It is plaintext; the caller encrypts it before storing it.

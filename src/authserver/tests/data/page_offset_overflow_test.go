@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -163,7 +163,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 	// SQL Server override formats it into the statement by hand.
 	auditEvent := "PageOffsetOverflowTest"
 	for i := 0; i < 3; i++ {
-		auditLog := &models.AuditLog{AuditEvent: auditEvent, Details: `{"n":1}`}
+		auditLog := &record.AuditLog{AuditEvent: auditEvent, Details: `{"n":1}`}
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
 	}
 

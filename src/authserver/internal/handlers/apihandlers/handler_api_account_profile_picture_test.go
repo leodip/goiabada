@@ -17,7 +17,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -137,7 +137,7 @@ func TestHandleAccountProfilePictureGet_HasPicture(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
 
@@ -160,7 +160,7 @@ func TestHandleAccountProfilePictureGet_NoPicture(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 
@@ -215,7 +215,7 @@ func TestHandleAccountProfilePicturePost_NoFile(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 
 	// A well-formed multipart form whose file is under another field name.
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "avatar", createTestPNG(100, 100))
@@ -242,7 +242,7 @@ func TestHandleAccountProfilePicturePost_BodyOverTheBound(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", bytes.Repeat([]byte{0xAB}, 64+2048))
 	require.NoError(t, err)
@@ -266,7 +266,7 @@ func TestHandleAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 
 	// Create a request with invalid image data
 	invalidImageData := []byte("not a valid image")
@@ -299,7 +299,7 @@ func TestHandleAccountProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(t *
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 
 	pictureData := createTestPNG(100, 100)
 	require.Greater(t, len(pictureData), 64)
@@ -327,7 +327,7 @@ func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", pictureData)
@@ -337,7 +337,7 @@ func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), user.Id).Return(nil, nil)
-	database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *record.UserProfilePicture) bool {
 		return pp.UserId == user.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -362,8 +362,8 @@ func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
-	existingPicture := &models.UserProfilePicture{
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	existingPicture := &record.UserProfilePicture{
 		Id:          1,
 		UserId:      user.Id,
 		Picture:     []byte("old picture data"),
@@ -378,7 +378,7 @@ func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), user.Id).Return(existingPicture, nil)
-	database.On("UpdateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("UpdateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *record.UserProfilePicture) bool {
 		return pp.Id == existingPicture.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -436,7 +436,7 @@ func TestHandleAccountProfilePictureDelete_Success(t *testing.T) {
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
 	req = setTokenContext(req, sub)
@@ -486,7 +486,7 @@ func TestHandleAccountProfilePictureDelete_DatabaseError(t *testing.T) {
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{Id: 1, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
 	req = setTokenContext(req, sub)

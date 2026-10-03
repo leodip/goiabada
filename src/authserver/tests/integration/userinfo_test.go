@@ -11,7 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -78,21 +78,21 @@ func assertUserinfoRefuses(t *testing.T, accessToken string, status int, bearerE
 
 // joinGroupCarriedInAccessToken puts user in a fresh group whose identifier rides in the access
 // token, and returns the identifier.
-func joinGroupCarriedInAccessToken(t *testing.T, user *models.User) string {
+func joinGroupCarriedInAccessToken(t *testing.T, user *record.User) string {
 	t.Helper()
-	group := &models.Group{
+	group := &record.Group{
 		GroupIdentifier:      "userinfo-group-" + strings.ToLower(fake.LetterN(8)),
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
 	require.NoError(t, database.CreateGroup(context.Background(), nil, group))
-	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &models.UserGroup{UserId: user.Id, GroupId: group.Id}))
+	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserId: user.Id, GroupId: group.Id}))
 	return group.GroupIdentifier
 }
 
 // refreshAuthCodeGrant presents an authorization code grant's refresh token, with `scope` when
 // scope is not empty, and returns the status and the response.
-func refreshAuthCodeGrant(t *testing.T, httpClient *http.Client, code *models.Code, clientSecret string,
+func refreshAuthCodeGrant(t *testing.T, httpClient *http.Client, code *record.Code, clientSecret string,
 	refreshToken string, scope string) (int, map[string]interface{}) {
 	t.Helper()
 	return refreshWithScope(t, httpClient, code.Client.ClientIdentifier, clientSecret, refreshToken, scope)
@@ -248,7 +248,7 @@ func TestUserinfo_ClaimScopesWithoutOpenid(t *testing.T) {
 	for _, scope := range []string{"profile", "groups"} {
 		t.Run("authorization endpoint/"+scope, func(t *testing.T) {
 			var groupIdentifier string
-			data, _, _, _ := userTokenResponseWithScope(t, scope, func(user *models.User) {
+			data, _, _, _ := userTokenResponseWithScope(t, scope, func(user *record.User) {
 				if scope == "groups" {
 					groupIdentifier = joinGroupCarriedInAccessToken(t, user)
 				}
@@ -258,7 +258,7 @@ func TestUserinfo_ClaimScopesWithoutOpenid(t *testing.T) {
 
 		t.Run("ROPC/"+scope, func(t *testing.T) {
 			var groupIdentifier string
-			data, _ := ropcTokenResponse(t, scope, func(user *models.User) {
+			data, _ := ropcTokenResponse(t, scope, func(user *record.User) {
 				if scope == "groups" {
 					groupIdentifier = joinGroupCarriedInAccessToken(t, user)
 				}

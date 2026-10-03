@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -46,14 +46,14 @@ func abandonedAttempt(state ceremony.AuthState) *ceremony.AuthContext {
 		IpAddress:           "203.0.113.7",
 		UILocales:           []string{"pt-BR"},
 		Prompt:              "login",
-		TargetAcrLevel:      models.AcrLevel1.String(),
+		TargetAcrLevel:      record.AcrLevel1.String(),
 		RequestedScope:      "openid profile email",
 
 		AuthState:           state,
 		Scope:               "openid profile",
 		ConsentedScope:      "openid",
 		UserId:              1,
-		AcrLevel:            models.AcrLevel2Optional,
+		AcrLevel:            record.AcrLevel2Optional,
 		AuthMethods:         "pwd otp",
 		AuthenticatedAt:     &authenticatedAt,
 		Level1AuthCompleted: false,
@@ -79,7 +79,7 @@ func restartedRequest() ceremony.AuthContext {
 		IpAddress:           "203.0.113.7",
 		UILocales:           []string{"pt-BR"},
 		Prompt:              "login",
-		TargetAcrLevel:      models.AcrLevel1.String(),
+		TargetAcrLevel:      record.AcrLevel1.String(),
 		RequestedScope:      "openid profile email",
 
 		AuthState: ceremony.AuthStateRequiresLevel1,
@@ -109,10 +109,10 @@ func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	ceremonyStore.On("GetAuthContext", mock.Anything).
 		Return(abandonedAttempt(ceremony.AuthStateAuthenticationCompleted), nil)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
-	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
-	userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds,
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
+	userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds,
 		testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 	var saved *ceremony.AuthContext
@@ -206,17 +206,17 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
-	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1,
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1,
 			AuthorizationCodeEnabled: true}, nil)
-	userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds,
+	userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds,
 		testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
-	userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", models.AcrLevel1, int64(0),
-		(*int64)(nil), &pwdAuthTime, "", (*models.UserSession)(nil)).
-		Return(&models.UserSession{Id: 1, UserId: 1, AcrLevel: models.AcrLevel1, AuthTime: pwdAuthTime}, nil, nil)
+	userSessionManager.On("StartNewUserSession", rr, req, int64(1), int64(1), "pwd", record.AcrLevel1, int64(0),
+		(*int64)(nil), &pwdAuthTime, "", (*record.UserSession)(nil)).
+		Return(&record.UserSession{Id: 1, UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: pwdAuthTime}, nil, nil)
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1, Enabled: true}, nil)
+	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1, Enabled: true}, nil)
 
 	const clearedContextCookie = "cleared-auth-context"
 	ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {

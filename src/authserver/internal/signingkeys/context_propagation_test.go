@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +59,7 @@ func TestDecodeAndValidateTokenString_ReadsTheKeyUnderTheCallersContext(t *testi
 	require.NoError(t, err)
 
 	mockDB.On("GetCurrentSigningKey", theParsersCallersContext(), mock.Anything).
-		Return(&models.KeyPair{PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey))}, nil).Once()
+		Return(&record.KeyPair{PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey))}, nil).Once()
 
 	_, err = tp.DecodeAndValidateTokenString(callersContext(), signedToken(t, privateKey), true)
 
@@ -79,9 +79,9 @@ func TestDecodeAndValidateTokenString_ReadsTheFallbackKeysUnderTheCallersContext
 	require.NoError(t, err)
 
 	mockDB.On("GetCurrentSigningKey", theParsersCallersContext(), mock.Anything).
-		Return(&models.KeyPair{PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))}, nil).Once()
+		Return(&record.KeyPair{PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))}, nil).Once()
 	mockDB.On("GetAllSigningKeys", theParsersCallersContext(), mock.Anything).
-		Return([]models.KeyPair{}, nil).Once()
+		Return([]record.KeyPair{}, nil).Once()
 
 	_, err = tp.DecodeAndValidateTokenString(callersContext(), signedToken(t, otherKey), true)
 

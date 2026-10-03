@@ -19,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
@@ -52,7 +52,7 @@ func TestHandleRegisterGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -74,7 +74,7 @@ func TestHandleRegisterGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: false,
 		}
 		ctx := req.Context()
@@ -106,7 +106,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/register", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -140,7 +140,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -175,7 +175,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -183,7 +183,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "existing@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&models.User{}, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&record.User{}, nil)
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -211,7 +211,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -220,7 +220,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		emailValidator.On("ValidateEmailAddress", "preregistered@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(nil, nil)
-		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(&models.PreRegistration{}, nil)
+		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(&record.PreRegistration{}, nil)
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -248,7 +248,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -298,7 +298,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -349,7 +349,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -391,7 +391,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -430,7 +430,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -469,7 +469,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 		}
 		ctx := req.Context()
@@ -509,7 +509,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: false,
 		}
 		ctx := req.Context()
@@ -556,7 +556,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             true,
 			SMTPHost:                "smtp.example.com",
@@ -571,8 +571,8 @@ func TestHandleRegisterPost(t *testing.T) {
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
 		var capturedVerificationCode string
-		database.On("CreatePreRegistration", mock.Anything, mock.Anything, mock.AnythingOfType("*models.PreRegistration")).Return(nil).Run(func(args mock.Arguments) {
-			preReg := args.Get(2).(*models.PreRegistration)
+		database.On("CreatePreRegistration", mock.Anything, mock.Anything, mock.AnythingOfType("*record.PreRegistration")).Return(nil).Run(func(args mock.Arguments) {
+			preReg := args.Get(2).(*record.PreRegistration)
 			assert.Equal(t, "test@example.com", preReg.Email)
 			assert.NotEmpty(t, preReg.PasswordHash)
 			assert.NotEmpty(t, preReg.VerificationCodeEncrypted)
@@ -649,7 +649,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             false, // SMTP is disabled
 		}
@@ -663,7 +663,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&models.User{}, nil)
+		})).Return(&record.User{}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
@@ -712,12 +712,12 @@ func TestHandleRegisterPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			SelfRegistrationEnabled: true,
 			SMTPEnabled:             true,
 			SMTPHost:                "smtp.example.com",
 			SMTPPort:                2525,
-			PasswordPolicy:          models.PasswordPolicyHigh,
+			PasswordPolicy:          record.PasswordPolicyHigh,
 			SelfRegistrationRequiresEmailVerification: false,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -727,11 +727,11 @@ func TestHandleRegisterPost(t *testing.T) {
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		// The policy is the request's settings', passed by the handler (#433).
-		passwordValidator.On("ValidatePassword", models.PasswordPolicyHigh, "password123").Return(nil)
+		passwordValidator.On("ValidatePassword", record.PasswordPolicyHigh, "password123").Return(nil)
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&models.User{}, nil)
+		})).Return(&record.User{}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
@@ -814,7 +814,7 @@ func TestHandleRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
-			ctx := reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: true})
+			ctx := reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: true})
 			req = req.WithContext(ctx)
 
 			emailValidator.On("ValidateEmailAddress", "invalid-email").Return(testCase.err)

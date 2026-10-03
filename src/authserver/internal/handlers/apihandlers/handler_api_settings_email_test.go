@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +22,7 @@ import (
 
 // sendTestEmailRequest is an administrator's POST /api/v1/admin/settings/email/send-test to
 // "admin@example.com", carrying the settings middleware.Settings would have put on it.
-func sendTestEmailRequest(t *testing.T, settings *models.Settings) *http.Request {
+func sendTestEmailRequest(t *testing.T, settings *record.Settings) *http.Request {
 	t.Helper()
 
 	body, err := json.Marshal(map[string]string{"to": "admin@example.com"})
@@ -40,7 +40,7 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		SMTPEnabled:           true,
 		SMTPHost:              "smtp.example.com",
 		SMTPPort:              465,
@@ -83,7 +83,7 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendNamesTheCause(t *testing.T) 
 
 	rr := httptest.NewRecorder()
 	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
-		ServeHTTP(rr, sendTestEmailRequest(t, &models.Settings{SMTPEnabled: true}))
+		ServeHTTP(rr, sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true}))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Contains(t, rr.Body.String(), "Unable to send email: unable to decrypt the SMTP password")

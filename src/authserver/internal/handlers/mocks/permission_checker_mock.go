@@ -12,7 +12,7 @@ package mocks_handlers
 import (
 	"context"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -53,7 +53,7 @@ func (_m *PermissionChecker) EXPECT() *PermissionChecker_Expecter {
 }
 
 // FilterOutScopesWhereUserIsNotAuthorized provides a mock function for the type PermissionChecker
-func (_mock *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error) {
+func (_mock *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *record.User) (string, error) {
 	ret := _mock.Called(ctx, scope, user)
 
 	if len(ret) == 0 {
@@ -62,15 +62,15 @@ func (_mock *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(ctx cont
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, *models.User) (string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, *record.User) (string, error)); ok {
 		return returnFunc(ctx, scope, user)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, *models.User) string); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, *record.User) string); ok {
 		r0 = returnFunc(ctx, scope, user)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, *models.User) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, *record.User) error); ok {
 		r1 = returnFunc(ctx, scope, user)
 	} else {
 		r1 = ret.Error(1)
@@ -86,12 +86,12 @@ type PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call struct {
 // FilterOutScopesWhereUserIsNotAuthorized is a helper method to define mock.On call
 //   - ctx context.Context
 //   - scope string
-//   - user *models.User
+//   - user *record.User
 func (_e *PermissionChecker_Expecter) FilterOutScopesWhereUserIsNotAuthorized(ctx any, scope any, user any) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
 	return &PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call{Call: _e.mock.On("FilterOutScopesWhereUserIsNotAuthorized", ctx, scope, user)}
 }
 
-func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Run(run func(ctx context.Context, scope string, user *models.User)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
+func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Run(run func(ctx context.Context, scope string, user *record.User)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -101,9 +101,9 @@ func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Run(ru
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 *models.User
+		var arg2 *record.User
 		if args[2] != nil {
-			arg2 = args[2].(*models.User)
+			arg2 = args[2].(*record.User)
 		}
 		run(
 			arg0,
@@ -119,7 +119,7 @@ func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Return
 	return _c
 }
 
-func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) RunAndReturn(run func(ctx context.Context, scope string, user *models.User) (string, error)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
+func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) RunAndReturn(run func(ctx context.Context, scope string, user *record.User) (string, error)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
 	_c.Call.Return(run)
 	return _c
 }

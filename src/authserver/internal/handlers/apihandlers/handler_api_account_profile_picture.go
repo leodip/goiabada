@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -16,11 +16,11 @@ import (
 // accountProfilePictureDatabase is what the account profile picture endpoints need: the caller's
 // user row and the picture attached to it.
 type accountProfilePictureDatabase interface {
-	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
 	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
-	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
+	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
 	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
 }
 
@@ -82,7 +82,7 @@ func HandleAccountProfilePicturePost(
 			err = database.UpdateUserProfilePicture(r.Context(), nil, existingPicture)
 		} else {
 			// Create new picture
-			profilePicture := &models.UserProfilePicture{
+			profilePicture := &record.UserProfilePicture{
 				UserId:      user.Id,
 				Picture:     pictureData,
 				ContentType: result.ContentType,

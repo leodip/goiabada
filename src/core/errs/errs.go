@@ -23,7 +23,7 @@
 // message alone. There is no LogValue: a JSON handler would then print the message only, which is
 // slog's convention, and the 500 writers print the stack explicitly regardless.
 //
-// This package imports nothing outside the standard library, deliberately: it sits below models
+// This package imports nothing outside the standard library, deliberately: it sits below record
 // and data, so anything it imported could never construct an error through it (#279).
 package errs
 

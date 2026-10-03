@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -44,7 +44,7 @@ type AuthContext struct {
 	Nonce                         string
 	UserAgent                     string
 	IpAddress                     string
-	AcrLevel                      models.AcrLevel
+	AcrLevel                      record.AcrLevel
 	AuthMethods                   string
 	UserId                        int64
 	AuthState                     AuthState
@@ -239,7 +239,7 @@ func (ac *AuthContext) ParkDeferredError(code, description string) {
 //   - Level1AuthCompleted is written here and nowhere else, deliberately: RecordOTPVerified sets
 //     AuthenticatedAt as well, and level 2 alone must not stand in for level 1 at /auth/completed's
 //     create gate (#129 decisions 6 and 15).
-func (ac *AuthContext) RecordPasswordVerified(user *models.User, now time.Time) {
+func (ac *AuthContext) RecordPasswordVerified(user *record.User, now time.Time) {
 	ac.UserId = user.Id
 	ac.AuthStateGeneration = user.AuthStateGeneration
 	otpConfigGeneration := user.OtpConfigGeneration
@@ -285,7 +285,7 @@ func (ac *AuthContext) RecordOTPVerified(now time.Time, enrolledGeneration *int6
 // The generation is inherited from the SESSION, never read from the user. Neither path reaches the
 // password handler, and reading the user's current generation here would launder an old session
 // into a newer one (#106 decision 11(d)).
-func (ac *AuthContext) AdoptSession(userSession *models.UserSession) {
+func (ac *AuthContext) AdoptSession(userSession *record.UserSession) {
 	ac.UserId = userSession.UserId
 	ac.AcrLevel = userSession.AcrLevel
 	ac.AuthMethods = userSession.AuthMethods
@@ -365,20 +365,20 @@ func (ac *AuthContext) RequestedMaxAge() *int64 {
 // existing session. The effective ACR is the maximum of the target and session ACR,
 // ensuring we never downgrade the authentication level within a session.
 //
-// Uses models.AcrMax() as the single source of truth for ACR comparison.
-func (ac *AuthContext) SetAcrLevel(targetAcrLevel models.AcrLevel, userSession *models.UserSession) error {
+// Uses record.AcrMax() as the single source of truth for ACR comparison.
+func (ac *AuthContext) SetAcrLevel(targetAcrLevel record.AcrLevel, userSession *record.UserSession) error {
 	if userSession == nil {
 		ac.AcrLevel = targetAcrLevel
 		return nil
 	}
 
-	userSessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel.String())
+	userSessionAcrLevel, err := record.AcrLevelFromString(userSession.AcrLevel.String())
 	if err != nil {
 		return err
 	}
 
 	// Use the higher of the two ACR levels (never downgrade)
-	ac.AcrLevel = models.AcrMax(targetAcrLevel, userSessionAcrLevel)
+	ac.AcrLevel = record.AcrMax(targetAcrLevel, userSessionAcrLevel)
 	return nil
 }
 
@@ -392,7 +392,7 @@ func (ac *AuthContext) SetAcrLevel(targetAcrLevel models.AcrLevel, userSession *
 // ceremony with no authenticated user each have nothing to reuse. The UserId != 0 check in
 // particular stops a future auth state reaching a call site before the user is known and matching
 // an unsaved session by accident, since two zeros are not a match (#133).
-func (ac *AuthContext) OwnsSession(userSession *models.UserSession) bool {
+func (ac *AuthContext) OwnsSession(userSession *record.UserSession) bool {
 	return userSession != nil && ac.UserId != 0 && userSession.UserId == ac.UserId
 }
 
@@ -406,13 +406,13 @@ func (ac *AuthContext) OwnsSession(userSession *models.UserSession) bool {
 // can only leave the target at the client's default, the floor computeTargetAcrLevel sets. A level
 // padded with a tab or a no-break space is not recognised either, where a trim used to admit it
 // (#244, #436).
-func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []models.AcrLevel {
-	arr := []models.AcrLevel{}
+func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []record.AcrLevel {
+	arr := []record.AcrLevel{}
 	if !oauth.IsWellFormedSpaceDelimited(ac.AcrValuesFromAuthorizeRequest) {
 		return arr
 	}
 	for _, v := range oauth.SplitSpaceDelimited(ac.AcrValuesFromAuthorizeRequest) {
-		acr, err := models.AcrLevelFromString(v)
+		acr, err := record.AcrLevelFromString(v)
 		if err == nil && !slices.Contains(arr, acr) {
 			arr = append(arr, acr)
 		}
@@ -424,7 +424,7 @@ func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []models.AcrLevel {
 // authorization request is accepted, because a target recomputed later is a target an
 // administrator can move underneath a ceremony that is already in progress. See TargetAcrLevel
 // for what that costs (#240).
-func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient models.AcrLevel) {
+func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient record.AcrLevel) {
 	ac.TargetAcrLevel = ac.computeTargetAcrLevel(defaultAcrLevelFromClient).String()
 }
 
@@ -433,9 +433,9 @@ func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient models.AcrLev
 // client's current default. It stays the only way a caller obtains a target, so no handler can
 // compute one another way and be missed. See TargetAcrLevel for why the fallback is the safe
 // direction.
-func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient models.AcrLevel) models.AcrLevel {
+func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient record.AcrLevel) record.AcrLevel {
 	if ac.TargetAcrLevel != "" {
-		acr, err := models.AcrLevelFromString(ac.TargetAcrLevel)
+		acr, err := record.AcrLevelFromString(ac.TargetAcrLevel)
 		if err == nil {
 			return acr
 		}
@@ -453,12 +453,12 @@ func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient models.AcrLev
 // which is what makes this a floor rather than the client default always winning, and dropping
 // that half would leave step-up broken while every clamp case still passed.
 //
-// models.AcrMax is the codebase's existing comparison, already used by SetAcrLevel one layer up for
+// record.AcrMax is the codebase's existing comparison, already used by SetAcrLevel one layer up for
 // the same never-downgrade rule against a session's ACR (#240).
-func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient models.AcrLevel) models.AcrLevel {
+func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient record.AcrLevel) record.AcrLevel {
 	acrValuesFromAuthorizeRequest := ac.parseAcrValuesFromAuthorizeRequest()
 	if len(acrValuesFromAuthorizeRequest) > 0 {
-		return models.AcrMax(acrValuesFromAuthorizeRequest[0], defaultAcrLevelFromClient)
+		return record.AcrMax(acrValuesFromAuthorizeRequest[0], defaultAcrLevelFromClient)
 	}
 	return defaultAcrLevelFromClient
 }

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +19,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier:      "test-group-members",
 		Description:          "Test Group for Members",
 		IncludeInIdToken:     true,
@@ -34,7 +34,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	// Setup: Create test users and add to group. The addresses are asserted
 	// below, so each is drawn once and read from the fixture rather than
 	// respelled as a literal.
-	testUser1 := &models.User{
+	testUser1 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("member1@group.test"),
@@ -48,7 +48,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
 	}()
 
-	testUser2 := &models.User{
+	testUser2 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("member2@group.test"),
@@ -63,14 +63,14 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	}()
 
 	// Add users to group
-	userGroup1 := &models.UserGroup{UserId: testUser1.Id, GroupId: testGroup.Id}
+	userGroup1 := &record.UserGroup{UserId: testUser1.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup1)
 	assert.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
 	}()
 
-	userGroup2 := &models.UserGroup{UserId: testUser2.Id, GroupId: testGroup.Id}
+	userGroup2 := &record.UserGroup{UserId: testUser2.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup2)
 	assert.NoError(t, err)
 	defer func() {
@@ -111,7 +111,7 @@ func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group with no members
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier:      "empty-group",
 		Description:          "Empty Test Group",
 		IncludeInIdToken:     true,
@@ -146,7 +146,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "pagination-group",
 		Description:     "Pagination Test Group",
 	}
@@ -157,11 +157,11 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 	}()
 
 	// Setup: Create multiple users and add to group
-	var testUsers []*models.User
-	var userGroups []*models.UserGroup
+	var testUsers []*record.User
+	var userGroups []*record.UserGroup
 
 	for i := 1; i <= 3; i++ {
-		user := &models.User{
+		user := &record.User{
 			Subject:    fake.UUID(),
 			Enabled:    true,
 			Email:      "paguser" + strconv.Itoa(i) + "@group.test",
@@ -172,7 +172,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 		assert.NoError(t, err)
 		testUsers = append(testUsers, user)
 
-		userGroup := &models.UserGroup{UserId: user.Id, GroupId: testGroup.Id}
+		userGroup := &record.UserGroup{UserId: user.Id, GroupId: testGroup.Id}
 		err = database.CreateUserGroup(context.Background(), nil, userGroup)
 		assert.NoError(t, err)
 		userGroups = append(userGroups, userGroup)
@@ -249,7 +249,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "test-add-member",
 		Description:     "Test Group for Adding Member",
 	}
@@ -260,7 +260,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("newmember@group.test"),
@@ -307,7 +307,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "duplicate-member-group",
 		Description:     "Test Group for Duplicate Member",
 	}
@@ -318,7 +318,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 	}()
 
 	// Setup: Create test user and add to group
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("duplicate@group.test"),
@@ -331,7 +331,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
-	userGroup := &models.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
+	userGroup := &record.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 	defer func() {
@@ -355,7 +355,7 @@ func TestAPIGroupMemberAdd_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "test-user-not-found",
 		Description:     "Test Group for User Not Found",
 	}
@@ -398,7 +398,7 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "invalid-request-group",
 		Description:     "Test Group for Invalid Request",
 	}
@@ -430,7 +430,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "test-remove-member",
 		Description:     "Test Group for Removing Member",
 	}
@@ -441,7 +441,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test user and add to group
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("removeme@group.test"),
@@ -454,7 +454,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
-	userGroup := &models.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
+	userGroup := &record.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 
@@ -484,7 +484,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "test-not-in-group",
 		Description:     "Test Group for User Not In Group",
 	}
@@ -495,7 +495,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 	}()
 
 	// Setup: Create test user (not in group)
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("notingroup@group.test"),
@@ -522,7 +522,7 @@ func TestAPIGroupMemberRemove_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "test-remove-user-not-found",
 		Description:     "Test Group for Remove User Not Found",
 	}
@@ -584,7 +584,7 @@ func TestAPIGroupMemberRemove_InvalidIds(t *testing.T) {
 // Test authorization for all endpoints
 func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 	// Setup: Create test group
-	testGroup := &models.Group{
+	testGroup := &record.Group{
 		GroupIdentifier: "unauthorized-test",
 		Description:     "Test Group for Unauthorized",
 	}

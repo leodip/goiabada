@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -33,7 +33,7 @@ func HandleSettingsAuditLogsGet() http.HandlerFunc {
 
 // settingsAuditLogsDatabase is what the audit log settings endpoint needs: the settings write.
 type settingsAuditLogsDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // HandleSettingsAuditLogsPut - PUT /api/v1/admin/settings/audit-logs

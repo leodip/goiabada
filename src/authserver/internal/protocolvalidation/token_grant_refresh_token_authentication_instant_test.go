@@ -9,8 +9,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,12 +50,12 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
-				client := &models.Client{
+				client := &record.Client{
 					Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
 					AuthorizationCodeEnabled: true, IsPublic: true,
 				}
-				user := models.User{Id: 7, Enabled: true}
-				refreshToken := &models.RefreshToken{
+				user := record.User{Id: 7, Enabled: true}
+				refreshToken := &record.RefreshToken{
 					RefreshTokenJti: "ropc_jti",
 					CodeId:          sql.NullInt64{Valid: false},
 					UserId:          sql.NullInt64{Int64: 7, Valid: true},
@@ -80,7 +80,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 				}
 
-				result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, &ValidateTokenRequestInput{
+				result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 					GrantType:    "refresh_token",
 					ClientId:     "ropc_client",
 					RefreshToken: "ropc_refresh_token",
@@ -110,18 +110,18 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
-		client := &models.Client{
+		client := &record.Client{
 			Id: 1, ClientIdentifier: "test_client", Enabled: true,
 			AuthorizationCodeEnabled: true, ClientSecretEncrypted: clientSecretEncrypted,
 		}
-		user := models.User{Id: 7, Enabled: true}
-		refreshToken := &models.RefreshToken{
+		user := record.User{Id: 7, Enabled: true}
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "the-jti",
 			CodeId:            sql.NullInt64{Int64: 5, Valid: true},
 			SessionIdentifier: "sid-1",
 			// NULL, as on every authorization-code token.
 			AuthenticatedAt: sql.NullTime{},
-			Code: models.Code{
+			Code: record.Code{
 				Id: 5, ClientId: 1, UserId: 7, Scope: "openid", SessionIdentifier: "sid-1",
 				AuthenticatedAt: recorded.Time, User: user,
 			},
@@ -136,13 +136,13 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
-			Return(&models.UserSession{
+			Return(&record.UserSession{
 				Id: 9, SessionIdentifier: "sid-1", UserId: 7,
 				Started: now.Add(-10 * time.Minute), LastAccessed: now,
 			}, nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil)
 
-		result, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{
+		result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}, &ValidateTokenRequestInput{

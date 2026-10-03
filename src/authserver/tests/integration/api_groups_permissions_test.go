@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -584,8 +584,8 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 }
 
 // Helper function to create a test group permission
-func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *models.GroupPermission {
-	groupPermission := &models.GroupPermission{
+func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *record.GroupPermission {
+	groupPermission := &record.GroupPermission{
 		GroupId:      groupId,
 		PermissionId: permissionId,
 	}

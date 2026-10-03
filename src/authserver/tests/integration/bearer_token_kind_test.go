@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
@@ -89,7 +89,7 @@ func sendBearer(t *testing.T, route bearerRoute, token string) bearerKindRespons
 }
 
 // grantAuthServerPermissionsToUser grants a user the named authserver built-ins.
-func grantAuthServerPermissionsToUser(t *testing.T, user *models.User, identifiers ...string) {
+func grantAuthServerPermissionsToUser(t *testing.T, user *record.User, identifiers ...string) {
 	t.Helper()
 
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
@@ -124,7 +124,7 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 	require.True(t, ok, "the exchange should yield an ID token: %v", authCodeTokens)
 
 	// ROPC's refresh token is always typ Offline.
-	ropcTokens, ropcUser := ropcTokenResponse(t, bearerKindGrant, func(user *models.User) {
+	ropcTokens, ropcUser := ropcTokenResponse(t, bearerKindGrant, func(user *record.User) {
 		grantAuthServerPermissionsToUser(t, user,
 			builtin.ManageAccountPermissionIdentifier,
 			builtin.ManagePermissionIdentifier,
@@ -152,7 +152,7 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 	tokens := []struct {
 		name  string
 		token string
-		user  *models.User
+		user  *record.User
 	}{
 		{name: "session refresh token", token: sessionRefreshToken, user: &code.User},
 		{name: "offline refresh token", token: offlineRefreshToken, user: ropcUser},
@@ -225,7 +225,7 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 		clientSecret := fake.Password(32)
 		clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 		require.NoError(t, err)
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "bearer-aud-client-" + strings.ToLower(fake.LetterN(8)),
 			Enabled:                  true,
 			ClientCredentialsEnabled: true,
@@ -243,11 +243,11 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == builtin.ManagePermissionIdentifier {
 				require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-					&models.ClientPermission{ClientId: client.Id, PermissionId: permissions[i].Id}))
+					&record.ClientPermission{ClientId: client.Id, PermissionId: permissions[i].Id}))
 			}
 		}
 		require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-			&models.ClientPermission{ClientId: client.Id, PermissionId: secondPermission.Id}))
+			&record.ClientPermission{ClientId: client.Id, PermissionId: secondPermission.Id}))
 
 		scope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier + " " + secondScope
 		data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{

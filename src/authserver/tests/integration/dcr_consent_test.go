@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ import (
 //
 // The caller owns the returned response body.
 func followAuthChain(t *testing.T, httpClient *http.Client, clientIdentifier string,
-	redirectURI string, user *models.User, password string) ([]string, *http.Response) {
+	redirectURI string, user *record.User, password string) ([]string, *http.Response) {
 
 	t.Helper()
 

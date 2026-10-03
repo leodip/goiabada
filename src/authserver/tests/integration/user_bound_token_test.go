@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -52,14 +52,14 @@ func newUserSubjectValidAsClientIdentifier(t *testing.T) string {
 }
 
 // createUserWithSubject creates an enabled user with a caller-chosen subject.
-func createUserWithSubject(t *testing.T, subject string) (*models.User, string) {
+func createUserWithSubject(t *testing.T, subject string) (*record.User, string) {
 	t.Helper()
 
 	password := fake.Password(12)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      subject,
 		Enabled:      true,
 		Email:        strings.ToLower(fake.LetterN(10)) + "@example.com",
@@ -83,13 +83,13 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		// The whole point: the client identifier is the user's subject.
 		ClientIdentifier:         subject,
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
@@ -102,7 +102,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 	require.NoError(t, err)
 
-	var granted *models.Permission
+	var granted *record.Permission
 	for i := range permissions {
 		if permissions[i].PermissionIdentifier == permissionIdentifier {
 			granted = &permissions[i]
@@ -111,7 +111,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	}
 	require.NotNil(t, granted, "built-in permission %q must exist on the authserver resource", permissionIdentifier)
 
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: granted.Id,
 	})
@@ -238,7 +238,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 	accountEmailUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
-	assertEmailChangeSucceeds := func(t *testing.T, accessToken string, user *models.User) {
+	assertEmailChangeSucceeds := func(t *testing.T, accessToken string, user *record.User) {
 		t.Helper()
 
 		// The change requires the current password (#404), and how the token was obtained
@@ -300,7 +300,7 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 
 // userAccessTokenViaAuthCodeRefresh exchanges an authorization code for tokens, then
 // exchanges the refresh token, returning the REFRESHED access token.
-func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
+func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *record.User) {
 	t.Helper()
 
 	// Deliberately NOT offline_access. Requesting it routes the flow through /auth/consent,
@@ -340,13 +340,13 @@ func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
 
 // userAccessTokenViaROPC issues a sessionless ROPC token for a user granted
 // authserver:manage-account, returning the access token, the user, and the refresh token.
-func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
+func userAccessTokenViaROPC(t *testing.T) (string, *record.User, string) {
 	t.Helper()
 
 	// ROPC checks the USER holds each requested resource permission, so manage-account has to be
 	// granted, and nothing else is needed: the token reaches /userinfo because its scope carries
 	// openid, which is not a permission (#449).
-	grantManageAccount := func(user *models.User) {
+	grantManageAccount := func(user *record.User) {
 		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 		require.NoError(t, err)
 		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
@@ -376,10 +376,10 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 // and chooses the scope. It turns ROPC on for the test, creates a confidential ROPC client and a
 // user, runs beforeGrant on the user when set, then makes the password grant. The refresh token's
 // client is recorded for refreshROPCToken and refreshROPCTokenResponse.
-func ropcTokenResponse(t *testing.T, scope string, beforeGrant func(user *models.User)) (map[string]interface{}, *models.User) {
+func ropcTokenResponse(t *testing.T, scope string, beforeGrant func(user *record.User)) (map[string]interface{}, *record.User) {
 	t.Helper()
 
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
 	client := createROPCClient(t, clientSecret, false)
@@ -463,10 +463,10 @@ func userAccessTokenViaImplicit(t *testing.T) string {
 // and chooses the response type and scope. It turns the implicit flow on for the test and runs the
 // ceremony for a fresh user, with a nonce, which OIDC Core 1.0 section 3.2.2.1 requires whenever
 // an ID token is asked for.
-func implicitTokenResponse(t *testing.T, responseType string, scope string) (map[string]string, *models.User) {
+func implicitTokenResponse(t *testing.T, responseType string, scope string) (map[string]string, *record.User) {
 	t.Helper()
 
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)

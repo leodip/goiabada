@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -44,7 +44,7 @@ func propagationCodeInput() *CreateCodeInput {
 		RedirectURI:       "https://example.com/callback",
 		ResponseMode:      "query",
 		IpAddress:         "127.0.0.1",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       "pwd",
 		SessionIdentifier: "session-propagation",
 	}
@@ -60,8 +60,8 @@ func TestIssueAuthCode_IssuesUnderTheCallersContext(t *testing.T) {
 	mockDB.On("AcquireUserSessionRow", theIssuersCallersContext(), issuanceTx, "session-propagation").
 		Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issuanceTx, "test-client").
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
-	mockDB.On("CreateCode", theIssuersCallersContext(), issuanceTx, mock.AnythingOfType("*models.Code")).
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("CreateCode", theIssuersCallersContext(), issuanceTx, mock.AnythingOfType("*record.Code")).
 		Return(nil).Once()
 
 	code, err := NewCodeIssuer(mockDB).IssueAuthCode(issuanceCallerContext(), issuanceTx, propagationCodeInput())

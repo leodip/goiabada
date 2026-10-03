@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -115,14 +115,14 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel2Optional,
+			DefaultAcrLevel:  record.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:                  1,
 			OTPEnabled:          true,
 			OtpConfigGeneration: 4,
@@ -163,14 +163,14 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel2Optional,
+			DefaultAcrLevel:  record.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:                  1,
 			OTPEnabled:          false,
 			OtpConfigGeneration: 4,
@@ -216,14 +216,14 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel2Mandatory,
+			DefaultAcrLevel:  record.AcrLevel2Mandatory,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:                  1,
 			OtpConfigGeneration: 4,
 		}
@@ -268,10 +268,10 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel2Mandatory,
+			DefaultAcrLevel:  record.AcrLevel2Mandatory,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -312,14 +312,14 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id: 1,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -341,17 +341,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 func TestDecideLevel2Arm(t *testing.T) {
 	testCases := []struct {
 		name       string
-		target     models.AcrLevel
+		target     record.AcrLevel
 		userHasOTP bool
 		wantState  ceremony.AuthState
 		wantPath   string
 		wantErr    string
 	}{
-		{"optional with OTP asks for it", models.AcrLevel2Optional, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"optional without OTP skips it", models.AcrLevel2Optional, false, ceremony.AuthStateAuthenticationCompleted, "/auth/completed", ""},
-		{"mandatory with OTP asks for it", models.AcrLevel2Mandatory, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"mandatory without OTP enrols", models.AcrLevel2Mandatory, false, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"level1 never reaches this hop", models.AcrLevel1, true, "", "", "invalid targetAcrLevel: urn:goiabada:level1"},
+		{"optional with OTP asks for it", record.AcrLevel2Optional, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
+		{"optional without OTP skips it", record.AcrLevel2Optional, false, ceremony.AuthStateAuthenticationCompleted, "/auth/completed", ""},
+		{"mandatory with OTP asks for it", record.AcrLevel2Mandatory, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
+		{"mandatory without OTP enrols", record.AcrLevel2Mandatory, false, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
+		{"level1 never reaches this hop", record.AcrLevel1, true, "", "", "invalid targetAcrLevel: urn:goiabada:level1"},
 		{"an unknown level is refused", "urn:goiabada:level3", false, "", "", "invalid targetAcrLevel: urn:goiabada:level3"},
 	}
 

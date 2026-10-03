@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -18,12 +18,12 @@ import (
 // groupMembersDatabase is what the group membership endpoints need: the group, its members, and
 // the rows that join them.
 type groupMembersDatabase interface {
-	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
+	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
-	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error)
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]record.User, int, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*record.UserGroup, error)
 }
 
 func HandleGroupMembersGet(
@@ -150,7 +150,7 @@ func HandleGroupMemberAddPost(
 		}
 
 		// Add user to group
-		err = database.CreateUserGroup(r.Context(), nil, &models.UserGroup{
+		err = database.CreateUserGroup(r.Context(), nil, &record.UserGroup{
 			UserId:  user.Id,
 			GroupId: group.Id,
 		})

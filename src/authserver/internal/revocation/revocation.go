@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -22,12 +22,12 @@ import (
 type Database interface {
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)
-	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)
-	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
-	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
+	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
+	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
 	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
@@ -35,7 +35,7 @@ type Database interface {
 	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
 	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 }
 
 // RevokeRefreshTokens marks the given refresh tokens revoked and returns the JTIs this call
@@ -50,7 +50,7 @@ type Database interface {
 //
 // The caller owns the transaction. Passing a nil tx is permitted and means no transaction,
 // following the data layer's convention, but every caller here supplies one.
-func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []*models.RefreshToken) ([]string, error) {
+func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken) ([]string, error) {
 	revokedJtis := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
@@ -224,7 +224,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 		}
 	}
 
-	toRevoke := make([]*models.RefreshToken, 0, len(tokens))
+	toRevoke := make([]*record.RefreshToken, 0, len(tokens))
 	for _, rt := range tokens {
 		if preservedIds[rt.Id] {
 			continue
@@ -411,7 +411,7 @@ type TerminationResult struct {
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a termination with no audit record of
 // it, which is fail-closed on the security side and a gap on the forensic side.
-func TerminateUserSessionTx(ctx context.Context, db Database, userSession *models.UserSession) (TerminationResult, error) {
+func TerminateUserSessionTx(ctx context.Context, db Database, userSession *record.UserSession) (TerminationResult, error) {
 	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
 	// loaded row rather than two loose values: from one row they cannot describe two different
 	// sessions, and both call sites already load it for their own not-found and ownership checks.
@@ -488,7 +488,7 @@ type AuthCodeReuseResult struct {
 // sweep runs. RevokeOnAuthCodeReuseTx is the caller that opens one; this form exists so the data
 // tier's ordering test can hold the transaction open across a termination's arrival and still run
 // the statements that ship.
-func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *models.Code) (AuthCodeReuseResult, error) {
+func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *record.Code) (AuthCodeReuseResult, error) {
 	if tx == nil {
 		return AuthCodeReuseResult{}, errs.New("the response to a reused authorization code requires a transaction: the session row it takes first is released by an autocommitted statement")
 	}
@@ -517,7 +517,7 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *m
 		}
 	}
 
-	var refreshTokens []*models.RefreshToken
+	var refreshTokens []*record.RefreshToken
 	var err error
 	if code.SessionIdentifier != "" {
 		refreshTokens, err = db.GetRefreshTokensBySessionIdentifier(ctx, tx, code.SessionIdentifier)
@@ -579,7 +579,7 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *m
 // order is not optional: AuditLogger.Log writes on a nil transaction, and on SQLite the whole
 // process shares the one connection this transaction holds, so an audit written inside it would
 // wait on itself. A logged response that then rolled back would also be a false record.
-func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *models.Code) (AuthCodeReuseResult, error) {
+func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code) (AuthCodeReuseResult, error) {
 	// Refused before a transaction is opened, so a bad argument is not reported as a database
 	// failure after a round trip.
 	if code == nil {
@@ -701,7 +701,7 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 // recordClientFamilies writes the revocation record of every distinct rotation family among the
 // given refresh tokens, each once. A token with no family identifier carries no family to record:
 // no issuer writes one, and RecordRefreshTokenFamilyRevoked refuses an empty jti as a caller bug.
-func recordClientFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*models.RefreshToken) error {
+func recordClientFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken) error {
 	seen := make(map[string]struct{}, len(tokens))
 	for _, rt := range tokens {
 		jti := rt.FirstRefreshTokenJti
@@ -857,7 +857,7 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 // that were really revoked.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *models.Code, result AuthCodeReuseResult) {
+func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *record.Code, result AuthCodeReuseResult) {
 	auditLogger.Log(ctx, audit.EventAuthCodeReuseDetected, map[string]interface{}{
 		"clientId":          code.ClientId,
 		"userId":            code.UserId,
@@ -882,7 +882,7 @@ func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *models
 // instead of EventDeletedUserSession, whose payload decision 9 leaves untouched.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, userSession *models.UserSession,
+func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, userSession *record.UserSession,
 	loggedInUser string, result TerminationResult) {
 
 	auditLogger.Log(ctx, audit.EventTerminatedUserSession, map[string]interface{}{

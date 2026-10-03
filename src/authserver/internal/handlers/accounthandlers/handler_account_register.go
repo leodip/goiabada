@@ -14,8 +14,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -86,9 +86,9 @@ func HandleRegisterGet(
 // accountRegisterDatabase is what the self-registration page needs: the address it must not
 // duplicate, and the pre-registration it parks.
 type accountRegisterDatabase interface {
-	CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error
-	GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.PreRegistration, error)
-	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+	CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error
+	GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.PreRegistration, error)
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 }
 
 func HandleRegisterPost(
@@ -238,7 +238,7 @@ func HandleRegisterPost(
 			verificationCodeHash := hashutil.HashString(verificationCode)
 
 			utcNow := time.Now().UTC()
-			preRegistration := &models.PreRegistration{
+			preRegistration := &record.PreRegistration{
 				Email:                     email,
 				PasswordHash:              passwordHash,
 				VerificationCodeEncrypted: verificationCodeEncrypted,

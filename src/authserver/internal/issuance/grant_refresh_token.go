@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -25,8 +25,8 @@ import (
 // what a password grant's token is. A password grant's token carries no code: its user and client
 // are on the token row. Otherwise they are on RefreshToken.Code, which the validator loaded.
 type RefreshTokenGrantInput struct {
-	Client         *models.Client
-	RefreshToken   *models.RefreshToken
+	Client         *record.Client
+	RefreshToken   *record.RefreshToken
 	ScopeRequested string
 	IsROPC         bool
 }
@@ -35,7 +35,7 @@ type RefreshTokenGrantInput struct {
 type RefreshOutcome struct {
 	// BumpedSession is the browser session the refresh kept alive: nil for a password grant's token,
 	// which has no session, and for a token bound to none.
-	BumpedSession *models.UserSession
+	BumpedSession *record.UserSession
 }
 
 // RefreshTokenReplayedError is a refresh whose token was already revoked when it was read, answered
@@ -92,7 +92,7 @@ var (
 //
 // A refusal is a *RefreshTokenReplayedError, ErrRefreshFlowDisabled, ErrRefreshTokenNotClaimed or
 // ErrRefreshFamilyRevoked, which the token handler answers; anything else is a fault.
-func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *models.Settings,
+func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *record.Settings,
 	input *RefreshTokenGrantInput) (*oauth.TokenResponse, *RefreshOutcome, error) {
 
 	refreshToken := input.RefreshToken
@@ -309,8 +309,8 @@ func (t *TokenIssuer) containRefreshTokenFamily(ctx context.Context, firstRefres
 // authorization code, and inserts its child. Every statement runs on tx, the rotation's own
 // transaction: the reads because sqlitedb has one connection, which tx holds, and a read on nil
 // would wait on it until the context expired, dropping the picture claim without an error (#437).
-func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, settings *models.Settings,
-	code *models.Code, parent *models.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
+func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, settings *record.Settings,
+	code *record.Code, parent *record.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
 
 	err := t.database.CodeLoadClient(ctx, tx, code)
 	if err != nil {
@@ -393,8 +393,8 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 // mintROPCRefreshTokens mints the token set for a claimed refresh token the password grant issued,
 // and inserts its child. Unlike a code-descended token's, its user and client are on the token row.
-func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, settings *models.Settings,
-	parent *models.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
+func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, settings *record.Settings,
+	parent *record.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
 
 	// The token endpoint refuses a token with no instant before it gets here: without one there is
 	// no auth_time this refresh could issue that OpenID Connect Core 1.0 section 12.2 allows (#125).

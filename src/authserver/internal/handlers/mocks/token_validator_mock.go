@@ -12,8 +12,8 @@ package mocks_handlers
 import (
 	"context"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -54,7 +54,7 @@ func (_m *TokenValidator) EXPECT() *TokenValidator_Expecter {
 }
 
 // ValidateTokenRequest provides a mock function for the type TokenValidator
-func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error) {
+func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *record.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error) {
 	ret := _mock.Called(ctx, settings, input)
 
 	if len(ret) == 0 {
@@ -63,17 +63,17 @@ func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, settings 
 
 	var r0 protocolvalidation.TokenGrant
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)); ok {
 		return returnFunc(ctx, settings, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) protocolvalidation.TokenGrant); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *protocolvalidation.ValidateTokenRequestInput) protocolvalidation.TokenGrant); ok {
 		r0 = returnFunc(ctx, settings, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocolvalidation.TokenGrant)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *record.Settings, *protocolvalidation.ValidateTokenRequestInput) error); ok {
 		r1 = returnFunc(ctx, settings, input)
 	} else {
 		r1 = ret.Error(1)
@@ -88,21 +88,21 @@ type TokenValidator_ValidateTokenRequest_Call struct {
 
 // ValidateTokenRequest is a helper method to define mock.On call
 //   - ctx context.Context
-//   - settings *models.Settings
+//   - settings *record.Settings
 //   - input *protocolvalidation.ValidateTokenRequestInput
 func (_e *TokenValidator_Expecter) ValidateTokenRequest(ctx any, settings any, input any) *TokenValidator_ValidateTokenRequest_Call {
 	return &TokenValidator_ValidateTokenRequest_Call{Call: _e.mock.On("ValidateTokenRequest", ctx, settings, input)}
 }
 
-func (_c *TokenValidator_ValidateTokenRequest_Call) Run(run func(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput)) *TokenValidator_ValidateTokenRequest_Call {
+func (_c *TokenValidator_ValidateTokenRequest_Call) Run(run func(ctx context.Context, settings *record.Settings, input *protocolvalidation.ValidateTokenRequestInput)) *TokenValidator_ValidateTokenRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.Settings
+		var arg1 *record.Settings
 		if args[1] != nil {
-			arg1 = args[1].(*models.Settings)
+			arg1 = args[1].(*record.Settings)
 		}
 		var arg2 *protocolvalidation.ValidateTokenRequestInput
 		if args[2] != nil {
@@ -122,7 +122,7 @@ func (_c *TokenValidator_ValidateTokenRequest_Call) Return(tokenGrant protocolva
 	return _c
 }
 
-func (_c *TokenValidator_ValidateTokenRequest_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)) *TokenValidator_ValidateTokenRequest_Call {
+func (_c *TokenValidator_ValidateTokenRequest_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)) *TokenValidator_ValidateTokenRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

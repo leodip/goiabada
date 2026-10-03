@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -47,9 +47,9 @@ var oneElementSpellings = []struct {
 	{"U+00A0", whitespaceScopeA + "\u00a0" + whitespaceScopeB},
 }
 
-var billingResource = models.Resource{Id: 1, ResourceIdentifier: "billing-api"}
+var billingResource = record.Resource{Id: 1, ResourceIdentifier: "billing-api"}
 
-var billingPermissions = []models.Permission{
+var billingPermissions = []record.Permission{
 	{Id: 10, PermissionIdentifier: "read", ResourceId: 1, Resource: billingResource},
 	{Id: 11, PermissionIdentifier: "write", ResourceId: 1, Resource: billingResource},
 }
@@ -133,7 +133,7 @@ func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator
 
 	clientSecretEncrypted, err := testDataCipher.Encrypt("valid_secret")
 	require.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "cc_client",
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
@@ -142,7 +142,7 @@ func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator
 	}
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "cc_client").Return(client, nil).Once()
 	mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil).Once()
-	mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil).Once()
+	mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]record.Permission")).Return(nil).Once()
 
 	return validator, mockDB, &ValidateTokenRequestInput{
 		GrantType:    "client_credentials",
@@ -153,7 +153,7 @@ func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator
 }
 
 func TestValidateTokenRequest_ClientCredentials_ScopeWhitespace(t *testing.T) {
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	t.Run("one space separates", func(t *testing.T) {
@@ -178,20 +178,20 @@ func TestValidateTokenRequest_ClientCredentials_ScopeWhitespace(t *testing.T) {
 	}
 }
 
-func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *mocks_protocolvalidation.PermissionChecker, *models.Settings, *ValidateTokenRequestInput) {
+func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *mocks_protocolvalidation.PermissionChecker, *record.Settings, *ValidateTokenRequestInput) {
 	t.Helper()
 	mockDB := mocks_data.NewDatabase(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mockPermissionChecker, testDataCipher)
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 
 	passwordHash, err := passwordhash.Hash("correctpassword")
 	require.NoError(t, err)
-	user := &models.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+	user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,

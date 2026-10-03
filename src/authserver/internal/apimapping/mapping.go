@@ -1,16 +1,16 @@
 // Package apimapping owns the auth server's mapping from persistence models to the
 // wire types in core/api. It lives here, and not beside the types it produces, so that
 // core/api declares JSON and nothing else: the kernel's wire contract must not depend on
-// authserver/internal/models, and the admin console must be able to decode a response
+// authserver/internal/record, and the admin console must be able to decode a response
 // without linking the persistence layer (#350).
 package apimapping
 
 import (
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 )
 
-func ToUserResponse(user *models.User) *api.UserResponse {
+func ToUserResponse(user *record.User) *api.UserResponse {
 	if user == nil {
 		return nil
 	}
@@ -57,7 +57,7 @@ func ToUserResponse(user *models.User) *api.UserResponse {
 	return resp
 }
 
-func ToUserResponses(users []models.User) []api.UserResponse {
+func ToUserResponses(users []record.User) []api.UserResponse {
 	if users == nil {
 		return nil
 	}
@@ -76,7 +76,7 @@ func ToUserResponses(users []models.User) []api.UserResponse {
 // whoever a listed session belongs to. It is not ToUserResponse narrowed for payload: the
 // client-sessions endpoint is the only caller and it is reached with the clients scopes alone,
 // so the fields left out are left out because that caller is not entitled to them (#373).
-func ToSessionOwnerResponse(user *models.User) *api.SessionOwnerResponse {
+func ToSessionOwnerResponse(user *record.User) *api.SessionOwnerResponse {
 	if user == nil {
 		return nil
 	}
@@ -90,7 +90,7 @@ func ToSessionOwnerResponse(user *models.User) *api.SessionOwnerResponse {
 	}
 }
 
-func ToSessionOwnerResponses(users []models.User) []api.SessionOwnerResponse {
+func ToSessionOwnerResponses(users []record.User) []api.SessionOwnerResponse {
 	if users == nil {
 		return nil
 	}
@@ -105,7 +105,7 @@ func ToSessionOwnerResponses(users []models.User) []api.SessionOwnerResponse {
 	return responses
 }
 
-func ToUserAttributeResponse(attr *models.UserAttribute) *api.UserAttributeResponse {
+func ToUserAttributeResponse(attr *record.UserAttribute) *api.UserAttributeResponse {
 	if attr == nil {
 		return nil
 	}
@@ -129,7 +129,7 @@ func ToUserAttributeResponse(attr *models.UserAttribute) *api.UserAttributeRespo
 	return resp
 }
 
-func ToUserAttributeResponses(attrs []models.UserAttribute) []api.UserAttributeResponse {
+func ToUserAttributeResponses(attrs []record.UserAttribute) []api.UserAttributeResponse {
 	if attrs == nil {
 		return nil
 	}
@@ -157,7 +157,7 @@ func ToUserAttributeResponses(attrs []models.UserAttribute) []api.UserAttributeR
 // session.Clients is read as already loaded and the database is never touched: the caller
 // hydrates the whole list in one query before calling this, which is why the mapping belongs in
 // this package (#350).
-func ToUserSessionDetailResponse(session *models.UserSession, currentSid string) *api.UserSessionDetailResponse {
+func ToUserSessionDetailResponse(session *record.UserSession, currentSid string) *api.UserSessionDetailResponse {
 	base := ToUserSessionResponse(session)
 	if base == nil {
 		return nil
@@ -177,7 +177,7 @@ func ToUserSessionDetailResponse(session *models.UserSession, currentSid string)
 	}
 }
 
-func ToUserSessionResponse(session *models.UserSession) *api.UserSessionResponse {
+func ToUserSessionResponse(session *record.UserSession) *api.UserSessionResponse {
 	if session == nil {
 		return nil
 	}
@@ -214,7 +214,7 @@ func ToUserSessionResponse(session *models.UserSession) *api.UserSessionResponse
 	return resp
 }
 
-func ToUserConsentResponse(consent *models.UserConsent) *api.UserConsentResponse {
+func ToUserConsentResponse(consent *record.UserConsent) *api.UserConsentResponse {
 	if consent == nil {
 		return nil
 	}
@@ -245,7 +245,7 @@ func ToUserConsentResponse(consent *models.UserConsent) *api.UserConsentResponse
 	return resp
 }
 
-func ToUserConsentResponses(consents []models.UserConsent) []api.UserConsentResponse {
+func ToUserConsentResponses(consents []record.UserConsent) []api.UserConsentResponse {
 	if consents == nil {
 		return nil
 	}
@@ -260,7 +260,7 @@ func ToUserConsentResponses(consents []models.UserConsent) []api.UserConsentResp
 	return responses
 }
 
-func ToGroupResponse(group *models.Group, memberCount int) *api.GroupResponse {
+func ToGroupResponse(group *record.Group, memberCount int) *api.GroupResponse {
 	if group == nil {
 		return nil
 	}
@@ -284,7 +284,7 @@ func ToGroupResponse(group *models.Group, memberCount int) *api.GroupResponse {
 	return resp
 }
 
-func ToGroupResponses(groups []models.Group, memberCounts map[int64]int) []api.GroupResponse {
+func ToGroupResponses(groups []record.Group, memberCounts map[int64]int) []api.GroupResponse {
 	if groups == nil {
 		return []api.GroupResponse{}
 	}
@@ -307,7 +307,7 @@ func ToGroupResponses(groups []models.Group, memberCounts map[int64]int) []api.G
 	return responses
 }
 
-func ToPermissionResponse(perm *models.Permission) *api.PermissionResponse {
+func ToPermissionResponse(perm *record.Permission) *api.PermissionResponse {
 	if perm == nil {
 		return nil
 	}
@@ -320,7 +320,7 @@ func ToPermissionResponse(perm *models.Permission) *api.PermissionResponse {
 	}
 }
 
-func ToPermissionResponses(perms []models.Permission) []api.PermissionResponse {
+func ToPermissionResponses(perms []record.Permission) []api.PermissionResponse {
 	if perms == nil {
 		return nil
 	}
@@ -334,7 +334,7 @@ func ToPermissionResponses(perms []models.Permission) []api.PermissionResponse {
 	return responses
 }
 
-func ToResourceResponse(resource *models.Resource) *api.ResourceResponse {
+func ToResourceResponse(resource *record.Resource) *api.ResourceResponse {
 	if resource == nil {
 		return nil
 	}
@@ -346,7 +346,7 @@ func ToResourceResponse(resource *models.Resource) *api.ResourceResponse {
 	}
 }
 
-func ToResourceResponses(resources []models.Resource) []api.ResourceResponse {
+func ToResourceResponses(resources []record.Resource) []api.ResourceResponse {
 	if resources == nil {
 		return nil
 	}
@@ -360,7 +360,7 @@ func ToResourceResponses(resources []models.Resource) []api.ResourceResponse {
 	return responses
 }
 
-func ToGroupAttributeResponse(attr *models.GroupAttribute) *api.GroupAttributeResponse {
+func ToGroupAttributeResponse(attr *record.GroupAttribute) *api.GroupAttributeResponse {
 	if attr == nil {
 		return nil
 	}
@@ -384,7 +384,7 @@ func ToGroupAttributeResponse(attr *models.GroupAttribute) *api.GroupAttributeRe
 	return resp
 }
 
-func ToGroupAttributeResponses(attrs []models.GroupAttribute) []api.GroupAttributeResponse {
+func ToGroupAttributeResponses(attrs []record.GroupAttribute) []api.GroupAttributeResponse {
 	if attrs == nil {
 		return nil
 	}
@@ -405,7 +405,7 @@ func ToGroupAttributeResponses(attrs []models.GroupAttribute) []api.GroupAttribu
 // Both preserve nil rather than returning an empty slice, because a client loaded without its
 // collections puts "redirectURIs":null on the wire and a client loaded with an empty one puts [],
 // and a consumer has to tell "not loaded" from "none" (#350).
-func toRedirectURIResponses(uris []models.RedirectURI) []api.RedirectURIResponse {
+func toRedirectURIResponses(uris []record.RedirectURI) []api.RedirectURIResponse {
 	if uris == nil {
 		return nil
 	}
@@ -423,7 +423,7 @@ func toRedirectURIResponses(uris []models.RedirectURI) []api.RedirectURIResponse
 	return responses
 }
 
-func toWebOriginResponses(origins []models.WebOrigin) []api.WebOriginResponse {
+func toWebOriginResponses(origins []record.WebOrigin) []api.WebOriginResponse {
 	if origins == nil {
 		return nil
 	}
@@ -441,7 +441,7 @@ func toWebOriginResponses(origins []models.WebOrigin) []api.WebOriginResponse {
 	return responses
 }
 
-func ToClientResponse(client *models.Client) *api.ClientResponse {
+func ToClientResponse(client *record.Client) *api.ClientResponse {
 	if client == nil {
 		return nil
 	}
@@ -489,7 +489,7 @@ func ToClientResponse(client *models.Client) *api.ClientResponse {
 	return resp
 }
 
-func ToClientResponses(clients []models.Client) []api.ClientResponse {
+func ToClientResponses(clients []record.Client) []api.ClientResponse {
 	if clients == nil {
 		return []api.ClientResponse{}
 	}

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +22,7 @@ func TestAPIClientPermissions_Get_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create client
-	client := &models.Client{ClientIdentifier: "api-perm-get-" + fake.LetterN(6), Enabled: true, IsPublic: true}
+	client := &record.Client{ClientIdentifier: "api-perm-get-" + fake.LetterN(6), Enabled: true, IsPublic: true}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
@@ -30,7 +30,7 @@ func TestAPIClientPermissions_Get_Success(t *testing.T) {
 	// Create resource + permission and assign to client
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
@@ -87,7 +87,7 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
 	enc, err := dataCipher.Encrypt(secret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "api-perm-put-" + strings.ToLower(fake.LetterN(6)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
@@ -141,7 +141,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 	enc, err := dataCipher.Encrypt(secret)
 	assert.NoError(t, err)
 
-	client := &models.Client{ClientIdentifier: "api-perm-put-same-" + strings.ToLower(fake.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
+	client := &record.Client{ClientIdentifier: "api-perm-put-same-" + strings.ToLower(fake.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
 	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
@@ -178,7 +178,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 // Test GET and PUT unauthorized (no access token)
 func TestAPIClientPermissions_Unauthorized(t *testing.T) {
 	// Create a target client
-	client := &models.Client{ClientIdentifier: "api-perm-unauth-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
+	client := &record.Client{ClientIdentifier: "api-perm-unauth-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
@@ -213,7 +213,7 @@ func TestAPIClientPermissions_Unauthorized(t *testing.T) {
 func TestAPIClientPermissions_Put_ClientCredentialsDisabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "api-perm-put-nocc-" + fake.LetterN(6),
 		Enabled:                  true,
 		ClientCredentialsEnabled: false,
@@ -327,7 +327,7 @@ func TestAPIClientPermissions_Put_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create client with client-credentials enabled
-	client := &models.Client{ClientIdentifier: "api-perm-put-noperm-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
+	client := &record.Client{ClientIdentifier: "api-perm-put-noperm-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
@@ -349,7 +349,7 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
 	tok := createClientCredentialsTokenWithoutRouteScope(t)
 
 	// Create target client to update
-	target := &models.Client{ClientIdentifier: "api-perm-put-target-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
+	target := &record.Client{ClientIdentifier: "api-perm-put-target-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
 	err := database.CreateClient(context.Background(), nil, target)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
@@ -385,11 +385,11 @@ func getClientPermissionIds(t *testing.T, accessToken string, clientId int64) []
 
 // createClientForPermissionsSave creates a confidential client with the client credentials flow
 // enabled, which is what its permissions are configurable for, and removes it afterwards.
-func createClientForPermissionsSave(t *testing.T) *models.Client {
+func createClientForPermissionsSave(t *testing.T) *record.Client {
 	t.Helper()
 	enc, err := dataCipher.Encrypt(fake.Password(32))
 	require.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "api-perm-expected-" + strings.ToLower(fake.LetterN(6)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
@@ -436,8 +436,8 @@ func TestAPIClientPermissions_Put_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	permA := createPermission(t, res.Id)
 	permB := createPermission(t, res.Id)
 	permC := createPermission(t, res.Id)
-	for _, p := range []*models.Permission{permA, permB} {
-		require.NoError(t, database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: p.Id}))
+	for _, p := range []*record.Permission{permA, permB} {
+		require.NoError(t, database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: p.Id}))
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
 

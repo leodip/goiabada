@@ -11,7 +11,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -198,10 +198,10 @@ func TestMigration000039_RowValuesSurviveTheRebuild(t *testing.T) {
 	// The two shapes a refresh token comes in, which are also the two variant E used: one
 	// issued through the authorization code flow, carrying a CodeId and no user or client,
 	// and one ROPC-shaped, carrying a UserId and ClientId and no code.
-	authCodeToken := seedRefreshToken000039(t, h, models.RefreshToken{
+	authCodeToken := seedRefreshToken000039(t, h, record.RefreshToken{
 		CodeId: sql.NullInt64{Int64: code.Id, Valid: true},
 	})
-	ropcToken := seedRefreshToken000039(t, h, models.RefreshToken{
+	ropcToken := seedRefreshToken000039(t, h, record.RefreshToken{
 		UserId:   sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId: sql.NullInt64{Int64: client.Id, Valid: true},
 	})
@@ -267,7 +267,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "apply 000039")
 
-	var applied models.Code
+	var applied record.Code
 	require.NoErrorf(t, createChallengelessCode000039(t, h, client, user, &applied),
 		"a challenge-less code must be storable on %s after 000039 (goal 3)", dbType())
 	stored := readCode000039(t, h, applied.Id)
@@ -321,7 +321,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 		// DELETE takes the token with it. Asserting the OLD behaviour is what makes the
 		// assertion after the apply mean the migration did something.
 		doomed := seedUser000039(t, h)
-		token := seedRefreshToken000039(t, h, models.RefreshToken{
+		token := seedRefreshToken000039(t, h, record.RefreshToken{
 			UserId:   sql.NullInt64{Int64: doomed.Id, Valid: true},
 			ClientId: sql.NullInt64{Int64: client.Id, Valid: true},
 		})
@@ -334,7 +334,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 	}
 
 	user := seedUser000039(t, h)
-	token := seedRefreshToken000039(t, h, models.RefreshToken{
+	token := seedRefreshToken000039(t, h, record.RefreshToken{
 		UserId:   sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId: sql.NullInt64{Int64: client.Id, Valid: true},
 	})
@@ -346,7 +346,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 		"the refused delete must leave the token in place on %s", dbType())
 
 	// The Go layer is exercised at the HEAD schema rather than at this migration's, because
-	// models.User and its neighbours always name every column the head declares: a column added
+	// record.User and its neighbours always name every column the head declares: a column added
 	// by any later migration, user_sessions.user_agent at 000045 for one, makes DeleteUser's
 	// session sweep select a column an older catalog does not have. Everything asserted above
 	// this line is what 000039 changed, and none of it is reversed between here and the head, so
@@ -369,9 +369,9 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 // says it should, and hand-written INSERTs per dialect would be asserting the test's own
 // column list rather than the migration's.
 
-func seedClient000039(t *testing.T, h *isolatedDB) *models.Client {
+func seedClient000039(t *testing.T, h *isolatedDB) *record.Client {
 	t.Helper()
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "c-" + fake.UUID()[:8],
 		Description:              "seeded by migration 000039's test",
 		Enabled:                  true,
@@ -382,9 +382,9 @@ func seedClient000039(t *testing.T, h *isolatedDB) *models.Client {
 	return client
 }
 
-func seedUser000039(t *testing.T, h *isolatedDB) *models.User {
+func seedUser000039(t *testing.T, h *isolatedDB) *record.User {
 	t.Helper()
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.UUID() + "@example.com",
@@ -397,12 +397,12 @@ func seedUser000039(t *testing.T, h *isolatedDB) *models.User {
 
 // seedCode000039 gives every column its own recognisable value, so a copy that crossed two
 // of them is visible in the comparison rather than hidden behind two equal defaults.
-func seedCode000039(t *testing.T, h *isolatedDB, client *models.Client, user *models.User,
-	challenge sql.NullString) *models.Code {
+func seedCode000039(t *testing.T, h *isolatedDB, client *record.Client, user *record.User,
+	challenge sql.NullString) *record.Code {
 	t.Helper()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	code := &models.Code{
+	code := &record.Code{
 		CodeHash:            "hash-" + fake.UUID(),
 		ClientId:            client.Id,
 		UserId:              user.Id,
@@ -429,7 +429,7 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *models.Client, user *mo
 
 // refreshTokenColumns000039 are the refresh_tokens columns as 000039 leaves them, and the order
 // seedRefreshToken000039 writes and readRefreshToken000039 scans them in. Named here rather than
-// taken from models.RefreshToken, which follows the head schema: through the data layer this test
+// taken from record.RefreshToken, which follows the head schema: through the data layer this test
 // named authenticated_at, which 000051 adds, against a table that does not have it yet (#125).
 var refreshTokenColumns000039 = []string{
 	"created_at", "updated_at", "code_id", "user_id", "client_id", "refresh_token_jti",
@@ -439,7 +439,7 @@ var refreshTokenColumns000039 = []string{
 }
 
 // refreshTokenFields000039 are token's fields in refreshTokenColumns000039's order, as scan targets.
-func refreshTokenFields000039(token *models.RefreshToken) []any {
+func refreshTokenFields000039(token *record.RefreshToken) []any {
 	return []any{
 		&token.CreatedAt, &token.UpdatedAt, &token.CodeId, &token.UserId, &token.ClientId,
 		&token.RefreshTokenJti, &token.PreviousRefreshTokenJti, &token.FirstRefreshTokenJti,
@@ -465,7 +465,7 @@ func flavor000039() sqlbuilder.Flavor {
 
 // seedRefreshToken000039 fills every column that is not part of the caller's chosen shape,
 // for the same reason seedCode000039 does, over refreshTokenColumns000039.
-func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape models.RefreshToken) *models.RefreshToken {
+func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape record.RefreshToken) *record.RefreshToken {
 	t.Helper()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
@@ -506,11 +506,11 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape models.RefreshTok
 // the authorization request carried no challenge: both NullStrings at their zero value,
 // which is Valid:false. It returns the error rather than requiring success, because being
 // refused is the assertion on one side of this migration.
-func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *models.Client,
-	user *models.User, out *models.Code) error {
+func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.Client,
+	user *record.User, out *record.Code) error {
 	t.Helper()
 
-	code := &models.Code{
+	code := &record.Code{
 		CodeHash:            "hash-" + fake.UUID(),
 		ClientId:            client.Id,
 		UserId:              user.Id,
@@ -531,7 +531,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *models.C
 	return err
 }
 
-func readCode000039(t *testing.T, h *isolatedDB, id int64) *models.Code {
+func readCode000039(t *testing.T, h *isolatedDB, id int64) *record.Code {
 	t.Helper()
 	code, err := h.DB.GetCodeById(context.Background(), nil, id)
 	require.NoErrorf(t, err, "read code %d back", id)
@@ -539,9 +539,9 @@ func readCode000039(t *testing.T, h *isolatedDB, id int64) *models.Code {
 	return code
 }
 
-func readRefreshToken000039(t *testing.T, h *isolatedDB, id int64) *models.RefreshToken {
+func readRefreshToken000039(t *testing.T, h *isolatedDB, id int64) *record.RefreshToken {
 	t.Helper()
-	token := &models.RefreshToken{Id: id}
+	token := &record.RefreshToken{Id: id}
 	read := sqlbuilder.NewSelectBuilder()
 	read.Select(refreshTokenColumns000039...).From("refresh_tokens").Where(read.Equal("id", id))
 	q, args := read.BuildWithFlavor(flavor000039())

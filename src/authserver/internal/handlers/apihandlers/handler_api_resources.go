@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -22,12 +22,12 @@ import (
 
 // resourcesDatabase is what the resource endpoints need: the resource row.
 type resourcesDatabase interface {
-	CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
+	CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
 	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
-	GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Resource, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
-	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
-	UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
+	GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Resource, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
+	UpdateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
 }
 
 func HandleResourcesGet(
@@ -102,7 +102,7 @@ func HandleResourceCreatePost(
 		}
 
 		// Create resource
-		resource := &models.Resource{
+		resource := &record.Resource{
 			ResourceIdentifier: strings.TrimSpace(createReq.ResourceIdentifier),
 			Description:        strings.TrimSpace(createReq.Description),
 		}

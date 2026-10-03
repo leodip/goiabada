@@ -8,9 +8,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -30,7 +30,7 @@ const revokedRefreshTokenMessage = "This refresh token has been revoked."
 // token set. Its three refusals are the redemption's: a replayed token, audited when containment
 // revoked anything; a token whose issuing flow is off for the client (#250); and a lost claim.
 func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Request,
-	settings *models.Settings, grant *protocolvalidation.RefreshTokenGrant) {
+	settings *record.Settings, grant *protocolvalidation.RefreshTokenGrant) {
 
 	tokenResponse, outcome, err := tr.issuer.IssueRefreshTokenGrant(r.Context(), settings, &issuance.RefreshTokenGrantInput{
 		Client:         grant.Client,

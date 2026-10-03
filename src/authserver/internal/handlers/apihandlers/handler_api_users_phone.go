@@ -13,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/phonecountries"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -50,8 +50,8 @@ func HandlePhoneCountriesGet() http.HandlerFunc {
 
 // usersPhoneDatabase is what the administrator's user phone endpoint needs: the user row.
 type usersPhoneDatabase interface {
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleUserPhonePut - PUT /api/v1/admin/users/{id}/phone

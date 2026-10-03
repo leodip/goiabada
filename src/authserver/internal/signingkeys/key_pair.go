@@ -5,7 +5,7 @@ package signingkeys
 
 import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/rsakey"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
@@ -17,7 +17,7 @@ import (
 //
 // It is the one path to a key pair: the rotator's replacement key and the seeder's first two are
 // all built here, where each used to assemble its own (#424).
-func NewKeyPair(dataCipher *encryption.DataCipher, state models.KeyState, bits int) (*models.KeyPair, error) {
+func NewKeyPair(dataCipher *encryption.DataCipher, state record.KeyState, bits int) (*record.KeyPair, error) {
 	kid := uuid.New()
 
 	material, err := rsakey.Generate(bits, kid)
@@ -30,7 +30,7 @@ func NewKeyPair(dataCipher *encryption.DataCipher, state models.KeyState, bits i
 		return nil, errs.Wrap(err, "unable to encrypt the private key")
 	}
 
-	return &models.KeyPair{
+	return &record.KeyPair{
 		State:             state.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",

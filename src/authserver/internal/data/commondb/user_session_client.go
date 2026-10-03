@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
+func (d *Database) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *Database) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, user
 	userSessionClient.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userSessionClient.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(record.UserSessionClient)).
 		For(d.Flavor)
 
 	insertBuilder := userSessionClientStruct.WithoutTag("pk").InsertInto("user_session_clients", userSessionClient)
@@ -35,7 +35,7 @@ func (d *Database) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-func (d *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
+func (d *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error {
 
 	if userSessionClient.Id == 0 {
 		return errs.New("can't update userSessionClient with id 0")
@@ -44,7 +44,7 @@ func (d *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, user
 	originalUpdatedAt := userSessionClient.UpdatedAt
 	userSessionClient.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(record.UserSessionClient)).
 		For(d.Flavor)
 
 	updateBuilder := userSessionClientStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_session_clients", userSessionClient)
@@ -61,7 +61,7 @@ func (d *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, user
 }
 
 func (d *Database) getUserSessionClientCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
+	userSessionClientStruct *sqlbuilder.Struct) (*record.UserSessionClient, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -70,7 +70,7 @@ func (d *Database) getUserSessionClientCommon(ctx context.Context, tx *sql.Tx, s
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userSessionClient models.UserSessionClient
+	var userSessionClient record.UserSessionClient
 	if rows.Next() {
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
@@ -86,7 +86,7 @@ func (d *Database) getUserSessionClientCommon(ctx context.Context, tx *sql.Tx, s
 	return nil, nil
 }
 
-func (d *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
+func (d *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error {
 
 	if userSessionClients == nil {
 		return nil
@@ -102,7 +102,7 @@ func (d *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx
 		return errs.Wrap(err, "unable to get clients by ids")
 	}
 
-	clientsMap := make(map[int64]models.Client)
+	clientsMap := make(map[int64]record.Client)
 	for _, client := range clients {
 		clientsMap[client.Id] = client
 	}
@@ -118,16 +118,16 @@ func (d *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
+func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error) {
 
 	if len(userSessionIds) == 0 {
 		return nil, nil
 	}
 
-	var userSessionClients []models.UserSessionClient
+	var userSessionClients []record.UserSessionClient
 
 	err := forEachIdBatch(userSessionIds, func(batch []int64) error {
-		userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+		userSessionClientStruct := sqlbuilder.NewStruct(new(record.UserSessionClient)).
 			For(d.Flavor)
 
 		selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -141,7 +141,7 @@ func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var userSessionClient models.UserSessionClient
+			var userSessionClient record.UserSessionClient
 			addr := userSessionClientStruct.Addr(&userSessionClient)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -163,9 +163,9 @@ func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx
 	return userSessionClients, nil
 }
 
-func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
+func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error) {
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(record.UserSessionClient)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -178,9 +178,9 @@ func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx 
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userSessionClients []models.UserSessionClient
+	var userSessionClients []record.UserSessionClient
 	for rows.Next() {
-		var userSessionClient models.UserSessionClient
+		var userSessionClient record.UserSessionClient
 		addr := userSessionClientStruct.Addr(&userSessionClient)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -196,16 +196,16 @@ func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx 
 	return userSessionClients, nil
 }
 
-func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
+func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]record.UserSessionClient, error) {
 
 	if len(userSessionClientIds) == 0 {
 		return nil, nil
 	}
 
-	var userSessionClients []models.UserSessionClient
+	var userSessionClients []record.UserSessionClient
 
 	err := forEachIdBatch(userSessionClientIds, func(batch []int64) error {
-		userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+		userSessionClientStruct := sqlbuilder.NewStruct(new(record.UserSessionClient)).
 			For(d.Flavor)
 
 		selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -219,7 +219,7 @@ func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, u
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var userSessionClient models.UserSessionClient
+			var userSessionClient record.UserSessionClient
 			addr := userSessionClientStruct.Addr(&userSessionClient)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -241,9 +241,9 @@ func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, u
 	return userSessionClients, nil
 }
 
-func (d *Database) GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
+func (d *Database) GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*record.UserSessionClient, error) {
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+	userSessionClientStruct := sqlbuilder.NewStruct(new(record.UserSessionClient)).
 		For(d.Flavor)
 
 	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
@@ -259,7 +259,7 @@ func (d *Database) GetUserSessionClientById(ctx context.Context, tx *sql.Tx, use
 
 func (d *Database) DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+	clientStruct := sqlbuilder.NewStruct(new(record.UserSessionClient)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("user_session_clients")

@@ -20,8 +20,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -64,8 +64,8 @@ const accountEmailRequestId = "req-email-0001"
 
 // accountEmailSettings are the settings middleware.Settings puts on the request, with SMTP on, so
 // every case that expects no notice is asserting it where one could have been sent.
-func accountEmailSettings() *models.Settings {
-	return &models.Settings{
+func accountEmailSettings() *record.Settings {
+	return &record.Settings{
 		AppName:       "TestApp",
 		SMTPEnabled:   true,
 		SMTPHost:      "smtp.example.com",
@@ -125,7 +125,7 @@ func accountEmailPutRequest(t *testing.T) *http.Request {
 func stubAccountEmailUpdate(t *testing.T, database *mocks_data.Database, updateErr error) {
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-		Return(&models.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
+		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
 			PasswordHash: accountEmailTestPasswordHash(t)}, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, emailTestAddress).Return(nil, nil).Once()
 	database.On("TrySetUserEmail", mock.Anything, mock.Anything, emailTestUserId, "old@example.com", false, emailTestAddress).
@@ -141,7 +141,7 @@ func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-		Return(&models.User{
+		Return(&record.User{
 			Id:                             emailTestUserId,
 			Subject:                        emailTestSubject,
 			Enabled:                        true,
@@ -262,7 +262,7 @@ func TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			jobs := &heldJobs{}
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-				Return(&models.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
+				Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
 					PasswordHash: accountEmailTestPasswordHash(t)}, nil).Once()
 			credentials := &countingCredentials{}
 
@@ -292,7 +292,7 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-		Return(&models.User{
+		Return(&record.User{
 			Id:                             emailTestUserId,
 			Subject:                        emailTestSubject,
 			Enabled:                        true,
@@ -324,9 +324,9 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 
 // changingUser is the caller's row as the handler loads it for a change from old@example.com to
 // new@example.com, in the given locale.
-func changingUser(t *testing.T, locale string) *models.User {
+func changingUser(t *testing.T, locale string) *record.User {
 	t.Helper()
-	return &models.User{
+	return &record.User{
 		Id:            emailTestUserId,
 		Subject:       emailTestSubject,
 		Enabled:       true,
@@ -342,7 +342,7 @@ func changingUser(t *testing.T, locale string) *models.User {
 // stubSuccessfulChange answers a change from old@example.com to new@example.com: the reads, the
 // narrow write, and the one updated_own_email entry. The audit expectation is the only one the
 // logger has, so an entry the notice wrote of its own would fail the case.
-func stubSuccessfulChange(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, user *models.User) {
+func stubSuccessfulChange(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, user *record.User) {
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).Return(user, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()

@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -18,13 +18,13 @@ import (
 // clientPermissionsDatabase is what the client permission endpoints need: the client's grants and
 // the catalogue they are granted from.
 type clientPermissionsDatabase interface {
-	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error
+	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
 	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
-	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.ClientPermission, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
-	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -140,8 +140,8 @@ func HandleClientPermissionsPut(
 			}
 		}
 
-		grantKey := func(cp models.ClientPermission) int64 { return cp.PermissionId }
-		grantId := func(cp models.ClientPermission) int64 { return cp.Id }
+		grantKey := func(cp record.ClientPermission) int64 { return cp.PermissionId }
+		grantId := func(cp record.ClientPermission) int64 { return cp.Id }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true, where
 		// the autocommitted writes this replaced could leave a grant made or a revocation done under
@@ -172,7 +172,7 @@ func HandleClientPermissionsPut(
 				}
 			}
 			for _, permissionId := range insert {
-				if createErr := database.CreateClientPermission(r.Context(), tx, &models.ClientPermission{
+				if createErr := database.CreateClientPermission(r.Context(), tx, &record.ClientPermission{
 					ClientId:     client.Id,
 					PermissionId: permissionId,
 				}); createErr != nil {

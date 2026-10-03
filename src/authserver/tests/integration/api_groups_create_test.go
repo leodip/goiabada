@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -142,7 +142,7 @@ func TestHandleGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a group first
-	existingGroup := &models.Group{
+	existingGroup := &record.Group{
 		GroupIdentifier:      "existing-group-" + fake.LetterN(6),
 		Description:          "Existing Group",
 		IncludeInIdToken:     true,

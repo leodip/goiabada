@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -235,7 +235,7 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 func seedUserEmail000047(t *testing.T, h *isolatedDB, n int, raw string) int64 {
 	t.Helper()
 
-	user := &models.User{
+	user := &record.User{
 		Enabled:      true,
 		Subject:      fmt.Sprintf("00000000-0000-0000-0000-0000000470%02d", n),
 		Username:     fmt.Sprintf("mig47user%d", n),
@@ -267,7 +267,7 @@ func assertEmailIndex000047(t *testing.T, h *isolatedDB, phase string) {
 		"[%s] idx_email must still be UNIQUE: it is what makes an email case collision impossible to create, and this migration writes to the column it covers",
 		phase)
 
-	taken := &models.User{
+	taken := &record.User{
 		Enabled:      true,
 		Subject:      "00000000-0000-0000-0000-000000047099",
 		Username:     "mig47dup",
@@ -303,11 +303,11 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	m, err := seed.NewMigrator(context.Background())
 	require.NoError(t, err)
 	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails000047), "step the throwaway database to 000046")
-	require.NoError(t, seed.CreateUser(context.Background(), nil, &models.User{
+	require.NoError(t, seed.CreateUser(context.Background(), nil, &record.User{
 		Enabled: true, Subject: "00000000-0000-0000-0000-000000047101",
 		Username: "mig47start0", Email: "Startup@example.com", PasswordHash: "not-a-real-hash",
 	}))
-	require.NoError(t, seed.CreateUser(context.Background(), nil, &models.User{
+	require.NoError(t, seed.CreateUser(context.Background(), nil, &record.User{
 		Enabled: true, Subject: "00000000-0000-0000-0000-000000047102",
 		Username: "mig47start1", Email: "startup@example.com", PasswordHash: "not-a-real-hash",
 	}))

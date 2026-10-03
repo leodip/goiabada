@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +53,7 @@ func refreshWithScope(t *testing.T, httpClient *http.Client, clientIdentifier, c
 // enableROPCGlobally turns the resource owner password credentials grant on until the test ends.
 func enableROPCGlobally(t *testing.T) {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 }
 
 // TestAuthorize_OfflineAccessIsCaseSensitive sends each spelling to the authorization endpoint
@@ -152,7 +152,7 @@ func TestClientCredentials_OfflineAccessIsCaseSensitive(t *testing.T) {
 	clientSecret := fake.Password(32)
 	encryptedSecret, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "cc-offline-case-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,

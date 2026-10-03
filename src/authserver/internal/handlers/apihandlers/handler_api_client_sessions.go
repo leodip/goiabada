@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -22,10 +22,10 @@ import (
 type clientSessionsDatabase interface {
 	sessionDetailsDatabase
 
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
-	GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)
-	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]models.User, error)
-	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]record.UserSession, int, error)
+	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error)
+	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
 // HandleClientSessionsGet - GET /api/v1/admin/clients/{id}/sessions
@@ -161,7 +161,7 @@ func sessionOwners(ctx context.Context, database clientSessionsDatabase, session
 		return nil, errs.Wrap(err, "unable to get users by ids")
 	}
 
-	ordered := make([]models.User, 0, len(userIds))
+	ordered := make([]record.User, 0, len(userIds))
 	for _, userId := range userIds {
 		user, ok := usersById[userId]
 		if !ok {

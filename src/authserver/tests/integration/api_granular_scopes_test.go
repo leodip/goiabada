@@ -9,19 +9,19 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
 // createClientWithGranularScope creates a client with a specific granular permission scope
 // and returns an access token for that client
-func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (string, *models.Client) {
+func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (string, *record.Client) {
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "granular-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
@@ -39,7 +39,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
 	assert.NoError(t, err)
 
-	var targetPermission *models.Permission
+	var targetPermission *record.Permission
 	for idx, permission := range permissions {
 		if permission.PermissionIdentifier == permissionIdentifier {
 			targetPermission = &permissions[idx]
@@ -49,7 +49,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 	assert.NotNil(t, targetPermission, "Should find permission: %s", permissionIdentifier)
 
 	// Assign permission to client
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: targetPermission.Id,
 	})
@@ -84,7 +84,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	}()
 
 	// Create a test user for the tests
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
@@ -138,7 +138,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 	}()
 
 	// Create a test client for the tests
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
@@ -233,7 +233,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	}()
 
 	// Create a test user for the tests
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
@@ -246,7 +246,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	}()
 
 	// Create a test client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
@@ -292,7 +292,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	}()
 
 	// Create a test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
@@ -305,7 +305,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	}()
 
 	// Create a test client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
@@ -351,7 +351,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 	}()
 
 	// Create a test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
@@ -396,7 +396,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	}()
 
 	// Create a test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
@@ -409,7 +409,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	}()
 
 	// Create a test client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
@@ -605,7 +605,7 @@ func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
 // require users scope
 func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 	// Create a test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:   fake.UUID(),
 		Enabled:   true,
 		Email:     fake.Email(),
@@ -650,7 +650,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 // require clients scope
 func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 	// Create a test client
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}

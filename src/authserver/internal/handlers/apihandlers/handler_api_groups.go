@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -23,12 +23,12 @@ import (
 // decides whether it can go.
 type groupsDatabase interface {
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
-	CreateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error
+	CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
-	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]models.Group, error)
-	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*models.Group, error)
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
-	UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error
+	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]record.Group, error)
+	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*record.Group, error)
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 }
 
 func HandleGroupsGet(
@@ -116,7 +116,7 @@ func HandleGroupCreatePost(
 		}
 
 		// Create the group
-		group := &models.Group{
+		group := &record.Group{
 			GroupIdentifier:      strings.TrimSpace(createReq.GroupIdentifier),
 			Description:          strings.TrimSpace(createReq.Description),
 			IncludeInIdToken:     createReq.IncludeInIdToken,
@@ -173,7 +173,7 @@ func HandleGroupGet(
 			return
 		}
 
-		memberCounts, err := countGroupMembers(r.Context(), database, []models.Group{*group})
+		memberCounts, err := countGroupMembers(r.Context(), database, []record.Group{*group})
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -279,7 +279,7 @@ func HandleGroupUpdatePut(
 			"loggedInUser":    callerSubject(r),
 		})
 
-		memberCounts, err := countGroupMembers(r.Context(), database, []models.Group{*group})
+		memberCounts, err := countGroupMembers(r.Context(), database, []record.Group{*group})
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

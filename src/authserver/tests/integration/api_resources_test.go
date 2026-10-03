@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -160,7 +160,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	encSecret, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "nonadmin-test-client-" + fake.UUID()[:8],
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
@@ -181,7 +181,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
 	assert.NoError(t, err)
 
-	var selected *models.Permission
+	var selected *record.Permission
 	for i := range perms {
 		if perms[i].PermissionIdentifier == permissionIdentifier {
 			selected = &perms[i]
@@ -191,7 +191,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	assert.NotNil(t, selected, "permission should exist")
 
 	// Assign permission to client
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: selected.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: selected.Id})
 	assert.NoError(t, err)
 
 	// Request an access token with that scope
@@ -237,7 +237,7 @@ func TestAPIResourcesGet_ManyResources(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create multiple test resources with different identifiers for sorting test
-	var testResources []*models.Resource
+	var testResources []*record.Resource
 	resourceNames := []string{"zebra-resource", "alpha-resource", "beta-resource"}
 
 	for _, name := range resourceNames {

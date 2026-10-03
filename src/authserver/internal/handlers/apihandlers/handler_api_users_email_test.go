@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -60,9 +60,9 @@ func adminEmailPutRequest(t *testing.T) *http.Request {
 // address no other user holds, and the write with updateErr.
 func stubAdminEmailUpdate(database *mocks_data.Database, updateErr error) {
 	database.On("GetUserById", mock.Anything, mock.Anything, emailTestUserId).
-		Return(&models.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com"}, nil).Once()
+		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com"}, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-		Return(&models.User{Id: emailTestUserId, Subject: emailTestSubject}, nil).Once()
+		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject}, nil).Once()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, emailTestAddress).Return(nil, nil).Once()
 	database.On("UpdateUser", mock.Anything, mock.Anything, mock.Anything).Return(updateErr).Once()
 }

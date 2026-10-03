@@ -3,7 +3,7 @@ package handlers
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,7 +72,7 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 		case issuanceFactUser:
 			facts.userLoaded = true
 			if !world.noUser {
-				facts.user = &models.User{
+				facts.user = &record.User{
 					Subject:             world.userSubject,
 					Enabled:             !world.userDisabled,
 					AuthStateGeneration: ceremonyGeneration + world.generationDrift,

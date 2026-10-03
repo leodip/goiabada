@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // The three conditional writes behind the self-service email change, the verification send and
@@ -22,7 +22,7 @@ import (
 
 // seedEmailState puts a fresh user in the verification state a case starts from, and returns the
 // row as stored.
-func seedEmailState(t *testing.T, verified bool, code []byte, issuedAt sql.NullTime) *models.User {
+func seedEmailState(t *testing.T, verified bool, code []byte, issuedAt sql.NullTime) *record.User {
 	t.Helper()
 	user := createTestUser(t)
 	user.EmailVerified = verified
@@ -97,11 +97,11 @@ const (
 func TestTrySetUserEmail_RefusesARowThatMovedSinceItWasRead(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
-		fromEmail    func(user *models.User) string
+		fromEmail    func(user *record.User) string
 		fromVerified bool
 	}{
-		{"the address moved", func(*models.User) string { return "elsewhere_" + fake.Email() }, true},
-		{"the verified flag moved", func(user *models.User) string { return user.Email }, false},
+		{"the address moved", func(*record.User) string { return "elsewhere_" + fake.Email() }, true},
+		{"the verified flag moved", func(user *record.User) string { return user.Email }, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			user := seedEmailState(t, true, []byte("pending"), issuedAgo(time.Minute))

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,13 +22,13 @@ func TestCors_TrailingSlashUsesTheSamePolicy(t *testing.T) {
 	})
 
 	t.Run("database gated userinfo uses a registered origin", func(t *testing.T) {
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "cors-slash-" + strings.ToLower(fake.LetterN(8)),
 			Enabled:          true,
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
 		defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
-		require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &models.WebOrigin{
+		require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{
 			ClientId: client.Id,
 			Origin:   origin,
 		}))

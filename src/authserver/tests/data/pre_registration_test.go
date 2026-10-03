@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreatePreRegistration(t *testing.T) {
@@ -118,11 +118,11 @@ func TestDeletePreRegistration(t *testing.T) {
 	}
 }
 
-func createTestPreRegistration(t *testing.T) *models.PreRegistration {
+func createTestPreRegistration(t *testing.T) *record.PreRegistration {
 	// The code hash is unique per row and never empty, which is what the production
 	// caller does: verification_code_hash is UNIQUE, so two rows sharing the '' default
 	// would be refused by the index (#112).
-	preReg := &models.PreRegistration{
+	preReg := &record.PreRegistration{
 		Email:                     fake.Email(),
 		PasswordHash:              fake.Password(16),
 		VerificationCodeEncrypted: []byte(fake.UUID()),
@@ -136,7 +136,7 @@ func createTestPreRegistration(t *testing.T) *models.PreRegistration {
 	return preReg
 }
 
-func validatePreRegistration(t *testing.T, expected, actual *models.PreRegistration) {
+func validatePreRegistration(t *testing.T, expected, actual *record.PreRegistration) {
 	if actual.Id != expected.Id {
 		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
 	}
@@ -208,7 +208,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 	deleteDormant()
 	t.Cleanup(deleteDormant)
 
-	dormant := &models.PreRegistration{
+	dormant := &record.PreRegistration{
 		Email:        dormantEmail,
 		PasswordHash: fake.Password(16),
 	}
@@ -248,7 +248,7 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 
 	tx := beginTx(t)
 
-	preReg := &models.PreRegistration{
+	preReg := &record.PreRegistration{
 		Email:                     fake.Email(),
 		PasswordHash:              fake.Password(16),
 		VerificationCodeEncrypted: []byte(fake.UUID()),

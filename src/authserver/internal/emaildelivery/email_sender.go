@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
 )
@@ -74,7 +74,7 @@ type SMTPConfig struct {
 }
 
 // SMTPConfigFromSettings copies the relay's fields off the settings row.
-func SMTPConfigFromSettings(settings *models.Settings) SMTPConfig {
+func SMTPConfigFromSettings(settings *record.Settings) SMTPConfig {
 	return SMTPConfig{
 		Host:              settings.SMTPHost,
 		Port:              settings.SMTPPort,

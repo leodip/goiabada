@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -41,15 +41,15 @@ var rotateTx = &sql.Tx{}
 
 // signingKey builds a key_pairs row in the given state. Only Id and State matter here: nothing in
 // this file reads key material.
-func signingKey(id int64, state models.KeyState) models.KeyPair {
-	return models.KeyPair{Id: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
+func signingKey(id int64, state record.KeyState) record.KeyPair {
+	return record.KeyPair{Id: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
 }
 
 // stubRotateRead registers the transaction the rotator opens through RunInTransaction and the
 // classify read inside it. The commit and the rollback are the helper's and never reach the mock;
 // the returned stub records what the body handed the helper, which is how the refusal cases below
 // assert that nothing was committed.
-func stubRotateRead(database *mocks_data.Database, keys []models.KeyPair) *mocks_data.RunInTransactionStub {
+func stubRotateRead(database *mocks_data.Database, keys []record.KeyPair) *mocks_data.RunInTransactionStub {
 	stub := mocks_data.ExpectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotateTx).Return(keys, nil).Once()
 	return stub
@@ -76,18 +76,18 @@ func TestHandleSettingsKeysRotatePost_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	stub := stubRotateRead(database, []models.KeyPair{
-		signingKey(1, models.KeyStatePrevious),
-		signingKey(2, models.KeyStateCurrent),
-		signingKey(3, models.KeyStateNext),
+	stub := stubRotateRead(database, []record.KeyPair{
+		signingKey(1, record.KeyStatePrevious),
+		signingKey(2, record.KeyStateCurrent),
+		signingKey(3, record.KeyStateNext),
 	})
 	database.On("DeleteKeyPair", mock.Anything, rotateTx, int64(1)).Return(nil).Once()
 	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(2),
-		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(true, nil).Once()
+		record.KeyStateCurrent.String(), record.KeyStatePrevious.String()).Return(true, nil).Once()
 	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(3),
-		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
-	database.On("CreateKeyPair", mock.Anything, rotateTx, mock.MatchedBy(func(kp *models.KeyPair) bool {
-		return kp.State == models.KeyStateNext.String()
+		record.KeyStateNext.String(), record.KeyStateCurrent.String()).Return(true, nil).Once()
+	database.On("CreateKeyPair", mock.Anything, rotateTx, mock.MatchedBy(func(kp *record.KeyPair) bool {
+		return kp.State == record.KeyStateNext.String()
 	})).Return(nil).Once()
 
 	var payload map[string]interface{}
@@ -115,13 +115,13 @@ func TestHandleSettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	stub := stubRotateRead(database, []models.KeyPair{
-		signingKey(2, models.KeyStateCurrent),
-		signingKey(3, models.KeyStateNext),
+	stub := stubRotateRead(database, []record.KeyPair{
+		signingKey(2, record.KeyStateCurrent),
+		signingKey(3, record.KeyStateNext),
 	})
 	// The compare-and-set transitions no row: another rotation already moved this key.
 	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(2),
-		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(false, nil).Once()
+		record.KeyStateCurrent.String(), record.KeyStatePrevious.String()).Return(false, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
@@ -147,9 +147,9 @@ func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	stub := stubRotateRead(database, []models.KeyPair{
-		signingKey(1, models.KeyStatePrevious),
-		signingKey(2, models.KeyStateCurrent),
+	stub := stubRotateRead(database, []record.KeyPair{
+		signingKey(1, record.KeyStatePrevious),
+		signingKey(2, record.KeyStateCurrent),
 	})
 
 	rr := httptest.NewRecorder()
@@ -189,7 +189,7 @@ func TestHandleSettingsKeysRotatePost_InternalError(t *testing.T) {
 
 	mocks_data.ExpectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotateTx).
-		Return([]models.KeyPair(nil), assert.AnError).Once()
+		Return([]record.KeyPair(nil), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
 	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
@@ -212,37 +212,37 @@ func TestHandleSettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
 
 	testCases := []struct {
 		name  string
-		given []models.KeyState
+		given []record.KeyState
 		want  []string
 		why   string
 	}{
 		{
 			name:  "reversed",
-			given: []models.KeyState{models.KeyStatePrevious, models.KeyStateCurrent, models.KeyStateNext},
+			given: []record.KeyState{record.KeyStatePrevious, record.KeyStateCurrent, record.KeyStateNext},
 			want:  []string{"next", "current", "previous"},
 			why:   "the full set, arriving backwards",
 		},
 		{
 			name:  "next last, two previous keys",
-			given: []models.KeyState{models.KeyStatePrevious, models.KeyStatePrevious, models.KeyStateCurrent, models.KeyStateNext},
+			given: []record.KeyState{record.KeyStatePrevious, record.KeyStatePrevious, record.KeyStateCurrent, record.KeyStateNext},
 			want:  []string{"next", "current", "previous", "previous"},
 			why:   "every previous key is kept, after the single next and current",
 		},
 		{
 			name:  "current first",
-			given: []models.KeyState{models.KeyStateCurrent, models.KeyStateNext, models.KeyStatePrevious},
+			given: []record.KeyState{record.KeyStateCurrent, record.KeyStateNext, record.KeyStatePrevious},
 			want:  []string{"next", "current", "previous"},
 			why:   "next is hoisted above current",
 		},
 		{
 			name:  "no next key, which is the state a refused rotation leaves",
-			given: []models.KeyState{models.KeyStatePrevious, models.KeyStateCurrent},
+			given: []record.KeyState{record.KeyStatePrevious, record.KeyStateCurrent},
 			want:  []string{"current", "previous"},
 			why:   "an absent state contributes no row rather than an empty one",
 		},
 		{
 			name:  "one key only",
-			given: []models.KeyState{models.KeyStateCurrent},
+			given: []record.KeyState{record.KeyStateCurrent},
 			want:  []string{"current"},
 			why:   "a freshly seeded deployment before its first rotation",
 		},
@@ -258,7 +258,7 @@ func TestHandleSettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 
-			keys := make([]models.KeyPair, 0, len(tc.given))
+			keys := make([]record.KeyPair, 0, len(tc.given))
 			for i, state := range tc.given {
 				keys = append(keys, signingKey(int64(i+1), state))
 			}

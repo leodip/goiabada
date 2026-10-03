@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -15,7 +15,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowDisplayName true with DisplayName set - should use DisplayName", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
@@ -37,7 +37,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowDisplayName true but DisplayName empty - should fallback to ClientIdentifier", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "",
@@ -59,7 +59,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowDisplayName false - should fallback to ClientIdentifier", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
@@ -81,7 +81,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowLogo true and client has logo - should set HasLogo and LogoURL", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         true,
@@ -104,7 +104,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowLogo true but client does not have logo - should not set HasLogo", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         true,
@@ -127,7 +127,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowLogo false - should not call ClientHasLogo", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         false,
@@ -148,7 +148,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowDescription true with Description set - should include Description", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			Description:      "This is a great app",
@@ -170,7 +170,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowDescription true but Description empty - should not include Description", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			Description:      "",
@@ -192,7 +192,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowDescription false - should not include Description", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			Description:      "This is a great app",
@@ -214,7 +214,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowWebsiteURL true with WebsiteURL set - should include WebsiteURL", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			WebsiteURL:       "https://example.com",
@@ -236,7 +236,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowWebsiteURL true but WebsiteURL empty - should not include WebsiteURL", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			WebsiteURL:       "",
@@ -258,7 +258,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ShowWebsiteURL false - should not include WebsiteURL", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			WebsiteURL:       "https://example.com",
@@ -280,7 +280,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("All fields enabled and populated - should include all", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
@@ -309,7 +309,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("All fields disabled - should still show ClientIdentifier", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
@@ -336,7 +336,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("CreatedViaDCR with a Description - getClientDisplayInfo is unaffected by the column", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "dcr_a3f9e1b2",
 			Description:      "Payroll Portal",
@@ -356,7 +356,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 	t.Run("ClientHasLogo returns error - should default to false and log warning", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         true,
@@ -385,8 +385,8 @@ func TestGetClientDisplayInfo(t *testing.T) {
 // is the situation the rule exists for: the client picked that string itself, so it is shown as a
 // claim rather than as something this server vouched for (#108).
 func TestConsentClientName(t *testing.T) {
-	base := func() *models.Client {
-		return &models.Client{
+	base := func() *record.Client {
+		return &record.Client{
 			ClientIdentifier: "dcr_a3f9e1b2",
 			Description:      "Payroll Portal",
 			CreatedViaDCR:    true,
@@ -395,21 +395,21 @@ func TestConsentClientName(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		mutate         func(c *models.Client)
+		mutate         func(c *record.Client)
 		wantName       string
 		wantUnverified bool
 		why            string
 	}{
 		{
 			name:           "self-registered with a self-asserted name",
-			mutate:         func(c *models.Client) {},
+			mutate:         func(c *record.Client) {},
 			wantName:       "Payroll Portal",
 			wantUnverified: true,
 			why:            "the base case: the client named itself, so the name is a claim",
 		},
 		{
 			name:           "self-registered with no name asserted",
-			mutate:         func(c *models.Client) { c.Description = "" },
+			mutate:         func(c *record.Client) { c.Description = "" },
 			wantName:       "dcr_a3f9e1b2",
 			wantUnverified: false,
 			why: "there is nothing attacker-supplied on the page, so there is nothing to mark " +
@@ -417,7 +417,7 @@ func TestConsentClientName(t *testing.T) {
 		},
 		{
 			name:           "a description on a client that did not register itself",
-			mutate:         func(c *models.Client) { c.CreatedViaDCR = false },
+			mutate:         func(c *record.Client) { c.CreatedViaDCR = false },
 			wantName:       "dcr_a3f9e1b2",
 			wantUnverified: false,
 			why: "keep this: it fails if the marking is driven by Description rather than by the " +
@@ -426,7 +426,7 @@ func TestConsentClientName(t *testing.T) {
 		},
 		{
 			name: "an administrator display name on a self-registered client",
-			mutate: func(c *models.Client) {
+			mutate: func(c *record.Client) {
 				c.ShowDisplayName = true
 				c.DisplayName = "Acme Payroll"
 			},
@@ -437,7 +437,7 @@ func TestConsentClientName(t *testing.T) {
 		},
 		{
 			name: "display name enabled but empty on a self-registered client",
-			mutate: func(c *models.Client) {
+			mutate: func(c *record.Client) {
 				c.ShowDisplayName = true
 				c.DisplayName = ""
 			},
@@ -447,7 +447,7 @@ func TestConsentClientName(t *testing.T) {
 		},
 		{
 			name: "a display name that is not shown on a self-registered client",
-			mutate: func(c *models.Client) {
+			mutate: func(c *record.Client) {
 				c.ShowDisplayName = false
 				c.DisplayName = "Acme Payroll"
 			},
@@ -457,7 +457,7 @@ func TestConsentClientName(t *testing.T) {
 		},
 		{
 			name: "show description enabled on a self-registered client",
-			mutate: func(c *models.Client) {
+			mutate: func(c *record.Client) {
 				c.ShowDescription = true
 			},
 			wantName:       "Payroll Portal",
@@ -467,7 +467,7 @@ func TestConsentClientName(t *testing.T) {
 		},
 		{
 			name: "an ordinary client with nothing configured",
-			mutate: func(c *models.Client) {
+			mutate: func(c *record.Client) {
 				c.CreatedViaDCR = false
 				c.Description = ""
 				c.ClientIdentifier = "my-client"

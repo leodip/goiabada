@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,10 +21,10 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel2Mandatory, // Requires OTP
+		DefaultAcrLevel:  record.AcrLevel2Mandatory, // Requires OTP
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -43,7 +43,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -82,10 +82,10 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.AcrLevel2Mandatory,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -104,7 +104,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -144,10 +144,10 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.AcrLevel2Mandatory,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -166,7 +166,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -202,10 +202,10 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel2Mandatory, // Requires OTP
+		DefaultAcrLevel:  record.AcrLevel2Mandatory, // Requires OTP
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -217,7 +217,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -255,10 +255,10 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.AcrLevel2Mandatory,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -270,7 +270,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -309,10 +309,10 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.AcrLevel2Mandatory,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -324,7 +324,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

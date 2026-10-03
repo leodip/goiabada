@@ -13,15 +13,15 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
 // createTestClientForLogo creates a client for logo tests
-func createTestClientForLogo(t *testing.T) *models.Client {
+func createTestClientForLogo(t *testing.T) *record.Client {
 	t.Helper()
 	ident := "test-logo-" + strings.ToLower(fake.LetterN(10))
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: ident,
 		Description:      "Test client for logo tests",
 		Enabled:          true,

@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -40,8 +40,8 @@ func TestHandleUserConsentsGet_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
-	user := &models.User{Id: 7}
-	consents := []models.UserConsent{{Id: 1, UserId: 7, ClientId: 3, Scope: "openid"}}
+	user := &record.User{Id: 7}
+	consents := []record.UserConsent{{Id: 1, UserId: 7, ClientId: 3, Scope: "openid"}}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
 	req = setChiURLParam(req, "id", "7")
@@ -84,7 +84,7 @@ func TestHandleUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.User{Id: 7}, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{Id: 7}, nil)
 	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
@@ -97,13 +97,13 @@ func TestHandleUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
-	consents := []models.UserConsent{{Id: 1, UserId: 7, ClientId: 3}}
+	consents := []record.UserConsent{{Id: 1, UserId: 7, ClientId: 3}}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
 	req = setChiURLParam(req, "id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.User{Id: 7}, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{Id: 7}, nil)
 	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(consents, nil)
 	database.On("UserConsentsLoadClients", mock.Anything, (*sql.Tx)(nil), consents).Return(assert.AnError)
 
@@ -125,7 +125,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	req = setTokenContext(req, "admin-subject-1")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&record.UserConsent{Id: 5, UserId: 7}, nil)
 	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil)
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == int64(7) && details["consentId"] == int64(5) &&
@@ -165,7 +165,7 @@ func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "5")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&record.UserConsent{Id: 5, UserId: 7}, nil)
 	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)

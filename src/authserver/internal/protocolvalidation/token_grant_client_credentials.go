@@ -6,16 +6,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
 // ClientCredentialsGrant is a validated client credentials request: the authenticated client and
 // the scope it is granted, which is every permission it holds when the request named none.
 type ClientCredentialsGrant struct {
-	Client *models.Client
+	Client *record.Client
 	Scope  string
 }
 
@@ -23,7 +23,7 @@ func (*ClientCredentialsGrant) GrantType() oidc.GrantType { return oidc.GrantTyp
 
 // validateClientCredentialsGrant validates a client credentials request (RFC 6749 section 4.4.2)
 // for a client ValidateTokenRequest has already found and found enabled.
-func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, client *models.Client,
+func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, client *record.Client,
 	input *ValidateTokenRequestInput) (*ClientCredentialsGrant, error) {
 	if !client.ClientCredentialsEnabled {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
@@ -101,7 +101,7 @@ func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, c
 	}, nil
 }
 
-func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *models.Client) error {
+func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *record.Client) error {
 
 	if len(scope) == 0 {
 		return nil

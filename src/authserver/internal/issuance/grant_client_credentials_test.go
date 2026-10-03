@@ -6,7 +6,7 @@ import (
 	"time"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,7 +16,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 3600,
 	}
@@ -28,7 +28,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		client         *models.Client
+		client         *record.Client
 		scope          string
 		expectedScopes []string
 		expectedAud    interface{}
@@ -37,7 +37,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 	}{
 		{
 			name: "Single custom scope",
-			client: &models.Client{
+			client: &record.Client{
 				Id:               1,
 				ClientIdentifier: "test-client-1",
 			},
@@ -48,7 +48,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 		},
 		{
 			name: "Multiple custom scopes",
-			client: &models.Client{
+			client: &record.Client{
 				Id:               2,
 				ClientIdentifier: "test-client-2",
 			},
@@ -59,7 +59,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 		},
 		{
 			name: "Custom scopes with OIDC scopes (should be ignored)",
-			client: &models.Client{
+			client: &record.Client{
 				Id:               3,
 				ClientIdentifier: "test-client-3",
 			},
@@ -72,7 +72,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 			// The client's override wins over the setting for both expires_in and exp, as it does
 			// for every other grant (#437 decision 11).
 			name: "Client lifetime override",
-			client: &models.Client{
+			client: &record.Client{
 				Id:                       5,
 				ClientIdentifier:         "test-client-5",
 				TokenExpirationInSeconds: 900,
@@ -86,7 +86,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+			mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 				KeyIdentifier: "test-key-id",
 				PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 			}, nil)
@@ -127,21 +127,21 @@ func TestIssueClientCredentialsGrant_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 3600,
 	}
 
 	ctx := context.Background()
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               4,
 		ClientIdentifier: "test-client-4",
 	}
 
 	privateKeyBytes := getTestPrivateKey(t)
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)

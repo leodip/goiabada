@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ import (
 // on every application request, so a render reaches its template.
 func newRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
-	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
 
 // assertNoStore requires the two cache header fields every rendered page carries. Read off
@@ -243,7 +243,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		}
 		layoutHelper := New(layoutFS)
 		req := httptest.NewRequest("GET", "/", nil)
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
 			AppName:     "sentinel app",
 			UITheme:     "sentinel theme",
 			SMTPEnabled: true,
@@ -278,7 +278,7 @@ func TestRenderTemplateToBuffer_NilDataMap(t *testing.T) {
 		"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.urlPath}}{{end}}")},
 	}
 	req := httptest.NewRequest("GET", "/some/page", nil)
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{AppName: "sentinel app"}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "sentinel app"}))
 
 	buf, err := New(templateFS).RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", nil)
 

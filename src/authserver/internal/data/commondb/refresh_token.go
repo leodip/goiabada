@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 	refreshToken.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	refreshToken.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	insertBuilder := refreshTokenStruct.WithoutTag("pk").InsertInto("refresh_tokens", refreshToken)
@@ -35,7 +35,7 @@ func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 	return nil
 }
 
-func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 
 	if refreshToken.Id == 0 {
 		return errs.New("can't update refreshToken with id 0")
@@ -44,7 +44,7 @@ func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 	originalUpdatedAt := refreshToken.UpdatedAt
 	refreshToken.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	updateBuilder := refreshTokenStruct.WithoutTag("pk").WithoutTag("dont-update").Update("refresh_tokens", refreshToken)
@@ -160,7 +160,7 @@ func (d *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, fir
 }
 
 func (d *Database) getRefreshTokenCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
+	refreshTokenStruct *sqlbuilder.Struct) (*record.RefreshToken, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -169,7 +169,7 @@ func (d *Database) getRefreshTokenCommon(ctx context.Context, tx *sql.Tx, select
 	}
 	defer func() { _ = rows.Close() }()
 
-	var refreshToken models.RefreshToken
+	var refreshToken record.RefreshToken
 	if rows.Next() {
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
@@ -185,9 +185,9 @@ func (d *Database) getRefreshTokenCommon(ctx context.Context, tx *sql.Tx, select
 	return nil, nil
 }
 
-func (d *Database) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error) {
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
@@ -201,7 +201,7 @@ func (d *Database) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshT
 	return refreshToken, nil
 }
 
-func (d *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
@@ -226,7 +226,7 @@ func (d *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refresh
 
 // RefreshTokenLoadUser loads the User entity for ROPC flow refresh tokens.
 // For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
-func (d *Database) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
@@ -250,7 +250,7 @@ func (d *Database) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refresh
 
 // RefreshTokenLoadClient loads the Client entity for ROPC flow refresh tokens.
 // For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
-func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
@@ -272,9 +272,9 @@ func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refre
 	return nil
 }
 
-func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error) {
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
@@ -288,9 +288,9 @@ func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti str
 	return refreshToken, nil
 }
 
-func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error) {
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
@@ -303,9 +303,9 @@ func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, cod
 	}
 	defer func() { _ = rows.Close() }()
 
-	var refreshTokens []*models.RefreshToken
+	var refreshTokens []*record.RefreshToken
 	for rows.Next() {
-		var refreshToken models.RefreshToken
+		var refreshToken record.RefreshToken
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -328,13 +328,13 @@ func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, cod
 // linked code does). An empty sessionIdentifier returns an empty slice with
 // no error: the join would otherwise match every code with an empty
 // session_identifier and over-revoke.
-func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error) {
 
 	if sessionIdentifier == "" {
 		return nil, nil
 	}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
@@ -348,9 +348,9 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 	}
 	defer func() { _ = rows.Close() }()
 
-	var refreshTokens []*models.RefreshToken
+	var refreshTokens []*record.RefreshToken
 	for rows.Next() {
-		var refreshToken models.RefreshToken
+		var refreshToken record.RefreshToken
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -368,7 +368,7 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 
 func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	userConsentStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	deleteBuilder := userConsentStruct.DeleteFrom("refresh_tokens")
@@ -475,13 +475,13 @@ func (d *Database) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) e
 // Built as two UNION ALL branches rather than one join with an OR across the two
 // tables. The shapes are mutually exclusive, so the union cannot produce duplicates,
 // and each branch can use its own index where the OR would defeat both. (#106)
-func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error) {
 
 	if userId == 0 {
 		return nil, nil
 	}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	// Authorization code flow: the user is on the code, not the token.
@@ -500,9 +500,9 @@ func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, use
 	}
 	defer func() { _ = rows.Close() }()
 
-	var refreshTokens []*models.RefreshToken
+	var refreshTokens []*record.RefreshToken
 	for rows.Next() {
-		var refreshToken models.RefreshToken
+		var refreshToken record.RefreshToken
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -533,13 +533,13 @@ func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, use
 // Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: each
 // branch can use its own index where an OR across the two tables would defeat both.
 // (#245)
-func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error) {
 
 	if clientId == 0 {
 		return nil, nil
 	}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
 		For(d.Flavor)
 
 	// Authorization code flow: the client is on the code, not the token.
@@ -558,9 +558,9 @@ func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, c
 	}
 	defer func() { _ = rows.Close() }()
 
-	var refreshTokens []*models.RefreshToken
+	var refreshTokens []*record.RefreshToken
 	for rows.Next() {
-		var refreshToken models.RefreshToken
+		var refreshToken record.RefreshToken
 		addr := refreshTokenStruct.Addr(&refreshToken)
 		err = rows.Scan(addr...)
 		if err != nil {

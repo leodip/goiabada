@@ -4,7 +4,7 @@
 // It exists because that conversion was written twice -- once in
 // authserver/internal/handlers/handler_userinfo.go and once in
 // authserver/internal/issuance/token_issuer.go -- and the two copies had drifted in three places
-// that no test and no document named. Building the address claim sat on models.User besides,
+// that no test and no document named. Building the address claim sat on record.User besides,
 // which is a persistence record with no business constructing an OIDC claim (#387 decision 5).
 //
 // Two of the three divergences are inputs here, not merges. Each is observable on the wire, so
@@ -33,7 +33,7 @@
 // /userinfo's decision to answer at all -- together with iss, aud, exp, nonce and everything else
 // a token carries that is not read off the user row.
 //
-// Staying on models.User: FullName, which also names the user in the emails the auth server
+// Staying on record.User: FullName, which also names the user in the emails the auth server
 // sends. The birthdate claim's YYYY-MM-DD format has no reader but the claim, so it is written
 // here, as the claim construction it is (#424).
 //
@@ -49,7 +49,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // Database is what claim construction needs: the one row behind the picture claim.
@@ -73,21 +73,21 @@ const (
 	InclusionAccessToken
 )
 
-func (i Inclusion) includesGroup(group models.Group) bool {
+func (i Inclusion) includesGroup(group record.Group) bool {
 	if i == InclusionAccessToken {
 		return group.IncludeInAccessToken
 	}
 	return group.IncludeInIdToken
 }
 
-func (i Inclusion) includesUserAttribute(attribute models.UserAttribute) bool {
+func (i Inclusion) includesUserAttribute(attribute record.UserAttribute) bool {
 	if i == InclusionAccessToken {
 		return attribute.IncludeInAccessToken
 	}
 	return attribute.IncludeInIdToken
 }
 
-func (i Inclusion) includesGroupAttribute(attribute models.GroupAttribute) bool {
+func (i Inclusion) includesGroupAttribute(attribute record.GroupAttribute) bool {
 	if i == InclusionAccessToken {
 		return attribute.IncludeInAccessToken
 	}
@@ -119,7 +119,7 @@ type Mapper struct {
 // a transaction and reads on nil gets no error for it. sqlitedb has one connection, the read waits
 // for the connection the caller's transaction is holding until the context expires, and the
 // picture claim is silently dropped (#437). /userinfo runs in no transaction and passes nil.
-func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims jwt.MapClaims, user *models.User, scopes []string) {
+func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims jwt.MapClaims, user *record.User, scopes []string) {
 
 	if slices.Contains(scopes, "profile") {
 		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
@@ -162,7 +162,7 @@ func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims j
 // AddGroupClaims writes the groups claim when the scopes ask for it and at least one of the user's
 // groups carries this mapper's include flag. An empty result writes no claim rather than an empty
 // array, which is what both callers did before this package.
-func (m Mapper) AddGroupClaims(claims jwt.MapClaims, user *models.User, scopes []string) {
+func (m Mapper) AddGroupClaims(claims jwt.MapClaims, user *record.User, scopes []string) {
 	if !slices.Contains(scopes, "groups") {
 		return
 	}
@@ -181,7 +181,7 @@ func (m Mapper) AddGroupClaims(claims jwt.MapClaims, user *models.User, scopes [
 // AddAttributeClaims writes the attributes claim from the user's own attributes and then from the
 // attributes of every group the user belongs to, each filtered by this mapper's include flag. The
 // group pass runs second and therefore wins a key collision, as it did at both sites before.
-func (m Mapper) AddAttributeClaims(claims jwt.MapClaims, user *models.User, scopes []string) {
+func (m Mapper) AddAttributeClaims(claims jwt.MapClaims, user *record.User, scopes []string) {
 	if !slices.Contains(scopes, "attributes") {
 		return
 	}
@@ -215,8 +215,8 @@ func addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue strin
 }
 
 // hasAddress reports whether any of the six address columns holds more than whitespace. It was
-// models.User.HasAddress until #387: it exists to gate the address claim and has no other caller.
-func hasAddress(user *models.User) bool {
+// record.User.HasAddress until #387: it exists to gate the address claim and has no other caller.
+func hasAddress(user *record.User) bool {
 	return len(strings.TrimSpace(user.AddressLine1)) > 0 ||
 		len(strings.TrimSpace(user.AddressLine2)) > 0 ||
 		len(strings.TrimSpace(user.AddressLocality)) > 0 ||
@@ -226,14 +226,14 @@ func hasAddress(user *models.User) bool {
 }
 
 // addressClaim builds the OIDC address claim, a JSON object of the members OIDC Core 1.0 5.1.1
-// defines. It was models.User.GetAddressClaim until #387.
+// defines. It was record.User.GetAddressClaim until #387.
 //
 // Two shapes are kept verbatim rather than tidied, because both are observable by a client that
 // stores what it is given. street_address joins the two address lines with CRLF whether or not the
 // second one is set, so a user with one line has a trailing CRLF in that member; and formatted is
 // written only when the country is set, so an address without one carries the members but no
 // formatted rendering of them.
-func addressClaim(user *models.User) map[string]string {
+func addressClaim(user *record.User) map[string]string {
 	claim := make(map[string]string)
 
 	formatted := ""

@@ -20,7 +20,7 @@ import (
 	"time"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/stretchr/testify/assert"
@@ -166,8 +166,8 @@ func assertReadNoFurtherThanTheValue(t *testing.T, server *httptest.Server, coun
 
 // paddingTestSettings is what middleware.Settings reads. Registration is on so DCR reaches its
 // decode; both audit sinks are off so the real audit.Logger writes no row.
-func paddingTestSettings() *models.Settings {
-	return &models.Settings{Id: 1, AppName: "Goiabada", DynamicClientRegistrationEnabled: true}
+func paddingTestSettings() *record.Settings {
+	return &record.Settings{Id: 1, AppName: "Goiabada", DynamicClientRegistrationEnabled: true}
 }
 
 // paddingDCRTx is the transaction the registration's writes are stubbed on.
@@ -200,7 +200,7 @@ func TestBodyLimitPadding_ABearerJSONHandler(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
-		Return(&models.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
+		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
 	database.On("UpdateUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	server, counts := newPaddingTestServer(t, database)
 
@@ -222,7 +222,7 @@ func TestBodyLimitPadding_AnUpload(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
-		Return(&models.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
+		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
 	database.On("GetUserProfilePictureByUserId", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 	database.On("CreateUserProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	server, counts := newPaddingTestServer(t, database)

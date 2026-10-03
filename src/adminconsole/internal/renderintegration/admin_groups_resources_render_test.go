@@ -29,7 +29,7 @@ func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 }
 
 // Seam 4 for the group family (#350): the three group pages whose templates read the fields the
-// apiclient used to rebuild into a models.Group. This is the only seam that catches a template
+// apiclient used to rebuild into a record.Group. This is the only seam that catches a template
 // naming a field the DTO does not carry, because it runs the real template FS, funcmap and layout.
 //
 // The list is the page that reads the most of the response: five columns, of which two are the
@@ -108,8 +108,8 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 
 // The two resource pages, which hold this change's last two families: admin_resources.html ranges
 // over the resource DTOs the API client now hands back untouched, and admin_resources_permissions
-// pushes each permission DTO into a JavaScript array by field. Both used to read a models.Resource
-// and a models.Permission that the API client rebuilt column by column. This is the only seam that
+// pushes each permission DTO into a JavaScript array by field. Both used to read a record.Resource
+// and a record.Permission that the API client rebuilt column by column. This is the only seam that
 // catches a template naming a field the DTO does not carry, which is the whole reason the package
 // exists (#350).
 func TestRender_AdminResourcesList(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +37,7 @@ var consentSaveTx = &sql.Tx{}
 // what says the filter is not consulted on a cancel, a stale ceremony or a rejected body (#241).
 func stubUserHoldsEveryScope(permissionChecker *mocks_handlers.PermissionChecker) {
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
-		Return(func(_ context.Context, scope string, user *models.User) string { return scope }, nil)
+		Return(func(_ context.Context, scope string, user *record.User) string { return scope }, nil)
 }
 
 func TestBuildScopeInfoArray(t *testing.T) {
@@ -97,7 +97,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 	})
 
 	t.Run("With existing consent", func(t *testing.T) {
-		consent := &models.UserConsent{
+		consent := &record.UserConsent{
 			Scope: "openid profile",
 		}
 		result := buildScopeInfoArray(context.Background(), "openid profile email", consent)
@@ -108,7 +108,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 	})
 
 	t.Run("Mixed scopes with consent", func(t *testing.T) {
-		consent := &models.UserConsent{
+		consent := &record.UserConsent{
 			Scope: "openid custom:read",
 		}
 		result := buildScopeInfoArray(context.Background(), "openid profile custom:read custom:write", consent)
@@ -234,7 +234,7 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, nil)
@@ -270,10 +270,10 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
 			Description:      "Test Client",
@@ -329,17 +329,17 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
 			Description:      "Test Client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		consent := &models.UserConsent{
+		consent := &record.UserConsent{
 			UserId:   1,
 			ClientId: 1,
 			Scope:    "openid profile",
@@ -380,10 +380,10 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
 			Description:      "Test Client",
@@ -391,7 +391,7 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		consent := &models.UserConsent{
+		consent := &record.UserConsent{
 			UserId:   1,
 			ClientId: 1,
 			Scope:    "openid profile",
@@ -441,9 +441,9 @@ func TestHandleConsentGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
 
 		var rendered map[string]interface{}
@@ -873,19 +873,19 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 
-		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *record.UserConsent) bool {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
@@ -936,16 +936,16 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		existingConsent := &models.UserConsent{
+		existingConsent := &record.UserConsent{
 			Id:       1,
 			UserId:   1,
 			ClientId: 1,
@@ -954,7 +954,7 @@ func TestHandleConsentPost(t *testing.T) {
 		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(existingConsent, nil)
 
-		database.On("UpdateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		database.On("UpdateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *record.UserConsent) bool {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
@@ -1008,10 +1008,10 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		// The whole ticked selection is what the filter is asked about, and backend:write is what
@@ -1023,8 +1023,8 @@ func TestHandleConsentPost(t *testing.T) {
 		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 
-		var persisted *models.UserConsent
-		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		var persisted *record.UserConsent
+		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *record.UserConsent) bool {
 			persisted = consent
 			return true
 		})).Return(nil)
@@ -1095,10 +1095,10 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid backend:read", user).
@@ -1154,10 +1154,10 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
@@ -1229,10 +1229,10 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
@@ -1302,10 +1302,10 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
@@ -1366,10 +1366,10 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		user := &models.User{Id: 1}
+		user := &record.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
@@ -1876,14 +1876,14 @@ func TestHandleConsentPost(t *testing.T) {
 					}
 					expectedScope := strings.Join(grantedScopes, " ")
 
-					client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
+					client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-					database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+					database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
 					mocks_data.ExpectRunInTransaction(database, consentSaveTx)
 					database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 
-					var persisted *models.UserConsent
-					database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
+					var persisted *record.UserConsent
+					database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *record.UserConsent) bool {
 						persisted = consent
 						return true
 					})).Return(nil)
@@ -1952,13 +1952,13 @@ func TestHandleConsentPost(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
 		mocks_data.ExpectRunInTransaction(database, consentSaveTx)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).
-			Return(&models.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid profile"}, nil)
+			Return(&record.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid profile"}, nil)
 
-		database.On("UpdateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *models.UserConsent) bool {
+		database.On("UpdateUserConsent", mock.Anything, consentSaveTx, mock.MatchedBy(func(consent *record.UserConsent) bool {
 			return consent.Scope == "email"
 		})).Return(nil)
 

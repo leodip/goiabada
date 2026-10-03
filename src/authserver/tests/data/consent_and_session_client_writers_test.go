@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +68,7 @@ type consentReader struct {
 	reads      atomic.Int32
 }
 
-func (c *consentReader) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error) {
+func (c *consentReader) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error) {
 	consent, err := c.Database.GetConsentByUserIdAndClientId(ctx, tx, userId, clientId)
 	c.reads.Add(1)
 	c.rendezvous.meet()
@@ -83,7 +83,7 @@ type sessionReader struct {
 	reads      atomic.Int32
 }
 
-func (s *sessionReader) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+func (s *sessionReader) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error {
 	err := s.Database.UserSessionLoadClients(ctx, tx, userSession)
 	s.reads.Add(1)
 	s.rendezvous.meet()
@@ -91,12 +91,12 @@ func (s *sessionReader) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, 
 }
 
 // consentsOf is the rows a user holds for one client, read through the data layer.
-func consentsOf(t *testing.T, userId, clientId int64) []models.UserConsent {
+func consentsOf(t *testing.T, userId, clientId int64) []record.UserConsent {
 	t.Helper()
 
 	all, err := database.GetConsentsByUserId(context.Background(), nil, userId)
 	require.NoError(t, err)
-	var pair []models.UserConsent
+	var pair []record.UserConsent
 	for _, consent := range all {
 		if consent.ClientId == clientId {
 			pair = append(pair, consent)
@@ -106,7 +106,7 @@ func consentsOf(t *testing.T, userId, clientId int64) []models.UserConsent {
 }
 
 // associationsOf is the session's associations for one client.
-func associationsOf(t *testing.T, sessionIdentifier string, clientId int64) (pair []models.UserSessionClient, all []models.UserSessionClient) {
+func associationsOf(t *testing.T, sessionIdentifier string, clientId int64) (pair []record.UserSessionClient, all []record.UserSessionClient) {
 	t.Helper()
 
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sessionIdentifier)
@@ -158,7 +158,7 @@ func TestUserConsentRecord_TwoSavesThatOverlapBothSucceedAndLeaveOneRow(t *testi
 		callers := [2]*consentReader{{Database: database, rendezvous: meet}, {Database: database, rendezvous: meet}}
 
 		type outcome struct {
-			consent *models.UserConsent
+			consent *record.UserConsent
 			err     error
 		}
 		var outcomes [2]outcome
@@ -206,7 +206,7 @@ func TestBumpUserSession_ASecondBumpForTheSameClientUpdatesItsAssociation(t *tes
 	session := createTestUserSessionWithClient(t, user.Id, held.Id)
 	manager := usersession.NewManager(nil, "", database)
 
-	_, err := manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", models.AcrLevel1, "")
+	_, err := manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
 	require.NoError(t, err)
 	pair, all := associationsOf(t, session.SessionIdentifier, added.Id)
 	require.Len(t, pair, 1, "the first bump added the client")
@@ -214,7 +214,7 @@ func TestBumpUserSession_ASecondBumpForTheSameClientUpdatesItsAssociation(t *tes
 	firstAccessed := pair[0].LastAccessed
 
 	time.Sleep(10 * time.Millisecond)
-	_, err = manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", models.AcrLevel1, "")
+	_, err = manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
 	require.NoError(t, err)
 
 	pair, all = associationsOf(t, session.SessionIdentifier, added.Id)
@@ -239,7 +239,7 @@ func TestBumpUserSession_TwoBumpsThatOverlapBothSucceedAndLeaveOnePair(t *testin
 		callers := [2]*sessionReader{{Database: database, rendezvous: meet}, {Database: database, rendezvous: meet}}
 
 		type outcome struct {
-			session *models.UserSession
+			session *record.UserSession
 			err     error
 		}
 		var outcomes [2]outcome
@@ -249,7 +249,7 @@ func TestBumpUserSession_TwoBumpsThatOverlapBothSucceedAndLeaveOnePair(t *testin
 			go func() {
 				defer wg.Done()
 				manager := usersession.NewManager(nil, "", callers[i])
-				outcomes[i].session, outcomes[i].err = manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", models.AcrLevel1, "")
+				outcomes[i].session, outcomes[i].err = manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
 			}()
 		}
 		wg.Wait()

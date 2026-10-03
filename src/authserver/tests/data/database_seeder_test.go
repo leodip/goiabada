@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/bootstrap"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,7 +113,7 @@ type seedFaultDB struct {
 	failCommit        bool
 }
 
-func (f *seedFaultDB) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
+func (f *seedFaultDB) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 	if err := f.Database.CreateInitialSettings(ctx, tx, settings); err != nil {
 		return err
 	}

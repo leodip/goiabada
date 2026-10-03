@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/stretchr/testify/assert"
@@ -31,8 +31,8 @@ func implicitIssuerOn(db data.Database) *issuance.TokenIssuer {
 
 // implicitSettings turns the profile claims on for both tokens, so the picture lookup is reached by
 // the access token and by the ID token.
-func implicitSettings() *models.Settings {
-	return &models.Settings{
+func implicitSettings() *record.Settings {
+	return &record.Settings{
 		Issuer:                                  "https://implicit.example.com",
 		TokenExpirationInSeconds:                600,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
@@ -41,12 +41,12 @@ func implicitSettings() *models.Settings {
 }
 
 // implicitInput is the ceremony's implicit grant for this client, user and session.
-func implicitInput(client *models.Client, user *models.User, sessionIdentifier string) *issuance.ImplicitGrantInput {
+func implicitInput(client *record.Client, user *record.User, sessionIdentifier string) *issuance.ImplicitGrantInput {
 	return &issuance.ImplicitGrantInput{
 		Client:            client,
 		User:              user,
 		Scope:             "openid profile",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       "pwd",
 		SessionIdentifier: sessionIdentifier,
 		Nonce:             "implicit-nonce",
@@ -63,12 +63,12 @@ func withRealSigningKeyOn(t *testing.T, db data.Database) {
 	keyPairs, err := db.GetAllSigningKeys(context.Background(), nil)
 	require.NoError(t, err)
 	for _, existing := range keyPairs {
-		if existing.State == models.KeyStateCurrent.String() {
+		if existing.State == record.KeyStateCurrent.String() {
 			require.NoError(t, db.DeleteKeyPair(context.Background(), nil, existing.Id))
 		}
 	}
 
-	keyPair, err := signingkeys.NewKeyPair(dataCipher, models.KeyStateCurrent, 2048)
+	keyPair, err := signingkeys.NewKeyPair(dataCipher, record.KeyStateCurrent, 2048)
 	require.NoError(t, err, "generating a signing key")
 	require.NoError(t, db.CreateKeyPair(context.Background(), nil, keyPair))
 	t.Cleanup(func() { _ = db.DeleteKeyPair(context.Background(), nil, keyPair.Id) })
@@ -78,7 +78,7 @@ func withRealSigningKeyOn(t *testing.T, db data.Database) {
 // find.
 func withProfilePictureOn(t *testing.T, db data.Database, userId int64) {
 	t.Helper()
-	require.NoError(t, db.CreateUserProfilePicture(context.Background(), nil, &models.UserProfilePicture{
+	require.NoError(t, db.CreateUserProfilePicture(context.Background(), nil, &record.UserProfilePicture{
 		UserId:      userId,
 		Picture:     createTestPNG(100, 100),
 		ContentType: "image/png",

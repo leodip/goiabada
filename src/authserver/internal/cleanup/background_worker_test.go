@@ -7,7 +7,7 @@ import (
 	"time"
 
 	mocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,7 +20,7 @@ func TestWorker_AuditLogRetention_Enabled(t *testing.T) {
 	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           30,
@@ -56,7 +56,7 @@ func TestWorker_AuditLogRetention_Disabled(t *testing.T) {
 	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention disabled
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           0,
@@ -87,7 +87,7 @@ func TestWorker_AuditLogRetention_BatchDeletion(t *testing.T) {
 	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           90,
@@ -120,7 +120,7 @@ func TestWorker_AuditLogRetention_MaxBatches(t *testing.T) {
 	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           60,
@@ -153,7 +153,7 @@ func TestWorker_AuditLogRetention_Error(t *testing.T) {
 	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           45,
@@ -187,7 +187,7 @@ func TestWorker_AuditLogRetention_NoDeletion(t *testing.T) {
 	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           180,
@@ -356,7 +356,7 @@ func expectFullCleanup(mockDB *mocks.Database) {
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}, nil).Maybe()
@@ -497,7 +497,7 @@ func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
 		Return(errors.New("delete failed")).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}, nil).Once()

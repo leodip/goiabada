@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,7 +76,7 @@ func assertRefusedAsInvalidGrant(t *testing.T, status int, body map[string]inter
 }
 
 // refreshTokenRowByJti loads the persisted row behind a serialized refresh token.
-func refreshTokenRowByJti(t *testing.T, refreshToken string) *models.RefreshToken {
+func refreshTokenRowByJti(t *testing.T, refreshToken string) *record.RefreshToken {
 	t.Helper()
 
 	row, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
@@ -94,24 +94,24 @@ func refreshTokenRowByJti(t *testing.T, refreshToken string) *models.RefreshToke
 // This is what produces two independent rotation families on one browser session, which is
 // the fixture the family-scope boundary case needs.
 func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, clientSecret string,
-	scope string) (*models.Client, string, string) {
+	scope string) (*record.Client, string, string) {
 	t.Helper()
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "second-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	const codeVerifier = testCodeVerifier + "-second-client"
@@ -221,7 +221,7 @@ func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
 // find nothing here and this is the case that would expose it. The authorization-code test
 // above cannot stand in for it.
 func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)
@@ -284,7 +284,7 @@ func TestToken_Refresh_Replay_RepeatIsANoOp(t *testing.T) {
 	before, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
 	require.NoError(t, err)
 	require.NotEmpty(t, before)
-	snapshot := make(map[int64]models.RefreshToken, len(before))
+	snapshot := make(map[int64]record.RefreshToken, len(before))
 	for _, rt := range before {
 		require.Truef(t, rt.Revoked, "every family member must be revoked after the first replay (id %d)", rt.Id)
 		snapshot[rt.Id] = *rt

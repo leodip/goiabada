@@ -14,8 +14,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -51,16 +51,16 @@ import (
 // Nothing here asserts the gate; this is the fixture that lets the cases about something else stay
 // about that something else.
 func stubRegisteredRedirectURI(database *mocks_data.Database, registered ...string) {
-	uris := make([]models.RedirectURI, 0, len(registered))
+	uris := make([]record.RedirectURI, 0, len(registered))
 	for _, uri := range registered {
-		uris = append(uris, models.RedirectURI{URI: uri})
+		uris = append(uris, record.RedirectURI{URI: uri})
 	}
 	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 }
 
 func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-		Return(&models.UserSession{Id: 1, UserId: 1}, nil)
+		Return(&record.UserSession{Id: 1, UserId: 1}, nil)
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 		Return(true)
 }
@@ -83,7 +83,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Add settings to context
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -94,10 +94,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -105,7 +105,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:     1,
 			UserId: 123,
 			// Deliberately conflicting and nonzero: the SESSION is at 7 while the user it
@@ -113,7 +113,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			// user's current value here would launder an old ceremony into the generation a
 			// later credential change established (#106 decision 11(d)).
 			AuthStateGeneration: 7,
-			User: models.User{
+			User: record.User{
 				Id:                  123,
 				Enabled:             true,
 				AuthStateGeneration: 9,
@@ -164,7 +164,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Add settings to context
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -175,10 +175,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -188,9 +188,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -326,7 +326,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&response_mode=query", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -337,10 +337,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -381,11 +381,11 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		stubRegisteredRedirectURI(database, "https://example.com")
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -396,7 +396,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		for i := 0; i < 2; i++ {
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 			assert.NoError(t, err)
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			rr := httptest.NewRecorder()
 
 			var saved *ceremony.AuthContext
@@ -440,7 +440,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Add settings to context
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -453,10 +453,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -491,7 +491,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Add settings to context
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -511,10 +511,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -551,7 +551,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -566,10 +566,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -615,7 +615,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -634,10 +634,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -676,7 +676,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -695,10 +695,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -731,7 +731,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Add settings to context
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -742,10 +742,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -753,10 +753,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:     1,
 			UserId: 123,
-			User: models.User{
+			User: record.User{
 				Id:      123,
 				Enabled: false,
 			},
@@ -799,16 +799,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		assert.NoError(t, err)
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
 		stubRegisteredRedirectURI(database, "https://example.com")
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -846,7 +846,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Add settings to context
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -857,10 +857,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel2Optional,
+			DefaultAcrLevel:  record.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -868,12 +868,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    models.AcrLevel1, // Set this to the appropriate level
+			AcrLevel:    record.AcrLevel1, // Set this to the appropriate level
 			AuthMethods: "pwd",            // Set this to the appropriate method(s)
-			User: models.User{
+			User: record.User{
 				Id:      123,
 				Enabled: true,
 			},
@@ -928,7 +928,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -938,10 +938,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -950,8 +950,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -995,7 +995,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -1007,10 +1007,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -1054,7 +1054,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
@@ -1067,7 +1067,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -1082,8 +1082,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil).Once()
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1124,7 +1124,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		assert.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := reqctx.WithSettings(req.Context(), settings)
 		req = req.WithContext(ctx)
 
@@ -1137,7 +1137,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
+		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -1149,8 +1149,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})).Return(nil).Once()
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1166,7 +1166,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 // refusal case still asserts the redirect it was written to assert (#108).
 func stubClientProvenanceLookup(database *mocks_data.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
 			AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
 }
 
@@ -1182,9 +1182,9 @@ func stubClientProvenanceLookup(database *mocks_data.Database) {
 func testRegisteredDatabase(t *testing.T, registered ...string) *mocks_data.Database {
 	database := mocks_data.NewDatabase(t)
 
-	uris := make([]models.RedirectURI, 0, len(registered))
+	uris := make([]record.RedirectURI, 0, len(registered))
 	for _, uri := range registered {
-		uris = append(uris, models.RedirectURI{URI: uri})
+		uris = append(uris, record.RedirectURI{URI: uri})
 	}
 	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 
@@ -1204,7 +1204,7 @@ func testRedirectError(code string, description string, responseMode string, red
 	state string, responseType string) redirectErrorInput {
 
 	return redirectErrorInput{
-		client:       &models.Client{ClientIdentifier: "test-client"},
+		client:       &record.Client{ClientIdentifier: "test-client"},
 		code:         code,
 		description:  description,
 		responseMode: responseMode,
@@ -1228,7 +1228,7 @@ func TestRedirectErrorFromAuthContext(t *testing.T) {
 	}
 
 	t.Run("carries the client it was handed", func(t *testing.T) {
-		client := &models.Client{Id: 7, ClientIdentifier: "test-client"}
+		client := &record.Client{Id: 7, ClientIdentifier: "test-client"}
 
 		input := redirectErrorFromAuthContext(authContext, client, "access_denied", "Access denied")
 
@@ -1771,9 +1771,9 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 	registeredDatabase := func(t *testing.T, registered ...string) *mocks_data.Database {
 		database := mocks_data.NewDatabase(t)
 
-		uris := make([]models.RedirectURI, 0, len(registered))
+		uris := make([]record.RedirectURI, 0, len(registered))
 		for _, uri := range registered {
-			uris = append(uris, models.RedirectURI{URI: uri})
+			uris = append(uris, record.RedirectURI{URI: uri})
 		}
 		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 
@@ -1796,7 +1796,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		database     func(t *testing.T) *mocks_data.Database
-		client       *models.Client
+		client       *record.Client
 		redirectURI  string
 		responseType string
 		want         bool
@@ -1807,7 +1807,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "https://legit.example/cb")
 			},
-			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
 			redirectURI:  "https://legit.example/cb",
 			responseType: "code",
 			want:         true,
@@ -1817,7 +1817,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			name: "self-registered client",
 			// No expectation: the provenance gate refuses above the read.
 			database:     noReadExpected,
-			client:       &models.Client{ClientIdentifier: "dcr-client", CreatedViaDCR: true},
+			client:       &record.Client{ClientIdentifier: "dcr-client", CreatedViaDCR: true},
 			redirectURI:  "https://legit.example/cb",
 			responseType: "code",
 			want:         false,
@@ -1838,7 +1838,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			name: "administrator-registered client with an unemittable redirect URI",
 			// No expectation: the emittability gate refuses above the read.
 			database:     noReadExpected,
-			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
 			redirectURI:  "//evil.example/cb",
 			responseType: "code",
 			want:         false,
@@ -1850,7 +1850,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "https://other.example/cb")
 			},
-			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
 			redirectURI:  "https://legit.example/cb",
 			responseType: "code",
 			want:         false,
@@ -1863,7 +1863,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t)
 			},
-			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
 			redirectURI:  "https://legit.example/cb",
 			responseType: "code",
 			want:         false,
@@ -1874,7 +1874,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		{
 			name:         "registration read fails",
 			database:     failingDatabase,
-			client:       &models.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
 			redirectURI:  "https://legit.example/cb",
 			responseType: "code",
 			want:         false,
@@ -1887,7 +1887,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
-			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
 			redirectURI:  "http://127.0.0.1:49152/cb",
 			responseType: "code",
 			want:         true,
@@ -1901,7 +1901,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
-			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
 			redirectURI:  "http://127.0.0.1:49152/cb",
 			responseType: "token",
 			want:         false,
@@ -1915,7 +1915,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
-			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
 			redirectURI:  "http://127.0.0.1:49152/cb",
 			responseType: "code code",
 			want:         false,
@@ -1928,7 +1928,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			database: func(t *testing.T) *mocks_data.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
-			client:       &models.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
 			redirectURI:  "http://127.0.0.1:49152/cb",
 			responseType: "code foo",
 			want:         false,
@@ -2160,7 +2160,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Add settings to context with implicit flow enabled
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired:        true,
 			ImplicitFlowEnabled: true,
 		}
@@ -2176,10 +2176,10 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		// Client with implicit flow enabled
-		client := &models.Client{
+		client := &record.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      models.AcrLevel1,
+			DefaultAcrLevel:      record.AcrLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2191,9 +2191,9 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -2226,7 +2226,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired:        false,
 			ImplicitFlowEnabled: true,
 		}
@@ -2241,10 +2241,10 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		})).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      models.AcrLevel1,
+			DefaultAcrLevel:      record.AcrLevel1,
 			ImplicitGrantEnabled: nil,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2256,9 +2256,9 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -2291,7 +2291,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired:        false,
 			ImplicitFlowEnabled: false, // Disabled globally
 		}
@@ -2306,10 +2306,10 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      models.AcrLevel1,
+			DefaultAcrLevel:      record.AcrLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting (disabled)
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2350,7 +2350,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired:        false,
 			ImplicitFlowEnabled: false, // Disabled globally
 		}
@@ -2365,10 +2365,10 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		// Client explicitly enables implicit flow
 		implicitEnabled := true
-		client := &models.Client{
+		client := &record.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      models.AcrLevel1,
+			DefaultAcrLevel:      record.AcrLevel1,
 			ImplicitGrantEnabled: &implicitEnabled, // Client override
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2381,9 +2381,9 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -2406,7 +2406,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 // not say which kind of token was sent (#401). ID Tokens carry no typ at all, so the absent row is
 // the one a real hint takes.
 func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
-	settings := &models.Settings{Issuer: "https://test-issuer.com"}
+	settings := &record.Settings{Issuer: "https://test-issuer.com"}
 
 	tests := []struct {
 		name     string
@@ -2464,7 +2464,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=bad-jwt-token", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -2477,10 +2477,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2523,7 +2523,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-wrong-issuer", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://correct-issuer.com",
 		}
@@ -2536,10 +2536,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2591,7 +2591,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=an-access-token", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -2604,10 +2604,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2660,7 +2660,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-no-sub", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -2673,10 +2673,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2725,7 +2725,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=expired-jwt-token", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -2739,10 +2739,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2759,12 +2759,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired-jwt-token", false).Return(expiredToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
-			User: models.User{
+			User: record.User{
 				Id:      123,
 				Enabled: true,
 				Subject: userSubject,
@@ -2809,7 +2809,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-token", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -2823,10 +2823,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2843,12 +2843,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
-			User: models.User{
+			User: record.User{
 				Id:      123,
 				Enabled: true,
 				Subject: userSubject,
@@ -2895,7 +2895,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -2909,10 +2909,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2929,12 +2929,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      456,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
-			User: models.User{
+			User: record.User{
 				Id:      456,
 				Enabled: true,
 				Subject: sessionSubject,
@@ -2981,7 +2981,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		// server reads it, so the session records the latest address it was seen from (#243).
 		req.RemoteAddr = "203.0.113.7:4444"
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -2997,10 +2997,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3017,16 +3017,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      789,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
 			// Session at 7, user at 9. The prompt=none path is a SEPARATE session-reuse
 			// site from the interactive one, and it must inherit from the session too, or a
 			// silent re-issue would launder an old ceremony forward (#106 decision 11(d)).
 			AuthStateGeneration: 7,
-			User: models.User{
+			User: record.User{
 				Id:                  789,
 				Enabled:             true,
 				Subject:             userSubject,
@@ -3038,11 +3038,11 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", mock.MatchedBy(func(u *models.User) bool {
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", mock.MatchedBy(func(u *record.User) bool {
 			return u.Id == 789
 		})).Return("openid", nil)
 
-		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", models.AcrLevel1, "203.0.113.7").Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", record.AcrLevel1, "203.0.113.7").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
@@ -3100,7 +3100,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid%20res:offline_access_read&prompt=none&id_token_hint=valid-jwt-token", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -3114,10 +3114,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 			ConsentRequired:  false,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -3135,13 +3135,13 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:                  1,
 			UserId:              789,
-			AcrLevel:            models.AcrLevel1,
+			AcrLevel:            record.AcrLevel1,
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 7,
-			User: models.User{
+			User: record.User{
 				Id:                  789,
 				Enabled:             true,
 				Subject:             userSubject,
@@ -3153,11 +3153,11 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, requestedScope, mock.MatchedBy(func(u *models.User) bool {
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, requestedScope, mock.MatchedBy(func(u *record.User) bool {
 			return u.Id == 789
 		})).Return(requestedScope, nil)
 
-		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", models.AcrLevel1, "").Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", record.AcrLevel1, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
@@ -3207,7 +3207,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -3221,10 +3221,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3241,12 +3241,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
-			User: models.User{
+			User: record.User{
 				Id:      999,
 				Enabled: true,
 				Subject: sessionSubject,
@@ -3301,7 +3301,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -3315,10 +3315,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3335,12 +3335,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
-			User: models.User{
+			User: record.User{
 				Id:      999,
 				Enabled: true,
 				Subject: sessionSubject,
@@ -3399,7 +3399,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -3413,10 +3413,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3433,12 +3433,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
-			User: models.User{
+			User: record.User{
 				Id:      999,
 				Enabled: true,
 				Subject: sessionSubject,
@@ -3489,7 +3489,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=openid&prompt=none&id_token_hint=different-user-jwt", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			PKCERequired: true,
 			Issuer:       "https://test-issuer.com",
 		}
@@ -3503,10 +3503,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3523,12 +3523,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    models.AcrLevel1,
+			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
-			User: models.User{
+			User: record.User{
 				Id:      999,
 				Enabled: true,
 				Subject: sessionSubject,
@@ -3576,7 +3576,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=abc123&request=foo", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -3625,7 +3625,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=xyz&request_uri=https://example.com/x", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -3673,7 +3673,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&request=", nil)
 		assert.NoError(t, err)
 
-		settings := &models.Settings{PKCERequired: true}
+		settings := &record.Settings{PKCERequired: true}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -3864,13 +3864,13 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			}
 
 			req := httptest.NewRequest("GET", target, nil)
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			rr := httptest.NewRecorder()
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
+				&record.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters",
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 			authorizeValidator.On("ValidateRequest",
@@ -3885,13 +3885,13 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			// destination registered, which is what keeps them about the routing they are named
 			// for rather than about a deleted callback (#241 decision 11).
 			database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
-				Return([]models.RedirectURI{{URI: tc.redirectURI}}, nil).Maybe()
+				Return([]record.RedirectURI{{URI: tc.redirectURI}}, nil).Maybe()
 
 			// Maybe, because whether the session is looked up at all is the point of half these
 			// rows: the clauses that read nothing are evaluated first, so a request that is
 			// silent, or whose redirect would be withheld anyway, never queries.
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
+				Return(&record.UserSession{Id: 1, UserId: 1}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 
@@ -3984,13 +3984,13 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			}
 
 			req := httptest.NewRequest("GET", target, nil)
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			rr := httptest.NewRecorder()
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+				&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 			// Maybe on all three, because the predicate is computed above the validations: the
 			// row that answers 500 does so before any of them runs, which is the correct order
 			// (there is no answer to give a client until the server knows who is at the browser)
@@ -4066,7 +4066,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	req := httptest.NewRequest("GET",
 		"/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb"+
 			"&response_type=code&scope="+url.QueryEscape("openid 💣"), nil)
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 
 	// The one save is the deferral.
@@ -4080,7 +4080,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 	authorizeValidator.On("ValidateUnsupportedRequestParameters",
 		mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 	authorizeValidator.On("ValidateRequest",
@@ -4135,7 +4135,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			},
 			secondRead: func(database *mocks_data.Database) {
 				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
-					Return([]models.RedirectURI{{URI: redirectURI}}, nil).Maybe()
+					Return([]record.RedirectURI{{URI: redirectURI}}, nil).Maybe()
 			},
 			wantReads: 1,
 			why: "the first read failed, which is what routed this logged-out browser to an immediate " +
@@ -4147,11 +4147,11 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			hasSession: true,
 			firstRead: func(database *mocks_data.Database) {
 				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
-					Return([]models.RedirectURI{{URI: redirectURI}}, nil).Once()
+					Return([]record.RedirectURI{{URI: redirectURI}}, nil).Once()
 			},
 			secondRead: func(database *mocks_data.Database) {
 				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
-					Return([]models.RedirectURI{}, nil).Maybe()
+					Return([]record.RedirectURI{}, nil).Maybe()
 			},
 			wantReads: 2,
 			why: "the other direction, and it must still work: an administrator deleting the callback " +
@@ -4175,7 +4175,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
 			req := httptest.NewRequest("GET", target, nil)
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
@@ -4183,7 +4183,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: false}, nil)
+				&record.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: false}, nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters",
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 			authorizeValidator.On("ValidateRequest",
@@ -4204,7 +4204,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			tc.secondRead(database)
 
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
+				Return(&record.UserSession{Id: 1, UserId: 1}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 

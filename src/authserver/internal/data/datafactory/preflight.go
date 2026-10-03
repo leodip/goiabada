@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -19,7 +19,7 @@ const LowercaseEmailsVersion = 47
 // emailCaseScanner is the one read the pre-flight makes. The `migrate` subcommand, the other
 // caller, declares its own port with the same method rather than naming this one (#438).
 type emailCaseScanner interface {
-	ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error)
+	ScanEmailCase(ctx context.Context) ([]record.EmailCaseRow, error)
 }
 
 // CheckEmailCaseBeforeMigrating refuses an upgrade that crosses migration 000047 when the stored
@@ -85,8 +85,8 @@ func CheckEmailCaseBeforeMigrating(ctx context.Context, database emailCaseScanne
 // Go's strings.ToLower decides the grouping, not the engine's, because the collision that
 // matters is the one 000047's UPDATE would create: two rows whose repaired values are equal are
 // two rows the UNIQUE index cannot both hold afterwards.
-func findEmailCaseCollisions(rows []models.EmailCaseRow) [][]models.EmailCaseRow {
-	byLowered := map[string][]models.EmailCaseRow{}
+func findEmailCaseCollisions(rows []record.EmailCaseRow) [][]record.EmailCaseRow {
+	byLowered := map[string][]record.EmailCaseRow{}
 	for _, row := range rows {
 		lowered := strings.ToLower(row.Email)
 		byLowered[lowered] = append(byLowered[lowered], row)
@@ -100,7 +100,7 @@ func findEmailCaseCollisions(rows []models.EmailCaseRow) [][]models.EmailCaseRow
 	}
 	sort.Strings(lowered)
 
-	groups := make([][]models.EmailCaseRow, 0, len(lowered))
+	groups := make([][]record.EmailCaseRow, 0, len(lowered))
 	for _, key := range lowered {
 		group := byLowered[key]
 		sort.Slice(group, func(i, j int) bool { return group[i].Id < group[j].Id })
@@ -118,8 +118,8 @@ func findEmailCaseCollisions(rows []models.EmailCaseRow) [][]models.EmailCaseRow
 // modernc.org/sqlite, and SQL Server leaves U+1E9E and U+212A unchanged at the collation 000040
 // installs; MySQL and PostgreSQL agree with Go on both. Written as a comparison rather than as a
 // character list, it also covers whatever a future engine, driver or collation does.
-func findEnginesLowerDisagreements(rows []models.EmailCaseRow) []models.EmailCaseRow {
-	var found []models.EmailCaseRow
+func findEnginesLowerDisagreements(rows []record.EmailCaseRow) []record.EmailCaseRow {
+	var found []record.EmailCaseRow
 	for _, row := range rows {
 		if row.EngineLowered != strings.ToLower(row.Email) {
 			found = append(found, row)
@@ -135,7 +135,7 @@ func findEnginesLowerDisagreements(rows []models.EmailCaseRow) []models.EmailCas
 //
 // Every row rather than the first: two collisions are two separate hand fixes, and a message
 // naming one of them turns a single outage into two.
-func describeEmailCaseHazards(collisions [][]models.EmailCaseRow, unreachable []models.EmailCaseRow) string {
+func describeEmailCaseHazards(collisions [][]record.EmailCaseRow, unreachable []record.EmailCaseRow) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b,

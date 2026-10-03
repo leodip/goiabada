@@ -21,8 +21,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 )
 
@@ -54,7 +54,7 @@ const mailpitURL = "http://mailpit:8025"
 // row at mailpit but leaves SMTP off, as seeded, so a test that sends mail turns it on itself.
 func useMailpitSMTP(t *testing.T) {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.SMTPEnabled = true
 		settings.SMTPHost = "mailpit"
 		settings.SMTPPort = 1025
@@ -64,7 +64,7 @@ func useMailpitSMTP(t *testing.T) {
 	})
 }
 
-func createResetTestUser(t *testing.T, email string) (*models.User, string) {
+func createResetTestUser(t *testing.T, email string) (*record.User, string) {
 	t.Helper()
 
 	password := fake.Password(12) + "aA1!"
@@ -73,7 +73,7 @@ func createResetTestUser(t *testing.T, email string) (*models.User, string) {
 
 	// Verified, because recovery goes only to an address the account has proven (#404
 	// decision 1): an unverified one is sent nothing.
-	user := &models.User{
+	user := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         email,
@@ -632,7 +632,7 @@ func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabl
 	for _, tc := range []struct {
 		name  string
 		email string
-		user  *models.User
+		user  *record.User
 	}{
 		{name: "an unverified address", email: unverifiedEmail, user: unverified},
 		{name: "a disabled account", email: disabledEmail, user: disabled},
@@ -830,16 +830,16 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			records := awaitRequestedPasswordResetRecords(t, tc.address)
 			require.Len(t, records, 1, "exactly one record per request")
-			record := records[0]
+			auditDetails := records[0]
 
-			assert.Equal(t, tc.outcome, record["outcome"])
-			assert.NotEmpty(t, record["ip"])
+			assert.Equal(t, tc.outcome, auditDetails["outcome"])
+			assert.NotEmpty(t, auditDetails["ip"])
 			if tc.userId == 0 {
-				assert.NotContains(t, record, "userId", "no account matched, so none is named")
+				assert.NotContains(t, auditDetails, "userId", "no account matched, so none is named")
 			} else {
-				assert.Equal(t, float64(tc.userId), record["userId"])
+				assert.Equal(t, float64(tc.userId), auditDetails["userId"])
 			}
-			for key, value := range record {
+			for key, value := range auditDetails {
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,
 					"the address must not appear in the record, found under %q", key)
 			}
@@ -891,7 +891,7 @@ func TestForgotPassword_AnswersBeforeTheMailIsSent(t *testing.T) {
 	useMailpitSMTP(t)
 	requireDatabaseAuditLogs(t)
 	port, accepted := silentSMTPServer(t)
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.SMTPHost = "127.0.0.1"
 		settings.SMTPPort = port
 	})

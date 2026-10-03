@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -448,7 +448,7 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 //
 // Its snapshot is set to the user's current counter, so before the endpoint is called it owes no
 // re-prompt. That is what makes the assertion below meaningful: the row starts out satisfied.
-func seedExtraSessionForOTPTest(t *testing.T, userId int64) *models.UserSession {
+func seedExtraSessionForOTPTest(t *testing.T, userId int64) *record.UserSession {
 	t.Helper()
 
 	current, err := database.GetUserById(context.Background(), nil, userId)
@@ -457,12 +457,12 @@ func seedExtraSessionForOTPTest(t *testing.T, userId int64) *models.UserSession 
 	}
 
 	now := time.Now().UTC()
-	session := &models.UserSession{
+	session := &record.UserSession{
 		SessionIdentifier:   fake.UUID(),
 		Started:             now,
 		LastAccessed:        now,
 		AuthMethods:         "pwd otp",
-		AcrLevel:            models.AcrLevel2Optional,
+		AcrLevel:            record.AcrLevel2Optional,
 		AuthTime:            now,
 		IpAddress:           "10.0.0.1",
 		DeviceName:          "another device",
@@ -780,7 +780,7 @@ func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
 // for the write and read back, TestOtpCredentialEstablish_ClearsThePendingEnrollment for the clear.
 //
 // Loading the user is fixture setup rather than an assertion: the ceremony driver takes a
-// *models.User for its email, and no caller of this API has one.
+// *record.User for its email, and no caller of this API has one.
 func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	userId := getAccountUserId(t, accessToken)

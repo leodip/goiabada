@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
 )
@@ -101,7 +101,7 @@ func renderActivationLinkExpired(pageRenderer PageRenderer, w http.ResponseWrite
 // registration it consumes.
 type accountActivateDatabase interface {
 	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
-	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.PreRegistration, error)
+	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.PreRegistration, error)
 }
 
 // HandleActivateGet serves both halves of the activation link's journey.
@@ -240,7 +240,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession session
 // isVerificationCodeExpired reports whether the activation code issued for this
 // pre-registration is past its lifetime. A row with no issued-at is treated as expired, which
 // fails closed.
-func isVerificationCodeExpired(preRegistration *models.PreRegistration) bool {
+func isVerificationCodeExpired(preRegistration *record.PreRegistration) bool {
 	return preRegistration.VerificationCodeIssuedAt.Time.Add(verificationCodeLifetime).Before(time.Now().UTC())
 }
 

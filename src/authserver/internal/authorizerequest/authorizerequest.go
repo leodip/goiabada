@@ -23,7 +23,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 )
@@ -48,14 +48,14 @@ const (
 // package's own port and the authorization handlers' ports embed it to hand the capability on
 // (#387).
 type Parking interface {
-	CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *models.AuthorizeRequest) error
+	CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequest *record.AuthorizeRequest) error
 }
 
 // Consuming is what consuming a request needs: the read, the claim, and the transaction the pair
 // runs in. Apart from Parking because the POST that parks a request never consumes one and the GET
 // that consumes it never parks.
 type Consuming interface {
-	GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*models.AuthorizeRequest, error)
+	GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*record.AuthorizeRequest, error)
 	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -80,7 +80,7 @@ func Park(ctx context.Context, db Parking, form url.Values) (string, error) {
 	}
 	handle := base64.RawURLEncoding.EncodeToString(raw)
 
-	err := db.CreateAuthorizeRequest(ctx, nil, &models.AuthorizeRequest{
+	err := db.CreateAuthorizeRequest(ctx, nil, &record.AuthorizeRequest{
 		HandleHash:  hashutil.HashString(handle),
 		RequestForm: form.Encode(),
 		ExpiresAt:   time.Now().UTC().Add(Lifetime),
@@ -108,7 +108,7 @@ func Consume(ctx context.Context, db Consuming, handle string) (url.Values, bool
 	}
 	handleHash := hashutil.HashString(handle)
 
-	var parked *models.AuthorizeRequest
+	var parked *record.AuthorizeRequest
 	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		// Cleared on entry: the body is rerun after a deadlock, and what a first attempt found
 		// never committed.

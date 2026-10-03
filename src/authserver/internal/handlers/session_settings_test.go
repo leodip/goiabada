@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // The two session lifetimes the ceremony handlers read from the request's settings and pass to
@@ -17,7 +17,7 @@ const (
 // withSessionSettings puts settings carrying the two lifetimes above on the request, where
 // middleware.Settings puts them in production.
 func withSessionSettings(r *http.Request) *http.Request {
-	return withSettings(r, &models.Settings{
+	return withSettings(r, &record.Settings{
 		UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds,
 		UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds,
 	})

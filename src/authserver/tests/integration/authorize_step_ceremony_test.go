@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,8 +37,8 @@ func assertCeremonyNoLongerActive(t *testing.T, resp *http.Response, what string
 
 // walkToPasswordPage starts one authorization request on the caller's browser and follows it to its
 // login screen. It returns the screen's URL, which names the ceremony, and the screen itself.
-func walkToPasswordPage(t *testing.T, httpClient *http.Client, client *models.Client,
-	redirectUri *models.RedirectURI, state string) (string, *http.Response) {
+func walkToPasswordPage(t *testing.T, httpClient *http.Client, client *record.Client,
+	redirectUri *record.RedirectURI, state string) (string, *http.Response) {
 	t.Helper()
 
 	resp, err := httpClient.Get(authorizeUrlFor(client, redirectUri, "openid profile", state))
@@ -156,7 +156,7 @@ func TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused(t *testing.T) {
 // link. Register from a sign-in and go back, and the visitor lands on the same sign-in's password
 // form, where a bare link would load a step naming no ceremony and get the "no longer active" page.
 func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.SelfRegistrationEnabled = true
 	})
 

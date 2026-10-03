@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/i18n"
@@ -19,8 +19,8 @@ import (
 // profileValidatorDatabase is what the account profile validator reads: the rows that decide
 // whether a username is already somebody else's.
 type profileValidatorDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*record.User, error)
 }
 
 type ProfileValidator struct {

@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -26,8 +26,8 @@ type settingsKeysDatabase interface {
 	signingkeys.RotationDatabase
 
 	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
-	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
-	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*models.KeyPair, error)
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
+	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error)
 }
 
 // HandleSettingsKeysGet - GET /api/v1/admin/settings/keys
@@ -65,19 +65,19 @@ func HandleSettingsKeysGet(
 		// Order: next, current, then all previous
 		ordered := make([]api.SettingsSigningKeyResponse, 0, len(mapped))
 		for _, v := range mapped {
-			if v.State == models.KeyStateNext.String() {
+			if v.State == record.KeyStateNext.String() {
 				ordered = append(ordered, v)
 				break
 			}
 		}
 		for _, v := range mapped {
-			if v.State == models.KeyStateCurrent.String() {
+			if v.State == record.KeyStateCurrent.String() {
 				ordered = append(ordered, v)
 				break
 			}
 		}
 		for _, v := range mapped {
-			if v.State == models.KeyStatePrevious.String() {
+			if v.State == record.KeyStatePrevious.String() {
 				ordered = append(ordered, v)
 			}
 		}
@@ -161,12 +161,12 @@ func HandleSettingsKeyDelete(
 			return
 		}
 
-		keyState, err := models.KeyStateFromString(kp.State)
+		keyState, err := record.KeyStateFromString(kp.State)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
-		if keyState != models.KeyStatePrevious {
+		if keyState != record.KeyStatePrevious {
 			writeJSONError(w, "Only a previous key can be revoked", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

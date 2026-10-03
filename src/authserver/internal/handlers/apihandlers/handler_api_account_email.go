@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -21,7 +21,7 @@ import (
 
 // accountEmailDatabase is what the account email endpoints need: the caller's own user row.
 type accountEmailDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
 }
 
@@ -161,7 +161,7 @@ func HandleAccountEmailPut(
 // learning, nor carries a link. It is rendered in the user's stored locale, falling back to
 // English, as the reset mail is.
 func notifyPreviousAddress(r *http.Request, pageRenderer PageRenderer, emailSender EmailSender,
-	afterResponse AfterResponse, previousEmail string, user *models.User) {
+	afterResponse AfterResponse, previousEmail string, user *record.User) {
 
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {

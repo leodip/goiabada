@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -36,7 +36,7 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 		{
 			name: "the client read fails",
 			stub: func(database *mocks_data.Database, _ *mocks_handlers.PageRenderer, _ *mocks_handlers.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, boom)
 			},
 			wantErr: "boom",
@@ -44,9 +44,9 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 		{
 			name: "the consent read fails",
 			stub: func(database *mocks_data.Database, _ *mocks_handlers.PageRenderer, _ *mocks_handlers.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-					Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+					Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, boom)
 			},
 			wantErr: "boom",
@@ -54,9 +54,9 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 		{
 			name: "the render fails",
 			stub: func(database *mocks_data.Database, pageRenderer *mocks_handlers.PageRenderer, _ *mocks_handlers.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-					Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+					Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
 				pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html", "/consent.html", mock.Anything).
 					Return(boom)
@@ -66,11 +66,11 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 		{
 			name: "the save before issuance fails",
 			stub: func(database *mocks_data.Database, _ *mocks_handlers.PageRenderer, ceremonyStore *mocks_handlers.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
+				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-					Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+					Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
-					Return(&models.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid"}, nil)
+					Return(&record.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid"}, nil)
 				ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(boom)
 			},
 			wantErr: "boom",
@@ -116,8 +116,8 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 // "The filter failing closed records nothing" in handler_consent_test.go.
 func TestHandleConsentPost_GrantFailures(t *testing.T) {
 	boom := errors.New("boom")
-	client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-	user := &models.User{Id: 1}
+	client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
+	user := &record.User{Id: 1}
 
 	testCases := []struct {
 		name    string

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -346,7 +346,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 
 	// Setup: Create many permissions
 	const numPermissions = 10
-	var permissions []*models.Permission
+	var permissions []*record.Permission
 	for i := 0; i < numPermissions; i++ {
 		perm := createTestPermission(t, resource.Id,
 			"permission-"+strconv.Itoa(i),

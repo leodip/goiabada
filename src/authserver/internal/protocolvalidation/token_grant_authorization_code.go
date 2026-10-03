@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
@@ -15,7 +15,7 @@ import (
 // AuthorizationCodeGrant is a validated code redemption: the code, loaded with its client and user,
 // not yet claimed. The claim is the issuer's, and it is what makes the redemption single-use (#77).
 type AuthorizationCodeGrant struct {
-	Code *models.Code
+	Code *record.Code
 }
 
 func (*AuthorizationCodeGrant) GrantType() oidc.GrantType { return oidc.GrantTypeAuthorizationCode }
@@ -29,7 +29,7 @@ const AuthorizationCodeNotSupportedErrorMsg = "The client associated with the pr
 
 // validateAuthorizationCodeGrant validates a code redemption (RFC 6749 section 4.1.3) for a client
 // ValidateTokenRequest has already found and found enabled.
-func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, client *models.Client,
+func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, client *record.Client,
 	input *ValidateTokenRequestInput) (*AuthorizationCodeGrant, error) {
 	if !client.AuthorizationCodeEnabled {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",

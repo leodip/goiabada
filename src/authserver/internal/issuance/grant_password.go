@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -24,8 +24,8 @@ import (
 // session identifier, and the refresh path already hard-coded it empty. Removed rather
 // than defaulted, so it cannot be reintroduced by an eager caller (#106).
 type ROPCGrantInput struct {
-	Client *models.Client
-	User   *models.User
+	Client *record.Client
+	User   *record.User
 	Scope  string
 	// AuthenticatedAt is when the password was checked, and so what every token of the grant
 	// issues as auth_time. The issuer writes it, not the caller: IssuePasswordGrant
@@ -45,7 +45,7 @@ type ROPCGrantInput struct {
 // its own used to differ only in three omitempty tags, on the access token, token type and
 // expires_in, none of which is ever empty here: the settings refuse a lifetime of 0 or less, and
 // a client's 0 means it inherits that setting (#437).
-func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *models.Settings,
+func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.Settings,
 	input *ROPCGrantInput) (*oauth.TokenResponse, error) {
 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)

@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
@@ -41,7 +41,7 @@ func HandleForgotPasswordGet(
 // forgotPasswordDatabase is what the forgot password page needs: the user it stamps with a reset
 // code.
 type forgotPasswordDatabase interface {
-	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 	TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
 		codeHash string, issuedAt time.Time) (bool, error)
 }
@@ -53,7 +53,7 @@ type forgotPasswordDatabase interface {
 // Only issuance reads verification. Redeeming a link checks the account is enabled and not
 // whether its address is verified, so the administrator's setup link, issued to a new user's
 // possibly unverified address, keeps working.
-func canRecoverPassword(user *models.User) bool {
+func canRecoverPassword(user *record.User) bool {
 	return user.Enabled && user.EmailVerified
 }
 
@@ -87,7 +87,7 @@ const (
 )
 
 // ineligibleRecoveryOutcome names why canRecoverPassword refused an account.
-func ineligibleRecoveryOutcome(user *models.User) string {
+func ineligibleRecoveryOutcome(user *record.User) string {
 	if !user.Enabled {
 		return recoveryOutcomeAccountDisabled
 	}
@@ -193,7 +193,7 @@ func finishForgotPassword(
 	baseURL string,
 	clientIP string,
 	email string,
-	user *models.User,
+	user *record.User,
 ) {
 	switch {
 	case user == nil:

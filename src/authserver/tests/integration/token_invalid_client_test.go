@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,12 +59,12 @@ func TestToken_InvalidClient_OneShapeOverBothTransports(t *testing.T) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
-	newClient := func(enabled bool) *models.Client {
-		client := &models.Client{
+	newClient := func(enabled bool) *record.Client {
+		client := &record.Client{
 			ClientIdentifier:         "invalid-client-" + fake.LetterN(8),
 			Enabled:                  enabled,
 			ClientCredentialsEnabled: true,
-			DefaultAcrLevel:          models.AcrLevel2Optional,
+			DefaultAcrLevel:          record.AcrLevel2Optional,
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))

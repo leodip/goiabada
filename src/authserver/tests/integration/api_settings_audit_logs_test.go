@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -212,7 +212,7 @@ func TestAPISettingsAuditLogsPut_InvalidBody(t *testing.T) {
 // before saving precisely so that turning logging off is still recorded.
 func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	// Database logging must be on for the event to be queryable.
-	changeSettings(t, func(settings *models.Settings) { settings.AuditLogsInDatabaseEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 	accessToken, _ := createAdminClientWithToken(t)
 
 	before, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, audit.EventUpdatedAuditLogsSettings, "")

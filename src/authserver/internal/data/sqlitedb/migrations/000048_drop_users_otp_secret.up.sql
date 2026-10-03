@@ -4,7 +4,7 @@
 -- one-shot startup pass that read each plaintext seed, wrote its ciphertext to
 -- users.otp_secret_encrypted and blanked this column; it is deleted here along with
 -- ReencryptDataToNewKey, the other 1.5.x conversion. Since 1.6.0 every write of a seed has gone to
--- otp_secret_encrypted through models.User.SetOTPSecret, and every read through GetOTPSecret, so on
+-- otp_secret_encrypted through record.User.SetOTPSecret, and every read through GetOTPSecret, so on
 -- any database that has booted 1.6.x this column holds nothing anybody reads.
 --
 -- AN UPGRADE MUST PASS THROUGH 1.6.x. Coming straight from 1.5.x, nothing has run the conversion,
@@ -13,7 +13,7 @@
 -- in. No pre-flight refuses that upgrade; the release notes are the whole of the warning.
 --
 -- The column is nullable on all four engines, carries no default and is in no index, so nothing has
--- to be dropped before it. The Go field models.User.OTPSecret goes in the same commit, because
+-- to be dropped before it. The Go field record.User.OTPSecret goes in the same commit, because
 -- sqlbuilder derives every users statement's column list from the struct tags and a surviving
 -- `db:"otp_secret"` would break every user query on every engine.
 ALTER TABLE users DROP COLUMN otp_secret;

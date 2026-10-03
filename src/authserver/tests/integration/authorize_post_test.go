@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // Verifies OIDC Core 3.1.2.1: the authorization endpoint MUST support POST
@@ -27,18 +27,18 @@ func TestAuthorize_PostRequest(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			client := &models.Client{
+			client := &record.Client{
 				ClientIdentifier:         "test-client-" + fake.LetterN(8),
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
 				ConsentRequired:          false,
-				DefaultAcrLevel:          models.AcrLevel1,
+				DefaultAcrLevel:          record.AcrLevel1,
 			}
 			if err := database.CreateClient(context.Background(), nil, client); err != nil {
 				t.Fatal(err)
 			}
 
-			redirectUri := &models.RedirectURI{
+			redirectUri := &record.RedirectURI{
 				ClientId: client.Id,
 				URI:      fake.URL(),
 			}

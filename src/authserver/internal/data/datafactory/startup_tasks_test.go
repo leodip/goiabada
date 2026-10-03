@@ -10,7 +10,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,20 +32,20 @@ const (
 
 // canaryUnder is a key pair whose PEM is real ciphertext under key, which is what the decision
 // reads: a stubbed decrypt would test the stub.
-func canaryUnder(t *testing.T, key []byte) models.KeyPair {
+func canaryUnder(t *testing.T, key []byte) record.KeyPair {
 	t.Helper()
 	ciphertext, err := encryption.EncryptText(canaryPEM, key)
 	require.NoError(t, err)
-	return models.KeyPair{PrivateKeyPEM: ciphertext}
+	return record.KeyPair{PrivateKeyPEM: ciphertext}
 }
 
 // rotatedRecords counts the record a re-key writes, so the rows that must not re-key can say they
 // wrote nothing either.
 func rotatedRecords(capture *logtest.SlogCapture) []logtest.CapturedRecord {
 	var found []logtest.CapturedRecord
-	for _, record := range capture.Records() {
-		if record.Message == rotatedRecord {
-			found = append(found, record)
+	for _, logRecord := range capture.Records() {
+		if logRecord.Message == rotatedRecord {
+			found = append(found, logRecord)
 		}
 	}
 	return found
@@ -85,20 +85,20 @@ func TestRunStartupDataTasks_SkipsWithoutAUsablePreviousKey(t *testing.T) {
 func TestRunStartupDataTasks_NothingToRotate(t *testing.T) {
 	cases := []struct {
 		name string
-		keys func(t *testing.T) []models.KeyPair
+		keys func(t *testing.T) []record.KeyPair
 	}{
-		{"no key pairs", func(*testing.T) []models.KeyPair { return nil }},
-		{"key pairs holding no PEM", func(*testing.T) []models.KeyPair {
-			return []models.KeyPair{{}, {PrivateKeyPEM: []byte{}}}
+		{"no key pairs", func(*testing.T) []record.KeyPair { return nil }},
+		{"key pairs holding no PEM", func(*testing.T) []record.KeyPair {
+			return []record.KeyPair{{}, {PrivateKeyPEM: []byte{}}}
 		}},
-		{"a canary already under the current key", func(t *testing.T) []models.KeyPair {
-			return []models.KeyPair{canaryUnder(t, currentKey)}
+		{"a canary already under the current key", func(t *testing.T) []record.KeyPair {
+			return []record.KeyPair{canaryUnder(t, currentKey)}
 		}},
 		// The canary is the FIRST non-empty PEM. The pair under an unknown key after it would be a
 		// refusal if it were read; the empty one before it would be a refusal too, since it opens
 		// under nothing, if emptiness were not skipped.
-		{"the first non-empty PEM is the canary", func(t *testing.T) []models.KeyPair {
-			return []models.KeyPair{{}, canaryUnder(t, currentKey), canaryUnder(t, unknownKey)}
+		{"the first non-empty PEM is the canary", func(t *testing.T) []record.KeyPair {
+			return []record.KeyPair{{}, canaryUnder(t, currentKey), canaryUnder(t, unknownKey)}
 		}},
 	}
 
@@ -126,7 +126,7 @@ func TestRunStartupDataTasks_RotatesACanaryUnderThePreviousKey(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	db := mocks_data.NewDatabase(t)
 	db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
-		Return([]models.KeyPair{{}, canaryUnder(t, previousKey)}, nil).Once()
+		Return([]record.KeyPair{{}, canaryUnder(t, previousKey)}, nil).Once()
 	db.EXPECT().ReencryptToKey(mock.Anything, previousKey, currentKey).Return(nil).Once()
 
 	require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, previousKey))
@@ -150,7 +150,7 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 	t.Run("a canary under neither key is refused and nothing is re-keyed", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
-			Return([]models.KeyPair{canaryUnder(t, unknownKey)}, nil).Once()
+			Return([]record.KeyPair{canaryUnder(t, unknownKey)}, nil).Once()
 
 		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
 
@@ -177,7 +177,7 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 		capture := logtest.CaptureSlog(t)
 		db := mocks_data.NewDatabase(t)
 		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
-			Return([]models.KeyPair{canaryUnder(t, previousKey)}, nil).Once()
+			Return([]record.KeyPair{canaryUnder(t, previousKey)}, nil).Once()
 		db.EXPECT().ReencryptToKey(mock.Anything, previousKey, currentKey).Return(boom).Once()
 
 		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)

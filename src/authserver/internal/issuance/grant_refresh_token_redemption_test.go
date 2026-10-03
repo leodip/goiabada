@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +41,7 @@ var (
 // fakeSessions is the session port a refresh bumps through, recording each bump.
 type fakeSessions struct {
 	bumps   []bumpCall
-	session *models.UserSession
+	session *record.UserSession
 	err     error
 	note    func(string)
 }
@@ -50,12 +50,12 @@ type bumpCall struct {
 	sessionIdentifier string
 	clientId          int64
 	authMethods       string
-	acrLevel          models.AcrLevel
+	acrLevel          record.AcrLevel
 	ipAddress         string
 }
 
 func (f *fakeSessions) BumpUserSession(_ context.Context, sessionIdentifier string, clientId int64,
-	authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error) {
+	authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
 	f.bumps = append(f.bumps, bumpCall{sessionIdentifier, clientId, authMethods, acrLevel, ipAddress})
 	if f.note != nil {
 		f.note("bump")
@@ -68,8 +68,8 @@ func (f *fakeSessions) BumpUserSession(_ context.Context, sessionIdentifier stri
 func codeRefreshInput() *RefreshTokenGrantInput {
 	now := time.Now().UTC()
 	return &RefreshTokenGrantInput{
-		Client: &models.Client{Id: 1, ClientIdentifier: "test-client", AuthorizationCodeEnabled: true},
-		RefreshToken: &models.RefreshToken{
+		Client: &record.Client{Id: 1, ClientIdentifier: "test-client", AuthorizationCodeEnabled: true},
+		RefreshToken: &record.RefreshToken{
 			Id:                   7,
 			RefreshTokenJti:      "jti-presented",
 			FirstRefreshTokenJti: "jti-family",
@@ -77,7 +77,7 @@ func codeRefreshInput() *RefreshTokenGrantInput {
 			MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 			Scope:                "openid resource1:read",
 			CodeId:               sql.NullInt64{Int64: 9, Valid: true},
-			Code: models.Code{
+			Code: record.Code{
 				Id:                9,
 				ClientId:          1,
 				UserId:            5,
@@ -86,8 +86,8 @@ func codeRefreshInput() *RefreshTokenGrantInput {
 				SessionIdentifier: "sid-1",
 				AcrLevel:          "urn:goiabada:level1",
 				AuthMethods:       "pwd",
-				Client:            models.Client{Id: 1, ClientIdentifier: "test-client"},
-				User:              models.User{Id: 5, Subject: fake.UUID(), Email: "someone@example.com"},
+				Client:            record.Client{Id: 1, ClientIdentifier: "test-client"},
+				User:              record.User{Id: 5, Subject: fake.UUID(), Email: "someone@example.com"},
 			},
 		},
 	}
@@ -99,8 +99,8 @@ func ropcRefreshInput() *RefreshTokenGrantInput {
 	now := time.Now().UTC()
 	ropcOn := true
 	return &RefreshTokenGrantInput{
-		Client: &models.Client{Id: 1, ClientIdentifier: "ropc-client", ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
-		RefreshToken: &models.RefreshToken{
+		Client: &record.Client{Id: 1, ClientIdentifier: "ropc-client", ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
+		RefreshToken: &record.RefreshToken{
 			Id:                   7,
 			RefreshTokenJti:      "jti-presented",
 			FirstRefreshTokenJti: "jti-family",
@@ -110,8 +110,8 @@ func ropcRefreshInput() *RefreshTokenGrantInput {
 			RefreshTokenType:     "Offline",
 			MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 			AuthenticatedAt:      sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
-			User:                 models.User{Id: 5, Subject: fake.UUID(), Email: "someone@example.com"},
-			Client:               models.Client{Id: 1, ClientIdentifier: "ropc-client"},
+			User:                 record.User{Id: 5, Subject: fake.UUID(), Email: "someone@example.com"},
+			Client:               record.Client{Id: 1, ClientIdentifier: "ropc-client"},
 		},
 		IsROPC: true,
 	}
@@ -147,7 +147,7 @@ func armRotationReading(mockDB *mocks_data.Database, input *RefreshTokenGrantInp
 	if claimed && !familyRevoked {
 		mockDB.On("GetRefreshTokenById", mock.Anything, rotationTx, input.RefreshToken.Id).
 			Run(func(mock.Arguments) { note("reread") }).
-			Return(&models.RefreshToken{Id: input.RefreshToken.Id, Revoked: true, AuthStateGeneration: currentGeneration}, nil).Once()
+			Return(&record.RefreshToken{Id: input.RefreshToken.Id, Revoked: true, AuthStateGeneration: currentGeneration}, nil).Once()
 	}
 	return stub
 }
@@ -155,7 +155,7 @@ func armRotationReading(mockDB *mocks_data.Database, input *RefreshTokenGrantInp
 // insertedChild is the refresh token row the mint inserted, captured for the case that asks what it
 // was stamped with.
 type insertedChild struct {
-	row *models.RefreshToken
+	row *record.RefreshToken
 }
 
 // armRefreshMint arms every read and write minting input's token set makes, all on rotationTx,
@@ -165,20 +165,20 @@ func armRefreshMint(t *testing.T, mockDB *mocks_data.Database, input *RefreshTok
 	t.Helper()
 	parent := input.RefreshToken
 	inserted := &insertedChild{}
-	mockDB.On("GetCurrentSigningKey", mock.Anything, rotationTx).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, rotationTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil).Once()
-	mockDB.On("CreateRefreshToken", mock.Anything, rotationTx, mock.AnythingOfType("*models.RefreshToken")).
+	mockDB.On("CreateRefreshToken", mock.Anything, rotationTx, mock.AnythingOfType("*record.RefreshToken")).
 		Run(func(args mock.Arguments) {
 			note("insert")
-			inserted.row = args.Get(2).(*models.RefreshToken)
+			inserted.row = args.Get(2).(*record.RefreshToken)
 		}).Return(nil).Once()
 	mockDB.On("UserHasProfilePicture", mock.Anything, rotationTx, mock.Anything).Return(false, nil).Maybe()
 	if input.IsROPC {
 		// The mint loads onto the parent it was handed: the presented token as the validator read
 		// it, with the generation the rotation re-read under the lock, so the row is matched by id.
-		sameToken := mock.MatchedBy(func(rt *models.RefreshToken) bool { return rt.Id == parent.Id })
+		sameToken := mock.MatchedBy(func(rt *record.RefreshToken) bool { return rt.Id == parent.Id })
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, rotationTx, sameToken).Run(func(mock.Arguments) { note("mint") }).Return(nil).Once()
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, rotationTx, sameToken).Return(nil).Once()
 		mockDB.On("UserLoadGroups", mock.Anything, rotationTx, &parent.User).Return(nil).Once()
@@ -194,14 +194,14 @@ func armRefreshMint(t *testing.T, mockDB *mocks_data.Database, input *RefreshTok
 	mockDB.On("GroupsLoadAttributes", mock.Anything, rotationTx, code.User.Groups).Return(nil).Once()
 	mockDB.On("UserLoadAttributes", mock.Anything, rotationTx, &code.User).Return(nil).Once()
 	// The max lifetime of a session-bound token is read off the session, on the transaction.
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, rotationTx, "sid-1").Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, rotationTx, "sid-1").Return(&record.UserSession{
 		Id: 1, UserId: 5, Started: now.Add(-30 * time.Minute), LastAccessed: now.Add(-5 * time.Minute),
 	}, nil).Once()
 	return inserted
 }
 
-func refreshGrantSettings() *models.Settings {
-	return &models.Settings{
+func refreshGrantSettings() *record.Settings {
+	return &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -219,7 +219,7 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	var order []string
 	note := func(what string) { order = append(order, what) }
-	sessions := &fakeSessions{session: &models.UserSession{Id: 3, UserId: 5}, note: note}
+	sessions := &fakeSessions{session: &record.UserSession{Id: 3, UserId: 5}, note: note}
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, sessions)
 
 	input := codeRefreshInput()
@@ -309,7 +309,7 @@ func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &models.UserSession{}})
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &record.UserSession{}})
 
 			input := tc.input()
 			input.ScopeRequested = "openid profile"
@@ -490,27 +490,27 @@ func TestIssueRefreshTokenGrant_FlowGate(t *testing.T) {
 
 	for _, tc := range []struct {
 		name       string
-		client     *models.Client
+		client     *record.Client
 		globalROPC bool
 		ropcToken  bool
 		refused    bool
 	}{
 		{"row 1: ROPC token, both flows on, accepted",
-			&models.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
+			&record.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
 		{"row 2: ROPC token, ROPC-only client, accepted",
-			&models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
+			&record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
 		{"row 3: ROPC token, ROPC off on the client, refused",
-			&models.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
+			&record.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
 		{"row 4: ROPC token, both flows off, refused",
-			&models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
+			&record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
 		// The only row that fails if the gate reads the per-client override alone: the client
 		// inherits, and the global switch is what turns ROPC off.
 		{"row 5: ROPC token, client inherits, global ROPC off, refused",
-			&models.Client{Id: 1, AuthorizationCodeEnabled: true}, false, true, true},
+			&record.Client{Id: 1, AuthorizationCodeEnabled: true}, false, true, true},
 		{"row 6: authorization code token, that flow off, refused",
-			&models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, false, true},
+			&record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, false, true},
 		{"row 7: authorization code token, that flow on, ROPC off, accepted",
-			&models.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, false, false, false},
+			&record.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
@@ -561,7 +561,7 @@ func TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate(t *testing.T) {
 			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{})
 
 			input := tc.input
-			input.Client = &models.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}
+			input.Client = &record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}
 			input.RefreshToken.Revoked = true
 			settings := refreshGrantSettings()
 			settings.ResourceOwnerPasswordCredentialsEnabled = false
@@ -750,7 +750,7 @@ func TestIssueRefreshTokenGrant_ARefusedCommitHandsOutNothing(t *testing.T) {
 	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(true, nil).Once()
 	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, "jti-family").Return(false, nil).Once()
 	mockDB.On("GetRefreshTokenById", mock.Anything, rotationTx, input.RefreshToken.Id).
-		Return(&models.RefreshToken{Id: input.RefreshToken.Id}, nil).Once()
+		Return(&record.RefreshToken{Id: input.RefreshToken.Id}, nil).Once()
 	armRefreshMint(t, mockDB, input, func(string) {})
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
@@ -786,7 +786,7 @@ func TestIssueRefreshTokenGrant_TakesTheTokensOwnersRowFirst(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &models.UserSession{}})
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &record.UserSession{}})
 
 			input := tc.input()
 			var order []string
@@ -852,7 +852,7 @@ func TestIssueRefreshTokenGrant_TheChildIsStampedFromTheRowReadUnderTheLock(t *t
 		} {
 			t.Run(tc.name+", "+current.name, func(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
-				issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &models.UserSession{}})
+				issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, &fakeSessions{session: &record.UserSession{}})
 
 				input := tc.input()
 				input.RefreshToken.AuthStateGeneration = 3
@@ -882,7 +882,7 @@ func TestIssueRefreshTokenGrant_ATokenThatCannotBeReadBackIsAFault(t *testing.T)
 
 	for _, tc := range []struct {
 		name string
-		row  *models.RefreshToken
+		row  *record.RefreshToken
 		err  error
 	}{
 		{"the read fails", nil, failure},

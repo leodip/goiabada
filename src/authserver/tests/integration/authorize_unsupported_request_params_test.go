@@ -9,14 +9,14 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
-func createTestClientWithRedirect(t *testing.T) (*models.Client, *models.RedirectURI) {
+func createTestClientWithRedirect(t *testing.T) (*record.Client, *record.RedirectURI) {
 	t.Helper()
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -25,7 +25,7 @@ func createTestClientWithRedirect(t *testing.T) (*models.Client, *models.Redirec
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}

@@ -6,7 +6,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -42,9 +42,9 @@ func TestValidateScopes_ResolvesUnderTheCallersContext(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 
 	mockDB.On("GetResourceByResourceIdentifier", theCallersContext(), mock.Anything, "billing-api").
-		Return(&models.Resource{Id: 9, ResourceIdentifier: "billing-api"}, nil).Once()
+		Return(&record.Resource{Id: 9, ResourceIdentifier: "billing-api"}, nil).Once()
 	mockDB.On("GetPermissionsByResourceId", theCallersContext(), mock.Anything, int64(9)).
-		Return([]models.Permission{{Id: 21, PermissionIdentifier: "read", ResourceId: 9}}, nil).Once()
+		Return([]record.Permission{{Id: 21, PermissionIdentifier: "read", ResourceId: 9}}, nil).Once()
 
 	err := NewAuthorizeValidator(mockDB).ValidateScopes(aCallersContext(), "billing-api:read")
 
@@ -71,13 +71,13 @@ func TestValidateScopes_AMalformedScopeReachesNoDatabasePort(t *testing.T) {
 func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 
-	client := &models.Client{Id: 5, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true}
+	client := &record.Client{Id: 5, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true}
 
 	mockDB.On("GetClientByClientIdentifier", theCallersContext(), mock.Anything, "portal").
 		Return(client, nil).Once()
 	mockDB.On("ClientLoadRedirectURIs", theCallersContext(), mock.Anything, client).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: "https://example.com/callback"}}
 		}).Return(nil).Once()
 
 	err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(aCallersContext(),
