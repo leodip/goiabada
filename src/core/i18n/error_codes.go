@@ -6,7 +6,7 @@ package i18n
 // Conventions:
 //   - validator.<domain>.<reason>: errors emitted by validators in
 //     src/authserver/internal/protocolvalidation/, src/authserver/internal/
-//     accountvalidation/ and src/core/validators/. Domain is the entity
+//     accountvalidation/ and src/core/inputvalidation/. Domain is the entity
 //     (e.g. "login", "address", "email"). Reason is a short slug.
 //   - handler.<domain>.<reason>: errors emitted by handlers (auth flow,
 //     account self-service, admin operations).
