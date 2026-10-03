@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -168,7 +168,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Create a confidential client with auth code enabled
-	clientSecret := stringutil.GenerateSecurityRandomString(60)
+	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 	client := &models.Client{

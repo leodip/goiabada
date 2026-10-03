@@ -22,7 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -336,7 +336,7 @@ func HandleAPIClientCreatePost(
 		}
 
 		// Generate and encrypt client secret
-		clientSecret := stringutil.GenerateSecurityRandomString(60)
+		clientSecret := securerandom.String(60)
 		clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to encrypt client secret"))

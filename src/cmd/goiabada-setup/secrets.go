@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 func generateHexKey(bytes int) string {
@@ -28,7 +28,7 @@ const generatedPasswordLength = 16
 // container exits, and one uniform 16-character draw in 17 had no digit (#430).
 func generatePassword() string {
 	for {
-		password := stringutil.RandomStringFromAlphabet(generatedPasswordLength, generatedAlphabet)
+		password := securerandom.StringFromAlphabet(generatedPasswordLength, generatedAlphabet)
 		if hasThreeClasses(password) {
 			return password
 		}
@@ -54,5 +54,5 @@ func hasThreeClasses(s string) bool {
 // generateSecret is a secret no one types, the OAuth client secret: a plain uniform draw, with no
 // character classes to hold.
 func generateSecret(length int) string {
-	return stringutil.RandomStringFromAlphabet(length, generatedAlphabet)
+	return securerandom.StringFromAlphabet(length, generatedAlphabet)
 }

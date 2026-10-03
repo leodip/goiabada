@@ -411,6 +411,8 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `NewErrorDetailWithHTTPStatus` | both-apps | — |
 | `core/oauth` | `SplitSpaceDelimited` | kernel | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
+| `core/securerandom` | `String` | both-apps | — |
+| `core/securerandom` | `StringFromAlphabet` | own-package | — |
 | `core/sessionstore` | `Backend` | kernel | — |
 | `core/sessionstore` | `BrowserSessionCookie` | reachable | — |
 | `core/sessionstore` | `ConfiguredKey` | both-apps | — |
@@ -435,8 +437,6 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
 | `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
-| `core/stringutil` | `GenerateSecurityRandomString` | both-apps | — |
-| `core/stringutil` | `RandomStringFromAlphabet` | own-package | — |
 | `core/testutil` | `AssertAgentDocs` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertArchitecture` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertAuditLogContext` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |

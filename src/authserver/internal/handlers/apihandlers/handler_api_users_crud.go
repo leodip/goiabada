@@ -28,7 +28,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 // usersCrudDatabase is what the user endpoints need: the user row, the writes that change it, and
@@ -462,7 +462,7 @@ func HandleAPIUserCreatePost(
 
 		// Handle email flow if needed
 		if sendSetupEmail {
-			verificationCode := stringutil.GenerateSecurityRandomString(32)
+			verificationCode := securerandom.String(32)
 			verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 			if err != nil {
 				writeInternalServerError(w, r, err)

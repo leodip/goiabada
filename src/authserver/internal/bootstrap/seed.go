@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 )
 
 // seedDatabase is the seed's port: the transaction and the nine creates its 18 writes call.
@@ -130,7 +130,7 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 		clientSecret = r.cfg.OAuthClientSecret
 		slog.InfoContext(ctx, "using pre-generated OAuth client secret from environment")
 	} else {
-		clientSecret = stringutil.GenerateSecurityRandomString(60)
+		clientSecret = securerandom.String(60)
 		slog.InfoContext(ctx, "generated new OAuth client secret")
 	}
 	clientSecretEncrypted, err := r.dataCipher.Encrypt(clientSecret)

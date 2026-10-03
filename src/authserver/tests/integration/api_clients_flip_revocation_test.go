@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +51,7 @@ func flipToPublic(t *testing.T, adminToken string, clientId int64) api.UpdateCli
 func flipToConfidential(t *testing.T, adminToken string, clientId int64) string {
 	t.Helper()
 
-	secret := stringutil.GenerateSecurityRandomString(60)
+	secret := securerandom.String(60)
 	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
 		strconv.FormatInt(clientId, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken,

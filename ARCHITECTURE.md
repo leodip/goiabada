@@ -109,8 +109,8 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
 | `core/oauth` | kernel | — |
+| `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
-| `core/stringutil` | kernel | — |
 | `core/testutil` | kernel | — |
 | `core/timezones` | kernel | — |
 | `core/validators` | kernel | — |

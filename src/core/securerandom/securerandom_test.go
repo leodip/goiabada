@@ -1,4 +1,4 @@
-package stringutil
+package securerandom
 
 import (
 	"bytes"
@@ -79,9 +79,9 @@ func TestGenerators_LengthAndAlphabet(t *testing.T) {
 		gen      func(int) string
 		alphabet string
 	}{
-		{"GenerateSecurityRandomString", GenerateSecurityRandomString, securityAlphabet},
-		{"RandomStringFromAlphabet", func(n int) string {
-			return RandomStringFromAlphabet(n, securityAlphabet)
+		{"String", String, securityAlphabet},
+		{"StringFromAlphabet", func(n int) string {
+			return StringFromAlphabet(n, securityAlphabet)
 		}, securityAlphabet},
 	}
 
@@ -107,10 +107,10 @@ func TestGenerators_LengthAndAlphabet(t *testing.T) {
 }
 
 // crashChildEnv marks the re-executed child of
-// TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure. Only the
-// child swaps crypto/rand.Reader, so the parent's binary -- and every other case
-// in this package -- keeps the real source.
-const crashChildEnv = "GOIABADA_STRINGUTIL_CRASH_CHILD"
+// TestString_CrashesIrrecoverablyOnReaderFailure. Only the child swaps
+// crypto/rand.Reader, so the parent's binary -- and every other case in this
+// package -- keeps the real source.
+const crashChildEnv = "GOIABADA_SECURERANDOM_CRASH_CHILD"
 
 // alwaysFailingReader is a CSPRNG that has stopped answering. errReader above is
 // the same shape but is fed straight to randomStringFromReader; this one is
@@ -119,44 +119,44 @@ const crashChildEnv = "GOIABADA_STRINGUTIL_CRASH_CHILD"
 type alwaysFailingReader struct{}
 
 func (alwaysFailingReader) Read([]byte) (int, error) {
-	return 0, errors.New("stringutil_test: entropy source is unavailable")
+	return 0, errors.New("securerandom_test: entropy source is unavailable")
 }
 
-// TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure pins the
-// half of the exported generators' contract that no length or alphabet
-// assertion can reach: on a CSPRNG failure the process dies, and no caller gets
-// a string or a chance to invent one.
+// TestString_CrashesIrrecoverablyOnReaderFailure pins the half of the exported
+// generators' contract that no length or alphabet assertion can reach: on a
+// CSPRNG failure the process dies, and no caller gets a string or a chance to
+// invent one.
 //
 // It is the case #211 was missing. The wrapper this package shipped until then
 // answered a failed draw with "", and every other case in this file passes
 // against that version, so the ceremony ids and continuation ids it fed were
 // guarded by hand at two call sites and nowhere else. Reverting
-// randomStringFromAlphabet to io.ReadFull with an `if err != nil { return "" }`
+// StringFromAlphabet's draw to io.ReadFull with an `if err != nil { return "" }`
 // branch leaves the whole rest of this file green and fails only here.
 //
 // It runs in a re-executed child because the failure is a runtime fatal that no
 // recover can catch, so it takes its process with it. The child needs no broken
 // OS: crypto/rand.Read reads whatever crypto/rand.Reader holds and calls the
 // fatal handler on any error from it.
-func TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure(t *testing.T) {
+func TestString_CrashesIrrecoverablyOnReaderFailure(t *testing.T) {
 	if os.Getenv(crashChildEnv) == "1" {
 		rand.Reader = alwaysFailingReader{}
 		defer func() {
 			// Reached only if the draw failed in a catchable way, which is the
 			// contract being violated. Exit 0 so the parent's assertion fails.
 			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "GenerateSecurityRandomString panicked recoverably with %v\n", r)
+				fmt.Fprintf(os.Stderr, "String panicked recoverably with %v\n", r)
 				os.Exit(0)
 			}
 		}()
-		got := GenerateSecurityRandomString(32)
-		fmt.Fprintf(os.Stderr, "GenerateSecurityRandomString returned %q from a failing reader\n", got)
+		got := String(32)
+		fmt.Fprintf(os.Stderr, "String returned %q from a failing reader\n", got)
 		os.Exit(0)
 		return
 	}
 
 	cmd := exec.Command(os.Args[0],
-		"-test.run=^TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure$")
+		"-test.run=^TestString_CrashesIrrecoverablyOnReaderFailure$")
 	cmd.Env = append(os.Environ(), crashChildEnv+"=1")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -177,8 +177,8 @@ func TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure(t *tes
 	}
 }
 
-// TestRandomStringFromAlphabet_Domain is the reason the exported wrapper exists. The private
-// sampler assumed an alphabet of at most 256 bytes, which was true of all three callers in this
+// TestStringFromAlphabet_Domain is the reason StringFromAlphabet checks its alphabet's length
+// before it samples. The private sampler assumed an alphabet of at most 256 bytes, which was true of all three callers in this
 // repository; exporting it under a generic name publishes that assumption to callers who have
 // never read it, and the failure mode is not a wrong answer but a hang. The rejection limit is
 // 256 - (256 % n), which is 0 for n > 256, so every byte drawn is rejected and the loop inside
@@ -187,7 +187,7 @@ func TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure(t *tes
 // 256 is the last length that works and 257 the first that would spin, so both are rows here
 // rather than one. A regression makes this test hang rather than fail, and the tier's own
 // timeout is the backstop (#385).
-func TestRandomStringFromAlphabet_Domain(t *testing.T) {
+func TestStringFromAlphabet_Domain(t *testing.T) {
 	alphabetOf := func(n int) string {
 		b := make([]byte, n)
 		for i := range b {
@@ -197,21 +197,21 @@ func TestRandomStringFromAlphabet_Domain(t *testing.T) {
 	}
 
 	t.Run("a one-byte alphabet yields that byte", func(t *testing.T) {
-		if got := RandomStringFromAlphabet(4, "x"); got != "xxxx" {
+		if got := StringFromAlphabet(4, "x"); got != "xxxx" {
 			t.Errorf("got %q, want %q", got, "xxxx")
 		}
 	})
 
 	t.Run("a 256-byte alphabet is inside the domain", func(t *testing.T) {
 		alphabet := alphabetOf(256)
-		got := RandomStringFromAlphabet(64, alphabet)
+		got := StringFromAlphabet(64, alphabet)
 		if len(got) != 64 {
 			t.Fatalf("len = %d, want 64", len(got))
 		}
 		// IndexByte rather than ContainsRune: the alphabet is bytes, and at 256 entries it
 		// holds every byte, so as a Go string it is not valid UTF-8 and rune decoding would
 		// answer for a replacement character instead of the byte that was drawn. That is the
-		// domain this wrapper documents, seen from the test side.
+		// domain StringFromAlphabet documents, seen from the test side.
 		for i := 0; i < len(got); i++ {
 			if strings.IndexByte(alphabet, got[i]) < 0 {
 				t.Fatalf("produced byte %d, which is not in the alphabet", got[i])
@@ -220,19 +220,19 @@ func TestRandomStringFromAlphabet_Domain(t *testing.T) {
 	})
 
 	t.Run("a 257-byte alphabet returns rather than spinning", func(t *testing.T) {
-		if got := RandomStringFromAlphabet(4, alphabetOf(257)); got != "" {
+		if got := StringFromAlphabet(4, alphabetOf(257)); got != "" {
 			t.Errorf("got %q, want the empty string", got)
 		}
 	})
 
 	t.Run("the two pre-existing out-of-domain answers are unchanged", func(t *testing.T) {
-		if got := RandomStringFromAlphabet(0, "abc"); got != "" {
+		if got := StringFromAlphabet(0, "abc"); got != "" {
 			t.Errorf("length 0: got %q, want the empty string", got)
 		}
-		if got := RandomStringFromAlphabet(-1, "abc"); got != "" {
+		if got := StringFromAlphabet(-1, "abc"); got != "" {
 			t.Errorf("length -1: got %q, want the empty string", got)
 		}
-		if got := RandomStringFromAlphabet(4, ""); got != "" {
+		if got := StringFromAlphabet(4, ""); got != "" {
 			t.Errorf("empty alphabet: got %q, want the empty string", got)
 		}
 	})
