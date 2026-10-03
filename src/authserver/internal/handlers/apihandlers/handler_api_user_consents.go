@@ -24,7 +24,7 @@ type userConsentsDatabase interface {
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []models.UserConsent) error
 }
 
-func HandleAPIUserConsentsGet(
+func HandleUserConsentsGet(
 	database userConsentsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func HandleAPIUserConsentsGet(
 	}
 }
 
-func HandleAPIUserConsentDelete(
+func HandleUserConsentDelete(
 	database userConsentsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

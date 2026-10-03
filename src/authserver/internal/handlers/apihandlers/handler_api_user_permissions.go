@@ -28,7 +28,7 @@ type userPermissionsDatabase interface {
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-func HandleAPIUserPermissionsGet(
+func HandleUserPermissionsGet(
 	database userPermissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func HandleAPIUserPermissionsGet(
 	}
 }
 
-func HandleAPIUserPermissionsPut(
+func HandleUserPermissionsPut(
 	database userPermissionsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

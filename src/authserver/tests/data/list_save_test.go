@@ -111,7 +111,7 @@ func saveRedirectURIs(t *testing.T, db data.Database, auditLogger apihandlers.Au
 	ctx = reqctx.WithSettings(ctx, &models.Settings{Id: 1})
 
 	rr := httptest.NewRecorder()
-	apihandlers.HandleAPIClientRedirectURIsPut(db, auditLogger).ServeHTTP(rr, req.WithContext(ctx))
+	apihandlers.HandleClientRedirectURIsPut(db, auditLogger).ServeHTTP(rr, req.WithContext(ctx))
 	return rr
 }
 

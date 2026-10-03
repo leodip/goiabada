@@ -38,14 +38,14 @@ func theApiRequestsContext() interface{} {
 // The accept arm: the paged search is issued on behalf of the request that asked for it, which is
 // also the read most worth cancelling, since it is the one an operator can make arbitrarily
 // expensive from the query string.
-func TestHandleAPIUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
+func TestHandleUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
 		Return([]models.User{{Id: 1, Subject: "sub-1", Email: "ada@example.com"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIUsersSearchGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/users/search?query=ada"))
+	HandleUsersSearchGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/users/search?query=ada"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -53,14 +53,14 @@ func TestHandleAPIUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
 
 // The reject arm: two annotations that cannot be combined are refused after the search but before
 // either annotation read, so neither annotating port is reached at all.
-func TestHandleAPIUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *testing.T) {
+func TestHandleUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
 		Return([]models.User{{Id: 1, Subject: "sub-1"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIUsersSearchGet(database).ServeHTTP(rr,
+	HandleUsersSearchGet(database).ServeHTTP(rr,
 		apiRequestCarryingId("/api/v1/admin/users/search?query=ada&annotateGroupMembership=1&annotatePermissionId=2"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
@@ -73,7 +73,7 @@ func TestHandleAPIUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *
 // and each of them now issued on behalf of the request that asked.
 
 // apiSessionsRequest is apiRequestCarryingId plus the chi id parameter and the settings the
-// session handlers read, which is everything HandleAPIUserSessionsGet needs before its first query.
+// session handlers read, which is everything HandleUserSessionsGet needs before its first query.
 func apiSessionsRequest(userId string) *http.Request {
 	req := apiRequestCarryingId("/api/v1/admin/users/" + userId + "/sessions")
 	rctx := chi.NewRouteContext()
@@ -89,7 +89,7 @@ func apiSessionsRequest(userId string) *http.Request {
 // The accept arm: all three reads -- the user, its sessions, and the clients those sessions
 // authorized -- carry the request's own context, including the loader, which reaches the database
 // a second time inside commondb.
-func TestHandleAPIUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T) {
+func TestHandleUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetUserById", theApiRequestsContext(), mock.Anything, int64(7)).
@@ -100,7 +100,7 @@ func TestHandleAPIUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testin
 		Return(nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("7"))
+	HandleUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("7"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -108,11 +108,11 @@ func TestHandleAPIUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testin
 
 // The reject arm: an id that is not a number is refused before the first query, so no session
 // port is reached at all and there is no context to get wrong.
-func TestHandleAPIUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) {
+func TestHandleUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
-	HandleAPIUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("not-a-number"))
+	HandleUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything, mock.Anything)
@@ -125,7 +125,7 @@ func TestHandleAPIUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) 
 // inside commondb.
 
 // apiClientRequest is apiRequestCarryingId plus the chi id parameter the single-client handlers
-// read, which is everything HandleAPIClientGet needs before its first query.
+// read, which is everything HandleClientGet needs before its first query.
 func apiClientRequest(clientId string) *http.Request {
 	req := apiRequestCarryingId("/api/v1/admin/clients/" + clientId)
 	rctx := chi.NewRouteContext()
@@ -137,7 +137,7 @@ func apiClientRequest(clientId string) *http.Request {
 // context. The loaders matter more than the list here, because each reaches the database a second
 // time inside commondb and is the shape that would keep compiling with a context.Background()
 // under it.
-func TestHandleAPIClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
+func TestHandleClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllClients", theApiRequestsContext(), mock.Anything).
@@ -148,7 +148,7 @@ func TestHandleAPIClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 		Return(nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/clients"))
+	HandleClientsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/clients"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -156,11 +156,11 @@ func TestHandleAPIClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 
 // The reject arm: an id that is not a number is refused before the first query, so neither the
 // client read nor either loader is reached and there is no context to get wrong.
-func TestHandleAPIClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
+func TestHandleClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientGet(database, testDataCipher).ServeHTTP(rr, apiClientRequest("not-a-number"))
+	HandleClientGet(database, testDataCipher).ServeHTTP(rr, apiClientRequest("not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetClientById", mock.Anything, mock.Anything, mock.Anything)
@@ -178,7 +178,7 @@ func apiResourcePermissionsRequest(resourceId string) *http.Request {
 
 // The accept arm for the permission half: the listing and the resource hydration that follows it
 // are both issued on behalf of the request that asked.
-func TestHandleAPIPermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(t *testing.T) {
+func TestHandlePermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetPermissionsByResourceId", theApiRequestsContext(), mock.Anything, int64(4)).
@@ -187,7 +187,7 @@ func TestHandleAPIPermissionsByResourceGet_ReadsPermissionsUnderTheRequestsConte
 		Return(nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIPermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("4"))
+	HandlePermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("4"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -195,11 +195,11 @@ func TestHandleAPIPermissionsByResourceGet_ReadsPermissionsUnderTheRequestsConte
 
 // The reject arm: a resource id that is not a number is refused before the listing, so neither
 // permission port is reached.
-func TestHandleAPIPermissionsByResourceGet_MalformedResourceIdReachesNoPermissionPort(t *testing.T) {
+func TestHandlePermissionsByResourceGet_MalformedResourceIdReachesNoPermissionPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
-	HandleAPIPermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("not-a-number"))
+	HandlePermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetPermissionsByResourceId", mock.Anything, mock.Anything, mock.Anything)

@@ -17,13 +17,13 @@ import (
 )
 
 // =============================================================================
-// HandleAPIClientLogoGet tests
+// HandleClientLogoGet tests
 // =============================================================================
 
-func TestHandleAPIClientLogoGet_NoClientId(t *testing.T) {
+func TestHandleClientLogoGet_NoClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database, testBaseURL)
+	handler := HandleClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients//logo", nil)
 	rr := httptest.NewRecorder()
@@ -38,10 +38,10 @@ func TestHandleAPIClientLogoGet_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleAPIClientLogoGet_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoGet_InvalidClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database, testBaseURL)
+	handler := HandleClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/invalid/logo", nil)
 	req = setChiURLParam(req, "id", "invalid")
@@ -57,10 +57,10 @@ func TestHandleAPIClientLogoGet_InvalidClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleAPIClientLogoGet_ClientNotFound(t *testing.T) {
+func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database, testBaseURL)
+	handler := HandleClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -80,10 +80,10 @@ func TestHandleAPIClientLogoGet_ClientNotFound(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
+func TestHandleClientLogoGet_HasLogo(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database, testBaseURL)
+	handler := HandleClientLogoGet(database, testBaseURL)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -103,10 +103,10 @@ func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIClientLogoGet_NoLogo(t *testing.T) {
+func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	handler := HandleAPIClientLogoGet(database, testBaseURL)
+	handler := HandleClientLogoGet(database, testBaseURL)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -127,14 +127,14 @@ func TestHandleAPIClientLogoGet_NoLogo(t *testing.T) {
 }
 
 // =============================================================================
-// HandleAPIClientLogoPost tests
+// HandleClientLogoPost tests
 // =============================================================================
 
-func TestHandleAPIClientLogoPost_NoClientId(t *testing.T) {
+func TestHandleClientLogoPost_NoClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
+	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	req, _ := http.NewRequest("POST", "/api/v1/admin/clients//logo", nil)
 	rr := httptest.NewRecorder()
@@ -149,11 +149,11 @@ func TestHandleAPIClientLogoPost_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleAPIClientLogoPost_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoPost_InvalidClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
+	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	req, _ := http.NewRequest("POST", "/api/v1/admin/clients/invalid/logo", nil)
 	req = setChiURLParam(req, "id", "invalid")
@@ -169,11 +169,11 @@ func TestHandleAPIClientLogoPost_InvalidClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
+func TestHandleClientLogoPost_ClientNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
+	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
@@ -195,11 +195,11 @@ func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
+func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
+	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -226,11 +226,11 @@ func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 
 // The size cap is the one the handler was handed, not the configured default: an image the
 // default accepts is refused under a smaller injected cap, and the refusal names that cap (#434).
-func TestHandleAPIClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) {
+func TestHandleClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, 64)
+	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, 64)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 
@@ -253,11 +253,11 @@ func TestHandleAPIClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.
 	assert.Equal(t, "The image can be at most 64 bytes.", response["error_description"])
 }
 
-func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
+func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
+	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 	adminSub := "admin-user-sub"
@@ -289,11 +289,11 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
+func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
+	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 	existingLogo := &models.ClientLogo{
@@ -332,14 +332,14 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 }
 
 // =============================================================================
-// HandleAPIClientLogoDelete tests
+// HandleClientLogoDelete tests
 // =============================================================================
 
-func TestHandleAPIClientLogoDelete_NoClientId(t *testing.T) {
+func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoDelete(database, auditLogger)
+	handler := HandleClientLogoDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients//logo", nil)
 	rr := httptest.NewRecorder()
@@ -354,11 +354,11 @@ func TestHandleAPIClientLogoDelete_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleAPIClientLogoDelete_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoDelete_InvalidClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoDelete(database, auditLogger)
+	handler := HandleClientLogoDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/invalid/logo", nil)
 	req = setChiURLParam(req, "id", "invalid")
@@ -374,11 +374,11 @@ func TestHandleAPIClientLogoDelete_InvalidClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleAPIClientLogoDelete_ClientNotFound(t *testing.T) {
+func TestHandleClientLogoDelete_ClientNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoDelete(database, auditLogger)
+	handler := HandleClientLogoDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -398,11 +398,11 @@ func TestHandleAPIClientLogoDelete_ClientNotFound(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
+func TestHandleClientLogoDelete_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoDelete(database, auditLogger)
+	handler := HandleClientLogoDelete(database, auditLogger)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 	adminSub := "admin-user-sub"
@@ -429,11 +429,11 @@ func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-func TestHandleAPIClientLogoDelete_DatabaseError(t *testing.T) {
+func TestHandleClientLogoDelete_DatabaseError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIClientLogoDelete(database, auditLogger)
+	handler := HandleClientLogoDelete(database, auditLogger)
 
 	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
 

@@ -13,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// HandleAPISettingsTokensGet - GET /api/v1/admin/settings/tokens
-func HandleAPISettingsTokensGet() http.HandlerFunc {
+// HandleSettingsTokensGet - GET /api/v1/admin/settings/tokens
+func HandleSettingsTokensGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
@@ -39,8 +39,8 @@ type settingsTokensDatabase interface {
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 }
 
-// HandleAPISettingsTokensPut - PUT /api/v1/admin/settings/tokens
-func HandleAPISettingsTokensPut(
+// HandleSettingsTokensPut - PUT /api/v1/admin/settings/tokens
+func HandleSettingsTokensPut(
 	database settingsTokensDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

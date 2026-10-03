@@ -21,8 +21,8 @@ type accountAddressDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// HandleAPIAccountAddressPut - PUT /api/v1/account/address
-func HandleAPIAccountAddressPut(
+// HandleAccountAddressPut - PUT /api/v1/account/address
+func HandleAccountAddressPut(
 	database accountAddressDatabase,
 	addressValidator *accountvalidation.AddressValidator,
 	auditLogger AuditLogger,

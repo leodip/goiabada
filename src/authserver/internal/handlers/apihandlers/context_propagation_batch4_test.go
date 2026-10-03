@@ -35,7 +35,7 @@ func apiIdRequest(target, id string) *http.Request {
 // on behalf of the request that asked. The count matters more than the list, because it runs once
 // per group inside a loop and is the shape that would keep compiling with a context.Background()
 // under it.
-func TestHandleAPIGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
+func TestHandleGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllGroups", theApiRequestsContext(), mock.Anything).
@@ -44,7 +44,7 @@ func TestHandleAPIGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
 		Return(2, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
+	HandleGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -52,11 +52,11 @@ func TestHandleAPIGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
 
 // The reject arm: an id that is not a number is refused before the first query, so neither the
 // group read nor the member count is reached and there is no context to get wrong.
-func TestHandleAPIGroupGet_MalformedIdReachesNoGroupPort(t *testing.T) {
+func TestHandleGroupGet_MalformedIdReachesNoGroupPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
-	HandleAPIGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number", "not-a-number"))
+	HandleGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number", "not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetGroupById", mock.Anything, mock.Anything, mock.Anything)
@@ -67,7 +67,7 @@ func TestHandleAPIGroupGet_MalformedIdReachesNoGroupPort(t *testing.T) {
 // once for the group's permission rows and once for the permissions themselves, and both hops
 // carry whatever context the handler hands in. It is one of stage 1's five nil-transaction sites,
 // so it is also the method most worth showing carries the request's own.
-func TestHandleAPIGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t *testing.T) {
+func TestHandleGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetGroupById", theApiRequestsContext(), mock.Anything, int64(5)).
@@ -78,7 +78,7 @@ func TestHandleAPIGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t 
 		Return(0, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5/permissions", "5"))
+	HandleGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5/permissions", "5"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -86,11 +86,11 @@ func TestHandleAPIGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t 
 
 // The reject arm: a group id that is not a number is refused before the read, so the loader is
 // never reached.
-func TestHandleAPIGroupPermissionsGet_MalformedIdReachesNoPermissionPort(t *testing.T) {
+func TestHandleGroupPermissionsGet_MalformedIdReachesNoPermissionPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
-	HandleAPIGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number/permissions", "not-a-number"))
+	HandleGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number/permissions", "not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetGroupById", mock.Anything, mock.Anything, mock.Anything)
@@ -99,14 +99,14 @@ func TestHandleAPIGroupPermissionsGet_MalformedIdReachesNoPermissionPort(t *test
 
 // The accept arm for the key half: the signing keys page reads every key pair on the install, and
 // reads it on behalf of the request that asked.
-func TestHandleAPISettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
+func TestHandleSettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theApiRequestsContext(), mock.Anything).
 		Return([]models.KeyPair{{Id: 9, KeyIdentifier: "kid-9", State: models.KeyStateCurrent.String()}}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/settings/keys"))
+	HandleSettingsKeysGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/settings/keys"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -115,14 +115,14 @@ func TestHandleAPISettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T)
 // The reject arm: a key id that is not a number is refused before the read, so neither the key
 // read nor the delete is reached. The delete is the assertion worth having, because it is the one
 // that would destroy a signing key: a revocation retires every token that key signed.
-func TestHandleAPISettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
+func TestHandleSettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	req := apiIdRequest("/api/v1/admin/settings/keys/not-a-number", "not-a-number")
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeyDelete(database, auditLogger).ServeHTTP(rr, req)
+	HandleSettingsKeyDelete(database, auditLogger).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetKeyPairById", mock.Anything, mock.Anything, mock.Anything)
@@ -132,14 +132,14 @@ func TestHandleAPISettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
 // The accept arm for the audit log half. It is the read most worth cancelling in this batch for
 // the same reason the user search was in stage 7: an operator chooses the page size from the query
 // string, and the count statement runs over the whole table whatever that size is.
-func TestHandleAPIAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
+func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
 		Return([]models.AuditLog{{Id: 1, AuditEvent: "login"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAuditLogsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/audit-logs"))
+	HandleAuditLogsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/audit-logs"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -149,14 +149,14 @@ func TestHandleAPIAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 // every malformed page and size falls back to the default rather than answering 400. So what the
 // case pins is that the clamp happens BEFORE the read and that the read still carries the
 // request's context -- a size of 500 reaches the database as 20, not as 500.
-func TestHandleAPIAuditLogsGet_AnOutOfRangeSizeReachesTheDatabaseClamped(t *testing.T) {
+func TestHandleAuditLogsGet_AnOutOfRangeSizeReachesTheDatabaseClamped(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
 		Return([]models.AuditLog{}, 0, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAuditLogsGet(database).ServeHTTP(rr,
+	HandleAuditLogsGet(database).ServeHTTP(rr,
 		apiRequestCarryingId("/api/v1/admin/audit-logs?page=0&size=500"))
 
 	require.Equal(t, http.StatusOK, rr.Code)

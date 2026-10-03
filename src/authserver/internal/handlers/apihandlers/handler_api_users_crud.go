@@ -49,8 +49,8 @@ type usersCrudDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// HandleAPIUserGet - GET /api/v1/admin/users/{id}
-func HandleAPIUserGet(
+// HandleUserGet - GET /api/v1/admin/users/{id}
+func HandleUserGet(
 	database usersCrudDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -91,8 +91,8 @@ func HandleAPIUserGet(
 	}
 }
 
-// HandleAPIUserPasswordPut - PUT /api/v1/admin/users/{id}/password
-func HandleAPIUserPasswordPut(
+// HandleUserPasswordPut - PUT /api/v1/admin/users/{id}/password
+func HandleUserPasswordPut(
 	database usersCrudDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
@@ -203,8 +203,8 @@ func HandleAPIUserPasswordPut(
 	}
 }
 
-// HandleAPIUserOTPPut - PUT /api/v1/admin/users/{id}/otp
-func HandleAPIUserOTPPut(
+// HandleUserOTPPut - PUT /api/v1/admin/users/{id}/otp
+func HandleUserOTPPut(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -285,8 +285,8 @@ func HandleAPIUserOTPPut(
 	}
 }
 
-// HandleAPIUserCreatePost - POST /api/v1/admin/users/create
-func HandleAPIUserCreatePost(
+// HandleUserCreatePost - POST /api/v1/admin/users/create
+func HandleUserCreatePost(
 	pageRenderer PageRenderer,
 	database usersCrudDatabase,
 	userCreator UserCreator,
@@ -528,15 +528,15 @@ func HandleAPIUserCreatePost(
 	}
 }
 
-// errUserAlreadyDisabled is what HandleAPIUserEnabledPut's write callback returns to
+// errUserAlreadyDisabled is what HandleUserEnabledPut's write callback returns to
 // revocation.RevokeUserAuthStateTx when the compare-and-set found the account already disabled.
 // It exists so the transaction ends before the sweep and without committing: a nil return would
 // sweep a user a previous disable already dealt with, and any other error would be reported as a
 // fault, when the honest answer is "nothing to do".
 var errUserAlreadyDisabled = errors.New("the user is already disabled")
 
-// HandleAPIUserEnabledPut - PUT /api/v1/admin/users/{id}/enabled
-func HandleAPIUserEnabledPut(
+// HandleUserEnabledPut - PUT /api/v1/admin/users/{id}/enabled
+func HandleUserEnabledPut(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -669,8 +669,8 @@ func HandleAPIUserEnabledPut(
 	}
 }
 
-// HandleAPIUserDelete - DELETE /api/v1/admin/users/{id}
-func HandleAPIUserDelete(
+// HandleUserDelete - DELETE /api/v1/admin/users/{id}
+func HandleUserDelete(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

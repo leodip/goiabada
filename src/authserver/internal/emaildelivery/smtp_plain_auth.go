@@ -21,7 +21,7 @@ func plainResponse(username, password string) []byte {
 // smtp.PlainAuth always writes them there, as `AUTH PLAIN <base64>`, and RFC 4954 section 4 says
 // that "if use of the initial response argument would cause the AUTH command to exceed this
 // length, the client MUST NOT use the initial response parameter". Nothing bounds the SMTP
-// password on the way into the settings -- apihandlers.HandleAPISettingsEmailPut bounds the host,
+// password on the way into the settings -- apihandlers.HandleSettingsEmailPut bounds the host,
 // username, from-name and from-address and not the password -- so a password an admin can save
 // today is enough to overrun the line against a server that enforces it (#274).
 func plainInitialResponseFits(username, password string) bool {

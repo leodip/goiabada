@@ -666,7 +666,7 @@ func TestWireJSON_ListMapperNilShapes(t *testing.T) {
 // rather than merely returning more.
 //
 // And the null that the producer must never emit: both arrays are required and neither is
-// nullable, so the nil row below is the shape HandleAPIClientSessionsGet is written to avoid on
+// nullable, so the nil row below is the shape HandleClientSessionsGet is written to avoid on
 // an empty page. The integration tier reads the raw bytes of that page, because a decode into
 // this struct cannot tell [] from null.
 func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {

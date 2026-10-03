@@ -113,7 +113,7 @@ UPDATE web_origins SET origin = substr(origin, 1, length(origin) - 4)
 -- three it is inert. A standards-valid origin can reach 267 characters
 -- (`https://` plus a 253-character host plus `:65535`), so this is a storage
 -- limit rather than a fact about origins, and it is the same limit
--- HandleAPIClientWebOriginsPut refuses a new value against (#250 decision 14b).
+-- HandleClientWebOriginsPut refuses a new value against (#250 decision 14b).
 -- Widening three columns four different ways inside a migration already doing
 -- string surgery four different ways is the trade this declines.
 DELETE FROM web_origins WHERE length(origin) > 256;

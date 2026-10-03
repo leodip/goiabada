@@ -30,7 +30,7 @@ type resourcesDatabase interface {
 	UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
 }
 
-func HandleAPIResourcesGet(
+func HandleResourcesGet(
 	database resourcesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -53,8 +53,8 @@ func HandleAPIResourcesGet(
 	}
 }
 
-// HandleAPIResourceCreatePost - POST /api/v1/admin/resources
-func HandleAPIResourceCreatePost(
+// HandleResourceCreatePost - POST /api/v1/admin/resources
+func HandleResourceCreatePost(
 	database resourcesDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -126,8 +126,8 @@ func HandleAPIResourceCreatePost(
 	}
 }
 
-// HandleAPIResourceGet - GET /api/v1/admin/resources/{id}
-func HandleAPIResourceGet(
+// HandleResourceGet - GET /api/v1/admin/resources/{id}
+func HandleResourceGet(
 	database resourcesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -160,8 +160,8 @@ func HandleAPIResourceGet(
 	}
 }
 
-// HandleAPIResourceUpdatePut - PUT /api/v1/admin/resources/{id}
-func HandleAPIResourceUpdatePut(
+// HandleResourceUpdatePut - PUT /api/v1/admin/resources/{id}
+func HandleResourceUpdatePut(
 	database resourcesDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -262,8 +262,8 @@ func HandleAPIResourceUpdatePut(
 	}
 }
 
-// HandleAPIResourceDelete - DELETE /api/v1/admin/resources/{id}
-func HandleAPIResourceDelete(
+// HandleResourceDelete - DELETE /api/v1/admin/resources/{id}
+func HandleResourceDelete(
 	database resourcesDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

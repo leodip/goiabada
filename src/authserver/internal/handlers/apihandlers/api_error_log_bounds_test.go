@@ -71,10 +71,10 @@ func oneErrorRecord(t *testing.T, capture *logtest.SlogCapture) map[string]any {
 	return records[0].Attrs
 }
 
-// TestHandleAPIAuditLogsGet_ErrorRecordBoundsBothFilters covers the endpoint this change gave the
+// TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters covers the endpoint this change gave the
 // request-id filter: when the query fails, both filter values reach the record clipped and escaped,
 // and neither reaches it whole.
-func TestHandleAPIAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
+func TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	rawEvent, wantEvent := oversized(t, forgedLine)
 	rawRequestId, wantRequestId := oversized(t, "abc\ndef")
 
@@ -85,7 +85,7 @@ func TestHandleAPIAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
-	HandleAPIAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
+	HandleAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
 		url.Values{"auditEvent": {rawEvent}, "requestId": {rawRequestId}}))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -105,9 +105,9 @@ func TestHandleAPIAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-// TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQuery is the same property on the other endpoint
+// TestHandleUsersSearchGet_ErrorRecordBoundsTheQuery is the same property on the other endpoint
 // that logs a client-chosen filter, and the reason the fix was four call sites rather than one.
-func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
+func TestHandleUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
 	rawQuery, wantQuery := oversized(t, forgedLine)
 
 	database := mocks_data.NewDatabase(t)
@@ -117,7 +117,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
-	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
+	HandleUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
 		url.Values{"query": {rawQuery}}))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -142,7 +142,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
-	HandleAPIAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
+	HandleAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
 		url.Values{"auditEvent": {event}, "requestId": {filterId}}))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -165,7 +165,7 @@ func searchThatSucceeds(database *mocks_data.Database, rawQuery string) {
 		Return([]models.User{{Id: 42}}, 1, nil)
 }
 
-func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t *testing.T) {
+func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t *testing.T) {
 	rawQuery, wantQuery := oversized(t, forgedLine)
 
 	database := mocks_data.NewDatabase(t)
@@ -176,7 +176,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFail
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
-	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
+	HandleUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
 		url.Values{"query": {rawQuery}, "annotateGroupMembership": {"7"}}))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -190,7 +190,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFail
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails(t *testing.T) {
+func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails(t *testing.T) {
 	rawQuery, wantQuery := oversized(t, forgedLine)
 
 	database := mocks_data.NewDatabase(t)
@@ -202,7 +202,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
-	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
+	HandleUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
 		url.Values{"query": {rawQuery}, "annotateGroupMembership": {"7"}}))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)

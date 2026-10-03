@@ -34,7 +34,7 @@ func loadGroupsOnto(groups ...models.Group) func(mock.Arguments) {
 }
 
 // usergroups/get-count.
-func TestHandleAPIUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
+func TestHandleUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(42)).
 		Return(&models.User{Id: 42, Subject: "sub-42"}, nil).Once()
@@ -44,7 +44,7 @@ func TestHandleAPIUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIUserGroupsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/users/42/groups", "42"))
+	HandleUserGroupsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/users/42/groups", "42"))
 
 	requireCountFailureAnswered500(t, rr, capture, 5)
 	require.Equal(t, int64(42), capture.Records()[0].Attrs["user_id"])
@@ -53,7 +53,7 @@ func TestHandleAPIUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
 // usergroups/put-count: the membership is committed and audited before the response is counted,
 // so the 500 answers a request whose effect stands. What the case pins is that the response does
 // not then claim the group has no members.
-func TestHandleAPIUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
+func TestHandleUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -77,7 +77,7 @@ func TestHandleAPIUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIUserGroupsPut(database, auditLogger).ServeHTTP(rr, req)
+	HandleUserGroupsPut(database, auditLogger).ServeHTTP(rr, req)
 
 	requireCountFailureAnswered500(t, rr, capture, 5)
 	require.Equal(t, int64(42), capture.Records()[0].Attrs["user_id"])
@@ -112,7 +112,7 @@ func serveUserGroupsBody(database *mocks_data.Database, auditLogger *mocks_handl
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", strings.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
 	rr := httptest.NewRecorder()
-	HandleAPIUserGroupsPut(database, auditLogger).ServeHTTP(rr, req)
+	HandleUserGroupsPut(database, auditLogger).ServeHTTP(rr, req)
 	return rr
 }
 
@@ -173,7 +173,7 @@ func recordMembershipAudits(t *testing.T, auditLogger *mocks_handlers.AuditLogge
 // compared with the set the caller loaded, and replaced by exactly replaceSet's plan, deletes then
 // inserts, on that transaction. One audit event per membership added and removed follows the
 // commit, and the answer's reload follows those (#428).
-func TestHandleAPIUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
+func TestHandleUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -212,7 +212,7 @@ func TestHandleAPIUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) 
 // A membership stored twice, which two overlapping saves that both add it leave behind, is deleted
 // in both copies when it is removed, and audited as one removal. An extra copy of a membership that
 // is kept is deleted as a repair and audited as nothing (#428).
-func TestHandleAPIUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
+func TestHandleUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -242,7 +242,7 @@ func TestHandleAPIUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *test
 // which is when the real one rolls back, and the answer is one 500 with nothing audited and no
 // reload. Written autocommitted, as this save was, the membership removed before the failure
 // stayed removed, and audited, under the 500 (#428).
-func TestHandleAPIUserGroupsPut_AFailedWriteCommitsNothing(t *testing.T) {
+func TestHandleUserGroupsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -268,7 +268,7 @@ func TestHandleAPIUserGroupsPut_AFailedWriteCommitsNothing(t *testing.T) {
 // with no write and no audit. A save removing the one stored membership, with the read's error
 // ignored, would find nothing to delete and answer 200 with the user still in the group; and with
 // both lists empty it would answer 200 over a read that never happened (#428).
-func TestHandleAPIUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
+func TestHandleUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 	variants := []struct {
 		name     string
 		expected []int64
@@ -303,7 +303,7 @@ func TestHandleAPIUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T
 // A body aborted as a deadlock victim on its first attempt and rerun by the helper answers once
 // and audits once: the plan is recomputed from a fresh read on each attempt, and the events are
 // emitted from the attempt that committed, after it did (#301, #428).
-func TestHandleAPIUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
+func TestHandleUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -344,7 +344,7 @@ func TestHandleAPIUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) 
 }
 
 // The helper giving up, a deadlock on every attempt, is one 500 and no audit event.
-func TestHandleAPIUserGroupsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
+func TestHandleUserGroupsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -363,7 +363,7 @@ func TestHandleAPIUserGroupsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 // outdated page: 409 CONCURRENT_UPDATE, nothing written and nothing audited, where applying the
 // whole set would silently put the user back into a group another administrator had just removed
 // them from (#428).
-func TestHandleAPIUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+func TestHandleUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -386,7 +386,7 @@ func TestHandleAPIUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 // A loaded set equal to the stored memberships as a set proceeds: in another order and with a
 // repeat, and [] against no stored memberships, which is a page that loaded none and not a missing
 // field (#428).
-func TestHandleAPIUserGroupsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
+func TestHandleUserGroupsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	variants := []struct {
 		name     string
 		stored   []membershipRow
@@ -423,7 +423,7 @@ func TestHandleAPIUserGroupsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 // strict mock carries the reads each refusal needs and nothing else, and reaching RunInTransaction
 // fails the case. The loaded set is required and read from the body before any query (#428); the
 // array bound is #373's; a group that does not exist is refused as before.
-func TestHandleAPIUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
+func TestHandleUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 	tooMany := make([]int64, maxGroupIdsPerRequest+1)
 	for i := range tooMany {
 		tooMany[i] = int64(i + 1)
@@ -495,7 +495,7 @@ func TestHandleAPIUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.
 // A repeated id in the request is looked up once, added once and audited once, like the three
 // permission saves. The lookup answers each group once, so the repeat used to be refused as a
 // group that does not exist (#428).
-func TestHandleAPIUserGroupsPut_ARepeatedIdIsAddedOnce(t *testing.T) {
+func TestHandleUserGroupsPut_ARepeatedIdIsAddedOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 

@@ -20,10 +20,10 @@ type groupsSearchDatabase interface {
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
 }
 
-// HandleAPIGroupsSearchGet
+// HandleGroupsSearchGet
 // GET /api/v1/admin/groups/search?annotatePermissionId={permissionId}&page={page}&size={size}
 // Returns paginated groups annotated with whether they have the specified permission.
-func HandleAPIGroupsSearchGet(
+func HandleGroupsSearchGet(
 	database groupsSearchDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

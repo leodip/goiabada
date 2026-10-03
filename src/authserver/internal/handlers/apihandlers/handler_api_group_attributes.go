@@ -29,7 +29,7 @@ type groupAttributesDatabase interface {
 	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error
 }
 
-func HandleAPIGroupAttributesGet(
+func HandleGroupAttributesGet(
 	database groupAttributesDatabase,
 ) http.HandlerFunc {
 
@@ -78,7 +78,7 @@ func HandleAPIGroupAttributesGet(
 	}
 }
 
-func HandleAPIGroupAttributeGet(
+func HandleGroupAttributeGet(
 	database groupAttributesDatabase,
 ) http.HandlerFunc {
 
@@ -120,7 +120,7 @@ func HandleAPIGroupAttributeGet(
 	}
 }
 
-func HandleAPIGroupAttributeCreatePost(
+func HandleGroupAttributeCreatePost(
 	database groupAttributesDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -208,7 +208,7 @@ func HandleAPIGroupAttributeCreatePost(
 	}
 }
 
-func HandleAPIGroupAttributeUpdatePut(
+func HandleGroupAttributeUpdatePut(
 	database groupAttributesDatabase,
 	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
@@ -312,7 +312,7 @@ func HandleAPIGroupAttributeUpdatePut(
 	}
 }
 
-func HandleAPIGroupAttributeDelete(
+func HandleGroupAttributeDelete(
 	database groupAttributesDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

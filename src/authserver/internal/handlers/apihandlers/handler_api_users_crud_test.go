@@ -46,7 +46,7 @@ func enabledRequest(t *testing.T, userId string, enabled bool) *http.Request {
 	})
 }
 
-// TestHandleAPIUserEnabledPut_RevocationConditionality is the four-row matrix from #106 findings 4
+// TestHandleUserEnabledPut_RevocationConditionality is the four-row matrix from #106 findings 4
 // and 21. The endpoint serves BOTH directions through one handler, so which requests revoke is a
 // real branch rather than a formality.
 //
@@ -58,7 +58,7 @@ func enabledRequest(t *testing.T, userId string, enabled bool) *http.Request {
 // Every row asserts EventUpdatedUserDetails still fires. That event is pre-existing and decision 7
 // requires it to be untouched, so a row where it stopped firing would be a regression this change
 // caused rather than a behaviour it intended.
-func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
+func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 	const userId = int64(42)
 
 	for _, tc := range []struct {
@@ -134,7 +134,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				Return(&models.User{Id: userId, Enabled: tc.requestedEnabled}, nil).Once()
 
 			rr := httptest.NewRecorder()
-			handler := HandleAPIUserEnabledPut(database, auditLogger)
+			handler := HandleUserEnabledPut(database, auditLogger)
 			handler.ServeHTTP(rr, enabledRequest(t, "42", tc.requestedEnabled))
 
 			assert.Equal(t, http.StatusOK, rr.Code)
@@ -172,10 +172,10 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 	}
 }
 
-// TestHandleAPIUserEnabledPut_SweepFailureRollsBack: the disable transition succeeded and the
+// TestHandleUserEnabledPut_SweepFailureRollsBack: the disable transition succeeded and the
 // sweep then failed. The compare-and-set must not survive, so the user stays enabled and no event
 // claims otherwise.
-func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
+func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	const userId = int64(42)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
@@ -187,7 +187,7 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 		Return(int64(0), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIUserEnabledPut(database, auditLogger)
+	handler := HandleUserEnabledPut(database, auditLogger)
 	handler.ServeHTTP(rr, enabledRequest(t, "42", false))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -198,11 +198,11 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestHandleAPIUserPasswordPut_RevokesEverything covers the fourth site, the one the issue never
+// TestHandleUserPasswordPut_RevokesEverything covers the fourth site, the one the issue never
 // mentioned (#106 decision 2). An admin setting another user's password revokes all of that
 // user's state with no exceptSid: the admin's own session belongs to a different user and is
 // unaffected.
-func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
+func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	const userId = int64(42)
 	const newPassword = "N3wP4ss!word"
 
@@ -239,7 +239,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 		map[string]interface{}{"sub": adminSubject, "auth_time": float64(1)})
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIUserPasswordPut(database, passwordValidator, auditLogger)
+	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger)
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -260,12 +260,12 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	assert.Equal(t, "", value)
 }
 
-// TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically is the admin half of #111 decision 13.
+// TestHandleUserOTPPut_DisableCommitsBothWritesAtomically is the admin half of #111 decision 13.
 // Decision 4 names two disable sites and this is the second: they share otpcredential.Remove, and this case
 // is what pins that this handler goes through it rather than keeping two unbound writes of its own.
-// Its account sibling, TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically, carries the
+// Its account sibling, TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically, carries the
 // reasoning about why the two writes have to commit together.
-func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
+func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	const userId = int64(42)
 
 	database := mocks_data.NewDatabase(t)
@@ -301,7 +301,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	HandleAPIUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
+	HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, []string{"begin", "update", "reset", "increment", "commit"}, calls,
@@ -310,7 +310,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	assert.False(t, user.OTPEnabled)
 }
 
-// TestHandleAPIUserCreatePost_StoresResetCodeHash covers the admin user-create path, which
+// TestHandleUserCreatePost_StoresResetCodeHash covers the admin user-create path, which
 // is one of the three places Goiabada issues a password-reset link and the only one with
 // no unit coverage of the email branch before this.
 //
@@ -318,14 +318,14 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 // actually went into the link. It is the only thing that will find this row when the link
 // comes back, since the link carries the code and no email address (#112), so a hash of
 // anything else leaves the new user unable to set a password at all.
-func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
+func TestHandleUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 
-	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
+	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
@@ -384,10 +384,10 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	emailSender.AssertExpectations(t)
 }
 
-// TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409 covers the branch decision 15 built the
+// TestHandleUserCreatePost_LostRaceOnTheEmailAnswers409 covers the branch decision 15 built the
 // unique-key sentinel for.
 //
-// HandleAPIUserCreatePost pre-checks the address with GetUserByEmail and answers 409 from that,
+// HandleUserCreatePost pre-checks the address with GetUserByEmail and answers 409 from that,
 // which is the ordinary case and what the integration suite exercises. This is the race that check
 // cannot close: a concurrent create takes the address between the read and the write, the engine
 // refuses the insert, and the data layer tags the failure with data.ErrUniqueViolation.
@@ -399,14 +399,14 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 // The error is wrapped twice on the way here, as it is in production -- ExecSQL tags, CreateUser
 // wraps, the user creator wraps -- because a bare type assertion or a comparison against the
 // outermost error would pass on an untouched sentinel and fail on the real one.
-func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
+func TestHandleUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 
-	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
+	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
@@ -449,18 +449,18 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	userCreator.AssertExpectations(t)
 }
 
-// TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500 is the other side of that branch, and
+// TestHandleUserCreatePost_AnyOtherCreateFailureAnswers500 is the other side of that branch, and
 // it is what stops the 409 from becoming the answer to every failed create. A caller told 409 will
 // retry with a different address; told 500, it reports the failure, which is the right thing to do
 // when the write failed for a reason no address change fixes.
-func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
+func TestHandleUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	userCreator := mocks_accounthandlers.NewUserCreator(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 
-	handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
+	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
 		accountvalidation.NewProfileValidator(database),
 		accountvalidation.NewPasswordValidator(),
@@ -496,7 +496,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	userCreator.AssertExpectations(t)
 }
 
-// TestHandleAPIUserCreatePost_SetPasswordTypeMatrix is the whole of what setPasswordType decides,
+// TestHandleUserCreatePost_SetPasswordTypeMatrix is the whole of what setPasswordType decides,
 // on both SMTP settings, including the cell that used to fall through both arms.
 //
 // openapi.yaml publishes the property as enum [now, email] and leaves it out of the schema's
@@ -511,7 +511,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 // is SMTP to send it with. The two arms are driven by one boolean, so "neither" is no longer a
 // reachable state; these rows are what would go red if that boolean were split back into two
 // independent conditions.
-func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
+func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 	const goodPassword = "password123"
 
 	for _, tc := range []struct {
@@ -583,7 +583,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 			emailSender := mocks_accounthandlers.NewEmailSender(t)
 
-			handler := HandleAPIUserCreatePost(pageRenderer, database, userCreator,
+			handler := HandleUserCreatePost(pageRenderer, database, userCreator,
 				accountvalidation.NewEmailValidator(database),
 				accountvalidation.NewProfileValidator(database),
 				accountvalidation.NewPasswordValidator(),

@@ -17,8 +17,8 @@ type userSessionsDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
 }
 
-// HandleAPIUserSessionGet - GET /api/v1/admin/user-sessions/{sessionIdentifier}
-func HandleAPIUserSessionGet(
+// HandleUserSessionGet - GET /api/v1/admin/user-sessions/{sessionIdentifier}
+func HandleUserSessionGet(
 	database userSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

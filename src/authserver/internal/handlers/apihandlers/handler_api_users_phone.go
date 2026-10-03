@@ -19,8 +19,8 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// HandleAPIPhoneCountriesGet - GET /api/v1/admin/phone-countries
-func HandleAPIPhoneCountriesGet() http.HandlerFunc {
+// HandlePhoneCountriesGet - GET /api/v1/admin/phone-countries
+func HandlePhoneCountriesGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
 
@@ -54,8 +54,8 @@ type usersPhoneDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// HandleAPIUserPhonePut - PUT /api/v1/admin/users/{id}/phone
-func HandleAPIUserPhonePut(
+// HandleUserPhonePut - PUT /api/v1/admin/users/{id}/phone
+func HandleUserPhonePut(
 	database usersPhoneDatabase,
 	phoneValidator *accountvalidation.PhoneValidator,
 	auditLogger AuditLogger,

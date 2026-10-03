@@ -32,11 +32,11 @@ func accountSessionDeleteRequest(sessionId string, subject string) *http.Request
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 
-// TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents is the wiring test for the
+// TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents is the wiring test for the
 // self-service half of decision 5. The payload is asserted here too rather than left to the admin
 // site: revocation.LogTerminatedUserSession is shared, but which session row each handler hands it is not, and
 // this is the site that resolves the row through an ownership check first.
-func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
+func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -62,7 +62,7 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountSessionDelete(database, auditLogger)
+	handler := HandleAccountSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -84,12 +84,12 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 	assert.Len(t, terminatedPayload, 6)
 }
 
-// TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate is the row that carries this file.
+// TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate is the row that carries this file.
 // KEEP IT. Ownership has to answer before termination, and the pre-existing integration case
 // (TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession) asserts only the 403, so a handler that
 // terminated somebody else's session and THEN refused would leave it green. The strict mock is the
 // mechanism: no termination expectation is registered, so any call fails the test.
-func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
+func TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -101,7 +101,7 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountSessionDelete(database, auditLogger)
+	handler := HandleAccountSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusForbidden, rr.Code)
@@ -112,10 +112,10 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestHandleAPIAccountSessionDelete_TerminationFailureIsA500 repeats the suppression contract at the
+// TestHandleAccountSessionDelete_TerminationFailureIsA500 repeats the suppression contract at the
 // second site deliberately. The two audit emitters are adjacent in both handlers, so leaving the
 // first one outside the error check is a one-line mistake that the other site's test cannot see.
-func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
+func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -130,7 +130,7 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 		Return(errors.New("the session delete failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountSessionDelete(database, auditLogger)
+	handler := HandleAccountSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)

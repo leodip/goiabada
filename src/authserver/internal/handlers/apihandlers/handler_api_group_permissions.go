@@ -29,7 +29,7 @@ type groupPermissionsDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
-func HandleAPIGroupPermissionsGet(
+func HandleGroupPermissionsGet(
 	database groupPermissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +88,7 @@ func HandleAPIGroupPermissionsGet(
 	}
 }
 
-func HandleAPIGroupPermissionsPut(
+func HandleGroupPermissionsPut(
 	database groupPermissionsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

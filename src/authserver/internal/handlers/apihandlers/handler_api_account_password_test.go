@@ -64,7 +64,7 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 
 // The new password is held to the request's policy: the handler passes settings.PasswordPolicy,
 // and a refusal answers the validator's localized message with nothing written (#433).
-func TestHandleAPIAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T) {
+func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
@@ -81,7 +81,7 @@ func TestHandleAPIAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testin
 		Return(i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": 6})).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}).
+	HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}).
 		ServeHTTP(rr, accountPasswordRequest(t, map[string]interface{}{"sub": "the-subject"}, currentPassword, "next"))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -89,11 +89,11 @@ func TestHandleAPIAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testin
 	database.AssertNotCalled(t, "SetUserPasswordHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestHandleAPIAccountPasswordPut_PreservesTheCallersSession is the wiring test for the one site
+// TestHandleAccountPasswordPut_PreservesTheCallersSession is the wiring test for the one site
 // that passes a non-empty exceptSid (#106 decision 4), and it doubles as the field-by-field
 // assertion on the new audit payload (decision 7), because this is the only site where
 // preservedSessionIdentifier is non-empty.
-func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
+func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
@@ -148,7 +148,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "sid": callerSid, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -177,14 +177,14 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	assert.Len(t, payload, 8)
 }
 
-// TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything covers the case that looks like
+// TestHandleAccountPasswordPut_SidlessBearerRevokesEverything covers the case that looks like
 // a bug and is not. After #106 decision 9 an offline or ROPC access token carries no sid, so
 // exceptSid is empty and the change revokes everything including the caller's own grant.
 //
 // That is the conservative direction and it is deliberate: such a bearer proves no live session
 // to preserve. Keep this case. Someone "fixing" it by falling back to another source for the sid
 // would let a caller preserve a session they did not authenticate with.
-func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
+func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
@@ -209,7 +209,7 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -229,12 +229,12 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 	assert.Equal(t, "", value)
 }
 
-// TestHandleAPIAccountPasswordPut_RevocationFailureIsA500 keeps this site's failure coverage
+// TestHandleAccountPasswordPut_RevocationFailureIsA500 keeps this site's failure coverage
 // thin: the reset handler owns the three-variant rollback matrix. What this adds is that a
 // SECOND site does not emit its pre-existing event either when the revocation fails, since the
 // two events are adjacent in the code and it would be easy to leave the first one outside the
 // error check.
-func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
+func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
@@ -251,7 +251,7 @@ func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 		Return(int64(0), errors.New("increment failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": "the-subject", "sid": "sid-caller", "auth_time": float64(1)},
 		currentPassword, "N3wP4ss!word"))

@@ -106,7 +106,7 @@ type VerifyResult struct {
 // transaction behaves exactly as a failed UpdateUser does today and the user types the next code.
 //
 // Shared by the two enable sites decision 2 names, HandleAuthOtpPost's enrollment branch and
-// HandleAPIAccountOTPPut's enable branch. There is no third. The encryption and the two field
+// HandleAccountOTPPut's enable branch. There is no third. The encryption and the two field
 // writes were the caller's before #387 and are folded in here, so a site that establishes an
 // authenticator cannot store the seed without moving the counter.
 //
@@ -179,8 +179,8 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 // the transaction observes either write until both have landed, but the order is kept: it costs
 // nothing and it is the order the two disable sites have always written in.
 //
-// Shared by the two sites decision 4 names, HandleAPIAccountOTPPut's disable branch and
-// HandleAPIUserOTPPut. There is no third: the browser flow enrolls but never disables.
+// Shared by the two sites decision 4 names, HandleAccountOTPPut's disable branch and
+// HandleUserOTPPut. There is no third: the browser flow enrolls but never disables.
 func Remove(ctx context.Context, db Database, user *models.User) error {
 	clearSecret(user)
 	user.OTPEnabled = false

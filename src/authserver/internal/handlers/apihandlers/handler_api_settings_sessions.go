@@ -13,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// HandleAPISettingsSessionsGet - GET /api/v1/admin/settings/sessions
-func HandleAPISettingsSessionsGet() http.HandlerFunc {
+// HandleSettingsSessionsGet - GET /api/v1/admin/settings/sessions
+func HandleSettingsSessionsGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
@@ -36,8 +36,8 @@ type settingsSessionsDatabase interface {
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 }
 
-// HandleAPISettingsSessionsPut - PUT /api/v1/admin/settings/sessions
-func HandleAPISettingsSessionsPut(
+// HandleSettingsSessionsPut - PUT /api/v1/admin/settings/sessions
+func HandleSettingsSessionsPut(
 	database settingsSessionsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

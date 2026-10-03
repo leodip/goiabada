@@ -228,7 +228,7 @@ type hintClassification struct {
 // nonIdTokenTypValues are the "typ" claim values Goiabada stamps on tokens that are NOT ID Tokens:
 // issuance.TokenTypeBearer on access tokens, and the two refresh-token markers TokenTypeRefresh and
 // TokenTypeOffline. generateIdTokenCore emits no typ at all, and neither does the short-lived hint
-// HandleAPIAccountLogoutRequestPost mints, so this rejects nothing an RP can legitimately present.
+// HandleAccountLogoutRequestPost mints, so this rejects nothing an RP can legitimately present.
 //
 // It is a denylist rather than a requirement that typ be "ID" for exactly that reason: no ID Token
 // this server issues carries the claim, so requiring it would reject every real hint.

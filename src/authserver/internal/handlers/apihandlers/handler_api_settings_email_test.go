@@ -36,7 +36,7 @@ func sendTestEmailRequest(t *testing.T, settings *models.Settings) *http.Request
 
 // The test send goes out through the relay the request's settings configure, the password still
 // encrypted: SendEmail decrypts it, so the handler never holds the plaintext (#433 decision 10).
-func TestHandleAPISettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing.T) {
+func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing.T) {
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -65,7 +65,7 @@ func TestHandleAPISettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *test
 	auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
+	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
 		ServeHTTP(rr, sendTestEmailRequest(t, settings))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -74,7 +74,7 @@ func TestHandleAPISettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *test
 // A failed send answers the administrator with the sender's own error after the fixed prefix, which
 // is the wording the admin console shows. Moving the decryption into SendEmail's caller would have
 // moved this text; keeping it in SendEmail keeps it (#433 decision 10).
-func TestHandleAPISettingsEmailSendTestPost_AFailedSendNamesTheCause(t *testing.T) {
+func TestHandleSettingsEmailSendTestPost_AFailedSendNamesTheCause(t *testing.T) {
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -82,7 +82,7 @@ func TestHandleAPISettingsEmailSendTestPost_AFailedSendNamesTheCause(t *testing.
 		Return(errs.New("unable to decrypt the SMTP password")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
+	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
 		ServeHTTP(rr, sendTestEmailRequest(t, &models.Settings{SMTPEnabled: true}))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)

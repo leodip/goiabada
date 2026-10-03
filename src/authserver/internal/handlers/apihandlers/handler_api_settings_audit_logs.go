@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// HandleAPISettingsAuditLogsGet - GET /api/v1/admin/settings/audit-logs
-func HandleAPISettingsAuditLogsGet() http.HandlerFunc {
+// HandleSettingsAuditLogsGet - GET /api/v1/admin/settings/audit-logs
+func HandleSettingsAuditLogsGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
@@ -36,8 +36,8 @@ type settingsAuditLogsDatabase interface {
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 }
 
-// HandleAPISettingsAuditLogsPut - PUT /api/v1/admin/settings/audit-logs
-func HandleAPISettingsAuditLogsPut(
+// HandleSettingsAuditLogsPut - PUT /api/v1/admin/settings/audit-logs
+func HandleSettingsAuditLogsPut(
 	database settingsAuditLogsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

@@ -44,10 +44,10 @@ func assertSelfRegistrationDisabledLogged(t *testing.T, logs *logtest.SlogCaptur
 	assert.Equal(t, "self-registration request refused because self-registration is disabled", records[0].Message)
 }
 
-func TestHandleAccountRegisterGet(t *testing.T) {
+func TestHandleRegisterGet(t *testing.T) {
 	t.Run("Self registration enabled", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		handler := HandleAccountRegisterGet(pageRenderer)
+		handler := HandleRegisterGet(pageRenderer)
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -69,7 +69,7 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 
 	t.Run("Self registration disabled", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		handler := HandleAccountRegisterGet(pageRenderer)
+		handler := HandleRegisterGet(pageRenderer)
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -91,7 +91,7 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 	})
 }
 
-func TestHandleAccountRegisterPost(t *testing.T) {
+func TestHandleRegisterPost(t *testing.T) {
 	t.Run("No email and email is required", func(t *testing.T) {
 		pageRenderer := mocks_handlers.NewPageRenderer(t)
 		database := mocks_data.NewDatabase(t)
@@ -101,7 +101,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/register", nil)
 		rr := httptest.NewRecorder()
@@ -132,7 +132,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "invalid-email")
@@ -167,7 +167,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "existing@example.com")
@@ -203,7 +203,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "preregistered@example.com")
@@ -240,7 +240,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -284,7 +284,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		// The email stays in the body, so the handler reaches the credential read the same
 		// way the neighbouring case does.
@@ -337,7 +337,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -382,7 +382,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -420,7 +420,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -459,7 +459,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -499,7 +499,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -545,7 +545,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -638,7 +638,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -701,7 +701,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		emailSender := mocks_accounthandlers.NewEmailSender(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -775,7 +775,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 // validator and here turned "please enter a valid email address" into a 500 page with the
 // administrator's reason in the log. Nothing wraps it today, which is exactly why a test has to
 // hold it: the old shape was correct only while that stayed true.
-func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
+func TestHandleRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
 	testCases := []struct {
 		name string
 		err  error
@@ -805,7 +805,7 @@ func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing
 			emailSender := mocks_accounthandlers.NewEmailSender(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			handler := HandleAccountRegisterPost(pageRenderer, database, userCreator, emailValidator,
+			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
 				passwordValidator, emailSender, auditLogger, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			form := url.Values{}

@@ -1396,7 +1396,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 	// The enrolling arm of the same refusal. #387's three-arm table has three columns —
 	// browser enrolled, browser enrolling, account API enable — and this is the one nothing
-	// pinned: TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused holds the API's column, where
+	// pinned: TestHandleAccountOTPPut_Enable_ReplayIsRefused holds the API's column, where
 	// no failure event is raised at all, and the case above holds the enrolled one. The
 	// difference is the whole reason the extracted verify reports an outcome and leaves the
 	// audit set to its caller.

@@ -33,10 +33,10 @@ type accountLogoutDatabase interface {
 	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
 }
 
-// HandleAPIAccountLogoutRequestPost - POST /api/v1/account/logout-request
+// HandleAccountLogoutRequestPost - POST /api/v1/account/logout-request
 // Returns a prepared logout instruction: a self-submitting form's parameters when the request asks
 // for api.AccountLogoutResponseModeFormPost, and a ready-to-follow redirect URL otherwise.
-func HandleAPIAccountLogoutRequestPost(
+func HandleAccountLogoutRequestPost(
 	database accountLogoutDatabase,
 	dataCipher *encryption.DataCipher,
 	baseURL string,

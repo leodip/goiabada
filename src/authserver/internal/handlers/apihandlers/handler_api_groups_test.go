@@ -86,7 +86,7 @@ func TestCountGroupMembers_NoGroupsIsAnEmptyMap(t *testing.T) {
 }
 
 // groups/list-count: the list used to render the failed group with 0 members.
-func TestHandleAPIGroupsGet_AFailedCountAnswers500(t *testing.T) {
+func TestHandleGroupsGet_AFailedCountAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAllGroups", mock.Anything, mock.Anything).
 		Return([]models.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
@@ -95,13 +95,13 @@ func TestHandleAPIGroupsGet_AFailedCountAnswers500(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
+	HandleGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
 
 	requireCountFailureAnswered500(t, rr, capture, 6)
 }
 
 // The accept arm beside it: every count reaches its own group in the body.
-func TestHandleAPIGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
+func TestHandleGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetAllGroups", mock.Anything, mock.Anything).
 		Return([]models.Group{{Id: 5, GroupIdentifier: "admins"}, {Id: 6, GroupIdentifier: "staff"}}, nil).Once()
@@ -109,7 +109,7 @@ func TestHandleAPIGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(7, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPIGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
+	HandleGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	var body struct {
@@ -125,7 +125,7 @@ func TestHandleAPIGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
 }
 
 // groups/get-count already answered 500; it now does so through the same helper.
-func TestHandleAPIGroupGet_AFailedCountAnswers500(t *testing.T) {
+func TestHandleGroupGet_AFailedCountAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetGroupById", mock.Anything, mock.Anything, int64(5)).
 		Return(&models.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
@@ -133,7 +133,7 @@ func TestHandleAPIGroupGet_AFailedCountAnswers500(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleAPIGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5", "5"))
+	HandleGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5", "5"))
 
 	requireCountFailureAnswered500(t, rr, capture, 5)
 }

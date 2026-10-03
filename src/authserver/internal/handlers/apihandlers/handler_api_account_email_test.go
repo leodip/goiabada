@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Seam 4 of #425 for the self-service twin of HandleAPIUserEmailPut, which carried the same defect
+// Seam 4 of #425 for the self-service twin of HandleUserEmailPut, which carried the same defect
 // and which #414 named only as the racing party. The fixture and requireEmailTaken are
 // handler_api_users_email_test.go's.
 
@@ -86,7 +86,7 @@ func accountEmailHandler(t *testing.T, database *mocks_data.Database, auditLogge
 func accountEmailHandlerWith(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger,
 	credentials CredentialFailureRecorder, jobs *heldJobs, pageRenderer *mocks_handlers.PageRenderer,
 	emailSender *mocks_accounthandlers.EmailSender) http.Handler {
-	return HandleAPIAccountEmailPut(pageRenderer, database, accountvalidation.NewEmailValidator(database),
+	return HandleAccountEmailPut(pageRenderer, database, accountvalidation.NewEmailValidator(database),
 		emailSender, auditLogger, credentials, jobs)
 }
 
@@ -132,11 +132,11 @@ func stubAccountEmailUpdate(t *testing.T, database *mocks_data.Database, updateE
 		Return(updateErr == nil, updateErr).Once()
 }
 
-// TestHandleAPIAccountEmailPut_SavesThroughTheNarrowWrite is #404 decision 4: the change writes
+// TestHandleAccountEmailPut_SavesThroughTheNarrowWrite is #404 decision 4: the change writes
 // the address, the cleared verified flag and the cleared verification code through TrySetUserEmail,
 // keyed on the caller's own id, and never writes back the user row it loaded at the start of the
 // request, which would undo a concurrent disable, password change or OTP change.
-func TestHandleAPIAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
+func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
@@ -177,7 +177,7 @@ func TestHandleAPIAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 	assert.Len(t, jobs.jobs, 1, "the notice to the previous address waits for after the response")
 }
 
-func TestHandleAPIAccountEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
+func TestHandleAccountEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
@@ -192,7 +192,7 @@ func TestHandleAPIAccountEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T)
 	assert.Empty(t, jobs.jobs, "a change that lost the race tells nobody it happened")
 }
 
-func TestHandleAPIAccountEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
+func TestHandleAccountEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
@@ -207,11 +207,11 @@ func TestHandleAPIAccountEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
 	assert.Empty(t, jobs.jobs, "a change that was not saved tells nobody it happened")
 }
 
-// TestHandleAPIAccountEmailPut_ABlankCurrentPasswordIsRefusedAndChargesNothing is #404 decision
+// TestHandleAccountEmailPut_ABlankCurrentPasswordIsRefusedAndChargesNothing is #404 decision
 // 3: a request carrying no password is refused 400 VALIDATION_ERROR before the account is read,
 // and spends nothing of the budget, since no password was compared (#219). The mock database has
 // no expectations, so a read or a write fails the case.
-func TestHandleAPIAccountEmailPut_ABlankCurrentPasswordIsRefusedAndChargesNothing(t *testing.T) {
+func TestHandleAccountEmailPut_ABlankCurrentPasswordIsRefusedAndChargesNothing(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		body any
@@ -241,13 +241,13 @@ func TestHandleAPIAccountEmailPut_ABlankCurrentPasswordIsRefusedAndChargesNothin
 	}
 }
 
-// TestHandleAPIAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt is #404
+// TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt is #404
 // decision 3: a wrong password is refused 400 AUTHENTICATION_FAILED and charged exactly once,
 // and it is checked before the address, so a caller without the password learns nothing about
 // the address: whether another account holds it, whether it is well formed, or whether it is the
 // account's own. Nothing beyond the caller's own row is read (GetUserByEmail has no expectation),
 // and nothing is written.
-func TestHandleAPIAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt(t *testing.T) {
+func TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		address string
@@ -282,12 +282,12 @@ func TestHandleAPIAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLooke
 	}
 }
 
-// TestHandleAPIAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing is #404 decision 10:
+// TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing is #404 decision 10:
 // the address the account already has, trimmed and lowercased as the handler normalizes it, is
 // answered 200 with the user as stored. Nothing is written, so the verified flag and a pending
 // verification code survive, and no audit event is logged. The validator is not consulted
 // (GetUserByEmail has no expectation), so the account's own address is never refused as taken.
-func TestHandleAPIAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *testing.T) {
+func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
@@ -357,12 +357,12 @@ func changeToNewAddress(t *testing.T) *http.Request {
 		Email: "new@example.com", CurrentPassword: accountEmailTestPassword})
 }
 
-// TestHandleAPIAccountEmailPut_TellsThePreviousAddressAfterTheResponse is #404 decisions 9 and
+// TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse is #404 decisions 9 and
 // 11: once the change is saved and answered, a job sends the previous address a notice, rendered
 // in the user's stored locale with English as the fallback, whose subject is the catalog's and
 // which names neither the new address nor carries a link. Nothing is sent before the response,
 // and the job carries the request's id.
-func TestHandleAPIAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testing.T) {
+func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
 		locale        string
@@ -429,9 +429,9 @@ func TestHandleAPIAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *tes
 	}
 }
 
-// TestHandleAPIAccountEmailPut_SendsNoNoticeWithSMTPOff is #404 decision 11: with SMTP disabled
+// TestHandleAccountEmailPut_SendsNoNoticeWithSMTPOff is #404 decision 11: with SMTP disabled
 // the change is saved and answered, and nothing is left to run after it.
-func TestHandleAPIAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
+func TestHandleAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
@@ -449,13 +449,13 @@ func TestHandleAPIAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
 	assert.Empty(t, jobs.jobs, "with SMTP off there is no notice to send")
 }
 
-// TestHandleAPIAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody is the notice's
+// TestHandleAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody is the notice's
 // bound under concurrency (#404). The write is conditional on the address and the verified flag
 // the request read, so of concurrent changes from one read only one matches the row. Each of the
 // others writes nothing, answers 409 CONCURRENT_UPDATE, audits nothing and queues no notice: with
 // an unconditional write every one of them notified the previous address, so one verification
 // bought as many mails as requests sent at once.
-func TestHandleAPIAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(t *testing.T) {
+func TestHandleAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
@@ -478,11 +478,11 @@ func TestHandleAPIAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(
 	assert.Equal(t, 0, credentials.failures, "the password was right; losing the row is not a failure")
 }
 
-// TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress is the notice's bound: an
+// TestHandleAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress is the notice's bound: an
 // address the account never verified is told nothing, because a caller may set any address they
 // do not hold and change away from it again, which would otherwise mail that address once per
 // request. The change itself is saved and answered as any other.
-func TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
+func TestHandleAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	jobs := &heldJobs{}
@@ -500,10 +500,10 @@ func TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.
 	assert.Empty(t, jobs.jobs, "an unverified previous address is sent no notice")
 }
 
-// TestHandleAPIAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse is #404 decision 11: a
+// TestHandleAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse is #404 decision 11: a
 // notice that cannot be rendered or sent never fails or undoes the change, which was answered 200
 // before the job ran. It is one Error record on the request's id, and no audit entry of its own.
-func TestHandleAPIAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *testing.T) {
+func TestHandleAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		renderErr error

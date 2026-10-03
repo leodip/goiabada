@@ -28,7 +28,7 @@ import (
 // The system resource's permissions are answered as stored. The read used to drop the userinfo
 // row, which the save then demanded as a built-in, so a save built from the read was refused
 // (#449); nothing is special-cased now, a row that happens to be identified userinfo included.
-func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *testing.T) {
+func TestHandlePermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	system := &models.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
@@ -47,7 +47,7 @@ func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t
 
 	req := setChiURLParam(httptest.NewRequest(http.MethodGet, "/api/v1/admin/resources/1/permissions", nil), "resourceId", "1")
 	rr := httptest.NewRecorder()
-	HandleAPIPermissionsByResourceGet(database).ServeHTTP(rr, req)
+	HandlePermissionsByResourceGet(database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	var response api.GetPermissionsByResourceResponse
@@ -60,17 +60,17 @@ func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t
 	database.AssertExpectations(t)
 }
 
-// TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB verifies that when
+// TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB verifies that when
 // a built-in permission is missing from the system resource's database rows, the handler
 // returns HTTP 500 with an appropriate integrity error message.
 // This is a unit test because simulating a missing built-in permission in integration tests
 // would cascade FK deletions that can't be rolled back.
-func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.T) {
+func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
-	handler := HandleAPIResourcePermissionsPut(database, identifierValidator, auditLogger)
+	handler := HandleResourcePermissionsPut(database, identifierValidator, auditLogger)
 
 	// System-level resource (authserver)
 	resource := &models.Resource{
@@ -175,7 +175,7 @@ func serveResourcePerms(database *mocks_data.Database, auditLogger *mocks_handle
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/7/permissions", strings.NewReader(body))
 	r = setChiURLParam(r, "resourceId", "7")
 	rr := httptest.NewRecorder()
-	HandleAPIResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), auditLogger).ServeHTTP(rr, r)
+	HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), auditLogger).ServeHTTP(rr, r)
 	return rr
 }
 
@@ -216,7 +216,7 @@ func expectResourcePermsAudit(t *testing.T, auditLogger *mocks_handlers.AuditLog
 // compared with the list the caller loaded, and changed by exactly the plan, on that transaction:
 // the dropped row deleted, the re-described row updated, the unchanged row left alone, the new
 // entry created. The one audit event follows the commit (#406, #428).
-func TestHandleAPIResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
+func TestHandleResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -257,7 +257,7 @@ func TestHandleAPIResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *te
 }
 
 // A rename is an update of the named row, on the transaction, and nothing else.
-func TestHandleAPIResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T) {
+func TestHandleResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -284,7 +284,7 @@ func TestHandleAPIResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T)
 // which is when the real one rolls back, and the answer is one 500 with nothing audited. Written
 // autocommitted, as this save was, the updates before the failure stayed committed under the 500
 // (#406, #428).
-func TestHandleAPIResourcePermissionsPut_AFailedWriteCommitsNothing(t *testing.T) {
+func TestHandleResourcePermissionsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -310,7 +310,7 @@ func TestHandleAPIResourcePermissionsPut_AFailedWriteCommitsNothing(t *testing.T
 // A new permission the engine refuses on the unique index is another save adding the same
 // identifier at the same moment: 409 CONCURRENT_UPDATE, the whole save rolled back and nothing
 // audited, where the autocommitted writes answered it 500 with the earlier writes kept (#428).
-func TestHandleAPIResourcePermissionsPut_AUniqueKeyRaceAnswersConflict(t *testing.T) {
+func TestHandleResourcePermissionsPut_AUniqueKeyRaceAnswersConflict(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -337,7 +337,7 @@ func TestHandleAPIResourcePermissionsPut_AUniqueKeyRaceAnswersConflict(t *testin
 // write and no audit: with the read's error ignored, a save dropping every permission would find
 // nothing to delete and answer 200 with them all still stored, and with both lists empty it would
 // answer 200 over a read that never happened (#428).
-func TestHandleAPIResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
+func TestHandleResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 	variants := []struct {
 		name     string
 		checked  []models.Permission
@@ -374,7 +374,7 @@ func TestHandleAPIResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *
 // A body aborted as a deadlock victim on its first attempt and rerun by the helper answers once
 // and audits once: the plan is recomputed from a fresh read on each attempt, and the event is
 // emitted after the attempt that committed (#301, #428).
-func TestHandleAPIResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
+func TestHandleResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -414,7 +414,7 @@ func TestHandleAPIResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *te
 }
 
 // The helper giving up, a deadlock on every attempt, is one 500 and no audit event.
-func TestHandleAPIResourcePermissionsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
+func TestHandleResourcePermissionsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
@@ -434,7 +434,7 @@ func TestHandleAPIResourcePermissionsPut_AnExhaustedRetryIsOneFiveHundred(t *tes
 // page: 409 CONCURRENT_UPDATE, nothing written and nothing audited. Each entry is compared whole,
 // so a description another save changed makes the list as outdated as a permission it added or
 // dropped, and applying this save's whole list would silently undo that change (#428).
-func TestHandleAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+func TestHandleResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	variants := []struct {
 		name   string
 		stored func() []models.Permission
@@ -483,7 +483,7 @@ func TestHandleAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testin
 // A loaded list equal to the stored rows as a set proceeds: in another order and with a repeat,
 // and [] against no stored permissions, which is a page that loaded none and not a missing field
 // (#428).
-func TestHandleAPIResourcePermissionsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
+func TestHandleResourcePermissionsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	reordered := loadedEntries(resourcePermsStored())
 	reordered = []api.ResourcePermissionUpsert{reordered[2], reordered[0], reordered[1], reordered[0]}
 
@@ -523,7 +523,7 @@ func TestHandleAPIResourcePermissionsPut_ALoadedListEqualAsASetProceeds(t *testi
 // fails the case. The loaded list is required (#428); the identifier rule is the one the update
 // and create loops applied, stated against the rows read here; and the system resource keeps its
 // built-in protection, each of the seven refused on delete and on rename.
-func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
+func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 	stored := resourcePermsStored()
 	loaded := loadedEntries(stored)
 	withEntry := func(i int, identifier string) []api.ResourcePermissionUpsert {
@@ -659,7 +659,7 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 // A named row that the step 1 read carried and the transaction's read does not, with the loaded
 // list still equal to the transaction's read, is a list that changed and changed back between the
 // two reads: refused 409 with nothing written, rather than an update of a row that is gone (#428).
-func TestHandleAPIResourcePermissionsPut_ANamedRowGoneByTheTransactionIsRefused(t *testing.T) {
+func TestHandleResourcePermissionsPut_ANamedRowGoneByTheTransactionIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 

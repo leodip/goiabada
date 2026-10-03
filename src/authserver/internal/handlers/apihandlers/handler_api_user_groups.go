@@ -51,7 +51,7 @@ type userGroupsDatabase interface {
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-func HandleAPIUserGroupsGet(
+func HandleUserGroupsGet(
 	database userGroupsDatabase,
 ) http.HandlerFunc {
 
@@ -100,7 +100,7 @@ func HandleAPIUserGroupsGet(
 	}
 }
 
-func HandleAPIUserGroupsPut(
+func HandleUserGroupsPut(
 	database userGroupsDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

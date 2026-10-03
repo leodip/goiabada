@@ -31,8 +31,8 @@ type accountEmailValidator interface {
 	ValidateEmailChange(ctx context.Context, email string, subject string) error
 }
 
-// HandleAPIAccountEmailPut - PUT /api/v1/account/email
-func HandleAPIAccountEmailPut(
+// HandleAccountEmailPut - PUT /api/v1/account/email
+func HandleAccountEmailPut(
 	pageRenderer PageRenderer,
 	database accountEmailDatabase,
 	emailValidator accountEmailValidator,

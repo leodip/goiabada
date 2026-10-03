@@ -81,7 +81,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	rateLimiter := middleware.NewRateLimiter(nil, unusedRenderer{t}, nil, nil, true)
-	handler := HandleAPIAccountEmailVerificationPost(database, auditLogger, rateLimiter, testDataCipher)
+	handler := HandleAccountEmailVerificationPost(database, auditLogger, rateLimiter, testDataCipher)
 
 	return &verificationEnv{
 		handler:  rateLimiter.LimitEmailVerification(handler),
@@ -121,11 +121,11 @@ func (e *verificationEnv) post(t *testing.T, submitted string) *httptest.Respons
 	return rr
 }
 
-// TestHandleAPIAccountEmailVerificationPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2
+// TestHandleAccountEmailVerificationPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2
 // for the email verification check. The budget itself is pinned at seam 1 in authserver/internal/middleware;
 // what is new here is the wiring, that a wrong code reaches the counter at all and that a
 // right one does not.
-func TestHandleAPIAccountEmailVerificationPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
+func TestHandleAccountEmailVerificationPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	const budget = 5 // failures per 15 minutes per token subject
 
 	t.Run("wrong codes fill the budget and the next attempt is refused", func(t *testing.T) {
@@ -167,13 +167,13 @@ func TestHandleAPIAccountEmailVerificationPost_SpendsTheLimiterBudgetOnFailuresO
 	})
 }
 
-// TestHandleAPIAccountEmailVerificationPost_CodeComparison pins what the move from
+// TestHandleAccountEmailVerificationPost_CodeComparison pins what the move from
 // strings.EqualFold to subtle.ConstantTimeCompare kept and what it narrowed.
 //
 // Kept: a code submitted in the wrong case still verifies, which the single-case alphabet
 // relies on. Narrowed: an empty submission no longer verifies against a stored code that
 // failed to decrypt, which EqualFold("", "") accepted (#219).
-func TestHandleAPIAccountEmailVerificationPost_CodeComparison(t *testing.T) {
+func TestHandleAccountEmailVerificationPost_CodeComparison(t *testing.T) {
 	t.Run("a lowercase submission still verifies", func(t *testing.T) {
 		env := newVerificationEnv(t)
 		rr := env.post(t, strings.ToLower(verificationCode))
@@ -209,13 +209,13 @@ func TestHandleAPIAccountEmailVerificationPost_CodeComparison(t *testing.T) {
 
 // The emailed verification link points at the admin console base URL the handler was handed,
 // not at the configured one (#434).
-func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHanded(t *testing.T) {
+func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHanded(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	database := mocks_data.NewDatabase(t)
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	handler := HandleAPIAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
+	handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL)
 
 	user := &models.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
@@ -242,11 +242,11 @@ func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHa
 	assert.Equal(t, "https://admin.test/account/email-verification", emailedLink)
 }
 
-// TestHandleAPIAccountEmailVerificationPost_KeepsTheIssuedAt is the verify's half of the resend
+// TestHandleAccountEmailVerificationPost_KeepsTheIssuedAt is the verify's half of the resend
 // cooldown's bound: a verified code is spent, and its issued-at stays for the cooldown to read,
 // so verifying an address the caller holds does not let the next send, to whatever address they
 // change to, go out at once (#404).
-func TestHandleAPIAccountEmailVerificationPost_KeepsTheIssuedAt(t *testing.T) {
+func TestHandleAccountEmailVerificationPost_KeepsTheIssuedAt(t *testing.T) {
 	env := newVerificationEnv(t)
 	issuedAt := env.user.EmailVerificationCodeIssuedAt
 
@@ -257,12 +257,12 @@ func TestHandleAPIAccountEmailVerificationPost_KeepsTheIssuedAt(t *testing.T) {
 	assert.Equal(t, issuedAt, env.user.EmailVerificationCodeIssuedAt, "the issued-at stays for the resend cooldown")
 }
 
-// TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts is the resend
+// TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts is the resend
 // cooldown's bound (#404): one code per five minutes, the code's own lifetime, read from when a
 // code was last issued whether or not that code is still pending. An email change and a verification both clear the code and keep the issued-at,
 // so neither reopens a send; before, either cleared both, and setting an address, changing away
 // and back again had a code mailed to it on every cycle, to any address the caller named.
-func TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *testing.T) {
+func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *testing.T) {
 	pending, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
 
@@ -275,7 +275,7 @@ func TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *t
 		req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
 		rr := httptest.NewRecorder()
-		HandleAPIAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
+		HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 			testDataCipher, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -339,17 +339,17 @@ func sendVerification(t *testing.T, database *mocks_data.Database, pageRenderer 
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
 	rr := httptest.NewRecorder()
-	HandleAPIAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
+	HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL).ServeHTTP(rr, req)
 	return rr
 }
 
-// TestHandleAPIAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWrite is the
+// TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWrite is the
 // cooldown under concurrency (#404). The check the handler reads first cannot bound concurrent
 // sends, which all read the same old issued-at; the write decides. It is keyed on the address
 // the mail goes to, its cutoff is exactly one code lifetime before the issued-at it stores, and
 // what it stores is the code the mail carries, encrypted.
-func TestHandleAPIAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWrite(t *testing.T) {
+func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWrite(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	pageRenderer := mocks_handlers.NewPageRenderer(t)
 	emailSender := mocks_accounthandlers.NewEmailSender(t)
@@ -385,11 +385,11 @@ func TestHandleAPIAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditional
 	assert.Equal(t, mailedCode, decrypted, "the code stored is the code mailed")
 }
 
-// TestHandleAPIAccountEmailVerificationSendPost_ALostClaimSendsNothing is the other side of
+// TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing is the other side of
 // the claim: a send whose write matched no row mails nothing and answers what the row says now,
 // read again. A concurrent send that claimed the code leaves a cooldown, a verification leaves
 // the address verified, and an email change leaves neither, which is a 409 (#404).
-func TestHandleAPIAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testing.T) {
+func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		reread *models.User
@@ -459,7 +459,7 @@ func verifyDirect(t *testing.T, database *mocks_data.Database, auditLogger *mock
 	ctx := reqctx.WithSettings(req.Context(), &models.Settings{SMTPEnabled: true})
 	req = setTokenContextWithClaims(req.WithContext(ctx), map[string]interface{}{"sub": verificationSubject})
 	rr := httptest.NewRecorder()
-	HandleAPIAccountEmailVerificationPost(database, auditLogger, credentials, testDataCipher).ServeHTTP(rr, req)
+	HandleAccountEmailVerificationPost(database, auditLogger, credentials, testDataCipher).ServeHTTP(rr, req)
 	return rr
 }
 
@@ -474,11 +474,11 @@ func pendingCodeUser(t *testing.T) *models.User {
 		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true}}
 }
 
-// TestHandleAPIAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite is the verify's
+// TestHandleAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite is the verify's
 // write (#404): conditional on the address read and on the exact ciphertext the handler
 // decrypted and compared, so the code that was checked is the code spent, and narrow, so
 // nothing else of the row the request loaded is written back.
-func TestHandleAPIAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite(t *testing.T) {
+func TestHandleAccountEmailVerificationPost_VerifiesThroughTheConditionalWrite(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 	user := pendingCodeUser(t)
@@ -499,12 +499,12 @@ func TestHandleAPIAccountEmailVerificationPost_VerifiesThroughTheConditionalWrit
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestHandleAPIAccountEmailVerificationPost_ALostWriteIsNotAGuess covers the verify whose
+// TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess covers the verify whose
 // conditional write matched no row after the code compared right (#404). A twin submission that
 // verified first is answered as that one was; a code a new send or an email change replaced is
 // invalid. Neither was a guess, so neither spends the failure budget, and neither writes an
 // audit entry: the twin already wrote the verification's.
-func TestHandleAPIAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) {
+func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		reread     func(user *models.User) *models.User

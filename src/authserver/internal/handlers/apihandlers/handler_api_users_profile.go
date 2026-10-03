@@ -26,8 +26,8 @@ type usersProfileDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-// HandleAPIUserProfilePut - PUT /api/v1/admin/users/{id}/profile
-func HandleAPIUserProfilePut(
+// HandleUserProfilePut - PUT /api/v1/admin/users/{id}/profile
+func HandleUserProfilePut(
 	database usersProfileDatabase,
 	profileValidator *accountvalidation.ProfileValidator,
 	auditLogger AuditLogger,
@@ -156,8 +156,8 @@ func HandleAPIUserProfilePut(
 	}
 }
 
-// HandleAPIUserAddressPut - PUT /api/v1/admin/users/{id}/address
-func HandleAPIUserAddressPut(
+// HandleUserAddressPut - PUT /api/v1/admin/users/{id}/address
+func HandleUserAddressPut(
 	database usersProfileDatabase,
 	addressValidator *accountvalidation.AddressValidator,
 	auditLogger AuditLogger,

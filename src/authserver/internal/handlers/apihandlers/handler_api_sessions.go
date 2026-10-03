@@ -90,7 +90,7 @@ type sessionsDatabase interface {
 	sessionbackend.BrowserSessionDatabase
 }
 
-// HandleAPISessionLoadPost - POST /api/v1/sessions/load
+// HandleSessionLoadPost - POST /api/v1/sessions/load
 //
 // 404 covers three things the caller must treat alike: no such session, one that was
 // logged out or reaped, and one that has expired. The last needs no test here, because the
@@ -102,7 +102,7 @@ type sessionsDatabase interface {
 // turns into a fresh session, while 500 means the lookup could not be performed, which is
 // a refused request. Flattening them would sign every administrator out during a database
 // interruption and leave nothing to diagnose it by.
-func HandleAPISessionLoadPost(database sessionsDatabase) http.HandlerFunc {
+func HandleSessionLoadPost(database sessionsDatabase) http.HandlerFunc {
 	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -129,10 +129,10 @@ func HandleAPISessionLoadPost(database sessionsDatabase) http.HandlerFunc {
 	}
 }
 
-// HandleAPISessionCreatePost - POST /api/v1/sessions/create
+// HandleSessionCreatePost - POST /api/v1/sessions/create
 //
 // No 404: creating names no existing session, so there is nothing here that can be absent.
-func HandleAPISessionCreatePost(database sessionsDatabase) http.HandlerFunc {
+func HandleSessionCreatePost(database sessionsDatabase) http.HandlerFunc {
 	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -151,12 +151,12 @@ func HandleAPISessionCreatePost(database sessionsDatabase) http.HandlerFunc {
 	}
 }
 
-// HandleAPISessionUpdatePost - POST /api/v1/sessions/update
+// HandleSessionUpdatePost - POST /api/v1/sessions/update
 //
 // Never inserts. A 404 here means the session is gone, and the caller's store is written
 // to fail the save rather than put it back, because the request that removed it was most
 // likely rotating the identifier.
-func HandleAPISessionUpdatePost(database sessionsDatabase) http.HandlerFunc {
+func HandleSessionUpdatePost(database sessionsDatabase) http.HandlerFunc {
 	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -179,12 +179,12 @@ func HandleAPISessionUpdatePost(database sessionsDatabase) http.HandlerFunc {
 	}
 }
 
-// HandleAPISessionTouchPost - POST /api/v1/sessions/touch
+// HandleSessionTouchPost - POST /api/v1/sessions/touch
 //
 // It moves the deadline as well as the last-accessed stamp, because the idle window is
 // expressed in the deadline: a touch that left it alone would never extend the session and
 // the idle timeout would behave as an absolute one.
-func HandleAPISessionTouchPost(database sessionsDatabase) http.HandlerFunc {
+func HandleSessionTouchPost(database sessionsDatabase) http.HandlerFunc {
 	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -207,12 +207,12 @@ func HandleAPISessionTouchPost(database sessionsDatabase) http.HandlerFunc {
 	}
 }
 
-// HandleAPISessionDeletePost - POST /api/v1/sessions/delete
+// HandleSessionDeletePost - POST /api/v1/sessions/delete
 //
 // 204 whether or not a row was there, so no 404. Deleting a session that is already gone
 // is the outcome the caller asked for, and answering 404 would make a logout that raced a
 // reap look like a failure.
-func HandleAPISessionDeletePost(database sessionsDatabase) http.HandlerFunc {
+func HandleSessionDeletePost(database sessionsDatabase) http.HandlerFunc {
 	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -125,7 +125,7 @@ func TestSessionOwners_ADatabaseFailureIsAnError(t *testing.T) {
 // The whole envelope, off the handler, which is the one place the two arrays are seen together.
 // The page reads a session's owner out of users by userId, so the pairing is the contract and
 // not the arrays' lengths.
-func TestHandleAPIClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing.T) {
+func TestHandleClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	sessions := []models.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "sid-two", 5)}
@@ -142,7 +142,7 @@ func TestHandleAPIClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing
 	req = setChiURLParam(req, "id", "7")
 
 	rr := httptest.NewRecorder()
-	HandleAPIClientSessionsGet(database).ServeHTTP(rr, req)
+	HandleClientSessionsGet(database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 

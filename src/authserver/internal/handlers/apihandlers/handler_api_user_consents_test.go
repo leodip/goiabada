@@ -36,9 +36,9 @@ func assertJSONInternalServerError(t *testing.T, rr *httptest.ResponseRecorder) 
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", response["error_code"])
 }
 
-func TestHandleAPIUserConsentsGet_Success(t *testing.T) {
+func TestHandleUserConsentsGet_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := HandleAPIUserConsentsGet(database)
+	handler := HandleUserConsentsGet(database)
 
 	user := &models.User{Id: 7}
 	consents := []models.UserConsent{{Id: 1, UserId: 7, ClientId: 3, Scope: "openid"}}
@@ -60,9 +60,9 @@ func TestHandleAPIUserConsentsGet_Success(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
+func TestHandleUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := HandleAPIUserConsentsGet(database)
+	handler := HandleUserConsentsGet(database)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
 	req = setChiURLParam(req, "id", "7")
@@ -76,9 +76,9 @@ func TestHandleAPIUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
+func TestHandleUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := HandleAPIUserConsentsGet(database)
+	handler := HandleUserConsentsGet(database)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
 	req = setChiURLParam(req, "id", "7")
@@ -93,9 +93,9 @@ func TestHandleAPIUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
+func TestHandleUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := HandleAPIUserConsentsGet(database)
+	handler := HandleUserConsentsGet(database)
 
 	consents := []models.UserConsent{{Id: 1, UserId: 7, ClientId: 3}}
 
@@ -113,10 +113,10 @@ func TestHandleAPIUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
+func TestHandleUserConsentDelete_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	handler := HandleAPIUserConsentDelete(database, auditLogger)
+	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
 	req = setChiURLParam(req, "id", "5")
@@ -139,10 +139,10 @@ func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-func TestHandleAPIUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
+func TestHandleUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	handler := HandleAPIUserConsentDelete(database, auditLogger)
+	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
 	req = setChiURLParam(req, "id", "5")
@@ -156,10 +156,10 @@ func TestHandleAPIUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleAPIUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
+func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	handler := HandleAPIUserConsentDelete(database, auditLogger)
+	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
 	req = setChiURLParam(req, "id", "5")

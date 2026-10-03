@@ -171,7 +171,7 @@ func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T
 // about who presents it. Whatever the administrator meant by the name is silently widened.
 //
 // The fixture is reachable through supported journeys, which is why it is worth a test:
-// HandleAPIResourcePermissionsPut refuses only to delete or rename a BUILT-IN permission
+// HandleResourcePermissionsPut refuses only to delete or rename a BUILT-IN permission
 // and its create arm has no resource check at all, so a permission of any name can be
 // added to the authserver resource. A user or group grant is not a lesser case than a
 // client one either, because the authorize endpoint filters a requested scope against what
