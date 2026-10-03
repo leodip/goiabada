@@ -1,6 +1,6 @@
 // Package oauthclient is the admin console's OAuth client: the redirect that starts
-// sign-in and mints the PKCE verifier, state and nonce, the code-for-token exchanger
-// that completes it, and the JWKS parser that validates what comes back. All three
+// sign-in and mints the PKCE verifier, state and nonce, the token client whose code
+// exchange completes it, and the JWKS parser that validates what comes back. All three
 // speak the client half of the protocol to one peer, the auth server, and nothing in
 // the auth server or in core calls any of them, which is why they are not in core: a
 // shared package holding one application's implementation is what #385 ends. The value

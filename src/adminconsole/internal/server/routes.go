@@ -28,10 +28,13 @@ func (s *Server) initRoutes(root chi.Router) {
 	// Initialize all the service dependencies
 	apiClient := apiclient.NewAuthServerClient(authBase)
 
-	authServerClient := newAuthServerHTTPClient()
+	authServerClient := oauthclient.NewAuthServerHTTPClient()
 
 	tokenParser := oauthclient.NewJWKSTokenParser(authBase, authServerClient, constants.AdminConsoleClientIdentifier, middleware.SettingsReader{})
-	tokenExchanger := oauthclient.NewTokenExchanger(authServerClient)
+	// The admin console is always the client the seeder provisions, so the identifier is the
+	// constant and only the secret is per deployment (#285).
+	tokenClient := oauthclient.NewTokenClient(authBase+"/auth/token", constants.AdminConsoleClientIdentifier,
+		config.GetAdminConsole().OAuthClientSecret, authServerClient)
 
 	identifierValidator := validators.NewIdentifierValidator()
 
@@ -95,7 +98,7 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	// Auth routes
 	root.With(baseAuth...).Route("/auth", func(r chi.Router) {
-		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenExchanger))
+		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenClient))
 		r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, apiClient))
 		r.Get("/session-ended", handlers.HandleSessionEndedGet(httpHelper, s.sessionStore))
 	})
@@ -265,19 +268,4 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Post("/settings/audit-logs", adminsettingshandlers.HandleAdminSettingsAuditLogsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/settings/audit-log-viewer", adminsettingshandlers.HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient))
 	})
-}
-
-// newAuthServerHTTPClient builds the one client for all three calls this process makes to
-// the auth server: the JWKS fetch, the code-for-token exchange and the refresh grant. Bare
-// &http.Client{} literals here left every one of them with no bound on the wait for
-// response headers or the body, so a peer that accepted the connection and never answered
-// held the handler open indefinitely.
-//
-// A function rather than a literal inline because for one of the three this is the only
-// bound there is. The two grants build their own deadline, being single use and detached
-// from the browser's context, but the JWKS fetch deliberately keeps the request's own
-// context -- it is an idempotent read -- and a browser context carries no deadline. So the
-// timeout here is what bounds it, and a function is what a test can reach (#338).
-func newAuthServerHTTPClient() *http.Client {
-	return &http.Client{Timeout: oauthclient.TokenExchangeTimeout}
 }

@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -76,21 +75,23 @@ func (b *armableBackend) Create(ctx context.Context, id string, data []byte, aut
 	return b.MemoryBackend.Create(ctx, id, data, authenticated)
 }
 
-// recordingExchanger answers the configured response or error, and records the call.
+// recordingExchanger answers the configured response or error, and records the call. The token
+// URL, the client id and the secret are not among what it records: they are the token client's,
+// fixed when it was built, and the callback names none of them (#441).
 type recordingExchanger struct {
 	response *oauth.TokenResponse
 	err      error
 
-	called                                    bool
-	code, redirectURI, clientID, codeVerifier string
-	tokenEndpoint                             string
+	called                          bool
+	code, redirectURI, codeVerifier string
+	requestID                       string
 }
 
-func (e *recordingExchanger) ExchangeCodeForTokens(_ context.Context, code, redirectURI, clientId,
-	_, codeVerifier, tokenEndpoint string) (*oauth.TokenResponse, error) {
+func (e *recordingExchanger) ExchangeCode(ctx context.Context, code, redirectURI,
+	codeVerifier string) (*oauth.TokenResponse, error) {
 	e.called = true
-	e.code, e.redirectURI, e.clientID, e.codeVerifier, e.tokenEndpoint =
-		code, redirectURI, clientId, codeVerifier, tokenEndpoint
+	e.code, e.redirectURI, e.codeVerifier = code, redirectURI, codeVerifier
+	e.requestID = chimiddleware.GetReqID(ctx)
 	return e.response, e.err
 }
 
@@ -172,7 +173,7 @@ func (h *callbackHarness) readBack(cookies []*http.Cookie) *sessionstore.Session
 }
 
 // serve posts form to the callback with cookies, behind chi's RequestID as in production.
-func (h *callbackHarness) serve(exchanger TokenExchanger, cookies []*http.Cookie, form url.Values) *httptest.ResponseRecorder {
+func (h *callbackHarness) serve(exchanger codeExchanger, cookies []*http.Cookie, form url.Values) *httptest.ResponseRecorder {
 	h.t.Helper()
 	req := handlertest.Request(http.MethodPost, "/auth/callback", handlertest.WithForm(form))
 	req.Header.Set("X-Request-Id", callbackRequestID)
@@ -585,9 +586,9 @@ func TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier(t *testing.T) {
 			assert.True(t, exchanger.called)
 			assert.Equal(t, callbackCode, exchanger.code)
 			assert.Equal(t, callbackRedirectURI, exchanger.redirectURI)
-			assert.Equal(t, coreconstants.AdminConsoleClientIdentifier, exchanger.clientID)
 			assert.Equal(t, callbackVerifier, exchanger.codeVerifier)
-			assert.Equal(t, config.GetAuthServer().GetEffectiveBaseURL()+"/auth/token", exchanger.tokenEndpoint)
+			assert.Equal(t, callbackRequestID, exchanger.requestID,
+				"the exchange is handed the request's context, so its records carry the request id")
 
 			want := *response
 			want.Scope = tc.wantScope

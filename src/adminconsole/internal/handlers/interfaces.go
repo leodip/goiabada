@@ -26,8 +26,3 @@ type AuthHelper interface {
 type TokenParser interface {
 	DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*oauthclient.JwtInfo, error)
 }
-
-type TokenExchanger interface {
-	ExchangeCodeForTokens(ctx context.Context, code, redirectURI, clientId, clientSecret,
-		codeVerifier, tokenEndpoint string) (*oauth.TokenResponse, error)
-}

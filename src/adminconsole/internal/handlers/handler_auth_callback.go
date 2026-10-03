@@ -9,12 +9,12 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -62,6 +62,13 @@ type callbackSessionStore interface {
 	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
 }
 
+// codeExchanger is the callback's one call to the token endpoint: redeem this code. The token
+// URL, the client identifier and the secret are the exchanger's, given to it once when it was
+// built, so the callback reads no configuration (#441).
+type codeExchanger interface {
+	ExchangeCode(ctx context.Context, code, redirectURI, codeVerifier string) (*oauth.TokenResponse, error)
+}
+
 // HandleAuthCallbackPost completes the admin console's sign-in: the authorization response comes
 // back here, form-posted, and the session that sent the browser away is checked against it.
 //
@@ -75,7 +82,7 @@ func HandleAuthCallbackPost(
 	httpHelper HttpHelper,
 	httpSession callbackSessionStore,
 	tokenParser TokenParser,
-	tokenExchanger TokenExchanger,
+	exchanger codeExchanger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
@@ -137,44 +144,15 @@ func HandleAuthCallbackPost(
 			return
 		}
 
-		// GetEffectiveBaseURL is the one derivation routes.go also uses: the internal base URL,
-		// trimmed, when one is configured. Deriving it here by hand tested the trimmed value and
-		// then used the untrimmed one (#427 decision 8).
-		baseUrl := config.GetAuthServer().GetEffectiveBaseURL()
-
-		// Debug: one record on every administrator sign-in, tracing a request through the
-		// code exchange. Decision 5 reserves Info for lifecycle and configuration, and this
-		// is neither: an operator reading the log to see what the console is doing does not
-		// need a line per sign-in, and the one reader who does is debugging the exchange
-		// against a base URL they suspect (#320).
-		slog.DebugContext(r.Context(), "exchanging the code for tokens", "base_url", baseUrl)
-
-		// The admin console is always the client the seeder provisions, so the identifier
-		// is the constant and only the secret is per deployment (#285).
-		clientID := coreconstants.AdminConsoleClientIdentifier
-		clientSecret := config.GetAdminConsole().OAuthClientSecret
-
-		// The browser may be gone; the auth server is not. authorization_code is single use,
-		// so the server has already burned the code by the time it answers, and abandoning
-		// the read loses the only copy of what it issued. WithoutCancel keeps the request's
-		// values, so request_id still reaches every record below, and drops only its
-		// cancellation; context.Background() would drop the request id with it. The deadline
-		// is what bounds this instead.
-		//
-		// The detachment covers this one call and stops there. Validating the tokens and
-		// writing the session below stay on the browser's own request deliberately: finishing
-		// a sign-in for a browser that has gone leaves a row holding an administrator's tokens
-		// under a cookie that can never be delivered, and the burned code buys nothing either
-		// way. So a browser that leaves here still has to sign in again -- what the detachment
-		// prevents is the exchange being abandoned in flight, not the sign-in failing. The
-		// refresh in internal/middleware carries its detached context further than this, because
-		// there a session already exists and holds the token being replaced (#338).
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauthclient.TokenExchangeTimeout)
-		defer cancel()
-
-		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(ctx, code,
-			handshake[sessionkeys.SessionKeyRedirectURI], clientID, clientSecret,
-			handshake[sessionkeys.SessionKeyCodeVerifier], baseUrl+"/auth/token")
+		// The token client owns the exchange's detachment from the browser and its deadline,
+		// because the code is spent whether or not anyone reads the answer. Everything after it
+		// stays on the browser's own request deliberately: finishing a sign-in for a browser that
+		// has gone leaves a row holding an administrator's tokens under a cookie that can never be
+		// delivered, and the burned code buys nothing either way. So a browser that leaves here
+		// still has to sign in again -- what the detachment prevents is the exchange being
+		// abandoned in flight, not the sign-in failing (#338, #441).
+		tokenResponse, err := exchanger.ExchangeCode(r.Context(), code,
+			handshake[sessionkeys.SessionKeyRedirectURI], handshake[sessionkeys.SessionKeyCodeVerifier])
 		if err != nil {
 			refuseSignIn(httpHelper, w, r, refusalExchange, errs.Wrap(err, "unable to exchange the code for tokens"))
 			return
