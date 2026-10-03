@@ -88,55 +88,68 @@ const testTokenURL = "https://authserver.example/auth/token"
 
 // Two assertions, and the pair is the point. With the cap removed this body is
 // read whole and parses cleanly, so the call succeeds and the count runs past
-// MaxTokenResponseBytes; both flip together.
-func TestExchangeCode_RefusesAnAnswerOverTheCap(t *testing.T) {
-	body := oversizedTokenResponse()
+// MaxTokenResponseBytes; both flip together. The refresh grant's read was a
+// bounded read of its own inside the middleware until #441, and is this one now.
+func TestTokenClient_RefusesAnAnswerOverTheCap(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			body := oversizedTokenResponse()
 
-	tokenResponse, err := NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)).
-		ExchangeCode(context.Background(), "c", "r", "cv")
+			tokenResponse, err := g.send(context.Background(),
+				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)))
 
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
-		"the answer is refused as oversized rather than reaching the decoder truncated: %v", err)
-	assert.Nil(t, tokenResponse, "nothing is decoded out of an answer that was refused")
+			require.Error(t, err)
+			assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+				"the answer is refused as oversized rather than reaching the decoder truncated: %v", err)
+			assert.Nil(t, tokenResponse, "nothing is decoded out of an answer that was refused")
 
-	assert.Equal(t, int64(MaxTokenResponseBytes)+1, body.read.Load(),
-		"one byte past the cap is read, which is what makes the overrun detectable, and no more")
+			assert.Equal(t, int64(MaxTokenResponseBytes)+1, body.read.Load(),
+				"one byte past the cap is read, which is what makes the overrun detectable, and no more")
+		})
+	}
 }
 
 // The answer exactly at the cap is accepted, so the case above is the overrun and
 // not the size. The case below it pads to half the cap, which leaves the boundary
 // itself untested without this.
-func TestExchangeCode_AcceptsABodyOfExactlyTheCap(t *testing.T) {
-	prefix := `{"access_token":"at","scope":"`
-	suffix := `"}`
-	padding := MaxTokenResponseBytes - len(prefix) - len(suffix)
-	body := io.NopCloser(strings.NewReader(prefix + strings.Repeat("x", padding) + suffix))
+func TestTokenClient_AcceptsABodyOfExactlyTheCap(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			prefix := `{"access_token":"at","scope":"`
+			suffix := `"}`
+			padding := MaxTokenResponseBytes - len(prefix) - len(suffix)
+			body := io.NopCloser(strings.NewReader(prefix + strings.Repeat("x", padding) + suffix))
 
-	tokenResponse, err := NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)).
-		ExchangeCode(context.Background(), "c", "r", "cv")
+			tokenResponse, err := g.send(context.Background(),
+				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)))
 
-	require.NoError(t, err)
-	require.NotNil(t, tokenResponse)
-	assert.Equal(t, "at", tokenResponse.AccessToken)
-	assert.Len(t, tokenResponse.Scope, padding)
+			require.NoError(t, err)
+			require.NotNil(t, tokenResponse)
+			assert.Equal(t, "at", tokenResponse.AccessToken)
+			assert.Len(t, tokenResponse.Scope, padding)
+		})
+	}
 }
 
 // The benign member of the class: an answer under the cap is unaffected, so the
 // case above cannot be read as "large answers are refused".
-func TestExchangeCode_AcceptsABodyUnderTheCap(t *testing.T) {
-	// Well over any realistic token response and still short of the cap: the
-	// padding rides in the scope claim, which is a string of unbounded length.
-	padding := strings.Repeat("x", MaxTokenResponseBytes/2)
-	body := io.NopCloser(strings.NewReader(`{"access_token":"at","scope":"` + padding + `"}`))
+func TestTokenClient_AcceptsABodyUnderTheCap(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			// Well over any realistic token response and still short of the cap: the
+			// padding rides in the scope claim, which is a string of unbounded length.
+			padding := strings.Repeat("x", MaxTokenResponseBytes/2)
+			body := io.NopCloser(strings.NewReader(`{"access_token":"at","scope":"` + padding + `"}`))
 
-	tokenResponse, err := NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)).
-		ExchangeCode(context.Background(), "c", "r", "cv")
+			tokenResponse, err := g.send(context.Background(),
+				NewTokenClient(testTokenURL, "ci", "cs", clientReturning(http.StatusOK, body)))
 
-	require.NoError(t, err)
-	require.NotNil(t, tokenResponse)
-	assert.Equal(t, "at", tokenResponse.AccessToken)
-	assert.Len(t, tokenResponse.Scope, len(padding))
+			require.NoError(t, err)
+			require.NotNil(t, tokenResponse)
+			assert.Equal(t, "at", tokenResponse.AccessToken)
+			assert.Len(t, tokenResponse.Scope, len(padding))
+		})
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -165,45 +178,50 @@ func (o *outboundContext) client() *http.Client {
 	})}
 }
 
-// The code is single use and already burned by the time the auth server answers, so
-// a browser that goes away between the redirect and the exchange must not take the
-// exchange with it: the call would be abandoned with the code spent and the answer
-// unread. The client owns that rule, so no caller can forget it (#338, #441).
+// Both grants are single use. The code is burned by the time the auth server answers,
+// and the refresh token is revoked as part of issuing its replacement, so a browser
+// that goes away mid-call must not take the call with it: it would be abandoned with
+// the grant spent and the answer unread, and for the refresh the administrator would
+// be left holding a revoked token and signed out on their next page load. The client
+// owns that rule, so no caller can forget it (#338, #441 decision 2).
 //
 // The caller's context here is already cancelled, which is exactly that. What reaches
 // the request has to be live anyway, bounded by TokenExchangeTimeout, which is what
 // replaces the cancellation, and still carrying the caller's values: chi's RequestID
 // puts the id on every inbound request and the installed slog handler lifts it off the
-// context onto every record, so context.Background() would silence this exchange in
-// the operator's log. Passing ctx straight through is the one-token change this case
+// context onto every record, so context.Background() would silence this grant in the
+// operator's log. Passing ctx straight through is the one-token change this case
 // exists to catch.
-func TestExchangeCode_SurvivesACancelledCallerAndKeepsItsRequestId(t *testing.T) {
-	const wantRequestID = "the-inbound-request-id"
-	ctx, cancel := context.WithCancel(
-		context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID))
-	cancel()
+func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestId(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			const wantRequestID = "the-inbound-request-id"
+			ctx, cancel := context.WithCancel(
+				context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID))
+			cancel()
 
-	outbound := &outboundContext{}
-	tokenResponse, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client()).
-		ExchangeCode(ctx, "c", "r", "cv")
+			outbound := &outboundContext{}
+			tokenResponse, err := g.send(ctx, NewTokenClient(testTokenURL, "ci", "cs", outbound.client()))
 
-	require.Error(t, err)
-	assert.Nil(t, tokenResponse)
-	require.True(t, outbound.called.Load(), "the request was sent, cancelled caller or not")
-	assert.NoError(t, outbound.ctxErr,
-		"the request runs on a context detached from the caller's, which is already cancelled")
+			require.Error(t, err)
+			assert.Nil(t, tokenResponse)
+			require.True(t, outbound.called.Load(), "the request was sent, cancelled caller or not")
+			assert.NoError(t, outbound.ctxErr,
+				"the request runs on a context detached from the caller's, which is already cancelled")
 
-	require.True(t, outbound.hasLimit, "detached, but not unbounded")
-	assert.LessOrEqual(t, time.Until(outbound.deadline), TokenExchangeTimeout,
-		"bounded by TokenExchangeTimeout, which is what replaces the cancellation")
-	// The tolerance is what the client spends between taking the deadline and the
-	// transport reading it, which is microseconds; a second is generous for a loaded
-	// machine and still refuses any value that is not the ten seconds chosen in #338.
-	assert.Greater(t, time.Until(outbound.deadline), TokenExchangeTimeout-time.Second,
-		"and by that value rather than by something shorter")
+			require.True(t, outbound.hasLimit, "detached, but not unbounded")
+			assert.LessOrEqual(t, time.Until(outbound.deadline), TokenExchangeTimeout,
+				"bounded by TokenExchangeTimeout, which is what replaces the cancellation")
+			// The tolerance is what the client spends between taking the deadline and the
+			// transport reading it, which is microseconds; a second is generous for a loaded
+			// machine and still refuses any value that is not the ten seconds chosen in #338.
+			assert.Greater(t, time.Until(outbound.deadline), TokenExchangeTimeout-time.Second,
+				"and by that value rather than by something shorter")
 
-	assert.Equal(t, wantRequestID, outbound.requestID,
-		"the detached request keeps the caller's values, so request_id still reaches its records")
+			assert.Equal(t, wantRequestID, outbound.requestID,
+				"the detached request keeps the caller's values, so request_id still reaches its records")
+		})
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -231,6 +249,20 @@ func TestExchangeCode_TheExchangeIsDebugAndCarriesTheTokenUrlAndTheRequestId(t *
 	assert.Equal(t, "exchanging the code for tokens", records[0].Message)
 	assert.Equal(t, "https://authserver.internal.example/auth/token", records[0].Attrs["token_url"])
 	assert.Equal(t, "req-admin-callback", records[0].Attrs["request_id"])
+}
+
+// A refresh writes no record of its own. It runs whenever a signed-in administrator's
+// access token is due, and the middleware records each way one can fail; a successful
+// refresh has never been logged, and moving it into the client did not start (#441).
+func TestRefresh_WritesNoRecord(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+
+	_, err := NewTokenClient(testTokenURL, "ci", "cs",
+		clientReturning(http.StatusOK, io.NopCloser(strings.NewReader(`{}`)))).
+		Refresh(context.Background(), "rt")
+	require.NoError(t, err)
+
+	assert.Empty(t, logs.Records())
 }
 
 // -----------------------------------------------------------------------------

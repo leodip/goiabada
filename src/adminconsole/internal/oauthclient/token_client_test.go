@@ -22,8 +22,13 @@ import (
 // ExchangeCode is the admin console's entire authorization-code exchange:
 // handler_auth_callback.go calls it with the code the auth server just
 // redirected back with, and what it returns becomes the administrator's
-// session. The client is built once with the token URL, the client id and the
-// secret, so the callback names none of them (#338, #441).
+// session. Refresh is the JWT middleware's refresh grant, sent when the stored
+// access token is due. The client is built once with the token URL, the client
+// id and the secret, so neither caller names any of them (#338, #441).
+//
+// Both grants share the transport, the read bound and the refusal, so the cases
+// about those run once per grant, over grants below. What differs, the form each
+// posts and Refresh's kept refresh token, has cases of its own.
 //
 // The seam is the token URL, which is an httptest.Server here, the same shape
 // newJwksServer uses. These cases pass a nil client and so take the configured
@@ -86,11 +91,40 @@ func newTokenEndpoint(t *testing.T, status int, body string) (string, *requestRe
 	return server.URL + "/auth/token", recorder
 }
 
-// exchangeAgainst builds a client for tokenURL with a nil HTTP client and exchanges
-// throwaway values: the cases using it are about the answer, not the request.
+// grant is one of the token client's grants, sent with throwaway values: the cases
+// running over grants are about the answer, not the request.
+type grant struct {
+	name string
+	send func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error)
+}
+
+var grants = []grant{
+	{"authorization_code", func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error) {
+		return c.ExchangeCode(ctx, "c", "r", "cv")
+	}},
+	{"refresh_token", func(ctx context.Context, c *TokenClient) (*oauth.TokenResponse, error) {
+		return c.Refresh(ctx, "rt")
+	}},
+}
+
+// sendAgainst builds a client for tokenURL with a nil HTTP client and sends g.
+func (g grant) sendAgainst(tokenURL string) (*oauth.TokenResponse, error) {
+	return g.send(context.Background(), NewTokenClient(tokenURL, "ci", "cs", nil))
+}
+
+// exchangeAgainst is the authorization-code grant's sendAgainst, for the cases about
+// what only the exchange answers.
 func exchangeAgainst(tokenURL string) (*oauth.TokenResponse, error) {
-	return NewTokenClient(tokenURL, "ci", "cs", nil).
-		ExchangeCode(context.Background(), "c", "r", "cv")
+	return grants[0].sendAgainst(tokenURL)
+}
+
+// formKeys is the set of parameter names a form carried.
+func formKeys(form url.Values) []string {
+	keys := make([]string, 0, len(form))
+	for key := range form {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 // -----------------------------------------------------------------------------
@@ -124,43 +158,124 @@ func TestExchangeCode_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	assert.Equal(t, "the-code-verifier", seen.form.Get("code_verifier"))
 
 	// Exactly those six: a parameter added without a test is what this catches.
-	keys := make([]string, 0, len(seen.form))
-	for key := range seen.form {
-		keys = append(keys, key)
-	}
 	assert.ElementsMatch(t, []string{
 		"grant_type", "code", "redirect_uri", "client_id", "client_secret", "code_verifier",
-	}, keys)
+	}, formKeys(seen.form))
+}
+
+// The refresh grant's form is RFC 6749 section 6's, with the client authenticated in
+// the body as every grant of this client does (#441 decision 7). It is the form the
+// middleware posted before #441, parameter for parameter.
+func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
+	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
+
+	_, err := NewTokenClient(tokenURL, "the-client-id", "the-client-secret", nil).
+		Refresh(context.Background(), "the-refresh-token")
+	require.NoError(t, err)
+
+	seen := recorder.snapshot()
+	assert.Equal(t, http.MethodPost, seen.method)
+	assert.Equal(t, "/auth/token", seen.path, "posted to the token URL the client was built with")
+	assert.Equal(t, "application/x-www-form-urlencoded", seen.contentType)
+
+	assert.Equal(t, "refresh_token", seen.form.Get("grant_type"))
+	assert.Equal(t, "the-refresh-token", seen.form.Get("refresh_token"))
+	assert.Equal(t, "the-client-id", seen.form.Get("client_id"))
+	assert.Equal(t, "the-client-secret", seen.form.Get("client_secret"))
+
+	// Exactly those four: no scope, so the grant is the one originally granted.
+	assert.ElementsMatch(t, []string{
+		"grant_type", "refresh_token", "client_id", "client_secret",
+	}, formKeys(seen.form))
 }
 
 // -----------------------------------------------------------------------------
 // The response
 // -----------------------------------------------------------------------------
 
-func TestExchangeCode_DecodesEveryTokenResponseField(t *testing.T) {
-	tokenURL, _ := newTokenEndpoint(t, http.StatusOK, `{
-		"access_token": "the-access-token",
-		"id_token": "the-id-token",
-		"token_type": "Bearer",
-		"expires_in": 300,
-		"refresh_token": "the-refresh-token",
-		"refresh_expires_in": 1200,
-		"scope": "openid email profile"
-	}`)
+func TestTokenClient_DecodesEveryTokenResponseField(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			tokenURL, _ := newTokenEndpoint(t, http.StatusOK, `{
+				"access_token": "the-access-token",
+				"id_token": "the-id-token",
+				"token_type": "Bearer",
+				"expires_in": 300,
+				"refresh_token": "the-refresh-token",
+				"refresh_expires_in": 1200,
+				"scope": "openid email profile"
+			}`)
+
+			tokenResponse, err := g.sendAgainst(tokenURL)
+			require.NoError(t, err)
+			require.NotNil(t, tokenResponse)
+
+			// Field by field rather than against a struct literal: a field added to
+			// oauth.TokenResponse later leaves a gap here that reads as a gap.
+			assert.Equal(t, "the-access-token", tokenResponse.AccessToken)
+			assert.Equal(t, "the-id-token", tokenResponse.IdToken)
+			assert.Equal(t, "Bearer", tokenResponse.TokenType)
+			assert.Equal(t, int64(300), tokenResponse.ExpiresIn)
+			assert.Equal(t, "the-refresh-token", tokenResponse.RefreshToken)
+			assert.Equal(t, int64(1200), tokenResponse.RefreshExpiresIn)
+			assert.Equal(t, "openid email profile", tokenResponse.Scope)
+		})
+	}
+}
+
+// RFC 6749 section 6: the auth server "MAY issue a new refresh token, in which case
+// the client MUST discard the old refresh token". One that issues none leaves the old
+// one the client's, and returning the answer as it came would have the caller store
+// it away as empty and sign the administrator out at the next refresh.
+// golang.org/x/oauth2 keeps it the same way (#427, #441 decision 2).
+func TestRefresh_KeepsTheOldRefreshTokenWhenTheAnswerCarriesNone(t *testing.T) {
+	testCases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "the answer issues a new one, which replaces the old",
+			body: `{"access_token":"the-new-access-token","refresh_token":"the-new-refresh-token"}`,
+			want: "the-new-refresh-token",
+		},
+		{
+			name: "the answer has no refresh_token member",
+			body: `{"access_token":"the-new-access-token"}`,
+			want: "the-old-refresh-token",
+		},
+		{
+			name: "the answer's refresh_token is empty",
+			body: `{"access_token":"the-new-access-token","refresh_token":""}`,
+			want: "the-old-refresh-token",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tokenURL, _ := newTokenEndpoint(t, http.StatusOK, tc.body)
+
+			tokenResponse, err := NewTokenClient(tokenURL, "ci", "cs", nil).
+				Refresh(context.Background(), "the-old-refresh-token")
+
+			require.NoError(t, err)
+			require.NotNil(t, tokenResponse)
+			assert.Equal(t, "the-new-access-token", tokenResponse.AccessToken)
+			assert.Equal(t, tc.want, tokenResponse.RefreshToken)
+		})
+	}
+}
+
+// The kept token is the refresh grant's alone: an exchange answering with none has
+// no old one to keep, and the session it starts is simply not refreshable.
+func TestExchangeCode_AnAnswerWithNoRefreshTokenStaysWithout(t *testing.T) {
+	tokenURL, _ := newTokenEndpoint(t, http.StatusOK, `{"access_token":"the-access-token"}`)
 
 	tokenResponse, err := exchangeAgainst(tokenURL)
+
 	require.NoError(t, err)
 	require.NotNil(t, tokenResponse)
-
-	// Field by field rather than against a struct literal: a field added to
-	// oauth.TokenResponse later leaves a gap here that reads as a gap.
-	assert.Equal(t, "the-access-token", tokenResponse.AccessToken)
-	assert.Equal(t, "the-id-token", tokenResponse.IdToken)
-	assert.Equal(t, "Bearer", tokenResponse.TokenType)
-	assert.Equal(t, int64(300), tokenResponse.ExpiresIn)
-	assert.Equal(t, "the-refresh-token", tokenResponse.RefreshToken)
-	assert.Equal(t, int64(1200), tokenResponse.RefreshExpiresIn)
-	assert.Equal(t, "openid email profile", tokenResponse.Scope)
+	assert.Empty(t, tokenResponse.RefreshToken)
 }
 
 // The benign member of the parse-failure class. It is here so the case below
@@ -178,7 +293,7 @@ func TestExchangeCode_AcceptsAnEmptyJSONObject(t *testing.T) {
 // Refused by the json.Unmarshal error check and by nothing else: the endpoint
 // answers 200 and is live, so neither the status gate nor the transport can be
 // what fails this.
-func TestExchangeCode_RejectsAnEmptyBody(t *testing.T) {
+func TestTokenClient_RejectsAnEmptyBody(t *testing.T) {
 	testCases := []struct {
 		name string
 		body string
@@ -187,34 +302,40 @@ func TestExchangeCode_RejectsAnEmptyBody(t *testing.T) {
 		{"whitespace only", "   "},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tokenURL, _ := newTokenEndpoint(t, http.StatusOK, tc.body)
+	for _, g := range grants {
+		for _, tc := range testCases {
+			t.Run(g.name+"/"+tc.name, func(t *testing.T) {
+				tokenURL, _ := newTokenEndpoint(t, http.StatusOK, tc.body)
 
-			tokenResponse, err := exchangeAgainst(tokenURL)
+				tokenResponse, err := g.sendAgainst(tokenURL)
 
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "unexpected end of JSON input")
-			assert.Nil(t, tokenResponse)
-		})
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "unexpected end of JSON input")
+				assert.Nil(t, tokenResponse)
+			})
+		}
 	}
 }
 
 // Refused by client.Do. The server is started and then closed, so the URL is
 // well formed and the host is real: only the listener is gone, which is the one
 // thing that differs from the cases above. It is not a refusal: nothing answered.
-func TestExchangeCode_ErrorsWhenTheEndpointIsUnreachable(t *testing.T) {
+func TestTokenClient_ErrorsWhenTheEndpointIsUnreachable(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	tokenURL := server.URL + "/auth/token"
 	server.Close()
 
-	tokenResponse, err := exchangeAgainst(tokenURL)
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			tokenResponse, err := g.sendAgainst(tokenURL)
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "error sending request")
-	var refusal *TokenEndpointError
-	assert.False(t, errors.As(err, &refusal), "an endpoint that never answered did not refuse anything")
-	assert.Nil(t, tokenResponse)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "error sending request")
+			var refusal *TokenEndpointError
+			assert.False(t, errors.As(err, &refusal), "an endpoint that never answered did not refuse anything")
+			assert.Nil(t, tokenResponse)
+		})
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -230,28 +351,32 @@ func TestExchangeCode_ErrorsWhenTheEndpointIsUnreachable(t *testing.T) {
 // Refused by the status check and by nothing else: this body is valid JSON and
 // unmarshals cleanly into a zero oauth.TokenResponse, so with the status gate
 // removed the call would succeed.
-func TestExchangeCode_ARefusalCarriesTheStatusTheErrorAndItsDescription(t *testing.T) {
-	tokenURL, _ := newTokenEndpoint(t, http.StatusBadRequest,
-		`{"error":"invalid_grant","error_description":"the code has expired"}`)
+func TestTokenClient_ARefusalCarriesTheStatusTheErrorAndItsDescription(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			tokenURL, _ := newTokenEndpoint(t, http.StatusBadRequest,
+				`{"error":"invalid_grant","error_description":"the grant has expired"}`)
 
-	tokenResponse, err := exchangeAgainst(tokenURL)
+			tokenResponse, err := g.sendAgainst(tokenURL)
 
-	require.Error(t, err)
-	assert.Nil(t, tokenResponse)
+			require.Error(t, err)
+			assert.Nil(t, tokenResponse)
 
-	var refusal *TokenEndpointError
-	require.True(t, errors.As(err, &refusal), "a caller can match the refusal: %v", err)
-	assert.Equal(t, http.StatusBadRequest, refusal.StatusCode)
-	assert.Equal(t, "invalid_grant", refusal.ErrorCode)
-	assert.Equal(t, "the code has expired", refusal.ErrorDescription)
-	assert.Equal(t,
-		"the auth server's token endpoint answered 400 (invalid_grant: the code has expired)",
-		err.Error())
+			var refusal *TokenEndpointError
+			require.True(t, errors.As(err, &refusal), "a caller can match the refusal: %v", err)
+			assert.Equal(t, http.StatusBadRequest, refusal.StatusCode)
+			assert.Equal(t, "invalid_grant", refusal.ErrorCode)
+			assert.Equal(t, "the grant has expired", refusal.ErrorDescription)
+			assert.Equal(t,
+				"the auth server's token endpoint answered 400 (invalid_grant: the grant has expired)",
+				err.Error())
+		})
+	}
 }
 
 // The message drops what the answer did not carry rather than printing an empty
 // slot for it.
-func TestExchangeCode_ARefusalMessageNamesOnlyWhatTheAnswerCarried(t *testing.T) {
+func TestTokenClient_ARefusalMessageNamesOnlyWhatTheAnswerCarried(t *testing.T) {
 	testCases := []struct {
 		name   string
 		status int
@@ -278,22 +403,24 @@ func TestExchangeCode_ARefusalMessageNamesOnlyWhatTheAnswerCarried(t *testing.T)
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tokenURL, _ := newTokenEndpoint(t, tc.status, tc.body)
+	for _, g := range grants {
+		for _, tc := range testCases {
+			t.Run(g.name+"/"+tc.name, func(t *testing.T) {
+				tokenURL, _ := newTokenEndpoint(t, tc.status, tc.body)
 
-			_, err := exchangeAgainst(tokenURL)
+				_, err := g.sendAgainst(tokenURL)
 
-			require.Error(t, err)
-			assert.Equal(t, tc.want, err.Error())
-		})
+				require.Error(t, err)
+				assert.Equal(t, tc.want, err.Error())
+			})
+		}
 	}
 }
 
 // A body that is not the RFC 6749 error object -- a proxy's HTML page, a stack trace --
 // is refused on its status alone, and none of its text reaches the message. Before
-// #441 the whole body was the message.
-func TestExchangeCode_ARefusalNeverCarriesTheRawBody(t *testing.T) {
+// #441 the whole body was the message, for the refresh grant until slice 2.
+func TestTokenClient_ARefusalNeverCarriesTheRawBody(t *testing.T) {
 	testCases := []struct {
 		name   string
 		status int
@@ -320,19 +447,21 @@ func TestExchangeCode_ARefusalNeverCarriesTheRawBody(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tokenURL, _ := newTokenEndpoint(t, tc.status, tc.body)
+	for _, g := range grants {
+		for _, tc := range testCases {
+			t.Run(g.name+"/"+tc.name, func(t *testing.T) {
+				tokenURL, _ := newTokenEndpoint(t, tc.status, tc.body)
 
-			_, err := exchangeAgainst(tokenURL)
+				_, err := g.sendAgainst(tokenURL)
 
-			require.Error(t, err)
-			var refusal *TokenEndpointError
-			require.True(t, errors.As(err, &refusal))
-			assert.Equal(t, tc.status, refusal.StatusCode)
-			assert.Equal(t, tc.want, err.Error())
-			assert.NotContains(t, err.Error(), "secret-peer-text")
-		})
+				require.Error(t, err)
+				var refusal *TokenEndpointError
+				require.True(t, errors.As(err, &refusal))
+				assert.Equal(t, tc.status, refusal.StatusCode)
+				assert.Equal(t, tc.want, err.Error())
+				assert.NotContains(t, err.Error(), "secret-peer-text")
+			})
+		}
 	}
 }
 
@@ -340,27 +469,32 @@ func TestExchangeCode_ARefusalNeverCarriesTheRawBody(t *testing.T) {
 // becomes '?' and the result stops at 512 bytes, the last three of them "...".
 // The description here carries a newline, which would split a log line, and runs
 // to 600 bytes, so neither reaches the message whole.
-func TestExchangeCode_ARefusalIsConformedAndBounded(t *testing.T) {
+func TestTokenClient_ARefusalIsConformedAndBounded(t *testing.T) {
 	description := "line one\nline two " + strings.Repeat("x", 600)
-	tokenURL, _ := newTokenEndpoint(t, http.StatusBadRequest,
-		`{"error":"invalid\"grant","error_description":"line one\nline two `+strings.Repeat("x", 600)+`"}`)
 
-	_, err := exchangeAgainst(tokenURL)
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			tokenURL, _ := newTokenEndpoint(t, http.StatusBadRequest,
+				`{"error":"invalid\"grant","error_description":"line one\nline two `+strings.Repeat("x", 600)+`"}`)
 
-	require.Error(t, err)
-	var refusal *TokenEndpointError
-	require.True(t, errors.As(err, &refusal))
+			_, err := g.sendAgainst(tokenURL)
 
-	// '"' is outside Appendix A's error_description set, as is the newline.
-	assert.Equal(t, "invalid?grant", refusal.ErrorCode)
+			require.Error(t, err)
+			var refusal *TokenEndpointError
+			require.True(t, errors.As(err, &refusal))
 
-	// "line one?line two " is 18 bytes, so 491 x's fill the 509 before the ellipsis.
-	wantDescription := "line one?line two " + strings.Repeat("x", 491) + "..."
-	require.Len(t, wantDescription, 512)
-	assert.Equal(t, wantDescription, refusal.ErrorDescription)
+			// '"' is outside Appendix A's error_description set, as is the newline.
+			assert.Equal(t, "invalid?grant", refusal.ErrorCode)
 
-	assert.NotContains(t, err.Error(), "\n", "the newline the peer sent does not split a log line")
-	assert.NotContains(t, err.Error(), description, "the description does not reach the message whole")
-	assert.Equal(t, "the auth server's token endpoint answered 400 (invalid?grant: "+wantDescription+")",
-		err.Error())
+			// "line one?line two " is 18 bytes, so 491 x's fill the 509 before the ellipsis.
+			wantDescription := "line one?line two " + strings.Repeat("x", 491) + "..."
+			require.Len(t, wantDescription, 512)
+			assert.Equal(t, wantDescription, refusal.ErrorDescription)
+
+			assert.NotContains(t, err.Error(), "\n", "the newline the peer sent does not split a log line")
+			assert.NotContains(t, err.Error(), description, "the description does not reach the message whole")
+			assert.Equal(t, "the auth server's token endpoint answered 400 (invalid?grant: "+wantDescription+")",
+				err.Error())
+		})
+	}
 }
