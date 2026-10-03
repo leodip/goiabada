@@ -86,6 +86,20 @@ func (c *AuthServerClient) UpdateUserAddress(ctx context.Context, accessToken st
 	return &response.User, nil
 }
 
+func (c *AuthServerClient) UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/phone",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.User, nil
+}
+
 func (c *AuthServerClient) UpdateUserEmail(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",

@@ -36,20 +36,6 @@ func (c *AuthServerClient) UpdateUserPermissions(ctx context.Context, accessToke
 	return err
 }
 
-// GetAllResources retrieves all resources from the auth server
-func (c *AuthServerClient) GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error) {
-	response, err := execute[api.GetResourcesResponse](ctx, c, accessToken, apiRequest{
-		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL),
-		contentType:   contentTypeJSON,
-		successStatus: http.StatusOK,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return response.Resources, nil
-}
-
 // GetPermissionsByResource retrieves permissions for a specific resource from the auth server
 func (c *AuthServerClient) GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
 	response, err := execute[api.GetPermissionsByResourceResponse](ctx, c, accessToken, apiRequest{

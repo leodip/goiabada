@@ -72,7 +72,7 @@ const (
 
 func wireCharacterization() []wireCase {
 	return []wireCase{
-		// --- account_client.go ------------------------------------------------------------
+		// --- account.go -------------------------------------------------------------------
 		{
 			name: "GetAccountProfile",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -273,7 +273,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 
-		// --- audit_log_client.go ----------------------------------------------------------
+		// --- audit_logs.go ----------------------------------------------------------------
 		{
 			name: "GetSettingsAuditLogs",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -326,7 +326,31 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"auditEventTypes":["AuditUserLogin"]}`, want: "AuditUserLogin",
 		},
 
-		// --- client_client.go -------------------------------------------------------------
+		// --- client_permissions.go --------------------------------------------------------
+		{
+			name: "GetClientPermissions",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				client, permissions, err := c.GetClientPermissions(ctx, charAccessToken, 3)
+				if err != nil {
+					return nil, err
+				}
+				return []any{client.Id, permissions[0].Id}, nil
+			},
+			verb: "GET", path: "/api/v1/admin/clients/3/permissions",
+			successStatus: 200, reply: `{"client":{"id":3},"permissions":[{"id":8}]}`,
+			want: []any{int64(3), int64(8)},
+		},
+		{
+			name: "UpdateClientPermissions",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.UpdateClientPermissions(ctx, charAccessToken, 3, charUpdateClientPerms)
+			},
+			verb: "PUT", path: "/api/v1/admin/clients/3/permissions", contentType: charJSON,
+			bodyOf:        charUpdateClientPerms,
+			successStatus: 200, reply: `{}`,
+		},
+
+		// --- clients.go -------------------------------------------------------------------
 		{
 			name: "GetAllClients",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -486,31 +510,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 
-		// --- client_permission_client.go --------------------------------------------------
-		{
-			name: "GetClientPermissions",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				client, permissions, err := c.GetClientPermissions(ctx, charAccessToken, 3)
-				if err != nil {
-					return nil, err
-				}
-				return []any{client.Id, permissions[0].Id}, nil
-			},
-			verb: "GET", path: "/api/v1/admin/clients/3/permissions",
-			successStatus: 200, reply: `{"client":{"id":3},"permissions":[{"id":8}]}`,
-			want: []any{int64(3), int64(8)},
-		},
-		{
-			name: "UpdateClientPermissions",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.UpdateClientPermissions(ctx, charAccessToken, 3, charUpdateClientPerms)
-			},
-			verb: "PUT", path: "/api/v1/admin/clients/3/permissions", contentType: charJSON,
-			bodyOf:        charUpdateClientPerms,
-			successStatus: 200, reply: `{}`,
-		},
-
-		// --- group_attribute_client.go ----------------------------------------------------
+		// --- group_attributes.go ----------------------------------------------------------
 		{
 			name: "GetGroupAttributesByGroupId",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -570,7 +570,31 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 
-		// --- group_client.go --------------------------------------------------------------
+		// --- group_permissions.go ---------------------------------------------------------
+		{
+			name: "GetGroupPermissions",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				group, permissions, err := c.GetGroupPermissions(ctx, charAccessToken, 5)
+				if err != nil {
+					return nil, err
+				}
+				return []any{group.Id, permissions[0].Id}, nil
+			},
+			verb: "GET", path: "/api/v1/admin/groups/5/permissions",
+			successStatus: 200, reply: `{"group":{"id":5},"permissions":[{"id":8}]}`,
+			want: []any{int64(5), int64(8)},
+		},
+		{
+			name: "UpdateGroupPermissions",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.UpdateGroupPermissions(ctx, charAccessToken, 5, charUpdateGroupPerm)
+			},
+			verb: "PUT", path: "/api/v1/admin/groups/5/permissions", contentType: charJSON,
+			bodyOf:        charUpdateGroupPerm,
+			successStatus: 200, reply: `{}`,
+		},
+
+		// --- groups.go --------------------------------------------------------------------
 		{
 			name: "GetAllGroups",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -715,31 +739,7 @@ func wireCharacterization() []wireCase {
 			want: []any{int64(42), int64(5)},
 		},
 
-		// --- group_permission_client.go ---------------------------------------------------
-		{
-			name: "GetGroupPermissions",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				group, permissions, err := c.GetGroupPermissions(ctx, charAccessToken, 5)
-				if err != nil {
-					return nil, err
-				}
-				return []any{group.Id, permissions[0].Id}, nil
-			},
-			verb: "GET", path: "/api/v1/admin/groups/5/permissions",
-			successStatus: 200, reply: `{"group":{"id":5},"permissions":[{"id":8}]}`,
-			want: []any{int64(5), int64(8)},
-		},
-		{
-			name: "UpdateGroupPermissions",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.UpdateGroupPermissions(ctx, charAccessToken, 5, charUpdateGroupPerm)
-			},
-			verb: "PUT", path: "/api/v1/admin/groups/5/permissions", contentType: charJSON,
-			bodyOf:        charUpdateGroupPerm,
-			successStatus: 200, reply: `{}`,
-		},
-
-		// --- permission_client.go ---------------------------------------------------------
+		// --- permissions.go ---------------------------------------------------------------
 		{
 			name: "GetUserPermissions",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -761,18 +761,6 @@ func wireCharacterization() []wireCase {
 			verb: "PUT", path: "/api/v1/admin/users/42/permissions", contentType: charJSON,
 			bodyOf:        charUpdateUserPerm,
 			successStatus: 200, reply: `{}`,
-		},
-		{
-			name: "GetAllResources",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetAllResources(ctx, charAccessToken)
-				if err != nil {
-					return nil, err
-				}
-				return got[0].Id, nil
-			},
-			verb: "GET", path: "/api/v1/admin/resources", contentType: charJSON,
-			successStatus: 200, reply: `{"resources":[{"id":2}]}`, want: int64(2),
 		},
 		{
 			name: "GetPermissionsByResource",
@@ -824,20 +812,7 @@ func wireCharacterization() []wireCase {
 			want: []any{true, 2},
 		},
 
-		// --- phone_client.go --------------------------------------------------------------
-		{
-			name: "UpdateUserPhone",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateUserPhone(ctx, charAccessToken, 42, charUpdateUserPhone)
-				if err != nil {
-					return nil, err
-				}
-				return got.PhoneNumber, nil
-			},
-			verb: "PUT", path: "/api/v1/admin/users/42/phone", contentType: charJSON,
-			bodyOf:        charUpdateUserPhone,
-			successStatus: 200, reply: `{"user":{"phoneNumber":"5555678"}}`, want: "5555678",
-		},
+		// --- phone_countries.go -----------------------------------------------------------
 		{
 			name: "GetPhoneCountries",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -851,7 +826,19 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"phoneCountries":[{"uniqueId":"BRA_0"}]}`, want: "BRA_0",
 		},
 
-		// --- resource_client.go -----------------------------------------------------------
+		// --- resources.go -----------------------------------------------------------------
+		{
+			name: "GetAllResources",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetAllResources(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return got[0].Id, nil
+			},
+			verb: "GET", path: "/api/v1/admin/resources", contentType: charJSON,
+			successStatus: 200, reply: `{"resources":[{"id":2}]}`, want: int64(2),
+		},
 		{
 			name: "CreateResource",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -899,7 +886,62 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 
-		// --- settings_email_client.go -----------------------------------------------------
+		// --- sessions.go ------------------------------------------------------------------
+		{
+			name: "GetUserSessionsByUserId",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetUserSessionsByUserId(ctx, charAccessToken, 42)
+				if err != nil {
+					return nil, err
+				}
+				return got[0].IsCurrent, nil
+			},
+			verb: "GET", path: "/api/v1/admin/users/42/sessions", contentType: charJSON,
+			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}]}`, want: true,
+		},
+		{
+			name: "DeleteUserSessionById",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.DeleteUserSessionById(ctx, charAccessToken, 31)
+			},
+			verb: "DELETE", path: "/api/v1/admin/user-sessions/31", contentType: charJSON,
+			successStatus: 200, reply: `{"success":true}`,
+		},
+		{
+			name: "GetClientSessionsByClientId",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetClientSessionsByClientId(ctx, charAccessToken, 3, 1, 10)
+				if err != nil {
+					return nil, err
+				}
+				return got.Sessions[0].IsCurrent, nil
+			},
+			verb: "GET", path: "/api/v1/admin/clients/3/sessions", query: "page=1&size=10",
+			contentType:   charJSON,
+			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}],"users":[]}`, want: true,
+		},
+		{
+			name: "GetAccountSessions",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetAccountSessions(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return got[0].IsCurrent, nil
+			},
+			verb: "GET", path: "/api/v1/account/sessions", contentType: charJSON,
+			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}]}`, want: true,
+		},
+		{
+			name: "DeleteAccountSession",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.DeleteAccountSession(ctx, charAccessToken, 31)
+			},
+			verb: "DELETE", path: "/api/v1/account/sessions/31", contentType: charJSON,
+			successStatus: 200, reply: `{"success":true}`,
+		},
+
+		// --- settings_email.go ------------------------------------------------------------
 		{
 			name: "GetSettingsEmail",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -935,7 +977,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 
-		// --- settings_general_client.go ---------------------------------------------------
+		// --- settings_general.go ----------------------------------------------------------
 		{
 			name: "GetSettingsGeneral",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -962,7 +1004,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"appName":"Goiabada"}`, want: "Goiabada",
 		},
 
-		// --- settings_keys_client.go ------------------------------------------------------
+		// --- settings_keys.go -------------------------------------------------------------
 		{
 			name: "GetSettingsKeys",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -994,7 +1036,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`, readErrorIsNotAnError: true,
 		},
 
-		// --- settings_sessions_client.go --------------------------------------------------
+		// --- settings_sessions.go ---------------------------------------------------------
 		{
 			name: "GetSettingsSessions",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -1021,7 +1063,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"userSessionIdleTimeoutInSeconds":900}`, want: 900,
 		},
 
-		// --- settings_tokens_client.go ----------------------------------------------------
+		// --- settings_tokens.go -----------------------------------------------------------
 		{
 			name: "GetSettingsTokens",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -1048,7 +1090,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"tokenExpirationInSeconds":300}`, want: 300,
 		},
 
-		// --- settings_ui_theme_client.go --------------------------------------------------
+		// --- settings_ui_theme.go ---------------------------------------------------------
 		{
 			name: "GetSettingsUITheme",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -1075,7 +1117,7 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"uiTheme":"dark"}`, want: "dark",
 		},
 
-		// --- user_attribute_client.go -----------------------------------------------------
+		// --- user_attributes.go -----------------------------------------------------------
 		{
 			name: "GetUserAttributesByUserId",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -1135,7 +1177,29 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 
-		// --- user_client.go ---------------------------------------------------------------
+		// --- user_consents.go -------------------------------------------------------------
+		{
+			name: "GetUserConsents",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetUserConsents(ctx, charAccessToken, 42)
+				if err != nil {
+					return nil, err
+				}
+				return got[0].Scope, nil
+			},
+			verb: "GET", path: "/api/v1/admin/users/42/consents", contentType: charJSON,
+			successStatus: 200, reply: `{"consents":[{"scope":"openid profile"}]}`, want: "openid profile",
+		},
+		{
+			name: "DeleteUserConsent",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.DeleteUserConsent(ctx, charAccessToken, 13)
+			},
+			verb: "DELETE", path: "/api/v1/admin/user-consents/13", contentType: charJSON,
+			successStatus: 200, reply: `{}`,
+		},
+
+		// --- users.go ---------------------------------------------------------------------
 		{
 			name: "SearchUsersPaginated",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
@@ -1200,6 +1264,19 @@ func wireCharacterization() []wireCase {
 			verb: "PUT", path: "/api/v1/admin/users/42/address", contentType: charJSON,
 			bodyOf:        charUpdateUserAddress,
 			successStatus: 200, reply: `{"user":{"addressLine1":"1 Main Street"}}`, want: "1 Main Street",
+		},
+		{
+			name: "UpdateUserPhone",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateUserPhone(ctx, charAccessToken, 42, charUpdateUserPhone)
+				if err != nil {
+					return nil, err
+				}
+				return got.PhoneNumber, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/users/42/phone", contentType: charJSON,
+			bodyOf:        charUpdateUserPhone,
+			successStatus: 200, reply: `{"user":{"phoneNumber":"5555678"}}`, want: "5555678",
 		},
 		{
 			name: "UpdateUserEmail",
@@ -1294,81 +1371,6 @@ func wireCharacterization() []wireCase {
 				return nil, c.DeleteUser(ctx, charAccessToken, 42)
 			},
 			verb: "DELETE", path: "/api/v1/admin/users/42", contentType: charJSON,
-			successStatus: 200, reply: `{}`,
-		},
-
-		// --- user_session_client.go -------------------------------------------------------
-		{
-			name: "GetUserSessionsByUserId",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserSessionsByUserId(ctx, charAccessToken, 42)
-				if err != nil {
-					return nil, err
-				}
-				return got[0].IsCurrent, nil
-			},
-			verb: "GET", path: "/api/v1/admin/users/42/sessions", contentType: charJSON,
-			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}]}`, want: true,
-		},
-		{
-			name: "DeleteUserSessionById",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteUserSessionById(ctx, charAccessToken, 31)
-			},
-			verb: "DELETE", path: "/api/v1/admin/user-sessions/31", contentType: charJSON,
-			successStatus: 200, reply: `{"success":true}`,
-		},
-		{
-			name: "GetClientSessionsByClientId",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetClientSessionsByClientId(ctx, charAccessToken, 3, 1, 10)
-				if err != nil {
-					return nil, err
-				}
-				return got.Sessions[0].IsCurrent, nil
-			},
-			verb: "GET", path: "/api/v1/admin/clients/3/sessions", query: "page=1&size=10",
-			contentType:   charJSON,
-			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}],"users":[]}`, want: true,
-		},
-		{
-			name: "GetAccountSessions",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetAccountSessions(ctx, charAccessToken)
-				if err != nil {
-					return nil, err
-				}
-				return got[0].IsCurrent, nil
-			},
-			verb: "GET", path: "/api/v1/account/sessions", contentType: charJSON,
-			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}]}`, want: true,
-		},
-		{
-			name: "DeleteAccountSession",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteAccountSession(ctx, charAccessToken, 31)
-			},
-			verb: "DELETE", path: "/api/v1/account/sessions/31", contentType: charJSON,
-			successStatus: 200, reply: `{"success":true}`,
-		},
-		{
-			name: "GetUserConsents",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserConsents(ctx, charAccessToken, 42)
-				if err != nil {
-					return nil, err
-				}
-				return got[0].Scope, nil
-			},
-			verb: "GET", path: "/api/v1/admin/users/42/consents", contentType: charJSON,
-			successStatus: 200, reply: `{"consents":[{"scope":"openid profile"}]}`, want: "openid profile",
-		},
-		{
-			name: "DeleteUserConsent",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteUserConsent(ctx, charAccessToken, 13)
-			},
-			verb: "DELETE", path: "/api/v1/admin/user-consents/13", contentType: charJSON,
 			successStatus: 200, reply: `{}`,
 		},
 	}

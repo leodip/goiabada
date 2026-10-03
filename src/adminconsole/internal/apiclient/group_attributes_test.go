@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Seam 2 for the group attribute family (#350). The same reasoning as group_client_test.go: the
+// Seam 2 for the group attribute family (#350). The same reasoning as groups_test.go: the
 // rebuild into models.GroupAttribute is gone, so the decode is where a renamed tag now hides, and
 // the bodies are literal JSON text for that reason.
 //

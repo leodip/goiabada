@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The permission and resource families' decode half. Every method below used to rebuild the
+// The resource family's decode half, and with permissions_test.go, client_permissions_test.go and
+// group_permissions_test.go the permission family's. Every method of both used to rebuild the
 // response into a models.Permission or a models.Resource, field by field, and each rebuild was a
 // list of the fields somebody remembered: a field added to the response and forgotten in the loop
 // reached the handlers as its zero value with nothing going red. They hand the decoded response
@@ -23,9 +24,6 @@ import (
 // wire. The rebuild could not carry it at all: models.Resource has no such field, only a method.
 const resourceBodyFields = `"id":2,"resourceIdentifier":"api","description":"The API",` +
 	`"isSystemLevelResource":true`
-
-const permissionBodyFields = `"id":9,"permissionIdentifier":"read","description":"Read it",` +
-	`"resourceId":2,"resource":{` + resourceBodyFields + `}`
 
 func TestAuthServerClient_GetResourceByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"resource":{`+resourceBodyFields+`}}`)
@@ -91,61 +89,4 @@ func TestAuthServerClient_UpdateResourceDecodesTheUpdatedRow(t *testing.T) {
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/resources/2", gotPath)
 	assert.Equal(t, "The API", resource.Description)
-}
-
-// The permission methods all decode the same nested shape, and every one of them carried its own
-// copy of the rebuild loop. The nested resource is what the loops truncated hardest: they copied
-// three of its fields and dropped the flag, so a permission's resource arrived looking ordinary
-// however the server had described it.
-func TestAuthServerClient_GetPermissionsByResourceDecodesTheNestedResource(t *testing.T) {
-	client, recorded := serves(t, `{"permissions":[{`+permissionBodyFields+`}]}`)
-
-	permissions, err := client.GetPermissionsByResource(context.Background(), "an-access-token", 2)
-	require.NoError(t, err)
-
-	gotPath, _ := recorded()
-	assert.Equal(t, "/api/v1/admin/resources/2/permissions", gotPath)
-
-	require.Len(t, permissions, 1)
-	assert.Equal(t, int64(9), permissions[0].Id)
-	assert.Equal(t, "read", permissions[0].PermissionIdentifier)
-	assert.Equal(t, "Read it", permissions[0].Description)
-	assert.Equal(t, int64(2), permissions[0].ResourceId)
-	assert.Equal(t, "api", permissions[0].Resource.ResourceIdentifier)
-	assert.True(t, permissions[0].Resource.IsSystemLevelResource,
-		"the flag survives the nested position too, which the rebuild loop could not carry at all")
-}
-
-func TestAuthServerClient_GetUserPermissionsReturnsTheUserBesideThePermissions(t *testing.T) {
-	client, recorded := serves(t, `{"user":{"id":42,"username":"jdoe"},`+
-		`"permissions":[{`+permissionBodyFields+`}]}`)
-
-	user, permissions, err := client.GetUserPermissions(context.Background(), "an-access-token", 42)
-	require.NoError(t, err)
-	require.NotNil(t, user)
-
-	gotPath, _ := recorded()
-	assert.Equal(t, "/api/v1/admin/users/42/permissions", gotPath)
-
-	assert.Equal(t, int64(42), user.Id)
-	assert.Equal(t, "jdoe", user.Username)
-	require.Len(t, permissions, 1)
-	assert.Equal(t, "read", permissions[0].PermissionIdentifier)
-}
-
-func TestAuthServerClient_GetClientPermissionsReturnsTheClientBesideThePermissions(t *testing.T) {
-	client, recorded := serves(t, `{"client":{"id":7,"clientIdentifier":"portal"},`+
-		`"permissions":[{`+permissionBodyFields+`}]}`)
-
-	clientResp, permissions, err := client.GetClientPermissions(context.Background(), "an-access-token", 7)
-	require.NoError(t, err)
-	require.NotNil(t, clientResp)
-
-	gotPath, _ := recorded()
-	assert.Equal(t, "/api/v1/admin/clients/7/permissions", gotPath)
-
-	assert.Equal(t, int64(7), clientResp.Id)
-	assert.Equal(t, "portal", clientResp.ClientIdentifier)
-	require.Len(t, permissions, 1)
-	assert.Equal(t, int64(9), permissions[0].Id)
 }

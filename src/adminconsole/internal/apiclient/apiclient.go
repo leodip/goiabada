@@ -1,3 +1,16 @@
+// Package apiclient is the admin console's client of the auth server's admin and account APIs.
+// AuthServerClient has one method per endpoint the console calls, each stating its verb, target,
+// body and the success it accepts, and every one takes the path executor.go declares once: the
+// administrator's bearer token on the request, the client's deadline on the call, the answer read
+// under one size ceiling, and a status the method does not accept answered as an APIError. There is
+// no interface over the client: each handler declares an unexported port naming the methods it
+// calls, so a fake missing one fails to compile.
+//
+// executor.go and this file aside, each file is named for the resource its methods call, and the
+// wire characterization table holds every method to the request it sends and the answer it reads.
+// The package also held the console's session backend, the client-credentials token source behind
+// it and the public settings client until #441, which moved them to sessionbackend, oauthclient
+// and publicsettings.
 package apiclient
 
 import (

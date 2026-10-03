@@ -24,7 +24,7 @@ import (
 // rename to catch.
 //
 // The body is literal bytes rather than marshalled from the api structs: a body produced by the
-// same tags it is meant to check proves nothing, which is the rule user_client_test.go already
+// same tags it is meant to check proves nothing, which is the rule users_test.go already
 // states for the user family.
 //
 // The presentation fields the session response used to carry -- startedAt,
