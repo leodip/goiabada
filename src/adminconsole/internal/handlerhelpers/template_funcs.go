@@ -58,8 +58,8 @@ var jsBootstrapKeys = []string{
 //
 // convertToString below is the other, and it is why the pair is here rather than in core. It was
 // core/stringutil.ConvertToString, exported for this one caller and writing its plain record
-// lawfully only because core/stringutil sits outside slogRequestPathDirs. Moving it in with its
-// caller costs it a third slogPlainSites row and retires that exemption by directory (#385).
+// lawfully only because core/stringutil sat outside the request-path scope of the day. Moving it
+// in with its caller cost it a slogPlainSites row and retired that exemption by directory (#385).
 func addUrlParam(u string, k string, v interface{}) string {
 	parsedUrl, err := url.Parse(u)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -57,15 +58,16 @@ import (
 //     there are four entries, each offset was checked by planting a camelCase key at a call site
 //     and seeing it reported, and reading signatures back is the machinery this file was cut to
 //     stop carrying (#320, review of #321).
-//  5. A plain slog.Debug, Info, Warn or Error is refused inside the directories slogRequestPathDirs
-//     lists, unless the enclosing top-level function is named in slogPlainSites. sloglint's
-//     context: scope demands the *Context variant only where a context.Context or *http.Request
-//     parameter exists, so a helper written without either is admitted by it, and 26 records were
+//  5. A plain slog.Debug, Info, Warn or Error is refused in every package outside the directories
+//     slogNoRequestDirs lists, unless the enclosing top-level function is named in slogPlainSites.
+//     sloglint's context: scope demands the *Context variant only where a context.Context or
+//     *http.Request parameter exists, so a helper written without either is admitted by it, and 26 records were
 //     found in exactly that shape after the sweep (decision 2, amended). This rule is what stops
 //     the shape coming back: in a package a request runs through, a record with no context to
-//     carry request_id is refused whatever the helper's signature. The directories are enumerated
-//     rather than inferred, and the two admitted functions are named with the reason no context
-//     can reach them.
+//     carry request_id is refused whatever the helper's signature. The directories with no request
+//     above them are enumerated rather than inferred, so a new package is checked until someone
+//     says why it should not be, and each admitted function is named with the reason no context
+//     can reach it.
 //
 // A dot import of log/slog is refused outright, since it leaves no selector for rule 2 to
 // resolve. Test files and mocks are exempt, as they are for AssertNoLegacyErrors: a test reads
@@ -222,145 +224,74 @@ var slogSpreadSites = []slogSpreadSite{
 	{scope: "core/middleware", name: "MiddlewareRequestLogger"},
 }
 
-// slogRequestPathDirs is rule 5's list: the directories, relative to the source root, that a
-// request runs through, so that every record written there is one an operator will filter by
-// request_id after a user reports a refusal. Both servers' handlers and middleware, the
-// authserver's API response writers and the admin console's client of the auth server's API, the
-// audit path's two packages, the authserver packages a ceremony runs through -- the ceremony
-// context, code and token issuance, and the signing keys (#339) -- the two validator packages the
-// handlers call on a request (#344) -- the eight application service and leaf packages that
-// followed them out of core (#346) -- and the core packages the handlers call into on a request:
-// the shared middleware, the identifier and angle-bracket validators that stayed there, and the
-// session store.
+// slogNoRequestDirs is the scope of rule 5, and of AssertRequestPathContext and
+// AssertAuditLogContext beside it, stated as what it leaves out: the directories, relative to the
+// source root, that no request runs through. Every other production package is a request path,
+// so a record written there is one an operator will filter by request_id after a user reports a
+// refusal, a context constructed there is one a request's should have been, and a package created
+// anywhere else is held to all three rules from its first commit, with nobody having to remember
+// to list it (#442).
 //
-// adminconsole/internal/oauthclient is here because the client-side token parser is: its JWKS
-// fetch writes the one record that package carries, and #385 moved it out of core/oauth. Listed
-// at the move rather than afterwards, since the walk only fails when it reaches no files at all,
-// so a directory absent from this list costs coverage in silence.
+// Each entry is one directory and not its subtree: a package created beneath a listed directory
+// is checked until it is listed itself, with its own reason. The entries fall into five groups.
 //
-// adminconsole/internal/handlerhelpers is here for the same reason and core/handlerhelpers is
-// gone: #385 split the one renderer both binaries parsed their templates with into one per
-// application. The auth server's half joined authserver/internal/handlerhelpers, already listed.
+//   - Startup and composition: the two server mains, both config and server packages, which load
+//     the configuration and build the route table before the first request, datafactory, the
+//     migrator, the four engine adapters, whose connection records and contexts are the
+//     connection's and not a request's, and bootstrap, the first-run seed.
+//   - Background work: workers, whose passes run on a timer with no request above them.
+//   - Developer tools and generators: droptestdb, both schemadumps, ownershipdump, the two
+//     reference-data generators and pinnedfetch, the download they share.
+//   - Test support: the guards themselves and the refgraph reader they share with ownershipdump,
+//     logtest, hostporttest, sessiontest, handlertest, oauthclienttest, renderintegration, fake and
+//     mailpit. None is compiled into a server.
+//   - The setup wizard, a command run once before either server exists.
 //
-// authserver/internal/protocolvalidation carries the one record any of the three writes, the
-// redirect_uri refusal in authorize_validator.go. accountvalidation and core/inputvalidation, which
-// was core/validators until #442, carry none, which is the same reason every other quiet directory
-// here is listed rather than left out: the rule is what refuses a plain slog.Warn written beside a validator
-// later, and a directory absent from this list costs coverage silently, since the walk only fails
-// when it reaches no files at all.
+// A package that holds both startup and request work stays out of this list, and its startup
+// functions are admitted by name instead: core/i18n's catalog loading is in slogPlainSites and its
+// nil-context fallback in requestContextOwners, while the locale middleware beside them is held to
+// every rule. Listing the package would have excused the middleware too. The two web packages are
+// admitted the same way, since the auth server's serves the OpenAPI document on a request.
 //
-// Left out: core/securerandom, which writes no record. It was core/stringutil, and the one ceiling
-// here while it held ConvertToString, whose record is written from a template function, until #385
-// moved that function to its one caller (#442). A startup, worker or main package is not a request
-// path and is not listed.
-//
-// authserver/internal/audit was a ceiling until #328 gave AuditLogger.Log a context and its 126
-// call sites the request's, so a plain record there is refused from then onward. The compiler
-// forces the parameter; what it cannot force is that the context is the request's, which is
-// AssertAuditLogContext's rule over this same list. It was two packages until #359 folded
-// core/auditlog, which held the console record's one writer, into it.
-//
-// authserver/internal/data/commondb was the other, and is now listed: #386 gave all 215 Database
-// methods a leading context and carried it into RunInTransaction, ExecSQL and QuerySQL, so the
-// transaction and statement records finally have one to take request_id from. commondb rather
-// than the whole of authserver/internal/data, because the match below is a path prefix and the
-// wider name would also reach the seeder's startup records and the four adapters' connection
-// records, which have no request above them and are the shape this list's own rule excludes.
-//
-// authserver/internal/revocation is listed by the commit that creates it, for the reason the
-// oauthclient note above gives: the five operations and their one warning record ran under
-// authserver/internal/handlers until #387, and a move alone would have dropped all three rules
-// this list gates -- the slog convention, AssertAuditLogContext and AssertRequestPathContext --
-// with nothing going red, since the walk fails only when it reaches no files at all. The three
-// Log* helpers are exactly what #328 gave a context so an audit record joins its request.
-//
-// authserver/internal/emaillinks is listed by the same commit series and for the same reason,
-// though it writes no record today: it is the session marker and the link builder that the
-// forgot-password, reset-password and activation handlers run through on a request, so it is a
-// request-path package by this list's own definition, and the rule is what refuses a plain
-// slog.Warn written beside the marker later (#387).
-//
-// authserver/internal/otpcredential likewise, and it also writes none today: establishing,
-// removing and verifying an authenticator all run under a request, at /auth/otp and at the two
-// account and admin OTP endpoints, and a record written there carries the same obligation the
-// handler packages' do. Listed by the commit that creates the package rather than by the one that
-// first writes a record in it, since a directory absent from this list costs all three rules
-// silently (#387).
-//
-// authserver/internal/userclaims is the fourth of #387's capability packages and is listed on the
-// same terms: the claim block it owns ran inside handler_userinfo.go and token_issuer.go, both
-// already here, and every call to it is made while answering /userinfo or minting a token. It
-// writes no record today -- a failed picture lookup omits the claim silently, as it did at both
-// sites before the move -- and the rule is what refuses one written there later without the
-// request's context (#387).
-//
-// authserver/internal/userconsent is listed by the commit that creates it, on the same terms: the
-// consent row's read and write ran inside HandleConsentPost, already here, and its one caller is
-// the consent screen's submission. It writes no record today (#437).
-//
-// authserver/internal/authorizerequest is listed on the same terms: its two operations run while
-// a POST to /auth/authorize is answered and while the GET that follows it is, and it writes one
-// record, for a parked row that does not parse (#437).
-//
-// authserver/internal/afterresponse is listed by the commit that creates it: it runs what a
-// handler hands off after its response, under the request's context detached from its
-// cancellation, and its one record, a job that panicked, is the request's to be filtered by.
-// Listing it is also what holds it to AssertRequestPathContext, since a context.Background() there
-// would cut every job's records and audit entries off from the request that started it (#404).
-//
-// adminconsole/internal/sessionbackend is listed by the commit that creates it, for the reason the
-// oauthclient note above gives: the HTTP session backend sat under adminconsole/internal/apiclient,
-// already listed, until #441 moved it out, and every admin console page loads its session through
-// it, so a move alone would have dropped all three rules this list gates with nothing going red.
-// It writes no record today.
-//
-// adminconsole/internal/publicsettings is listed by the commit that creates it, on the same terms:
-// its client sat under adminconsole/internal/apiclient, already listed, until #441 moved it here
-// beside the cache it fills, and every admin console page reads its settings through that cache
-// before it renders. It writes no record today, and its shared fetch is detached from the request's
-// cancellation but keeps the request's values, which AssertRequestPathContext holds it to.
-var slogRequestPathDirs = []string{
-	"authserver/internal/audit",
-	"authserver/internal/data/commondb",
-	"authserver/internal/handlerhelpers",
-	"authserver/internal/handlers",
-	"authserver/internal/middleware",
-	"authserver/internal/apiresponse",
-	"authserver/internal/sessionbackend",
-	"authserver/internal/ceremony",
-	"authserver/internal/issuance",
-	"authserver/internal/signingkeys",
-	"authserver/internal/accountvalidation",
-	"authserver/internal/protocolvalidation",
-	"authserver/internal/permissions",
-	"authserver/internal/revocation",
-	"authserver/internal/usercreation",
-	"authserver/internal/usersession",
-	"authserver/internal/useragent",
-	"authserver/internal/emaildelivery",
-	"authserver/internal/emaillinks",
-	"authserver/internal/otp",
-	"authserver/internal/otpcredential",
-	"authserver/internal/userclaims",
-	"authserver/internal/userconsent",
-	"authserver/internal/authorizerequest",
-	"authserver/internal/afterresponse",
-	"authserver/internal/imageupload",
-	"authserver/internal/uithemes",
-	"adminconsole/internal/handlers",
-	"adminconsole/internal/middleware",
-	"adminconsole/internal/apiclient",
-	"adminconsole/internal/oauthclient",
-	"adminconsole/internal/sessionbackend",
-	"adminconsole/internal/publicsettings",
-	"adminconsole/internal/handlerhelpers",
-	"core/middleware",
-	"core/inputvalidation",
-	"core/oauth",
-	"core/sessionstore",
+// The list replaced an allowlist of 38 request-path directories, which a new package joined only
+// when someone remembered to add it: #385, #387, #404, #437 and #441 each listed one by hand at
+// the commit that created it, because a package left off cost all three rules in silence.
+var slogNoRequestDirs = []string{
+	"adminconsole/cmd/goiabada-adminconsole",
+	"authserver/cmd/goiabada-authserver",
+	"adminconsole/internal/config",
+	"authserver/internal/config",
+	"adminconsole/internal/server",
+	"authserver/internal/server",
+	"authserver/internal/data/datafactory",
+	"authserver/internal/data/migrator",
+	"authserver/internal/data/mssqldb",
+	"authserver/internal/data/mysqldb",
+	"authserver/internal/data/postgresdb",
+	"authserver/internal/data/sqlitedb",
+	"authserver/internal/bootstrap",
+	"authserver/internal/workers",
+	"authserver/cmd/droptestdb",
+	"authserver/cmd/schemadump",
+	"authserver/internal/data/schemadump",
+	"core/cmd/ownershipdump",
+	"core/countries/generate",
+	"core/timezones/generate",
+	"core/internal/pinnedfetch",
+	"core/internal/refgraph",
+	"core/guard",
+	"core/logging/logtest",
+	"core/hostport/hostporttest",
+	"core/sessionstore/sessiontest",
+	"adminconsole/internal/handlertest",
+	"adminconsole/internal/oauthclient/oauthclienttest",
+	"adminconsole/internal/renderintegration",
+	"authserver/internal/fake",
+	"authserver/internal/testutil/mailpit",
+	"cmd/goiabada-setup",
 }
 
-// slogPlainSite is one top-level function inside slogRequestPathDirs admitted to write a plain
+// slogPlainSite is one top-level function in a request-path package admitted to write a plain
 // record. scope is the file that declares it, relative to the source root, so an admission cannot
 // leak to a namesake elsewhere in the package; name is the function name.
 type slogPlainSite struct {
@@ -368,16 +299,36 @@ type slogPlainSite struct {
 	name  string
 }
 
-// slogPlainSites is rule 5's table. Two functions, with the reason no context reaches them:
+// slogPlainSites is rule 5's table, each function with the reason no context reaches it.
+//
 // addUrlParam and convertToString are the admin console's template function and the helper it
 // calls, and html/template invokes a template function with no context, so a record either writes
 // has nothing to carry request_id on. convertToString was core/stringutil.ConvertToString and
-// stood outside these directories altogether until #385 moved it in with its one caller.
+// stood outside the request-path scope altogether until #385 moved it in with its one caller.
 // core/middleware's parseCIDRs was a third until #425 made a malformed trusted-proxy entry refuse
 // startup: its replacement returns the error to main and logs nothing.
+//
+// loadOverrideCatalogs and orEmpty are core/i18n's startup records. LoadBundle runs once, from
+// each main before the first request, and loadOverrideCatalogs writes its two records while it
+// does; orEmpty writes its one only when the catalogs compiled into the binary fail to parse,
+// which is also decided at load. core/i18n is not in slogNoRequestDirs because the locale
+// middleware every request runs through is there, so the two are admitted by name and the rest of
+// the package is held to the rule (#442).
+//
+// StaticFS and TemplateFS, in each application's web package, open the embedded static and
+// template trees, and record the one fault that can stop them. Their only callers are the two
+// server.NewServer functions, which run once before the first request. Neither web package is in
+// slogNoRequestDirs: the auth server's also serves the OpenAPI document on every request, so both
+// are admitted function by function, the way core/i18n's startup records are (#442).
 var slogPlainSites = []slogPlainSite{
 	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "addUrlParam"},
 	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "convertToString"},
+	{scope: "core/i18n/overrides.go", name: "loadOverrideCatalogs"},
+	{scope: "core/i18n/i18n.go", name: "orEmpty"},
+	{scope: "authserver/web/embed_fs.go", name: "StaticFS"},
+	{scope: "authserver/web/embed_fs.go", name: "TemplateFS"},
+	{scope: "adminconsole/web/embed_fs.go", name: "StaticFS"},
+	{scope: "adminconsole/web/embed_fs.go", name: "TemplateFS"},
 }
 
 var (
@@ -490,14 +441,17 @@ func slogHandlerOwner(rel string) bool {
 	return false
 }
 
-// slogRequestPath reports whether rel sits under one of the directories rule 5 lists.
+// slogRequestPath reports whether the file rel is in a request-path package: one whose directory
+// is not named in slogNoRequestDirs. The match is the directory itself, never a prefix, so a
+// package created beneath a listed one is a request path until it is listed in its own right.
 func slogRequestPath(rel string) bool {
-	for _, dir := range slogRequestPathDirs {
-		if slogWithinScope(rel, dir) {
-			return true
+	dir := path.Dir(rel)
+	for _, listed := range slogNoRequestDirs {
+		if dir == listed {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // slogPlainAdmitted reports whether a top-level function named name in the file rel is listed in

@@ -47,10 +47,10 @@ func parenthesised(auditLogger logger, r *http.Request) {
 	// resolved the import for one and not the other would pass this file on the strength of the
 	// half it did resolve.
 	//
-	// It sits in a listed core directory on purpose, and moved from core/auditlog to here when #359
-	// folded that package into authserver/internal/audit: it is the tree's only refused plant on
-	// the core side of slogRequestPathDirs, so putting it beside caught.go in the auth server would
-	// leave the core half of the walk proving nothing.
+	// It sits in core on purpose, and moved from core/auditlog to here when #359 folded that
+	// package into authserver/internal/audit: it is the tree's only refused plant in the core
+	// module, so putting it beside caught.go in the auth server would leave the core half of the
+	// walk proving nothing.
 	tree.write("core/sessionstore/aliased.go", `package sessionstore
 
 import (
@@ -111,8 +111,8 @@ func notLog(ctx context.Context, other interface{ Warn(context.Context) }) {
 	// instead recorded this path under "context" -- second in the file, so it overwrote the stdlib
 	// binding -- and the refused call on line 15 resolved to a package the rule does not name and
 	// was walked past. bindImports records watched paths only, which is what makes that
-	// unreachable. The vendored package sits outside slogRequestPathDirs so that it is filtered out
-	// rather than walked, and the count below moves by the one refused file (#385).
+	// unreachable. The vendored package is in no list, so it is walked like any other and found
+	// clean (#385).
 	tree.write("core/vendored/context/pkg.go", `package vendored
 
 func Helper() string { return "x" }
@@ -135,10 +135,39 @@ func collide(auditLogger collisionLogger) {
 }
 `)
 
-	// Outside slogRequestPathDirs: a startup pass has no request, so a Background context is the
-	// honest answer there and the rule says nothing about it. The scope filter drops it before it
-	// is parsed, which is why it is not among the walked files counted below.
-	tree.write("core/config/startup.go", `package config
+	// ---- scope: every package but the ones slogNoRequestDirs names ------------------------------
+
+	// A package no list names is checked from its first file.
+	tree.write("authserver/internal/newpackage/caught.go", `package newpackage
+
+import "context"
+
+type logger interface {
+	Log(ctx context.Context, event string, details map[string]interface{})
+}
+
+func raise(auditLogger logger) {
+	auditLogger.Log(context.Background(), "user_login", nil)
+}
+`)
+	// A listing names one directory, not its subtree, so a package beneath a listed one is checked.
+	tree.write("authserver/internal/workers/jobs/caught.go", `package jobs
+
+import "context"
+
+type logger interface {
+	Log(ctx context.Context, event string, details map[string]interface{})
+}
+
+func raise(auditLogger logger) {
+	auditLogger.Log(context.TODO(), "job_finished", nil)
+}
+`)
+
+	// Listed: a startup pass has no request, so a Background context is the honest answer there
+	// and the rule says nothing about it. The scope filter drops it before it is parsed, which is
+	// why it is not among the walked files counted below.
+	tree.write("authserver/internal/config/startup.go", `package config
 
 import "context"
 
@@ -182,7 +211,7 @@ func inMock(auditLogger logger) {
 
 	violations, files, err := findAuditLogContextViolations(tree.root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 4, files, "every non-exempt fixture in a request-path package is walked")
+	assert.Equal(t, 7, files, "every non-exempt fixture in a request-path package is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -195,6 +224,8 @@ func inMock(auditLogger logger) {
 		"authserver/internal/handlers/path_base_collision.go:15 context.Background() passed to .Log in a request-path package",
 		"core/sessionstore/aliased.go:12 context.Background() passed to .Log in a request-path package",
 		"core/sessionstore/aliased.go:16 context.TODO() passed to .Log in a request-path package",
+		"authserver/internal/newpackage/caught.go:10 context.Background() passed to .Log in a request-path package",
+		"authserver/internal/workers/jobs/caught.go:10 context.TODO() passed to .Log in a request-path package",
 	}
 	sort.Strings(want)
 	sort.Strings(got)
@@ -267,11 +298,11 @@ func raise(auditLogger logger, r *http.Request) {
 }
 
 // TestAuditLogContext_TheGuardIsFatalOnAnEmptyWalk pins the seam, and this guard's scope makes it
-// the likeliest of the fourteen to trip it: the walk counts only files in a request-path package,
-// so a directory dropping off slogRequestPathDirs empties it without emptying the tree.
+// the likeliest of the guards to trip it: the walk counts only files in a request-path package, so
+// a tree holding nothing but the directories slogNoRequestDirs names walks nothing.
 func TestAuditLogContext_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	tree := newFixtureTree(t)
-	tree.write("core/elsewhere/ok.go", "package elsewhere\n")
+	tree.write("authserver/internal/config/ok.go", "package config\n")
 
 	report := Run(func(r Reporter) { assertAuditLogContext(r, tree.root, nil) })
 
