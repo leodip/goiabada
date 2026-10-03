@@ -307,7 +307,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
 			Return(&models.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
-		f.auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return().Once()
+		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
 
 		f.serve()
@@ -322,7 +322,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).
 			Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", TokenType: "Bearer", ExpiresIn: 60, Scope: "openid"}, nil).Once()
-		f.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).Return().Once()
+		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
 		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
 
 		f.serve()
@@ -349,7 +349,7 @@ func TestHandleIssueGet_ADisabledUserIsAnsweredAccessDenied(t *testing.T) {
 			f.user.Enabled = false
 
 			var order []string
-			f.auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
+			f.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 				return details["userId"] == int64(123) && len(details) == 1
 			})).Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
@@ -541,7 +541,7 @@ func TestHandleIssueGet_TheImplicitIssuerIsHandedTheSessionAndAnswersAfterItsCom
 		}).
 		Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", IdToken: "the-id-token", TokenType: "Bearer",
 			ExpiresIn: 60, Scope: "openid"}, nil).Once()
-	f.auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedImplicitResponse, mock.Anything).
+	f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).
 		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).
 		Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()

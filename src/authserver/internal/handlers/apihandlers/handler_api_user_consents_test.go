@@ -127,7 +127,7 @@ func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
 
 	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
 	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil)
-	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == int64(7) && details["consentId"] == int64(5) &&
 			details["loggedInUser"] == "admin-subject-1"
 	})).Return()

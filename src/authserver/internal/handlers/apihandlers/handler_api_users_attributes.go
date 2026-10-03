@@ -194,7 +194,7 @@ func HandleAPIUserAttributeCreatePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditAddedUserAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventAddedUserAttribute, map[string]interface{}{
 			"userId":          user.Id,
 			"userAttributeId": userAttribute.Id,
 			"loggedInUser":    loggedInUser,
@@ -296,7 +296,7 @@ func HandleAPIUserAttributeUpdatePut(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditUpdatedUserAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedUserAttribute, map[string]interface{}{
 			"userId":          attribute.UserId,
 			"userAttributeId": attribute.Id,
 			"loggedInUser":    loggedInUser,
@@ -359,7 +359,7 @@ func HandleAPIUserAttributeDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditDeleteUserAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeleteUserAttribute, map[string]interface{}{
 			"userId":          attribute.UserId,
 			"userAttributeId": attributeId,
 			"loggedInUser":    loggedInUser,

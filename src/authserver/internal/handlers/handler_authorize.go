@@ -388,7 +388,7 @@ func HandleAuthorizeGet(
 			saveAndRedirect("/auth/level1")
 
 		case authorizeRouteDisabledUser:
-			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"userId": userSession.UserId,
 			})
 
@@ -852,7 +852,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 
 	if answer.errorCode != "" {
 		if answer.userDisabled {
-			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"userId": facts.session.UserId,
 			})
 		}
@@ -888,7 +888,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 		return
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditBumpedUserSession, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
 		"userId":   authContext.UserId,
 		"clientId": client.Id,
 	})

@@ -275,7 +275,7 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 		return cl.ClientId == int64(123) && cl.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -317,7 +317,7 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 		return cl.Id == existingLogo.Id && cl.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -415,7 +415,7 @@ func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("DeleteClientLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.EventDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
 	})).Return()
 

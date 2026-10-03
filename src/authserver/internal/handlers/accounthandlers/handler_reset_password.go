@@ -192,7 +192,7 @@ func auditFailedResetPasswordCode(auditLogger AuditLogger, r *http.Request, user
 		details["userId"] = userId
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditFailedResetPasswordCode, details)
+	auditLogger.Log(r.Context(), audit.EventFailedResetPasswordCode, details)
 }
 
 // rejectResetPassword audits the cause and renders the one indistinguishable response. The

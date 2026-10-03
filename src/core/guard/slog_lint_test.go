@@ -400,7 +400,7 @@ func addUrlParam2() { slog.Warn("not the admitted function") }
 
 func (m *limiter) addUrlParam() { slog.Warn("a method by the admitted name, in another file") }
 `)
-	// The audit path, listed by #328 now that AuditLogger.Log takes a context. Two files of the one
+	// The audit path, listed by #328 now that audit.Logger.Log takes a context. Two files of the one
 	// package are planted because the rule decides per file: a walk that reached the directory and
 	// stopped at the first file it found would pass the second, and LogToConsole is the second
 	// since #359 folded it in here from core/auditlog.

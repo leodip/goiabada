@@ -57,7 +57,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 		database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 		database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 		auditLogger := mocks_handlers.NewAuditLogger(t)
-		auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Once()
 
 		rr := serve(t, len(body), database, auditLogger)
 

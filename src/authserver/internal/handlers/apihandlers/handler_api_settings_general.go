@@ -146,7 +146,7 @@ func HandleAPISettingsGeneralPut(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), audit.AuditUpdatedGeneralSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedGeneralSettings, map[string]interface{}{
 			"loggedInUser": callerSubject(r),
 		})
 

@@ -194,7 +194,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// presenter nothing about the account (#137).
 	var userDisabled *protocolvalidation.UserDisabledError
 	if errors.As(err, &userDisabled) {
-		auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 			"clientId": input.ClientId,
 		})
 	}
@@ -208,12 +208,12 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// name the wrong ones; the value is unique to this refusal.
 	//
 	// clientIdentifier, the string from the request, rather than the numeric clientId
-	// the issuance events use, for the reason AuditTokenScopeDenied gives: the
+	// the issuance events use, for the reason EventTokenScopeDenied gives: the
 	// validator discards the client model on failure. Unlike that event, this one is
 	// reached only below client authentication and PKCE, so the identifier here has
 	// been proved rather than merely asserted.
 	if errors.Is(err, protocolvalidation.ErrCodeRedirectURIDeregistered) {
-		auditLogger.Log(r.Context(), audit.AuditRedemptionRefusedRedirectURI, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventRedemptionRefusedRedirectURI, map[string]interface{}{
 			"clientIdentifier": input.ClientId,
 		})
 	}
@@ -264,7 +264,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// budget without guessing and would fill the audit log with rows naming a
 	// username nothing checked. What invalid_grant does cover is a wrong password,
 	// an unknown user, a disabled user and a 2FA-blocked user, which is exactly the
-	// set AuditROPCAuthFailed is documented to mean.
+	// set EventROPCAuthFailed is documented to mean.
 	//
 	// The checks that run before the grant is looked at read no credential either, and none
 	// of them answers invalid_grant: a missing client_id is invalid_request, an unknown or
@@ -276,12 +276,12 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 		input.GrantType == oidc.GrantTypePassword && errDetail.Code() == "invalid_grant" {
 
 		credentialFailures.RecordCredentialFailure(r)
-		auditLogger.Log(r.Context(), audit.AuditROPCAuthFailed, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventROPCAuthFailed, map[string]interface{}{
 			// Normalized to what the limiter keyed its bucket on and to what every
 			// write path stores, so the audit row and the budget name one account.
 			"email": strings.ToLower(strings.TrimSpace(input.Username)),
 			// clientIdentifier, the string from the request, for the reason
-			// AuditTokenScopeDenied gives: the validator discards the client model on
+			// EventTokenScopeDenied gives: the validator discards the client model on
 			// failure. A public client's identifier is caller-supplied, so read it as
 			// the client the caller named rather than as proof of who called.
 			"clientIdentifier": input.ClientId,
@@ -289,7 +289,7 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	}
 
 	if errors.As(err, &errDetail) && errDetail.Code() == "invalid_scope" {
-		auditLogger.Log(r.Context(), audit.AuditTokenScopeDenied, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventTokenScopeDenied, map[string]interface{}{
 			// clientIdentifier, the string from the request, not the numeric clientId the
 			// issuance events use: the validator discards the client model on failure. See
 			// the constant's doc comment for what this attests to per grant type.

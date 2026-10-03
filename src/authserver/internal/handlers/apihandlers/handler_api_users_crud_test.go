@@ -55,7 +55,7 @@ func enabledRequest(t *testing.T, userId string, enabled bool) *http.Request {
 // because it would advance the generation and evict sessions a previous disable already handled,
 // making a repeated request non-idempotent.
 //
-// Every row asserts AuditUpdatedUserDetails still fires. That event is pre-existing and decision 7
+// Every row asserts EventUpdatedUserDetails still fires. That event is pre-existing and decision 7
 // requires it to be untouched, so a row where it stopped firing would be a regression this change
 // caused rather than a behaviour it intended.
 func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
@@ -120,10 +120,10 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 			}
 
 			// The pre-existing event, on every row.
-			auditLogger.On("Log", mock.Anything, audit.AuditUpdatedUserDetails, mock.Anything).Return().Once()
+			auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserDetails, mock.Anything).Return().Once()
 			var revocationPayload map[string]interface{}
 			if tc.wantSweep {
-				auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).
+				auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).
 					Run(func(args mock.Arguments) {
 						revocationPayload = args.Get(2).(map[string]interface{})
 					}).Return().Once()
@@ -162,7 +162,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				// state change, the second is the claim about it.
 				database.AssertNotCalled(t, "IncrementUserAuthStateGeneration",
 					mock.Anything, mock.Anything, mock.Anything)
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditRevokedUserAuthState,
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedUserAuthState,
 					mock.Anything)
 			}
 
@@ -219,9 +219,9 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 		}).Return(nil).Once()
 	stubSweep(database, userId, 4)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedUserAuthentication, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserAuthentication, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
@@ -287,7 +287,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, userId).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
-	auditLogger.On("Log", mock.Anything, audit.AuditDisabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 		Return(&models.User{Id: userId, Enabled: true}, nil).Once()
 
@@ -349,7 +349,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(createdUser, nil)
 	database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)
-	auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
 	var emailedLink string
 	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 		"/emails/email_newuser_set_password.html", mock.Anything).
@@ -617,7 +617,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 					Run(func(args mock.Arguments) {
 						gotPasswordHash = args.Get(1).(*usercreation.CreateUserInput).PasswordHash
 					}).Return(createdUser, nil)
-				auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.Anything).Return()
+				auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
 			}
 			if tc.wantEmail {
 				database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)

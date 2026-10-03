@@ -67,7 +67,7 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 
 	refreshToken := grant.RefreshToken
 	if grant.IsROPC {
-		tr.auditLogger.Log(r.Context(), audit.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
 			"userId":          refreshToken.UserId.Int64,
 			"clientId":        refreshToken.ClientId.Int64,
 			"refreshTokenJti": refreshToken.RefreshTokenJti,
@@ -75,12 +75,12 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		})
 	} else {
 		if outcome.BumpedSession != nil {
-			tr.auditLogger.Log(r.Context(), audit.AuditBumpedUserSession, map[string]interface{}{
+			tr.auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
 				"userId":   outcome.BumpedSession.UserId,
 				"clientId": refreshToken.Code.ClientId,
 			})
 		}
-		tr.auditLogger.Log(r.Context(), audit.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
 			"codeId":          refreshToken.Code.Id,
 			"refreshTokenJti": refreshToken.RefreshTokenJti,
 			"flow":            "auth_code",
@@ -116,7 +116,7 @@ func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *pro
 
 	// The principal fields are populated uniformly for both linkage shapes, so a security-event
 	// consumer does not need flow-specific logic just to identify the client and user. This
-	// deliberately departs from AuditTokenIssuedRefreshTokenResponse, which logs codeId on one shape
+	// deliberately departs from EventTokenIssuedRefreshTokenResponse, which logs codeId on one shape
 	// and userId/clientId on the other.
 	replayClientId := refreshToken.ClientId.Int64
 	replayUserId := refreshToken.UserId.Int64
@@ -127,7 +127,7 @@ func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *pro
 		replayFlow = "auth_code"
 	}
 
-	tr.auditLogger.Log(ctx, audit.AuditRefreshTokenReplayDetected, map[string]interface{}{
+	tr.auditLogger.Log(ctx, audit.EventRefreshTokenReplayDetected, map[string]interface{}{
 		"presentedRefreshTokenJti": refreshToken.RefreshTokenJti,
 		"firstRefreshTokenJti":     refreshToken.FirstRefreshTokenJti,
 		"revokedCount":             revokedCount,

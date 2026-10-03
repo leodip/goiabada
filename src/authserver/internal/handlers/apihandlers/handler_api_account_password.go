@@ -133,7 +133,7 @@ func HandleAPIAccountPasswordPut(
 		// Both events, after commit. The pre-existing one is unchanged, per decision 7: every
 		// existing event stays exactly as it is, and the revocation gets its own so revocations
 		// are queryable as a class rather than spread across four generic event types.
-		auditLogger.Log(r.Context(), audit.AuditChangedPassword, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventChangedPassword, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

@@ -8,7 +8,7 @@ import (
 
 // UserDisabledError is the token validator's refusal of a grant whose user is disabled. Detail is
 // what the client is answered with, and Unwrap puts it on the chain, so the writer answers it as it
-// answers any ErrorDetail; the type is what tells the token handler to write AuditUserDisabled.
+// answers any ErrorDetail; the type is what tells the token handler to write EventUserDisabled.
 //
 // A type rather than a sentinel matched by value, because a code or refresh grant's answer no
 // longer names the condition (#137): it is that grant's generic refusal, which other failures

@@ -630,7 +630,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
 		// We don't expect DeleteUserSession to be called in this case
 
-		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
@@ -667,8 +667,8 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(1)).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
-		auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.Anything).Return()
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
@@ -844,8 +844,8 @@ func stubPerClientTeardown(
 	database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(7)).Return(nil)
 	database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
-	auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.Anything).Return()
 }
 
 // mustParseURL fails the test rather than returning a zero URL, so an assertion on a malformed
@@ -939,10 +939,10 @@ func TestHandleLogoutPost(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
 		})).Return()
-		auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(123) &&
 				details["sessionIdentifier"] == "test-session" &&
 				loggedInUserIsPresentAndEmpty(details)
@@ -1278,10 +1278,10 @@ func TestHandleLogoutPost(t *testing.T) {
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
-				auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
 				})).Return()
-				auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userId"] == int64(123) && details["sessionIdentifier"] == "test-session"
 				})).Return()
 
@@ -1355,7 +1355,7 @@ func TestHandleLogoutPost(t *testing.T) {
 
 				assert.Equal(t, http.StatusInternalServerError, rr.Code)
 				// A failed teardown must not be reported as a completed logout.
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditLogout, mock.Anything)
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventLogout, mock.Anything)
 				pageRenderer.AssertExpectations(t)
 			})
 		}
@@ -1401,7 +1401,7 @@ func TestHandleLogoutPost(t *testing.T) {
 
 				tc.stubDB(database)
 
-				auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userId"] == int64(0) && details["sessionIdentifier"] == tc.sessionIdentifier
 				})).Return()
 
@@ -1415,7 +1415,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 				assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
 				database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditDeletedUserSession, mock.Anything)
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything)
 				auditLogger.AssertExpectations(t)
 			})
 		}

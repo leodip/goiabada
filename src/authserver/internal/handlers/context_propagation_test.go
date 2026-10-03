@@ -141,7 +141,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	codeIssuer.On("IssueAuthCodeTx", theRequestsContext(), mock.Anything).
 		Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: "https://example.com/callback"}, nil)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 

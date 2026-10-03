@@ -199,7 +199,7 @@ func expectResourcePermsRead(database *mocks_data.Database, stored []models.Perm
 // expectResourcePermsAudit accepts the one consolidated event and counts it.
 func expectResourcePermsAudit(t *testing.T, auditLogger *mocks_handlers.AuditLogger, order *[]string) *int {
 	count := new(int)
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedResourcePermissions, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedResourcePermissions, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details := args.Get(2).(map[string]interface{})
 			assert.Equal(t, resourcePermsId, details["resourceId"])

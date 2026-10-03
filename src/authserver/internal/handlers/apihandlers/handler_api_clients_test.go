@@ -245,11 +245,11 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	stubClientResponseLoads(database)
 
 	var revokedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).
 		Run(func(args mock.Arguments) {
 			revokedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
@@ -294,8 +294,8 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 	assert.EqualError(t, stub.BodyErr, "no client with that id")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient",
 		"RevokeCodesByClientId", "GetRefreshTokensByClientId")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything)
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything)
 }
 
 // TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing is the other
@@ -314,7 +314,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
@@ -324,7 +324,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	// The strict mock carries most of this: neither revocation call is registered, so reaching
 	// one fails. Naming them makes the failure say which property broke.
 	assertNotAttemptedOnClientDatabase(t, database, "RevokeCodesByClientId", "GetRefreshTokensByClientId")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything)
 }
 
 // TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants pins the
@@ -350,8 +350,8 @@ func TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePubli
 	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*models.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything).Return().Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientAuthenticationPut(database, auditLogger, testDataCipher)
@@ -467,7 +467,7 @@ func TestHandleAPIClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testi
 			order = append(order, "insert")
 		}).Return(nil).Once()
 	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).
 		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -593,7 +593,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
@@ -695,7 +695,7 @@ func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { created = args.Get(2).(*models.WebOrigin).Origin }).Return(nil).Once()
 	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
@@ -794,7 +794,7 @@ func TestHandleAPIClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.
 			}
 			database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			stubClientResponseLoads(database)
-			auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+			auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).Return().Once()
 
 			rr := httptest.NewRecorder()
 			HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
@@ -951,7 +951,7 @@ func TestHandleAPIClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *tes
 			order = append(order, "insert")
 		}).Return(nil).Once()
 	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).
 		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -1058,7 +1058,7 @@ func TestHandleAPIClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(deadlock).Once()
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
@@ -1131,7 +1131,7 @@ func TestHandleAPIClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testin
 			}
 			database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			stubClientResponseLoads(database)
-			auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).Return().Once()
+			auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()
 
 			rr := httptest.NewRecorder()
 			HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
@@ -1253,7 +1253,7 @@ func TestHandleAPIClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
 		Run(func(args mock.Arguments) { created = append(created, args.Get(2).(*models.RedirectURI).URI) }).
 		Return(nil).Times(60)
 	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",

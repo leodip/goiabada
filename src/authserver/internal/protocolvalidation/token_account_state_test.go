@@ -31,7 +31,7 @@ const (
 )
 
 // wantRefusal is one refusal as the client reads it, plus whether it is the disabled-user wrapper
-// the handler writes AuditUserDisabled from.
+// the handler writes EventUserDisabled from.
 type wantRefusal struct {
 	code         string
 	description  string

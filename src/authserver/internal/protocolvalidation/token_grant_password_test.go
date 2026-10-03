@@ -552,7 +552,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 
 	assert.Nil(t, result)
 	// Still named plainly, unlike a disabled user's code or refresh token (#137): this caller
-	// has just proved the password. The type is what the handler writes AuditUserDisabled from.
+	// has just proved the password. The type is what the handler writes EventUserDisabled from.
 	var disabled *UserDisabledError
 	require.ErrorAs(t, err, &disabled)
 	var customErr *oauth.ErrorDetail

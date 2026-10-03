@@ -326,7 +326,7 @@ func HandleAPIResourcePermissionsPut(
 		}
 
 		// Audit consolidated update, once the save has committed (#428).
-		auditLogger.Log(r.Context(), audit.AuditUpdatedResourcePermissions, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedResourcePermissions, map[string]interface{}{
 			"resourceId":   resource.Id,
 			"loggedInUser": callerSubject(r),
 		})

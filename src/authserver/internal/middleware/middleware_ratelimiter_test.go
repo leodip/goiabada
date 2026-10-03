@@ -1686,7 +1686,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		if refused < 10 {
 			t.Fatalf("only %d of 25 requests were refused; the case needs a burst of rejections", refused)
 		}
-		if got := auditLog.count(audit.AuditRateLimitExceeded); got != 1 {
+		if got := auditLog.count(audit.EventRateLimitExceeded); got != 1 {
 			t.Errorf("got %d rate_limit_exceeded events for %d rejections on one key, want exactly 1",
 				got, refused)
 		}
@@ -1703,13 +1703,13 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 			t.Fatalf("got %d events, want 1", len(auditLog.events))
 		}
 		e := auditLog.events[0]
-		if e.name != audit.AuditRateLimitExceeded {
-			t.Errorf("event name = %q, want %q", e.name, audit.AuditRateLimitExceeded)
+		if e.name != audit.EventRateLimitExceeded {
+			t.Errorf("event name = %q, want %q", e.name, audit.EventRateLimitExceeded)
 		}
 		if e.details["limiter"] != "pwd_account_net" {
 			t.Errorf("details[limiter] = %v, want pwd_account_net", e.details["limiter"])
 		}
-		// The normalized address, which is the identifier AuditAuthFailedPwd already
+		// The normalized address, which is the identifier EventAuthFailedPwd already
 		// records under the same name, and the one the log line no longer carries.
 		if e.details["email"] != "victim@example.com" {
 			t.Errorf("details[email] = %v, want victim@example.com", e.details["email"])
@@ -1739,7 +1739,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		}
 		// A gate keyed globally rather than per key would report the first account and
 		// go silent for the second, which is the failure that makes the bound useless.
-		if got := auditLog.count(audit.AuditRateLimitExceeded); got != 2 {
+		if got := auditLog.count(audit.EventRateLimitExceeded); got != 2 {
 			t.Errorf("got %d events for two rejected accounts, want 2", got)
 		}
 	})
@@ -1749,7 +1749,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			runPwd(m, fmt.Sprintf("user%d@example.com", i), host, true)
 		}
-		if got := auditLog.count(audit.AuditRateLimitExceeded); got != 0 {
+		if got := auditLog.count(audit.EventRateLimitExceeded); got != 0 {
 			t.Errorf("got %d events with nothing refused, want 0", got)
 		}
 	})
@@ -1958,8 +1958,8 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 				if len(events) != 1 {
 					t.Fatalf("got %d audit events for two refusals on one key, want exactly 1: %v", len(events), events)
 				}
-				if events[0].name != audit.AuditRateLimitExceeded {
-					t.Errorf("event name = %q, want %q", events[0].name, audit.AuditRateLimitExceeded)
+				if events[0].name != audit.EventRateLimitExceeded {
+					t.Errorf("event name = %q, want %q", events[0].name, audit.EventRateLimitExceeded)
 				}
 				if !reflect.DeepEqual(events[0].details, c.audited) {
 					t.Errorf("event details = %#v, want %#v", events[0].details, c.audited)

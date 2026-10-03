@@ -112,7 +112,7 @@ func HandleAPIResourceCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), audit.AuditCreatedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventCreatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       callerSubject(r),
@@ -248,7 +248,7 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       callerSubject(r),
@@ -300,7 +300,7 @@ func HandleAPIResourceDelete(
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.AuditDeletedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeletedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       callerSubject(r),

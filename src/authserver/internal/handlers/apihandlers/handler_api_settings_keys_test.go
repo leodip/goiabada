@@ -91,7 +91,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	})).Return(nil).Once()
 
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditRotatedKeys, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventRotatedKeys, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()

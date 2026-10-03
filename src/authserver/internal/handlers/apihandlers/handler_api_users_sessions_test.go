@@ -84,12 +84,12 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 	})
 
 	var deletedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
 			deletedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 	var terminatedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditTerminatedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventTerminatedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
 			terminatedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()

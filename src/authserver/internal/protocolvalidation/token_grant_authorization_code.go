@@ -176,7 +176,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 
 	// A disabled user's code is refused with the flat wording the generation check below gives,
 	// never with one naming the account (#137). UserDisabledError is what still tells the handler
-	// to write AuditUserDisabled.
+	// to write EventUserDisabled.
 	if !codeEntity.User.Enabled {
 		return nil, userDisabled("Code is invalid.")
 	}

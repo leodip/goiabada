@@ -259,7 +259,7 @@ func TestVerifyStored(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeReplayed, result.Outcome,
 			"a replay is a refusal distinct from a wrong code: every caller raises "+
-				"AuditOTPCodeReplayDetected on it, and two of the three raise nothing on a wrong code")
+				"EventOTPCodeReplayDetected on it, and two of the three raise nothing on a wrong code")
 		assert.EqualValues(t, now.Unix()/otp.StepSeconds, result.Step)
 	})
 

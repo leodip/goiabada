@@ -140,9 +140,9 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database.On("PromoteUserSessionGeneration", mock.Anything, apiRevokeTx, int64(100), int64(8)).Return(nil).Once()
 	database.On("DeleteUserSession", mock.Anything, apiRevokeTx, int64(200)).Return(nil).Once()
 
-	auditLogger.On("Log", mock.Anything, audit.AuditChangedPassword, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
@@ -201,9 +201,9 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	stubSweep(database, 42, 8)
 
-	auditLogger.On("Log", mock.Anything, audit.AuditChangedPassword, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()

@@ -216,14 +216,14 @@ func HandleAPIUserGroupsPut(
 		// removed, from the plan of the attempt that committed (#428).
 		loggedInSubject := callerSubject(r)
 		for _, groupId := range added {
-			auditLogger.Log(r.Context(), audit.AuditUserAddedToGroup, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserAddedToGroup, map[string]interface{}{
 				"userId":       user.Id,
 				"groupId":      groupId,
 				"loggedInUser": loggedInSubject,
 			})
 		}
 		for _, groupId := range removed {
-			auditLogger.Log(r.Context(), audit.AuditUserRemovedFromGroup, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserRemovedFromGroup, map[string]interface{}{
 				"userId":       user.Id,
 				"groupId":      groupId,
 				"loggedInUser": loggedInSubject,

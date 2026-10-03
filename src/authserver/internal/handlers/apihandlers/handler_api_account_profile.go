@@ -151,7 +151,7 @@ func HandleAPIAccountProfilePut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedOwnProfile, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedOwnProfile, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

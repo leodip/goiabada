@@ -164,7 +164,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 11. Audit log, after the commit, so an event never records a client that does not exist
-		auditLogger.Log(r.Context(), audit.AuditDynamicClientRegistration, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDynamicClientRegistration, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"grantTypes":       req.GrantTypes,

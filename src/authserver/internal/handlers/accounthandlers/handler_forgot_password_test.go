@@ -207,7 +207,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["outcome"] == "unknown_address"
 		})).Return().Once()
 		jobs.runAll(t)
@@ -273,7 +273,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 				return input.To == "existing@example.com" && input.Subject == "Password reset"
 			})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["outcome"] == "code_issued" && details["userId"] == int64(1)
 		})).Return().Once()
 
@@ -581,7 +581,7 @@ const (
 // a wrong value.
 func captureRequestedPasswordReset(auditLogger *mocks_handlers.AuditLogger) *map[string]interface{} {
 	details := map[string]interface{}{}
-	auditLogger.On("Log", mock.Anything, audit.AuditRequestedPasswordReset, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details = args.Get(2).(map[string]interface{})
 		}).Return().Once()
@@ -646,7 +646,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		expectLinkSentPage(pageRenderer, rr, req)
 		var details map[string]interface{}
 		var auditCtx context.Context
-		auditLogger.On("Log", mock.Anything, audit.AuditRequestedPasswordReset, mock.Anything).
+		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).
 			Run(func(args mock.Arguments) {
 				order = append(order, "audit")
 				auditCtx = args.Get(0).(context.Context)

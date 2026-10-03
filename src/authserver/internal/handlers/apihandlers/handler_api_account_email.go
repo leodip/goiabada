@@ -131,7 +131,7 @@ func HandleAPIAccountEmailPut(
 		user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedOwnEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedOwnEmail, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

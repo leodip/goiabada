@@ -71,7 +71,7 @@ func refuseActivationLink(pageRenderer PageRenderer, auditLogger AuditLogger, w 
 		details["preRegistrationId"] = preRegistrationId
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditFailedAccountActivationCode, details)
+	auditLogger.Log(r.Context(), audit.EventFailedAccountActivationCode, details)
 	renderActivationLinkExpired(pageRenderer, w, r)
 }
 
@@ -291,7 +291,7 @@ func handleActivationCleanHop(pageRenderer PageRenderer, httpSession sessionstor
 		return
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditCreatedUser, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
 		"email": createdUser.Email,
 	})
 
@@ -305,7 +305,7 @@ func handleActivationCleanHop(pageRenderer PageRenderer, httpSession sessionstor
 		return
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditActivatedAccount, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventActivatedAccount, map[string]interface{}{
 		"email": createdUser.Email,
 	})
 

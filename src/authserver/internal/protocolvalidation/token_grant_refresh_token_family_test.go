@@ -65,7 +65,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 		},
 		{
 			// The user's state is read above the record, so a disabled user's token is answered by the
-			// disabled-user wrapper that writes AuditUserDisabled, and the record is never read.
+			// disabled-user wrapper that writes EventUserDisabled, and the record is never read.
 			name: "the token's own client, family recorded, user disabled", clientIdentifier: "client1", clientSecret: clientSecret,
 			userEnabled: false, familyRevoked: true,
 			want: &wantRefusal{code: "invalid_grant", description: "The refresh token is invalid.", status: http.StatusBadRequest, userDisabled: true},

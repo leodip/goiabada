@@ -31,8 +31,8 @@ import (
 // reason had stopped being true, and it is worth recording why rather than quietly adding a file.
 //
 // Two branches here are specific to this handler and to no other. The response is JSON rather than a
-// rerendered template, and the replay branch deliberately emits AuditOTPCodeReplayDetected *without*
-// the AuditAuthFailedOtp that both browser sites emit beside it, because a wrong code at this endpoint
+// rerendered template, and the replay branch deliberately emits EventOTPCodeReplayDetected *without*
+// the EventAuthFailedOtp that both browser sites emit beside it, because a wrong code at this endpoint
 // has never audited anything and enabling OTP is not an authentication ceremony. Neither of those is
 // reachable from seam 5, and no integration case can drive them either: a sequential second enable is
 // intercepted by OTP_ALREADY_ENABLED before the claim is ever consulted, so making TryConsumeUserOTPStep
@@ -141,12 +141,12 @@ func TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 		}).
 		Return(false, nil).Once()
 
-	// Registering only this event is itself the assertion that AuditAuthFailedOtp is not emitted: the
+	// Registering only this event is itself the assertion that EventAuthFailedOtp is not emitted: the
 	// mock fails an unexpected Log call, so adding the browser sites' failure event here would break
 	// this test. That asymmetry is deliberate and decision 5 permits it, since there is no existing
 	// failure event at this endpoint for the replay event to be emitted "alongside".
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.AuditOTPCodeReplayDetected, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
@@ -258,7 +258,7 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
@@ -371,7 +371,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditDisabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
@@ -832,7 +832,7 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	// live seed still installed behind it.
 	database.On("ClearPendingOTPEnrollment", mock.Anything, tx, user.Id).Return(nil).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).

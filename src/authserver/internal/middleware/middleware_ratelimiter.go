@@ -405,7 +405,7 @@ func (m *RateLimiter) reportTrip(ctx context.Context, t *tier, key string,
 		details = map[string]interface{}{}
 	}
 	details["limiter"] = t.name
-	m.auditLogger.Log(ctx, audit.AuditRateLimitExceeded, details)
+	m.auditLogger.Log(ctx, audit.EventRateLimitExceeded, details)
 }
 
 // reject writes the 429 in the shape the route's caller parses.

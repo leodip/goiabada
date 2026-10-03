@@ -105,7 +105,7 @@ func HandleAPIClientLogoPost(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditUpdatedClientLogo, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientLogo, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": loggedInUser,
 		})
@@ -165,7 +165,7 @@ func HandleAPIClientLogoDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), audit.AuditDeletedClientLogo, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeletedClientLogo, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": loggedInUser,
 		})

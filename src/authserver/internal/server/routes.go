@@ -33,7 +33,7 @@ import (
 func (s *Server) initRoutes(branches appBranches) {
 	pages, protocol, api := branches.pages, branches.protocol, branches.api
 
-	auditLogger := audit.NewAuditLogger(s.database, middleware.NewAuditSwitches(s.database))
+	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database))
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
 	permissionChecker := permissions.NewPermissionChecker(s.database)

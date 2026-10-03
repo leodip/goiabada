@@ -295,7 +295,7 @@ func HandleConsentPost(
 			}
 			authContext.ConsentedScope = consent.Scope
 
-			auditLogger.Log(r.Context(), audit.AuditSavedConsent, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventSavedConsent, map[string]interface{}{
 				"userId":    consent.UserId,
 				"clientId":  consent.ClientId,
 				"consentId": consent.Id,

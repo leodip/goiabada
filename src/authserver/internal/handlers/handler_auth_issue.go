@@ -208,7 +208,7 @@ func HandleIssueGet(
 		case issuanceRefuseUserDisabled:
 			// The same event and the same answer as /auth/completed gives the same condition, arriving
 			// later: the account was disabled while the ceremony sat on a step.
-			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 				"userId": facts.user.Id,
 			})
 			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
@@ -235,7 +235,7 @@ func HandleIssueGet(
 				"user_id", authContext.UserId,
 				"client_identifier", authContext.ClientId)
 
-			auditLogger.Log(r.Context(), audit.AuditIssuanceRefusedScopeDenied, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventIssuanceRefusedScopeDenied, map[string]interface{}{
 				"userId":   authContext.UserId,
 				"clientId": authContext.ClientId,
 			})
@@ -532,7 +532,7 @@ func refuseIssuanceUnregisteredRedirect(
 	slog.WarnContext(r.Context(), "the redirect URI this ceremony would be answered at is no longer registered on the client, so nothing is issued and nothing is emitted",
 		"client_identifier", authContext.ClientId)
 
-	auditLogger.Log(r.Context(), audit.AuditIssuanceRefusedRedirectURI, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventIssuanceRefusedRedirectURI, map[string]interface{}{
 		"userId":   authContext.UserId,
 		"clientId": authContext.ClientId,
 	})
@@ -680,7 +680,7 @@ func issueAuthorizationCodeGrant(
 		return
 	}
 
-	auditLogger.Log(r.Context(), audit.AuditCreatedAuthCode, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventCreatedAuthCode, map[string]interface{}{
 		"userId":   createCodeInput.UserId,
 		"clientId": code.ClientId,
 		"codeId":   code.Id,
@@ -789,7 +789,7 @@ func refuseIssuanceUnusableSession(
 	// administrator can cause by configuring a timeout, and stretching it over two older
 	// conditions would make it useless for answering the question it exists for.
 	if shape == sessionExpired {
-		auditLogger.Log(r.Context(), audit.AuditIssuanceRefusedSessionInvalid, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventIssuanceRefusedSessionInvalid, map[string]interface{}{
 			"userId":            authContext.UserId,
 			"clientId":          authContext.ClientId,
 			"sessionIdentifier": sessionIdentifier,
@@ -946,7 +946,7 @@ func issueImplicitGrant(
 
 	// Everything below this line attests to what was signed, so it waits for the issuer to return,
 	// which is after the commit.
-	auditLogger.Log(r.Context(), audit.AuditTokenIssuedImplicitResponse, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.EventTokenIssuedImplicitResponse, map[string]interface{}{
 		"userId":           user.Id,
 		"clientId":         client.Id,
 		"scope":            scope,

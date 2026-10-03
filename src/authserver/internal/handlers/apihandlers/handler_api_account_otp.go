@@ -388,12 +388,12 @@ func HandleAPIAccountOTPPut(
 			}
 			switch verified.Outcome {
 			case otpcredential.OutcomeReplayed:
-				// No AuditAuthFailedOtp beside it, unlike the browser sites: this endpoint
+				// No EventAuthFailedOtp beside it, unlike the browser sites: this endpoint
 				// emits nothing when a code is simply wrong, and enabling OTP is not an
 				// authentication ceremony. Decision 5 puts the replay event alongside the
 				// existing failure event, and here there is none. That is why the verification
 				// reports an outcome and leaves the audit set to each caller (#387 decision 4).
-				auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
 					"userId": user.Id,
 					"step":   verified.Step,
 				})
@@ -414,7 +414,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			auditLogger.Log(r.Context(), audit.AuditEnabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		} else {
@@ -429,7 +429,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			auditLogger.Log(r.Context(), audit.AuditDisabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		}

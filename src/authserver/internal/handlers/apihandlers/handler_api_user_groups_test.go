@@ -65,7 +65,7 @@ func TestHandleAPIUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 	mocks_data.ExpectRunInTransaction(database, userGroupsTx)
 	database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, int64(42)).Return([]models.UserGroup{}, nil).Once()
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditUserAddedToGroup, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUserAddedToGroup, mock.Anything).Return().Once()
 	database.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Run(loadGroupsOnto(models.Group{Id: 5, GroupIdentifier: "admins"})).Return(nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
@@ -204,7 +204,7 @@ func TestHandleAPIUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) 
 	assert.NoError(t, stub.BodyErr)
 	assert.Equal(t, []int64{21}, deleted, "the removed membership's row, and nothing kept")
 	assert.Equal(t, []int64{6}, added, "the new membership, and nothing already stored")
-	assert.Equal(t, []auditRecord{audited(audit.AuditUserAddedToGroup, 6), audited(audit.AuditUserRemovedFromGroup, 3)}, *records)
+	assert.Equal(t, []auditRecord{audited(audit.EventUserAddedToGroup, 6), audited(audit.EventUserRemovedFromGroup, 3)}, *records)
 	assert.Equal(t, []string{"begin", "delete", "insert", "commit", "audit", "audit", "reload"}, order)
 	database.AssertExpectations(t)
 }
@@ -233,7 +233,7 @@ func TestHandleAPIUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *test
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, []int64{21, 22, 24}, deleted, "both copies of the removed membership, and the extra copy of the kept one")
-	assert.Equal(t, []auditRecord{audited(audit.AuditUserRemovedFromGroup, 3)}, *records, "one removal, and nothing for the repair")
+	assert.Equal(t, []auditRecord{audited(audit.EventUserRemovedFromGroup, 3)}, *records, "one removal, and nothing for the repair")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateUserGroup")
 }
@@ -339,7 +339,7 @@ func TestHandleAPIUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) 
 	assert.Equal(t, 2, attempts)
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.NotContains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
-	assert.Equal(t, []auditRecord{audited(audit.AuditUserAddedToGroup, 6), audited(audit.AuditUserRemovedFromGroup, 3)}, *records, "one event per change, not one per attempt")
+	assert.Equal(t, []auditRecord{audited(audit.EventUserAddedToGroup, 6), audited(audit.EventUserRemovedFromGroup, 3)}, *records, "one event per change, not one per attempt")
 	database.AssertExpectations(t)
 }
 
@@ -509,6 +509,6 @@ func TestHandleAPIUserGroupsPut_ARepeatedIdIsAddedOnce(t *testing.T) {
 	rr := serveUserGroupsSave(t, database, auditLogger, []int64{6, 6}, []int64{})
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.Equal(t, []auditRecord{audited(audit.AuditUserAddedToGroup, 6)}, *records)
+	assert.Equal(t, []auditRecord{audited(audit.EventUserAddedToGroup, 6)}, *records)
 	database.AssertExpectations(t)
 }

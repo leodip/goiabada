@@ -95,7 +95,7 @@ func TestDCR_ARegistrationWithNoFailureCommitsTheClientAndItsRedirectURIs(t *tes
 	db := &dcrWriteRecorder{Database: database}
 
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Once()
 
 	rr := registerThroughTheHandler(t, db, auditLogger)
 

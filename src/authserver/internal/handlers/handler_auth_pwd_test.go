@@ -599,7 +599,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// guard.AssertAuditLogContext, which refuses a Background one here.
 		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
 			return chimiddleware.GetReqID(ctx) == "goiabada/req-pwd-1"
-		}), audit.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		}), audit.EventAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
 		})).Return()
 
@@ -662,7 +662,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "bob@example.com").Return(nil, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "bob@example.com"
 		})).Return()
 
@@ -774,7 +774,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(user, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(1)
 		})).Return()
 
@@ -876,7 +876,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "disabled@example.com").Return(disabledUser, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(2)
 		})).Return()
 

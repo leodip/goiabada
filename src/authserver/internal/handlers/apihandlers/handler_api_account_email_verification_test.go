@@ -229,7 +229,7 @@ func TestHandleAPIAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHa
 			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
 		}).Return(&bytes.Buffer{}, nil)
 	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).Return(nil)
-	auditLogger.On("Log", mock.Anything, audit.AuditSentEmailVerificationMessage, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
@@ -319,7 +319,7 @@ func TestHandleAPIAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *t
 		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&bytes.Buffer{}, nil).Once()
 		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		auditLogger.On("Log", mock.Anything, audit.AuditSentEmailVerificationMessage, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 		database := mocks_data.NewDatabase(t)
 		database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
@@ -372,7 +372,7 @@ func TestHandleAPIAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditional
 			mailedCode, _ = args.Get(3).(map[string]interface{})["verificationCode"].(string)
 		}).Return(&bytes.Buffer{}, nil).Once()
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditSentEmailVerificationMessage, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 
 	rr := sendVerification(t, database, pageRenderer, emailSender, auditLogger)
 
@@ -486,7 +486,7 @@ func TestHandleAPIAccountEmailVerificationPost_VerifiesThroughTheConditionalWrit
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
 	database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", compared).
 		Return(true, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditVerifiedEmail, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventVerifiedEmail, mock.Anything).Return().Once()
 	credentials := &countingCredentials{}
 
 	rr := verifyDirect(t, database, auditLogger, credentials, verificationCode)

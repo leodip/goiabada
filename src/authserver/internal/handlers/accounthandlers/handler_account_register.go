@@ -252,7 +252,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			auditLogger.Log(r.Context(), audit.AuditCreatedPreRegistration, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventCreatedPreRegistration, map[string]interface{}{
 				"email": preRegistration.Email,
 			})
 
@@ -309,7 +309,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			auditLogger.Log(r.Context(), audit.AuditCreatedUser, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
 				"email": email,
 			})
 

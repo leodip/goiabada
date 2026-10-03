@@ -62,7 +62,7 @@ func TestHandleAPISettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *test
 	}, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 		return input.To == "admin@example.com" && input.Subject == "Test email"
 	})).Return(nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditSentTestEmail, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPISettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).

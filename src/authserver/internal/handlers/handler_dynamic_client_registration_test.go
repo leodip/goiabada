@@ -382,7 +382,7 @@ func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsIn
 			return r.ClientId == 42 && r.URI == uri
 		})).Run(func(mock.Arguments) { note("redirect uri") }).Return(nil).Once()
 	}
-	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).
 		Run(func(mock.Arguments) { note("audit") }).Return().Once()
 
 	rr := serveDCR(t, confidentialTwoURIRegistration, database, auditLogger)
@@ -447,7 +447,7 @@ func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublic
 		return c.IsPublic && c.PKCERequired != nil && *c.PKCERequired && !c.ClientCredentialsEnabled
 	})).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Once()
 
 	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
 		ClientName:              "A Public Client",
@@ -472,7 +472,7 @@ func TestHandleDynamicClientRegistrationPost_AuditsTheClientIPWithoutItsPort(t *
 	mocks_data.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration,
+	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration,
 		mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["sourceIP"] == "192.0.2.1"
 		})).Return().Once()

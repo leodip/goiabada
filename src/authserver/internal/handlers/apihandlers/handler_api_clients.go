@@ -260,7 +260,7 @@ func HandleAPIClientDelete(
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.AuditDeletedClient, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventDeletedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"loggedInUser":     callerSubject(r),
@@ -365,7 +365,7 @@ func HandleAPIClientCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), audit.AuditCreatedClient, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventCreatedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"loggedInUser":     callerSubject(r),
@@ -580,7 +580,7 @@ func HandleAPIClientUpdatePut(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), audit.AuditUpdatedClientSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientSettings, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
 		})
@@ -711,7 +711,7 @@ func HandleAPIClientAuthenticationPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedClientAuthentication, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientAuthentication, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
 		})
@@ -802,7 +802,7 @@ func HandleAPIClientOAuth2FlowsPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientOAuth2Flows, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
 		})
@@ -981,7 +981,7 @@ func HandleAPIClientRedirectURIsPut(
 		}
 
 		// Audit, once the save has committed.
-		auditLogger.Log(r.Context(), audit.AuditUpdatedRedirectURIs, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedRedirectURIs, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
 		})
@@ -1149,7 +1149,7 @@ func HandleAPIClientWebOriginsPut(
 		}
 
 		// Audit, once the save has committed.
-		auditLogger.Log(r.Context(), audit.AuditUpdatedWebOrigins, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedWebOrigins, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
 		})
@@ -1262,7 +1262,7 @@ func HandleAPIClientTokensPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedClientTokens, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventUpdatedClientTokens, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
 		})
