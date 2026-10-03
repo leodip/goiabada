@@ -62,7 +62,7 @@ RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-ve
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/cweill/gotests/gotests@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@v0.0.0-20260823230713-2fa3d841b0c8 && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/vuln/cmd/govulncheck@v1.8.0 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.8.0
 
