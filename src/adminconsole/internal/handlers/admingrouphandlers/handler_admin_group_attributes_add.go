@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -50,7 +51,7 @@ func HandleAdminGroupAttributesAddGet(
 		// Get group via API
 		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -103,7 +104,7 @@ func HandleAdminGroupAttributesAddPost(
 		// Get group via API
 		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -144,7 +145,7 @@ func HandleAdminGroupAttributesAddPost(
 
 		_, err = apiClient.CreateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

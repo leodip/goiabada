@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -52,7 +53,7 @@ func HandleAdminUserEmailGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -122,7 +123,7 @@ func HandleAdminUserEmailPost(
 		// Get user first for error handling template
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -142,7 +143,7 @@ func HandleAdminUserEmailPost(
 			// The classifier decides which failures the form can show: a 400 the API's validation
 			// refused, and a 409 for an address another account took after that validation passed
 			// (#425).
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				bind := map[string]interface{}{
 					"user":          user,
 					"email":         updateReq.Email,

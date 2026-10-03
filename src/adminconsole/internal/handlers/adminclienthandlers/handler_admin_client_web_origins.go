@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -62,7 +63,7 @@ func HandleAdminClientWebOriginsGet(
 
 		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
@@ -83,7 +84,7 @@ func HandleAdminClientWebOriginsGet(
 		// displays a list it is handed and holds no rule.
 		allClients, err := apiClient.GetAllClients(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -166,14 +167,14 @@ func HandleAdminClientWebOriginsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data WebOriginsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -198,7 +199,7 @@ func HandleAdminClientWebOriginsPost(
 			// the log. This is the same defect #122 fixed on the Redirect URIs page, and it
 			// bites here now that the API refuses shapes this page's own new URL().origin
 			// happily produces, such as a non-ASCII host or an IPv6 literal (#250).
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -50,7 +51,7 @@ func HandleAdminUserAttributesAddGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -102,7 +103,7 @@ func HandleAdminUserAttributesAddPost(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -150,7 +151,7 @@ func HandleAdminUserAttributesAddPost(
 
 		_, err = apiClient.CreateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, request)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

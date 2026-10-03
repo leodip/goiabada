@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -35,7 +36,7 @@ func HandleAdminSettingsKeysGet(
 
 		apiKeys, err := apiClient.GetSettingsKeys(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -94,7 +95,7 @@ func HandleAdminSettingsKeysRotatePost(
 			// server error has occurred" with a request id, for something neither unexpected
 			// nor a server error. HandleAPIErrorJson forwards the API's description instead,
 			// so the modal reads "Another key rotation is in progress" (#251).
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -117,13 +118,13 @@ func HandleAdminSettingsKeysRevokePost(
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		id, ok := data["id"].(float64)
 		if !ok {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -136,7 +137,7 @@ func HandleAdminSettingsKeysRevokePost(
 
 		// Let the API enforce state=previous and handle auditing
 		if err := apiClient.DeleteSettingsKey(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(id)); err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

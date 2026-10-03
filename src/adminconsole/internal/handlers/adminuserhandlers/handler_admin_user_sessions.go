@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -51,7 +52,7 @@ func HandleAdminUserSessionsGet(
 		// Get user details via API
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -62,7 +63,7 @@ func HandleAdminUserSessionsGet(
 		// Get the user's sessions via API
 		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -120,37 +121,37 @@ func HandleAdminUserSessionsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Verify user exists via API
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if decodeErr := decoder.Decode(&data); decodeErr != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -160,7 +161,7 @@ func HandleAdminUserSessionsPost(
 		// in one place (#373).
 		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -190,7 +191,7 @@ func HandleAdminUserSessionsPost(
 		// Delete the user session via API
 		err = apiClient.DeleteUserSessionById(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

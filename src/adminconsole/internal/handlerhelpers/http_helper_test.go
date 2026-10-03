@@ -398,6 +398,48 @@ func TestRenderTemplate_NilDataMap(t *testing.T) {
 	assert.Equal(t, "<html>sentinel app|/some/page</html>", body)
 }
 
+// The menu's full name is joined from the ID token's three name claims by the same rule
+// UserFullName applies to a user response, and the rows are TestFullNames_JoinTheSamePartsFromBothShapes'
+// own: the one that would expose a separate join is a missing part, where a hand-written
+// concatenation leaves a doubled or a dangling space (#373, #440).
+func TestRenderTemplate_MenuNameJoinsTheNameClaims(t *testing.T) {
+	templateFS := fstest.MapFS{
+		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"page.html":           {Data: []byte("{{define \"content\"}}[{{.loggedInUser.GetFullName}}]{{end}}")},
+	}
+	httpHelper := NewHttpHelper(templateFS)
+
+	for _, tc := range []struct {
+		name                              string
+		givenName, middleName, familyName string
+		want                              string
+	}{
+		{"all three", "Jane", "Q", "Doe", "Jane Q Doe"},
+		{"no middle name", "Jane", "", "Doe", "Jane Doe"},
+		{"given name only", "Jane", "", "", "Jane"},
+		{"family name only", "", "", "Doe", "Doe"},
+		{"middle name only", "", "Q", "", "Q"},
+		{"nothing at all", "", "", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := newRequest("GET", "/", nil)
+			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), oauthclient.JwtInfo{
+				IdToken: &oauth.JwtToken{Claims: map[string]interface{}{
+					"sub":         "user123",
+					"given_name":  tc.givenName,
+					"middle_name": tc.middleName,
+					"family_name": tc.familyName,
+				}},
+			}))
+
+			body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
+
+			require.NoError(t, err)
+			assert.Equal(t, "<html>["+tc.want+"]</html>", body)
+		})
+	}
+}
+
 // Every file under partials/ is parsed beside the layout and the page, which is how a page calls a
 // fragment it does not define. The second case is the first one's tree without the fragment, so a
 // pass there cannot come from anything but the partials branch (#431).

@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -54,7 +55,7 @@ func HandleAdminClientPermissionsGet(
 
 		clientResp, perms, err := apiClient.GetClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
@@ -81,7 +82,7 @@ func HandleAdminClientPermissionsGet(
 
 		resources, err := apiClient.GetAllResources(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -128,14 +129,14 @@ func HandleAdminClientPermissionsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data PermissionsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -152,7 +153,7 @@ func HandleAdminClientPermissionsPost(
 			ExpectedPermissionIds: data.ExpectedPermissionIds,
 		}
 		if updateClientPermissionsErr := apiClient.UpdateClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req); updateClientPermissionsErr != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, updateClientPermissionsErr)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, updateClientPermissionsErr)
 			return
 		}
 

@@ -1,4 +1,4 @@
-package handlers
+package handlerhelpers
 
 import (
 	"errors"
@@ -16,17 +16,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This is the first behavioural test in this package: the three files here today are two lint tests
-// and TestMain.
+// These tests came here from the handlers package with the classifiers, unchanged, when the six
+// child handler packages stopped reaching their parent for them (#440).
 //
-// It owns what HandleAPIErrorJson forwards, which is the only observable half of #251's admin
+// They own what HandleAPIErrorJson forwards, which is the only observable half of #251's admin
 // console change. The modal itself is sendAjaxRequest in utils.js, unchanged, and no test in this
 // repository drives a browser, so this is where "the administrator reads the API's sentence rather
 // than a request id" is pinned. The distinction it tests is invisible at runtime unless you read the
 // screen: both branches call JsonError, and only the argument differs.
 //
-// mocks_handlers.HttpHelper is the core module's mock. Its method set is a superset of this
-// package's HttpHelper interface, so it satisfies it without a hand-written stub.
+// mocks_handlers.HttpHelper is the handlers package's mock. Its method set is a superset of
+// ErrorWriter, so it satisfies it without a hand-written stub.
 
 // captureJsonError registers JsonError and returns a pointer to the error it was handed.
 func captureJsonError(httpHelper *mocks_handlers.HttpHelper) *error {

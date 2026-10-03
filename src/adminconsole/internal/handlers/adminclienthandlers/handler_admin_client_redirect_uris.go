@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -54,7 +55,7 @@ func HandleAdminClientRedirectURIsGet(
 
 		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
@@ -70,7 +71,7 @@ func HandleAdminClientRedirectURIsGet(
 		// PUT /api/v1/admin/clients/{id}/redirect-uris asks the same question.
 		settingsResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -139,14 +140,14 @@ func HandleAdminClientRedirectURIsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data RedirectURIsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -169,7 +170,7 @@ func HandleAdminClientRedirectURIsPost(
 			// telling the administrator which of their URIs was rejected and why. Handed
 			// to JsonError as a plain error it becomes a generic 500 and the sentence goes
 			// to the log instead of the screen (#122).
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

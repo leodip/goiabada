@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -50,7 +51,7 @@ func HandleAdminUserAttributesEditGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -72,7 +73,7 @@ func HandleAdminUserAttributesEditGet(
 
 		attribute, err := apiClient.GetUserAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if attribute == nil || attribute.UserId != user.Id {
@@ -123,7 +124,7 @@ func HandleAdminUserAttributesEditPost(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -145,7 +146,7 @@ func HandleAdminUserAttributesEditPost(
 
 		attribute, err := apiClient.GetUserAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if attribute == nil || attribute.UserId != user.Id {
@@ -189,7 +190,7 @@ func HandleAdminUserAttributesEditPost(
 
 		_, err = apiClient.UpdateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, request)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

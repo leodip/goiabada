@@ -38,8 +38,8 @@ func (s *stubApiClient) GetSettingsKeys(_ context.Context, accessToken string) (
 }
 
 // TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser owns the wiring between
-// the rotate handler and HandleAPIErrorJson. The helper's own forwarding is pinned next
-// door in api_error_helper_test.go, but that test cannot see which of the two error paths
+// the rotate handler and HandleAPIErrorJson. The helper's own forwarding is pinned in
+// handlerhelpers' api_error_helper_test.go, but that test cannot see which of the two error paths
 // this handler calls: swapping HandleAPIErrorJson back to a direct JsonError leaves the
 // helper's tests and the whole admin console suite green while putting the 409 back behind
 // "An unexpected server error has occurred" and a request id.

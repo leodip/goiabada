@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -41,7 +42,7 @@ func HandleAccountEmailVerificationGet(
 		}
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -99,7 +100,7 @@ func HandleAccountEmailSendVerificationPost(
 
 		resp, err := apiClient.SendAccountEmailVerification(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -129,7 +130,7 @@ func HandleAccountEmailVerificationPost(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -162,7 +163,7 @@ func HandleAccountEmailVerificationPost(
 			}
 
 			// Delegate other errors to generic handler
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, func(errorMessage string) {
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, func(errorMessage string) {
 				settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 				bind := map[string]interface{}{
 					"savedSuccessfully": false,

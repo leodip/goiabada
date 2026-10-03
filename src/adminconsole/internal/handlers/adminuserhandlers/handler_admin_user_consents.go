@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -53,7 +54,7 @@ func HandleAdminUserConsentsGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -63,7 +64,7 @@ func HandleAdminUserConsentsGet(
 
 		userConsents, err := apiClient.GetUserConsents(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -124,13 +125,13 @@ func HandleAdminUserConsentsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -143,30 +144,30 @@ func HandleAdminUserConsentsPost(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if decodeErr := decoder.Decode(&data); decodeErr != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		userConsents, err := apiClient.GetUserConsents(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -185,7 +186,7 @@ func HandleAdminUserConsentsPost(
 
 			err := apiClient.DeleteUserConsent(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(consentId))
 			if err != nil {
-				handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 				return
 			}
 

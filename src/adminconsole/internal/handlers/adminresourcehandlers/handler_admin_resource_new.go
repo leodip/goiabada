@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -73,7 +74,7 @@ func HandleAdminResourceNewPost(
 
 		_, err := apiClient.CreateResource(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

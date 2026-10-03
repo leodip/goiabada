@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -60,7 +61,7 @@ func HandleAdminGroupSettingsGet(
 				httpHelper.NotFound(w, r)
 				return
 			}
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -156,7 +157,7 @@ func HandleAdminGroupSettingsPost(
 		// Call API to update group
 		_, err = apiClient.UpdateGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

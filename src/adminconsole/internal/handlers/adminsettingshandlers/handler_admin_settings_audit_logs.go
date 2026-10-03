@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -45,7 +46,7 @@ func HandleAdminSettingsAuditLogsGet(
 		// Fetch settings
 		settingsResp, err := apiClient.GetSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -135,7 +136,7 @@ func HandleAdminSettingsAuditLogsPost(
 
 		_, err := apiClient.UpdateSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
@@ -182,7 +183,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// Fetch audit logs
 		auditLogsResp, err := apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -193,7 +194,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 			pageInt = clamped
 			auditLogsResp, err = apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		}
@@ -204,7 +205,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// never writes or omitting one it does (#351).
 		eventTypesResp, err := apiClient.GetAuditEventTypes(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

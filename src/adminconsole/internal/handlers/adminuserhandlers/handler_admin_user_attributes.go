@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -49,7 +50,7 @@ func HandleAdminUserAttributesGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -59,7 +60,7 @@ func HandleAdminUserAttributesGet(
 
 		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -87,13 +88,13 @@ func HandleAdminUserAttributesRemovePost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -106,29 +107,29 @@ func HandleAdminUserAttributesRemovePost(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -141,13 +142,13 @@ func HandleAdminUserAttributesRemovePost(
 		}
 
 		if !found {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		err = apiClient.DeleteUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

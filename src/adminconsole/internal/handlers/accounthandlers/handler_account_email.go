@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -39,7 +40,7 @@ func HandleAccountEmailGet(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -92,7 +93,7 @@ func HandleAccountEmailPost(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -117,7 +118,7 @@ func HandleAccountEmailPost(
 		req := &api.UpdateAccountEmailRequest{Email: email}
 		_, err = apiClient.UpdateAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				bind := map[string]interface{}{
 					"user":              user,
 					"email":             email,

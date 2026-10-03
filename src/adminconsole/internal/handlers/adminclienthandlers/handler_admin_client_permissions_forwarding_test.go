@@ -19,9 +19,9 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 )
 
-// #225 at a handler's seam, rather than at HandleAPIErrorJson's. api_error_helper_test.go owns what
-// the helper decides; this owns that this handler reaches it at all, which is the half a reader
-// cannot check by looking at the helper.
+// #225 at a handler's seam, rather than at HandleAPIErrorJson's. handlerhelpers'
+// api_error_helper_test.go owns what the helper decides; this owns that this handler reaches it
+// at all, which is the half a reader cannot check by looking at the helper.
 //
 // The block it replaced did the routing itself and did it wrong: it matched *apiclient.APIError,
 // took the message, and threw the status and the code away, so a 400 the API had explained arrived

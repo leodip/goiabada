@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -63,7 +64,7 @@ func HandleAdminGroupAttributesEditGet(
 		// Get group via API
 		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, groupId)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -74,7 +75,7 @@ func HandleAdminGroupAttributesEditGet(
 		// Get attribute via API
 		attribute, err := apiClient.GetGroupAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if attribute == nil || attribute.GroupId != group.Id {
@@ -136,7 +137,7 @@ func HandleAdminGroupAttributesEditPost(
 		// Get group via API for the redirect and error rendering
 		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, groupId)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -147,7 +148,7 @@ func HandleAdminGroupAttributesEditPost(
 		// Get current attribute for error rendering
 		currentAttribute, err := apiClient.GetGroupAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if currentAttribute == nil || currentAttribute.GroupId != group.Id {
@@ -191,7 +192,7 @@ func HandleAdminGroupAttributesEditPost(
 
 		_, err = apiClient.UpdateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, updateReq)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

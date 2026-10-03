@@ -204,29 +204,13 @@ func (h *HttpHelper) renderToBuffer(r *http.Request, layoutName string, template
 				loggedInUser["Username"] = username
 			}
 
-			// Build a GetFullName equivalent as a simple field
-			// This mimics what the auth server's models.User.FullName() does
-			// NOTE: We don't use email as fallback here - the template will show email separately
-			fullName := ""
-			if givenName, ok := loggedInUser["GivenName"].(string); ok && givenName != "" {
-				fullName = givenName
-			}
-			if middleName, ok := loggedInUser["MiddleName"].(string); ok && middleName != "" {
-				if fullName != "" {
-					fullName += " "
-				}
-				fullName += middleName
-			}
-			if familyName, ok := loggedInUser["FamilyName"].(string); ok && familyName != "" {
-				if fullName != "" {
-					fullName += " "
-				}
-				fullName += familyName
-			}
-
-			// Set GetFullName - will be empty string if no name components exist
-			// The template will handle showing just the email in that case
-			loggedInUser["GetFullName"] = fullName
+			// The menu label, joined by the rule UserFullName applies to a user response, an absent
+			// claim reading as empty. An empty name has no email fallback here: the template shows the
+			// email on its own line (#440).
+			givenName, _ := claims["given_name"].(string)
+			middleName, _ := claims["middle_name"].(string)
+			familyName, _ := claims["family_name"].(string)
+			loggedInUser["GetFullName"] = fullName(givenName, middleName, familyName)
 
 			data["loggedInUser"] = loggedInUser
 		}

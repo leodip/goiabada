@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -57,7 +58,7 @@ func HandleAdminResourcePermissionsGet(
 
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -82,7 +83,7 @@ func HandleAdminResourcePermissionsGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -124,13 +125,13 @@ func HandleAdminResourcePermissionsPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		// Get JWT info
@@ -141,18 +142,18 @@ func HandleAdminResourcePermissionsPost(
 		}
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		var data SavePermissionsInput
 		err = json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -192,7 +193,7 @@ func HandleAdminResourcePermissionsPost(
 			// in, where the 200 path passed the value straight to showModalDialog, which assigns
 			// innerHTML. Answering 200 also reported a save that had not happened to anything
 			// reading the status rather than the body (#279 decision 13).
-			handlers.HandleAPIErrorJson(httpHelper, w, r, updateResourcePermissionsErr)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, updateResourcePermissionsErr)
 			return
 		}
 
@@ -214,6 +215,12 @@ func HandleAdminResourcePermissionsPost(
 	}
 }
 
+// IdentifierValidator is the one check the permission form's pre-save asks, the same one the API
+// asks before the save (#275). It lives beside its one consumer (#440).
+type IdentifierValidator interface {
+	ValidateIdentifier(identifier string, enforceMinLength bool) error
+}
+
 // HandleAdminResourceValidatePermissionPost answers the permission form's pre-save check, and it
 // has to agree with the API's own refusal at PUT .../permissions: whatever this accepts, the save
 // that follows must accept too.
@@ -226,7 +233,7 @@ func HandleAdminResourcePermissionsPost(
 // available.
 func HandleAdminResourceValidatePermissionPost(
 	httpHelper handlers.HttpHelper,
-	identifierValidator handlers.IdentifierValidator,
+	identifierValidator IdentifierValidator,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -236,7 +243,7 @@ func HandleAdminResourceValidatePermissionPost(
 		var data map[string]string
 		err := json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 

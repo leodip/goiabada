@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -55,7 +56,7 @@ func HandleAdminUserGroupsGet(
 		// Get user and their groups
 		user, userGroups, err := apiClient.GetUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -68,7 +69,7 @@ func HandleAdminUserGroupsGet(
 		// Get all available groups
 		allGroups, err := apiClient.GetAllGroups(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -114,13 +115,13 @@ func HandleAdminUserGroupsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -133,14 +134,14 @@ func HandleAdminUserGroupsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data GroupsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -153,7 +154,7 @@ func HandleAdminUserGroupsPost(
 		// Call API to update user groups (this handles all the business logic including audit logging)
 		_, _, err = apiClient.UpdateUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

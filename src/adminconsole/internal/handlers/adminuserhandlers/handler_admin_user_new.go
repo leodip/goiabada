@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -32,7 +33,7 @@ func HandleAdminUserNewGet(
 
 		err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_new.html", bind)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 	}
@@ -114,7 +115,7 @@ func HandleAdminUserNewPost(
 			Password:        password,
 		})
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
