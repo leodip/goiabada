@@ -58,7 +58,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
-- `internal/reqctx/` - The four request-scoped values (settings, session identifier, bearer token, validated token), each written by one middleware and read through a typed accessor; services take theirs as parameters (#433)
+- `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
 - `internal/otpcredential/` - The stored TOTP credential: establish, remove, verify a stored or a supplied code, and the seed's encryption at rest. `internal/otp` underneath stays the stateless primitive (#387)
 - `internal/userclaims/` - The one stored-user-to-OIDC-claims conversion, serving `/userinfo` and issuance from the same mapper, with the two places those two disagree — the base URL and which include flag filters groups and attributes — as inputs rather than merged away. `updated_at` was a third until it turned out to be a defect: it rides with the `profile` scope at every site now, which is what OIDC Core 5.4 and this repository's own docs site both say it is, where issuance used to emit it for any scope beyond a lone `openid` and, in an access token, for a lone `openid` too, because the audience loop extends the scope slice before the claim block reads it (#387, #422)
 - `internal/userconsent/` - The stored consent a user gives a client: `Record` reads the row and creates or rewrites it with the scope the consent screen granted, replacing it whole. The handler parses, decides and answers (#437)
@@ -390,7 +390,7 @@ here, folded into #387 (PR #422).
 `go test -race`, and CI's `Unit / race` job does the same beside the plain unit jobs. The
 detector needs cgo, so the dev container ships gcc and pins `CGO_ENABLED=0` for everything
 except that leg, which sets it to 1 for itself. Code whose correctness is a locking argument
-(`authserver/internal/ratelimit`, the middleware's in-flight count, the concurrent transactions of #301) is
+(`authserver/internal/ratelimit`, whose failures-only limiter holds the in-flight count since #439, the concurrent transactions of #301) is
 covered there and nowhere else; the data and integration tiers do not run under it.
 
 **Guard shape**: every tree-wide guard splits in two, and a new one is written the same way. A

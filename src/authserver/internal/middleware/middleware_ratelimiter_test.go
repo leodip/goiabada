@@ -2,11 +2,10 @@ package middleware
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -25,7 +24,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -173,129 +171,6 @@ func spellingsOf(local, domain string) []string {
 		"\t" + base + "\t",
 		"\n" + strings.ToUpper(local) + "@" + domain + "\n",
 	}
-}
-
-// TestAccountRateLimitKey_BoundsTheIdentifier pins the length bound on the account key.
-// The key is retained by the limiter's store for two windows and comes straight off an
-// unauthenticated form with no body cap, so what matters is that an arbitrarily long
-// submission cannot become an arbitrarily long map entry, and that bounding it does not
-// put two identifiers in one bucket: nothing caps an account identifier's length on the
-// way in, so a threshold that folded would fold real accounts (#276).
-func TestAccountRateLimitKey_BoundsTheIdentifier(t *testing.T) {
-	// The longest address there is: a 64-octet local-part and a 255-octet domain, the
-	// maxima RFC 5321 sections 4.5.3.1.1 and 4.5.3.1.2 state.
-	longestLocal := strings.Repeat("a", 64)
-	longestDomain := strings.Repeat("b", 251) + ".com"
-	longestAddress := longestLocal + "@" + longestDomain
-
-	if len(longestAddress) != maxAccountIdentifierLen {
-		t.Fatalf("setup: the longest address is %d octets, want %d",
-			len(longestAddress), maxAccountIdentifierLen)
-	}
-
-	tests := []struct {
-		name       string
-		identifier string
-		want       string
-	}{
-		{"an ordinary address is itself", "victim@example.com", "victim@example.com"},
-		{"case and whitespace still normalize", "  VICTIM@Example.COM\t", "victim@example.com"},
-		{"the longest possible address keeps its own bucket", longestAddress, longestAddress},
-		{
-			"whitespace is trimmed before the length is judged",
-			"   " + longestAddress + "   ",
-			longestAddress,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := accountRateLimitKey(tc.identifier); got != tc.want {
-				t.Errorf("accountRateLimitKey(%q) = %q, want %q", tc.identifier, got, tc.want)
-			}
-		})
-	}
-
-	// The identifier the store must never retain whole: net/http's form limit is the only
-	// ceiling on it, and the limiter holds a key for two windows.
-	huge := strings.Repeat("x", 10<<20) + "@example.com"
-
-	t.Run("a form value at net/http's limit is digested rather than retained", func(t *testing.T) {
-		got := accountRateLimitKey(huge)
-		if len(got) != len(oversizedAccountKeyPrefix)+2*sha256.Size {
-			// Truncated: an input of ten mebibytes has no place in a failure line.
-			t.Errorf("accountRateLimitKey(%.20q...) is %d octets: %.80q", huge, len(got), got)
-		}
-		if !strings.HasPrefix(got, oversizedAccountKeyPrefix) {
-			t.Errorf("key %.80q does not carry the digest prefix %q, so an audit reader "+
-				"cannot tell it from an address", got, oversizedAccountKeyPrefix)
-		}
-	})
-
-	t.Run("one octet past the bound is digested", func(t *testing.T) {
-		if got := accountRateLimitKey(longestAddress + "x"); !strings.HasPrefix(got, oversizedAccountKeyPrefix) {
-			t.Errorf("accountRateLimitKey(longestAddress+\"x\") = %.80q, want a digest", got)
-		}
-	})
-
-	// The property the digest exists for, and the one a shared bucket cost. Nothing bounds
-	// an account identifier's length on the way in: ValidateEmailAddress checks the shape
-	// without a length, self-registration and the setup program use it, and users.email is
-	// TEXT on sqlite. So an identifier past the bound can name a real account, and folding
-	// would spend that account's budget on strangers' submissions (#276).
-	t.Run("two distinct oversized identifiers keep distinct buckets", func(t *testing.T) {
-		a := accountRateLimitKey(strings.Repeat("a", maxAccountIdentifierLen) + "@example.com")
-		b := accountRateLimitKey(strings.Repeat("b", maxAccountIdentifierLen) + "@example.com")
-		if a == b {
-			t.Errorf("two distinct oversized identifiers both keyed as %.80q; want a bucket each", a)
-		}
-	})
-
-	t.Run("an oversized identifier normalizes before it is digested", func(t *testing.T) {
-		// Otherwise a long account has 2^n buckets from case alone, which is the whole
-		// reason this function exists (#219).
-		long := strings.Repeat("a", maxAccountIdentifierLen) + "@Example.COM"
-		if got, want := accountRateLimitKey("  "+strings.ToUpper(long)+"\t"), accountRateLimitKey(long); got != want {
-			t.Errorf("two spellings of one oversized identifier keyed as %.80q and %.80q; want one bucket",
-				got, want)
-		}
-	})
-
-	// The two branches have to be disjoint, or bounding the key reintroduces the shared
-	// bucket it was meant to remove. A digest key is the eight-octet prefix and sixty-four
-	// hex characters, seventy-two in all and far inside the bound, so it can be submitted
-	// as an ordinary identifier; and it is not a secret, since reportTrip writes it to the
-	// warning line and the audit event. Without the prefix test in accountRateLimitKey,
-	// submitting one back lands in the bucket of the long identifier it names, with no
-	// SHA-256 collision involved and without the sender ever knowing that identifier (#276).
-	t.Run("a submission spelled as a digest key cannot reach a digested bucket", func(t *testing.T) {
-		long := strings.Repeat("a", maxAccountIdentifierLen) + "@example.com"
-		digested := accountRateLimitKey(long)
-		if len(digested) > maxAccountIdentifierLen {
-			t.Fatalf("setup: the digest key is %d octets, past the bound, so it could not be "+
-				"submitted as an exact key in the first place", len(digested))
-		}
-		if got := accountRateLimitKey(digested); got == digested {
-			t.Errorf("submitting %q back keyed as itself, so it shares the bucket of the "+
-				"oversized identifier it names", digested)
-		}
-	})
-
-	t.Run("the exact branch never emits a key carrying the digest prefix", func(t *testing.T) {
-		// The last spelling also pins the order: normalizing before the prefix is tested
-		// is what stops "<SHA256>" reaching the exact branch.
-		for _, spelling := range []string{
-			oversizedAccountKeyPrefix,
-			oversizedAccountKeyPrefix + "victim@example.com",
-			"  " + strings.ToUpper(oversizedAccountKeyPrefix) + "abc\t",
-		} {
-			got := accountRateLimitKey(spelling)
-			if len(got) != len(oversizedAccountKeyPrefix)+2*sha256.Size {
-				t.Errorf("accountRateLimitKey(%q) = %q, want a digest: an exact key carrying "+
-					"the prefix shares a namespace with the digested ones", spelling, got)
-			}
-		}
-	})
 }
 
 // runPwd drives one request through LimitPwd and reports the status, whether the handler
@@ -479,7 +354,7 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 	t.Run("ten case and whitespace variants of one address share the bucket", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
-		// Refused by accountRateLimitKey lowercasing and trimming, not by the limiter
+		// Refused by ratelimit.AccountKey lowercasing and trimming, not by the limiter
 		// merely working: without it each spelling is its own bucket and all 11 pass.
 		for i := 0; i < tightBudget; i++ {
 			if code, reached, _ := runPwd(m, spellings[i%len(spellings)], attacker, true); code != http.StatusTeapot || !reached {
@@ -639,31 +514,6 @@ func TestLimitPwd_AccountFailureBudget(t *testing.T) {
 	})
 }
 
-// TestFailureTier_FailsClosedOnACounterError is the one case that reaches failureTier
-// directly, and the reason for the exception is that nothing else can reach this branch:
-// the in-process store the limiter is built with cannot fail, so no request through the
-// middleware can produce an error here. An implementation that returned true on a counter
-// error would leave every other case in this file green while the gate failed open for the
-// duration of a storage fault (#219).
-func TestFailureTier_FailsClosedOnACounterError(t *testing.T) {
-	f := newFailureTier("test", 5, time.Minute)
-	f.rl = ratelimit.New(5, time.Minute, ratelimit.WithStore(&erroringStore{}))
-
-	if f.Reserve("anyone@example.com") {
-		t.Error("Reserve returned true with the counter erroring; the gate must fail closed")
-	}
-}
-
-// erroringStore is a ratelimit.Store whose reads fail, standing in for a store
-// implementation that can (unlike the in-process one).
-type erroringStore struct{}
-
-func (s *erroringStore) Get(key string, current, previous time.Time) (int, int, error) {
-	return 0, 0, errors.New("counter unavailable")
-}
-
-func (s *erroringStore) Add(key string, current time.Time) error { return nil }
-
 // TestLimitForgotPwd_PerEmailAndPerIP verifies the forgot-password limiter bounds
 // both a single address (mail-bombing) and a single source IP, and that neither
 // budget can be escaped by respelling the address or by moving inside one's own
@@ -707,7 +557,7 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 	t.Run("ten case and whitespace variants of one address share the per-email bucket", func(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		spellings := spellingsOf("victim", "example.com")
-		// Refused by accountRateLimitKey lowercasing and trimming: without it each
+		// Refused by ratelimit.AccountKey lowercasing and trimming: without it each
 		// spelling buys a fresh mail-bombing budget for the same mailbox.
 		for i := 0; i < emailBudget; i++ {
 			if code, reached := run(m, spellings[i%len(spellings)], freshIP(i)); code != http.StatusTeapot || !reached {
@@ -737,9 +587,10 @@ func TestLimitForgotPwd_PerEmailAndPerIP(t *testing.T) {
 		m := newTestMiddleware(nil, true)
 		// Nothing caps an account identifier's length on the way in, so any of these
 		// can name a real account. Folding them into one bucket would let the flood
-		// below spend the budget of whichever one does (#276).
+		// below spend the budget of whichever one does (#276). 320 octets of local part
+		// alone is past the longest address RFC 5321 allows, so each is digested.
 		oversized := func(i int) string {
-			return fmt.Sprintf("%s%d@example.com", strings.Repeat("a", maxAccountIdentifierLen), i)
+			return fmt.Sprintf("%s%d@example.com", strings.Repeat("a", 64+1+255), i)
 		}
 		for i := 0; i < emailBudget+1; i++ {
 			if code, reached := run(m, oversized(i), freshIP(i)); code != http.StatusTeapot || !reached {
@@ -1844,6 +1695,244 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 	})
 }
 
+// builtLimiter is one of the seven route-facing limiters whose body is written by a builder rather
+// than by hand (#439 decision 1): the four per-IP ones and the three failures-per-subject ones. It
+// holds what the route sends and everything its refusal is, as literals from the published budgets
+// and the refusal shapes #219 settled rather than read back off a tier, so a builder handed the
+// wrong tier, the wrong shape or the wrong audit identifier for one route fails here by name.
+type builtLimiter struct {
+	name    string
+	limit   func(m *RateLimiterMiddleware) func(http.Handler) http.Handler
+	request func() *http.Request
+	// failures is true for a failures-only tier, which only a credential failure the handler
+	// records can spend.
+	failures bool
+	budget   int
+	// contentType and retryAfter are the refusal's shape and the tier's window in seconds.
+	contentType string
+	retryAfter  string
+	// audited is the whole details map of the one event a trip audits, and warned the whole
+	// attribute set of the warning each refusal logs.
+	audited map[string]interface{}
+	warned  map[string]any
+	// noSubject, set on a failures-per-subject limiter, builds a request with no subject to
+	// key on and the ceremony store that goes with it. Such a request reaches the handler
+	// however often it is sent.
+	noSubject func() (authContextGetter, *http.Request)
+}
+
+func builtLimiters() []builtLimiter {
+	const ip = "203.0.113.7"
+	const subject = "11111111-1111-1111-1111-111111111111"
+	ipRequest := func(method, target string) func() *http.Request {
+		return func() *http.Request {
+			req := limiterRequest(method, target, nil)
+			req.RemoteAddr = ip + ":5000"
+			return req
+		}
+	}
+	ipWarned := func(limiter string) map[string]any {
+		return map[string]any{"limiter": limiter, "ip": ip, "request_id": limiterRequestId}
+	}
+	subjectWarned := func(limiter string) map[string]any {
+		return map[string]any{"limiter": limiter, "request_id": limiterRequestId}
+	}
+	noToken := func(target string) func() (authContextGetter, *http.Request) {
+		return func() (authContextGetter, *http.Request) {
+			return stubCeremonyStore{}, accountPasswordRequest(target, "")
+		}
+	}
+	return []builtLimiter{
+		{
+			name: "LimitActivate", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitActivate },
+			request: ipRequest(http.MethodGet, "/activate"), budget: 20,
+			contentType: "text/html; charset=UTF-8", retryAfter: "300",
+			audited: map[string]interface{}{"limiter": "activate", "ip": ip}, warned: ipWarned("activate"),
+		},
+		{
+			name: "LimitRegister", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitRegister },
+			request: ipRequest(http.MethodPost, "/register"), budget: 20,
+			contentType: "text/html; charset=UTF-8", retryAfter: "300",
+			audited: map[string]interface{}{"limiter": "register", "ip": ip}, warned: ipWarned("register"),
+		},
+		{
+			name: "LimitResetPwd", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitResetPwd },
+			request: ipRequest(http.MethodGet, "/reset-password"), budget: 30,
+			contentType: "text/html; charset=UTF-8", retryAfter: "300",
+			audited: map[string]interface{}{"limiter": "reset_pwd", "ip": ip}, warned: ipWarned("reset_pwd"),
+		},
+		{
+			name: "LimitDCR", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitDCR },
+			request: ipRequest(http.MethodPost, "/connect/register"), budget: 10,
+			contentType: "application/json", retryAfter: "60",
+			audited: map[string]interface{}{"limiter": "dcr", "ip": ip}, warned: ipWarned("dcr"),
+		},
+		{
+			// The bucket is user_7, and the event records the user id itself, as an int64: the
+			// identifier the audit records is not the bucket key, which is why the subject
+			// function returns both.
+			name: "LimitOtp", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitOtp },
+			request:  func() *http.Request { return limiterRequest(http.MethodPost, "/auth/otp?userId=7", nil) },
+			failures: true, budget: 5,
+			contentType: "text/html; charset=UTF-8", retryAfter: "900",
+			audited: map[string]interface{}{"limiter": "otp", "userId": int64(7)}, warned: subjectWarned("otp"),
+			noSubject: func() (authContextGetter, *http.Request) {
+				return stubCeremonyStore{err: ceremony.ErrNoAuthContext}, limiterRequest(http.MethodPost, "/auth/otp", nil)
+			},
+		},
+		{
+			name: "LimitEmailVerification", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitEmailVerification },
+			request:  func() *http.Request { return verificationRequest(subject) },
+			failures: true, budget: 5,
+			contentType: "application/json", retryAfter: "900",
+			audited:   map[string]interface{}{"limiter": "email_verification", "loggedInUser": subject},
+			warned:    subjectWarned("email_verification"),
+			noSubject: noToken("/api/v1/account/email/verification"),
+		},
+		{
+			name: "LimitAccountPassword", limit: func(m *RateLimiterMiddleware) func(http.Handler) http.Handler { return m.LimitAccountPassword },
+			request:  func() *http.Request { return accountPasswordRequest(accountPasswordRoute, subject) },
+			failures: true, budget: 5,
+			contentType: "application/json", retryAfter: "900",
+			audited:   map[string]interface{}{"limiter": "account_password", "loggedInUser": subject},
+			warned:    subjectWarned("account_password"),
+			noSubject: noToken(accountOTPRoute),
+		},
+	}
+}
+
+// runBuilt drives one request through a built limiter, recording a credential failure from
+// inside the handler when failed is set, and reports whether the handler ran.
+func runBuilt(m *RateLimiterMiddleware, c builtLimiter, req *http.Request, failed bool) (*httptest.ResponseRecorder, bool) {
+	rr := httptest.NewRecorder()
+	reached := false
+	c.limit(m)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
+		}
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, req)
+	return rr, reached
+}
+
+// TestBuiltLimiters_EachKeepsItsOwnRefusal holds the seven limiters a builder writes to what each
+// of them answered when it was written by hand (#439 decisions 1 and 2): the budget on both sides,
+// the refusal shape its caller parses, Retry-After at its own window, the one audit event with
+// exactly the identifier that route records, and a warning on every refusal that names a client
+// block for a per-IP tier and nobody for a per-subject one. The per-route tests above cover the
+// keys; this is the whole refusal, for all seven at once, because a builder writes all seven and
+// one wrong argument at one call site is the defect it makes possible.
+func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
+	for _, c := range builtLimiters() {
+		t.Run(c.name, func(t *testing.T) {
+			t.Run("the budget, then one refusal in its route's shape", func(t *testing.T) {
+				logs := logtest.CaptureSlog(t)
+				m, auditLog := newAuditedTestMiddleware(stubCeremonyStore{}, true)
+
+				for i := 0; i < c.budget; i++ {
+					if rr, reached := runBuilt(m, c, c.request(), c.failures); rr.Code != http.StatusTeapot || !reached {
+						t.Fatalf("request %d of a budget of %d: got code %d, handler reached %v; want %d and true",
+							i+1, c.budget, rr.Code, reached, http.StatusTeapot)
+					}
+				}
+				for i := 0; i < 2; i++ {
+					rr, reached := runBuilt(m, c, c.request(), c.failures)
+					if rr.Code != http.StatusTooManyRequests || reached {
+						t.Fatalf("request %d: got code %d, handler reached %v; want %d and false",
+							c.budget+1+i, rr.Code, reached, http.StatusTooManyRequests)
+					}
+					if got := rr.Header().Get("Content-Type"); got != c.contentType {
+						t.Errorf("Content-Type = %q, want %q", got, c.contentType)
+					}
+					if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+						t.Errorf("Cache-Control = %q, want no-store", got)
+					}
+					if got := rr.Header().Get("Retry-After"); got != c.retryAfter {
+						t.Errorf("Retry-After = %q, want %q", got, c.retryAfter)
+					}
+					assertNoRateLimitHeaders(t, rr, c.name+" rejection")
+				}
+
+				auditLog.mu.Lock()
+				events := append([]auditEvent(nil), auditLog.events...)
+				auditLog.mu.Unlock()
+				if len(events) != 1 {
+					t.Fatalf("got %d audit events for two refusals on one key, want exactly 1: %v", len(events), events)
+				}
+				if events[0].name != audit.AuditRateLimitExceeded {
+					t.Errorf("event name = %q, want %q", events[0].name, audit.AuditRateLimitExceeded)
+				}
+				if !reflect.DeepEqual(events[0].details, c.audited) {
+					t.Errorf("event details = %#v, want %#v", events[0].details, c.audited)
+				}
+				if events[0].requestId != limiterRequestId {
+					t.Errorf("request id on the audited context = %q, want %q", events[0].requestId, limiterRequestId)
+				}
+
+				warnings := 0
+				for _, record := range logs.Records() {
+					if record.Message != "rate limit reached" {
+						continue
+					}
+					warnings++
+					if record.Level != slog.LevelWarn {
+						t.Errorf("the trip was logged at %v, want WARN", record.Level)
+					}
+					if !reflect.DeepEqual(record.Attrs, c.warned) {
+						t.Errorf("warning attributes = %#v, want %#v", record.Attrs, c.warned)
+					}
+				}
+				if warnings != 2 {
+					t.Errorf("got %d rate limit warnings for two refusals, want 2", warnings)
+				}
+			})
+
+			if c.failures {
+				t.Run("a handler that records no failure spends nothing", func(t *testing.T) {
+					m := newTestMiddleware(stubCeremonyStore{}, true)
+					for i := 0; i < 3*c.budget; i++ {
+						if rr, reached := runBuilt(m, c, c.request(), false); rr.Code != http.StatusTeapot || !reached {
+							t.Fatalf("request %d with no failure recorded: got code %d, handler reached %v; want %d and true",
+								i+1, rr.Code, reached, http.StatusTeapot)
+						}
+					}
+					// The slots the successes held were handed back, so the whole budget of
+					// failures is still there.
+					for i := 0; i < c.budget; i++ {
+						if rr, reached := runBuilt(m, c, c.request(), true); rr.Code != http.StatusTeapot || !reached {
+							t.Fatalf("failure %d after the successes: got code %d, handler reached %v; want %d and true",
+								i+1, rr.Code, reached, http.StatusTeapot)
+						}
+					}
+				})
+
+				t.Run("a request with no subject reaches the handler", func(t *testing.T) {
+					store, _ := c.noSubject()
+					m := newTestMiddleware(store, true)
+					for i := 0; i < 3*c.budget; i++ {
+						_, req := c.noSubject()
+						if rr, reached := runBuilt(m, c, req, true); rr.Code != http.StatusTeapot || !reached {
+							t.Fatalf("request %d with no subject: got code %d, handler reached %v; want %d and true",
+								i+1, rr.Code, reached, http.StatusTeapot)
+						}
+					}
+				})
+			}
+
+			t.Run("disabled limiter never blocks", func(t *testing.T) {
+				m := newTestMiddleware(stubCeremonyStore{}, false)
+				for i := 0; i < 3*c.budget; i++ {
+					if rr, reached := runBuilt(m, c, c.request(), c.failures); rr.Code != http.StatusTeapot || !reached {
+						t.Fatalf("request %d with the limiter off: got code %d, handler reached %v; want %d and true",
+							i+1, rr.Code, reached, http.StatusTeapot)
+					}
+				}
+			})
+		})
+	}
+}
+
 // TestRateLimiter_EveryTierLogsUnderAConventionalKey holds the one attribute key in this tree
 // that no lint reads. reportTrip appends t.keyField, so the key at that slog call is a field
 // value rather than a string literal, and sloglint's key-naming-case reads literals: it cannot
@@ -1854,7 +1943,9 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
 // test can reach today are two of thirteen tiers, and the next tier is what this exists for (#320
-// decision 3).
+// decision 3). The thirteen are eight request tiers and three failures-only ones, plus the two
+// failures-only tiers of the password gate, which ratelimit.AccountLimiter counts and accountTiers
+// names (#439).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// Decision 3's vocabulary. Spelled out rather than imported: the lint's copy is unexported,
 	// and this is deliberately the same rule applied to the one value the lint cannot see.
@@ -2015,8 +2106,11 @@ type visitedValue struct {
 
 // collectTierKeyFields walks a value for the tier structs inside it and records each one's name
 // against the attribute key it logs its bucket under. Reading an unexported field through reflect
-// is allowed; only Interface and Set are not, and this needs neither. The walk stops at a tier
-// rather than descending into its limiter, which is what bounds the interesting half of it.
+// is allowed; only Interface and Set are not, and this needs neither. The walk stops at a tier,
+// which since #439 holds only the HTTP half: the limiter a tier reports for sits beside it, in
+// requestTier or failureTier, and the password gate's ratelimit.AccountLimiter beside its two
+// tiers in accountTiers. The walk descends into those as it does into anything else and finds no
+// tier there, since ratelimit cannot import this package.
 //
 // Every kind that can hold a tier is traversed, not the pointer and struct fields the constructor
 // happens to use today: a tier behind a slice, an array, a map or an interface is as reachable

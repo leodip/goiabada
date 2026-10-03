@@ -22,8 +22,8 @@ import (
 // than "at most one per window and at most two per window length in the worst phase",
 // which is what two independently anchored limiters could promise (#219, #276).
 //
-// A Gate always counts in an in-process store, even when its parent was built with
-// WithStore: the injectable store exists to reach a Limiter's fail-closed paths, and an
+// A Gate always counts in an in-process store of its own, even when a test has replaced
+// its parent's: a failing store exists to reach a Limiter's fail-closed paths, and an
 // audit gate has none to reach. Gate is safe for concurrent use.
 type Gate struct {
 	window time.Duration

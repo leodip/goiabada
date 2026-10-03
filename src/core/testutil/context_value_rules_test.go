@@ -3,9 +3,9 @@ package testutil
 // Seam 9 of #433: the rule AssertContextValuesThroughAccessors enforces, over fixture modules
 // written into a temp tree and walked through the same functions the real caller uses.
 //
-// The real caller walks a clean tree -- #433 left no raw read outside internal/reqctx but the
-// rate limiter's exempted one -- so it passes identically whether the rule still fires or has
-// quietly stopped resolving anything. Every fixture below is a shape the auth server had, or one
+// The real caller walks a clean tree -- #439 moved the rate limiter's credential reservation, the
+// last raw read #433 left outside internal/reqctx, in behind it -- so it passes identically
+// whether the rule still fires or has quietly stopped resolving anything. Every fixture below is a shape the auth server had, or one
 // that would make the walk answer by spelling rather than by type.
 
 import (

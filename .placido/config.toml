@@ -12,7 +12,7 @@ about = "go vet in all four modules (core, authserver, adminconsole, setup); abo
 
 [commands.unit]
 run   = ".placido/stack.sh run --type modules --no-build"
-about = "Unit tests of authserver (internal and web), core, and adminconsole; also checks gofmt. Narrow with --type internal|core|adminconsole and --run '<regex>'."
+about = "Unit tests of authserver (internal and web), core, and adminconsole; also checks gofmt, about 40 seconds. Narrow by module with --type internal|core|adminconsole; --run does not narrow it. For one test, use exec."
 
 [commands.setup-wizard]
 run   = ".placido/stack.sh run --type setup"
@@ -37,6 +37,10 @@ about = "Builds the server and runs the end-to-end tier on one engine: append my
 [commands.lint]
 run   = ".placido/stack.sh run --type lint --no-build"
 about = "golangci-lint and unparam on every module, as CI's Lint job runs them, and checks that the Tailwind CSS, the mocks, and the core ownership table are committed up to date."
+
+[commands.exec]
+run   = ".placido/stack.sh exec"
+about = "One command in this issue's devcontainer, from src/authserver, with its environment; the way to run a single unit test. Append it quoted: 'go test -count=1 -run TestName ./internal/oauth/...', or 'cd ../core && go test -count=1 -run TestName ./...' for core (likewise ../adminconsole)."
 
 [commands.mocks]
 run   = ".placido/stack.sh exec ./generate-mocks.sh"

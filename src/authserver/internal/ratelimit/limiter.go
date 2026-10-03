@@ -1,5 +1,7 @@
-// Package ratelimit provides the sliding-window request counter and the client-IP
-// canonicaliser the middleware rate limiter is built on.
+// Package ratelimit is the counting half of the auth server's rate limiter: the
+// sliding-window request counter, the failures-only limiter and the two-tier account
+// limiter built on it, the account-identifier key rule, and the client-IP canonicaliser.
+// The HTTP half -- tier names, audit reporting and refusal shapes -- is the middleware's.
 //
 // A Limiter divides time into fixed windows anchored at its own construction instant
 // and keeps a count per key for the current window and the previous one. The rate it
@@ -33,7 +35,12 @@ type Limiter struct {
 	// must not be one of those (#276).
 	anchor time.Time
 
-	store Store
+	// store is the in-process store in production. Only this package's own tests
+	// replace it, with one that fails, which is the only way to reach the fail-closed
+	// paths: the in-process store cannot produce an error. Unexported for the clock's
+	// reason below, and with no option to set it, since nothing above this package
+	// needs a failing store (#439).
+	store store
 
 	// now is time.Now in production. Only this package's own tests replace it: the
 	// alternative, an exported clock option, is a public test hook on a
@@ -48,31 +55,16 @@ type Limiter struct {
 	mu sync.Mutex
 }
 
-// Option configures a Limiter at construction.
-type Option func(*Limiter)
-
-// WithStore replaces the in-process store. It exists so that a test can inject a
-// store which fails, which is the only way to reach the fail-closed paths: the
-// in-process store cannot produce an error.
-func WithStore(s Store) Option {
-	return func(l *Limiter) { l.store = s }
-}
-
 // New returns a Limiter admitting limit hits per key per window, anchored at this
 // instant.
-func New(limit int, window time.Duration, opts ...Option) *Limiter {
+func New(limit int, window time.Duration) *Limiter {
 	l := &Limiter{
 		limit:  limit,
 		window: window,
+		store:  newMemStore(window),
 		now:    time.Now,
 	}
-	for _, opt := range opts {
-		opt(l)
-	}
 	l.anchor = l.now()
-	if l.store == nil {
-		l.store = newMemStore(window)
-	}
 	return l
 }
 
