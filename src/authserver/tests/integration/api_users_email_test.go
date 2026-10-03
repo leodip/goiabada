@@ -75,9 +75,11 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 // the previous address is for a self-service change only, so an administrator changing another
 // user's address, which needs no password, sends nothing to either address even with mail on.
 //
-// The notice would be sent after the response, so its absence is read once a later mail has
-// arrived: a reset requested for the new address after the change answered, whose job starts after
-// any job the change could have started.
+// The later reset mail shows only that mail was on; it is no barrier for a notice, because each job
+// after a response runs on its own goroutine and a later one finishing says nothing about an
+// earlier one. The two absence checks below therefore catch a notice that has already arrived and
+// nothing slower. The proof ordered on completion is TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly
+// in internal/server, which waits on the server's own job runner before it reads its capture.
 func TestAPIUserEmailPut_SendsNoNoticeWithMailOn(t *testing.T) {
 	useMailpitSMTP(t)
 	accessToken, _ := createAdminClientWithToken(t)
