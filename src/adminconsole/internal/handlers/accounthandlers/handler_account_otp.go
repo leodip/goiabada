@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -39,7 +40,7 @@ func HandleAccountOtpGet(
 		// Load current user profile via API
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -51,7 +52,7 @@ func HandleAccountOtpGet(
 			// request enrollment secret and QR from API
 			enrollment, enrollmentErr := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
 			if enrollmentErr != nil {
-				handlers.HandleAPIError(httpHelper, w, r, enrollmentErr)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, enrollmentErr)
 				return
 			}
 
@@ -83,7 +84,7 @@ func HandleAccountOtpPost(
 		// Load user to determine current OTP state
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -125,7 +126,7 @@ func HandleAccountOtpPost(
 		renderEnrollmentError := func(message string) {
 			enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
 			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 
@@ -154,7 +155,7 @@ func HandleAccountOtpPost(
 					renderDisableError(apiErr.Message)
 					return
 				}
-				handlers.HandleAPIError(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		} else {
@@ -191,7 +192,7 @@ func HandleAccountOtpPost(
 						return
 					}
 				}
-				handlers.HandleAPIError(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		}

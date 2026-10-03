@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -41,7 +42,7 @@ func HandleAdminSettingsGeneralGet(
 		// Fetch settings from API
 		apiResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -103,7 +104,7 @@ func HandleAdminSettingsGeneralPost(
 		// Fetch current settings to compare issuer later
 		currentSettingsResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		originalIssuer := currentSettingsResp.Issuer
@@ -147,7 +148,7 @@ func HandleAdminSettingsGeneralPost(
 
 		updatedResp, err := apiClient.UpdateSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

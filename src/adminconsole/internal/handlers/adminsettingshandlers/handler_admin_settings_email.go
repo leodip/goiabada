@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -46,7 +47,7 @@ func HandleAdminSettingsEmailGet(
 		// Fetch settings via API
 		apiResp, err := apiClient.GetSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -158,7 +159,7 @@ func HandleAdminSettingsEmailPost(
 
 		_, err := apiClient.UpdateSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
@@ -214,7 +215,7 @@ func HandleAdminSettingsEmailSendTestGet(
 		// Fetch settings to know whether SMTP is enabled
 		apiResp, err := apiClient.GetSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -276,10 +277,10 @@ func HandleAdminSettingsEmailSendTestPost(
 				case "VALIDATION_ERROR", "SMTP_NOT_ENABLED", "SEND_FAILED":
 					renderError(apiErr.Message)
 				default:
-					handlers.HandleAPIError(httpHelper, w, r, err)
+					handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				}
 			} else {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			}
 			return
 		}

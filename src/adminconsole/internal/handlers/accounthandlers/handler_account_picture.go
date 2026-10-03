@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/errs"
@@ -38,7 +39,7 @@ func HandleAccountPictureGet(
 		// real failure and is answered as one rather than drawn as an empty picture (#425).
 		pictureInfo, err := apiClient.GetAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if pictureInfo != nil && pictureInfo.HasPicture {

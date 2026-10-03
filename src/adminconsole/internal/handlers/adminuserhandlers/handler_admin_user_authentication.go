@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -54,7 +55,7 @@ func HandleAdminUserAuthenticationGet(
 
 		user, err := apiClient.GetUserById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -123,7 +124,7 @@ func HandleAdminUserAuthenticationPost(
 
 		user, err := apiClient.GetUserById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -161,7 +162,7 @@ func HandleAdminUserAuthenticationPost(
 			}
 			_, updateUserPasswordErr := apiClient.UpdateUserPassword(r.Context(), accessToken, id, passwordReq)
 			if updateUserPasswordErr != nil {
-				handlers.HandleAPIErrorWithCallback(httpHelper, w, r, updateUserPasswordErr, renderError)
+				handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, updateUserPasswordErr, renderError)
 				return
 			}
 		}
@@ -175,7 +176,7 @@ func HandleAdminUserAuthenticationPost(
 				}
 				_, updateUserOTPErr := apiClient.UpdateUserOTP(r.Context(), accessToken, id, otpReq)
 				if updateUserOTPErr != nil {
-					handlers.HandleAPIError(httpHelper, w, r, updateUserOTPErr)
+					handlerhelpers.HandleAPIError(httpHelper, w, r, updateUserOTPErr)
 					return
 				}
 			}

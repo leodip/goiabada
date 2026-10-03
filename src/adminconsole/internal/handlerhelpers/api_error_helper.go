@@ -1,4 +1,4 @@
-package handlers
+package handlerhelpers
 
 import (
 	"errors"
@@ -18,6 +18,16 @@ const sessionEndedPath = "/auth/session-ended"
 // fetch sites in web/static/utils.js and web/static/image-upload.js key on this literal, not on the
 // 403 status, to navigate to sessionEndedPath; every other 403 keeps its modal and signs nobody out.
 const sessionEndedCode = "session_ended"
+
+// ErrorWriter is what the classifiers below answer through: the two pages and the JSON writer
+// HttpHelper provides. The classifiers came here from the handlers package with the name helpers,
+// so that a child handler package can take them, and embed this port in its own, without
+// importing its parent (#440).
+type ErrorWriter interface {
+	NotFound(w http.ResponseWriter, r *http.Request)
+	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
+	JsonError(w http.ResponseWriter, r *http.Request, err error)
+}
 
 // IsSessionEnded reports whether the admin API refused the console's access token.
 //
@@ -47,7 +57,7 @@ func IsSessionEnded(err error) bool {
 // log record and a request id saying so (#279).
 //
 // A 401 sends the browser to sessionEndedPath (see IsSessionEnded).
-func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
+func HandleAPIError(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error) {
 	if IsSessionEnded(err) {
 		http.Redirect(w, r, sessionEndedPath, http.StatusFound)
 		return
@@ -79,7 +89,7 @@ func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reques
 //
 // A 401 sends the browser to sessionEndedPath, as HandleAPIError does: no resubmission of the form
 // can succeed with a token the admin API has refused.
-func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
+func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
 	if IsSessionEnded(err) {
 		http.Redirect(w, r, sessionEndedPath, http.StatusFound)
 		return
@@ -131,7 +141,7 @@ func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r 
 // 15.5.2 says a 401 "MUST send a WWW-Authenticate header field", and the console signs in with a
 // cookie and has no challenge to send; with 403 the client "MAY repeat the request with new or
 // different credentials", section 15.5.4, which is what signing in again is (#427 decision 18).
-func HandleAPIErrorJson(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
+func HandleAPIErrorJson(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error) {
 	if IsSessionEnded(err) {
 		httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(sessionEndedCode,
 			i18n.T(r.Context(), "adminconsole.session_ended.message"), http.StatusForbidden))
@@ -152,7 +162,7 @@ func HandleAPIErrorJson(httpHelper HttpHelper, w http.ResponseWriter, r *http.Re
 	httpHelper.JsonError(w, r, err)
 }
 
-// JsonNotFound is the AJAX counterpart of HttpHelper.NotFound, and answers the same three
+// JsonNotFound is the AJAX counterpart of ErrorWriter.NotFound, and answers the same three
 // conditions with the same status and the same silence: a URL id the router never bound, one that
 // does not parse, and an id the API says names nothing.
 //
@@ -165,7 +175,7 @@ func HandleAPIErrorJson(httpHelper HttpHelper, w http.ResponseWriter, r *http.Re
 //
 // It is silent because JsonError does not log an *ErrorDetail, which is the property that makes it
 // the counterpart of NotFound rather than a differently spelled 500.
-func JsonNotFound(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) {
+func JsonNotFound(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
 	httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("not_found",
 		"Sorry, the item you are looking for could not be found. It may have been deleted, or the address may be incorrect.",
 		http.StatusNotFound))
@@ -181,7 +191,7 @@ func JsonNotFound(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request)
 // client went away mid-request, and a decoded map missing its id is a body the console's own
 // script should never have sent. None is a server fault, and answering 500 logged a stack for each
 // of them (#279 decision 12).
-func JsonBadRequestBody(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) {
+func JsonBadRequestBody(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
 	httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request_body",
 		"The request body is not valid JSON, or is missing information this endpoint requires.",
 		http.StatusBadRequest))

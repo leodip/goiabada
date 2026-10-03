@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/errs"
@@ -55,14 +56,14 @@ func HandleAccountProfilePicturePost(
 		// held in memory before the rest spills to temporary files.
 		//nolint:gosec // G120: bounded by uploadBodyLimit, as above; G120 flags every multipart parse
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Get file from form
 		file, header, err := r.FormFile("picture")
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 		defer func() { _ = file.Close() }()
@@ -77,7 +78,7 @@ func HandleAccountProfilePicturePost(
 		// Call API client to upload
 		response, err := apiClient.UploadAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, pictureData, header.Filename)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -105,7 +106,7 @@ func HandleAccountProfilePictureDelete(
 		// Call API client to delete
 		err := apiClient.DeleteAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

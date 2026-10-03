@@ -37,6 +37,9 @@ import (
 // checker here. A page writer reached through an alias or a variable would evade it, which is a
 // deliberate boundary and not an oversight: this catches the regression that actually happens,
 // which is a branch written from the page handler beside it.
+//
+// The markers match a call however it is qualified, which reads the classifiers where they live,
+// in handlerhelpers since #440, and are outside this walk: they are writers, not handlers.
 func TestHandlers_AjaxHandlersDoNotUsePageWriters(t *testing.T) {
 	// go test runs with the package directory as the working directory, so ".." is
 	// src/adminconsole/internal.
@@ -80,7 +83,8 @@ func TestHandlers_AjaxHandlersDoNotUsePageWriters(t *testing.T) {
 					continue
 				}
 				t.Errorf("%s: %s answers with JSON but reaches %s on one branch; "+
-					"use JsonNotFound, JsonError or HandleAPIErrorJson instead, so every branch "+
+					"use handlerhelpers.JsonNotFound, JsonError or handlerhelpers.HandleAPIErrorJson "+
+					"instead, so every branch "+
 					"of an AJAX handler answers JSON (#279)",
 					filepath.ToSlash(path), name, strings.TrimSuffix(hit, "("))
 			}

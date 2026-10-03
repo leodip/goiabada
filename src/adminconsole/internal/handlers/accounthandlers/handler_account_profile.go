@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -47,7 +48,7 @@ func HandleAccountProfileGet(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -102,7 +103,7 @@ func HandleAccountProfilePost(
 		// Load current profile (for successful render or error rebound)
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -139,7 +140,7 @@ func HandleAccountProfilePost(
 		updatedUser, err := apiClient.UpdateAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken, request)
 		if err != nil {
 			// Render validation error retaining input
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// reflect submitted values onto user for display
 				user.Username = request.Username
 				user.GivenName = request.GivenName

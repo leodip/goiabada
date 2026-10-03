@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -50,7 +51,7 @@ func HandleAdminGroupAttributesGet(
 		// Get group via API
 		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -61,7 +62,7 @@ func HandleAdminGroupAttributesGet(
 		// Get group attributes via API
 		attributes, err := apiClient.GetGroupAttributesByGroupId(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -89,13 +90,13 @@ func HandleAdminGroupAttributesRemovePost(
 
 		attributeIdStr := chi.URLParam(r, "attributeId")
 		if len(attributeIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -109,7 +110,7 @@ func HandleAdminGroupAttributesRemovePost(
 		// Delete group attribute via API (audit logging handled by AuthServer)
 		err = apiClient.DeleteGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

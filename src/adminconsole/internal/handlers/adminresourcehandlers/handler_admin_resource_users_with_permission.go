@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -55,7 +56,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -65,7 +66,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		selectedPermissionStr := r.URL.Query().Get("permission")
@@ -107,7 +108,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		if selectedPermission > 0 {
 			usersWithPermission, total, err = apiClient.GetUsersByPermission(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 
@@ -118,7 +119,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 				pageInt = clamped
 				usersWithPermission, total, err = apiClient.GetUsersByPermission(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 				if err != nil {
-					handlers.HandleAPIError(httpHelper, w, r, err)
+					handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 					return
 				}
 			}
@@ -179,12 +180,12 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -197,49 +198,49 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		found := false
@@ -275,7 +276,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 		}
 		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -309,7 +310,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -319,7 +320,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
@@ -384,12 +385,12 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -402,17 +403,17 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
@@ -425,7 +426,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		}
 		selectedPermission, err := strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		// check if permission belongs to resource
@@ -437,7 +438,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			}
 		}
 		if !found {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -449,7 +450,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		annotatedUsers, _, err := apiClient.SearchUsersWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, query, 1, 15)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		usersResult := make([]UserResult, 0, len(annotatedUsers))
@@ -477,12 +478,12 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -495,49 +496,49 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -567,7 +568,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		newIds = append(newIds, permissionId)
 		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

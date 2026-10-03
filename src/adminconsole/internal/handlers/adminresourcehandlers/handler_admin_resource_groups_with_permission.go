@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -56,7 +57,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -66,7 +67,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -115,7 +116,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			// No permissions in resource; paginate groups client-side and mark all as false
 			allGroups, getGroupsErr := apiClient.GetAllGroups(r.Context(), accessToken)
 			if getGroupsErr != nil {
-				handlers.HandleAPIError(httpHelper, w, r, getGroupsErr)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, getGroupsErr)
 				return
 			}
 			total = len(allGroups)
@@ -150,7 +151,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		} else {
 			annotatedGroups, total2, searchErr := apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 			if searchErr != nil {
-				handlers.HandleAPIError(httpHelper, w, r, searchErr)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, searchErr)
 				return
 			}
 			total = total2
@@ -162,7 +163,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 				pageInt = clamped
 				annotatedGroups, total2, searchErr = apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 				if searchErr != nil {
-					handlers.HandleAPIError(httpHelper, w, r, searchErr)
+					handlerhelpers.HandleAPIError(httpHelper, w, r, searchErr)
 					return
 				}
 				total = total2
@@ -226,13 +227,13 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -245,51 +246,51 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		groupId, err := strconv.ParseInt(groupIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		group, currentPerms, err := apiClient.GetGroupPermissions(r.Context(), accessToken, groupId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -327,7 +328,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.Id, req); err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -349,13 +350,13 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
@@ -368,51 +369,51 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 
 		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		groupId, err := strconv.ParseInt(groupIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		group, currentPerms, err := apiClient.GetGroupPermissions(r.Context(), accessToken, groupId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -450,7 +451,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.Id, req); err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

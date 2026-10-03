@@ -11,6 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/errs"
@@ -44,7 +45,7 @@ func HandleAdminUserProfilePicturePost(
 		userIdStr := chi.URLParam(r, "userId")
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -53,14 +54,14 @@ func HandleAdminUserProfilePicturePost(
 		// held in memory before the rest spills to temporary files.
 		//nolint:gosec // G120: bounded by uploadBodyLimit, as above; G120 flags every multipart parse
 		if parseFormErr := r.ParseMultipartForm(10 << 20); parseFormErr != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Get file from form
 		file, header, err := r.FormFile("picture")
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 		defer func() { _ = file.Close() }()
@@ -75,7 +76,7 @@ func HandleAdminUserProfilePicturePost(
 		// Call API client to upload
 		response, err := apiClient.UploadUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId, pictureData, header.Filename)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -104,14 +105,14 @@ func HandleAdminUserProfilePictureDelete(
 		userIdStr := chi.URLParam(r, "userId")
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Call API client to delete
 		err = apiClient.DeleteUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

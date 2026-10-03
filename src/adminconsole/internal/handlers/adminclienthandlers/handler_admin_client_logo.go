@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -61,7 +62,7 @@ func HandleAdminClientLogoGet(
 
 		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
@@ -74,8 +75,8 @@ func HandleAdminClientLogoGet(
 		if err != nil {
 			// The page renders without the logo, but not past a 401: the administrator's session
 			// has ended, and nothing on the page would work (#427 decision 17).
-			if handlers.IsSessionEnded(err) {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+			if handlerhelpers.IsSessionEnded(err) {
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 			slog.WarnContext(r.Context(), "unable to fetch the client logo info", "error", err, "client_id", id)
@@ -110,7 +111,7 @@ func HandleAdminClientLogoPost(
 		clientIdStr := chi.URLParam(r, "clientId")
 		clientId, err := strconv.ParseInt(clientIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -119,13 +120,13 @@ func HandleAdminClientLogoPost(
 		// held in memory before the rest spills to temporary files.
 		//nolint:gosec // G120: bounded by uploadBodyLimit, as above; G120 flags every multipart parse
 		if parseFormErr := r.ParseMultipartForm(10 << 20); parseFormErr != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		file, header, err := r.FormFile("picture")
 		if err != nil {
-			handlers.JsonBadRequestBody(httpHelper, w, r)
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 		defer func() { _ = file.Close() }()
@@ -138,7 +139,7 @@ func HandleAdminClientLogoPost(
 
 		response, err := apiClient.UploadClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientId, logoData, header.Filename)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 
@@ -164,13 +165,13 @@ func HandleAdminClientLogoDelete(
 		clientIdStr := chi.URLParam(r, "clientId")
 		clientId, err := strconv.ParseInt(clientIdStr, 10, 64)
 		if err != nil {
-			handlers.JsonNotFound(httpHelper, w, r)
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		err = apiClient.DeleteClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientId)
 		if err != nil {
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
 

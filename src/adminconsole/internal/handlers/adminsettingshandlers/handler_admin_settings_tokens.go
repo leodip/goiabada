@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
@@ -41,7 +42,7 @@ func HandleAdminSettingsTokensGet(
 		// Fetch settings from API
 		apiResp, err := apiClient.GetSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -146,7 +147,7 @@ func HandleAdminSettingsTokensPost(
 
 		_, err := apiClient.UpdateSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

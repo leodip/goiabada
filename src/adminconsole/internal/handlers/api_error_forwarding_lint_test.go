@@ -87,12 +87,12 @@ func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
 	sort.Strings(problems)
 	if len(problems) > 0 {
 		t.Errorf("%d problem(s) across %d apiClient error guard(s):\n\t%s\n\n"+
-			"Call handlers.HandleAPIError for a page, HandleAPIErrorWithCallback for a page with a "+
+			"Call handlerhelpers.HandleAPIError for a page, HandleAPIErrorWithCallback for a page with a "+
 			"form to redraw, or HandleAPIErrorJson for JSON. Each routes 401 to the session-ended "+
 			"route, 404 to the console's own not-found answer, 400 (and 409) to the caller, and "+
 			"everything else to the 500 writer, which is where the stack and the request id belong "+
 			"(#279, #427). A read the page can do without keeps its fallback for everything but "+
-			"handlers.IsSessionEnded.",
+			"handlerhelpers.IsSessionEnded.",
 			len(problems), guards, strings.Join(problems, "\n\t"))
 	}
 }
@@ -149,7 +149,7 @@ func apiClientGuardProblems(fset *token.FileSet, file *ast.File, rel string) ([]
 				continue
 			}
 			problems = append(problems, at(guard.stmt)+"the error from "+guard.method+
-				" is answered here without reaching HandleAPIError, "+
+				" is answered here without reaching handlerhelpers.HandleAPIError, "+
 				"HandleAPIErrorWithCallback or HandleAPIErrorJson")
 		}
 		return true
@@ -393,6 +393,10 @@ func guardReturnsTheError(body *ast.BlockStmt, errVar string) bool {
 // first; what the rule holds is that the fall-through is the classifier and not a writer chosen by
 // hand.
 //
+// The call has to name handlerhelpers, where the three have lived since #440 took them out of
+// this package so the children could stop importing it. A bare HandleAPIError in a handler file
+// is a function of that package spelled the same, which classifies nothing this rule has read.
+//
 // ceiling: "anywhere" is existence, not ownership. A classifier call on one branch satisfies this
 // for a sibling branch that answers the failure itself, and a classifier called for a different
 // error satisfies it for the guarded one, so a hand-picked writer can still coexist with a
@@ -409,14 +413,14 @@ func guardReachesClassifier(body *ast.BlockStmt) bool {
 		if !ok {
 			return true
 		}
-		name := ""
-		switch fun := call.Fun.(type) {
-		case *ast.Ident:
-			name = fun.Name
-		case *ast.SelectorExpr:
-			name = fun.Sel.Name
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
 		}
-		switch name {
+		if pkg, ok := sel.X.(*ast.Ident); !ok || pkg.Name != "handlerhelpers" {
+			return true
+		}
+		switch sel.Sel.Name {
 		case "HandleAPIError", "HandleAPIErrorWithCallback", "HandleAPIErrorJson":
 			found = true
 		}
@@ -525,8 +529,8 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 			name: "the optional read that answers a 401 and warns on the rest",
 			body: `logoInfo, err := apiClient.GetClientLogo(ctx, token, id)
 				if err != nil {
-					if handlers.IsSessionEnded(err) {
-						handlers.HandleAPIError(httpHelper, w, r, err)
+					if handlerhelpers.IsSessionEnded(err) {
+						handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 						return
 					}
 					slog.WarnContext(ctx, "unable to fetch the client logo info", "error", err)
@@ -537,8 +541,8 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 			name: "the redraw that answers a 401 and carries on without the list otherwise",
 			body: `apiResp, err := apiClient.GetSettingsUITheme(ctx, token)
 				if err != nil {
-					if handlers.IsSessionEnded(err) {
-						handlers.HandleAPIError(httpHelper, w, r, err)
+					if handlerhelpers.IsSessionEnded(err) {
+						handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 						return
 					}
 				} else {
@@ -623,6 +627,35 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 			problems: []string{"GetClientById is answered here without reaching"},
 		},
 		{
+			name: "a classifier named without its package is a local copy, not the classifier",
+			body: `client, err := apiClient.GetClientById(ctx, token, id)
+				if err != nil {
+					HandleAPIError(httpHelper, w, r, err)
+					return
+				}`,
+			guards:   1,
+			problems: []string{"GetClientById is answered here without reaching"},
+		},
+		{
+			name: "nor is one named on another package",
+			body: `client, err := apiClient.GetClientById(ctx, token, id)
+				if err != nil {
+					handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+					return
+				}`,
+			guards:   1,
+			problems: []string{"GetClientById is answered here without reaching"},
+		},
+		{
+			name: "the classifier where it lives",
+			body: `client, err := apiClient.GetClientById(ctx, token, id)
+				if err != nil {
+					handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+					return
+				}`,
+			guards: 1,
+		},
+		{
 			name: "a blind catch in front of the classifier is still refused",
 			body: `client, err := apiClient.GetClientById(ctx, token, id)
 				if err != nil {
@@ -630,7 +663,7 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 						renderError(apiErr.Message)
 						return
 					}
-					handlers.HandleAPIError(httpHelper, w, r, err)
+					handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 					return
 				}`,
 			guards:   1,

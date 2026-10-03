@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -40,7 +41,7 @@ func HandleAdminUsersGet(
 
 		users, total, err := apiClient.SearchUsersPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
 		if err != nil {
-			handlers.HandleAPIError(httpHelper, w, r, err)
+			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -54,7 +55,7 @@ func HandleAdminUsersGet(
 			pageInt = clamped
 			users, total, err = apiClient.SearchUsersPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
 			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		}

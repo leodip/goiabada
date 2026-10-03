@@ -21,10 +21,6 @@ type AuthHelper interface {
 	IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool
 }
 
-type IdentifierValidator interface {
-	ValidateIdentifier(identifier string, enforceMinLength bool) error
-}
-
 // TokenParser is the sign-in's one question to the parser: is this token response, answering a
 // sign-in that sent this nonce, one the console may accept.
 type TokenParser interface {
