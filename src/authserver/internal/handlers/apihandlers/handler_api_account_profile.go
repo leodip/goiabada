@@ -125,7 +125,7 @@ func HandleAPIAccountProfilePut(
 		user.Website = input.Website
 
 		if len(input.Gender) > 0 {
-			if i, err := strconv.Atoi(input.Gender); err == nil && gender.IsGenderValid(i) {
+			if i, err := strconv.Atoi(input.Gender); err == nil && gender.IsValid(i) {
 				user.Gender = gender.Gender(i).String()
 			}
 		} else {

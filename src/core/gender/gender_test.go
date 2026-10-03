@@ -17,9 +17,9 @@ func TestGender_String(t *testing.T) {
 		gender Gender
 		want   string
 	}{
-		{"female is the zero value", GenderFemale, "female"},
-		{"male", GenderMale, "male"},
-		{"other, the top of the range", GenderOther, "other"},
+		{"female is the zero value", Female, "female"},
+		{"male", Male, "male"},
+		{"other, the top of the range", Other, "other"},
 		{"one past the range, which is what a profile form submitting gender=3 produces", Gender(3), ""},
 		{"far past the range", Gender(99), ""},
 		{"negative, which strconv.Atoi will happily produce from \"-1\"", Gender(-1), ""},
@@ -35,23 +35,23 @@ func TestGender_String(t *testing.T) {
 	}
 }
 
-// TestGender_StringAgreesWithIsGenderValid pins the two halves to each other. The empty string is
+// TestGender_StringAgreesWithIsValid pins the two halves to each other. The empty string is
 // what every production site writes for "no gender", so String answering it for exactly the
-// integers IsGenderValid refuses is what lets a caller skip the guard without changing the outcome.
-func TestGender_StringAgreesWithIsGenderValid(t *testing.T) {
+// integers IsValid refuses is what lets a caller skip the guard without changing the outcome.
+func TestGender_StringAgreesWithIsValid(t *testing.T) {
 	for i := -5; i <= 5; i++ {
-		valid := IsGenderValid(i)
+		valid := IsValid(i)
 		rendered := Gender(i).String()
 		if valid {
-			assert.NotEmpty(t, rendered, "IsGenderValid(%d) is true, so String must name a gender", i)
+			assert.NotEmpty(t, rendered, "IsValid(%d) is true, so String must name a gender", i)
 		} else {
-			assert.Empty(t, rendered, "IsGenderValid(%d) is false, so String must return the empty string", i)
+			assert.Empty(t, rendered, "IsValid(%d) is false, so String must return the empty string", i)
 		}
 	}
 }
 
-// TestIsGenderValid covers the bound on its own, including the two edges the type's range has.
-func TestIsGenderValid(t *testing.T) {
+// TestIsValid covers the bound on its own, including the two edges the type's range has.
+func TestIsValid(t *testing.T) {
 	testCases := []struct {
 		name string
 		in   int
@@ -67,7 +67,16 @@ func TestIsGenderValid(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, IsGenderValid(tc.in))
+			assert.Equal(t, tc.want, IsValid(tc.in))
 		})
 	}
+}
+
+// TestGender_TheIntegersAreTheStoredOnes pins each value to the integer a profile form submits for
+// it. Those integers are on the wire between the admin console and the auth server, so renaming the
+// constants (#442) must leave Female at 0, Male at 1 and Other at 2.
+func TestGender_TheIntegersAreTheStoredOnes(t *testing.T) {
+	assert.Equal(t, 0, int(Female))
+	assert.Equal(t, 1, int(Male))
+	assert.Equal(t, 2, int(Other))
 }
