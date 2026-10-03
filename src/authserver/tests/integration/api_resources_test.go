@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -218,7 +218,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 // ends, because later tests read, count and save the authserver resource's permission list (#449).
 func createClientCredentialsTokenWithoutRouteScope(t *testing.T) string {
 	t.Helper()
-	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 
@@ -228,7 +228,7 @@ func createClientCredentialsTokenWithoutRouteScope(t *testing.T) string {
 		assert.NoError(t, database.DeletePermission(context.Background(), nil, permission.Id))
 	})
 
-	return createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, permission.PermissionIdentifier)
+	return createClientCredentialsTokenWithScope(t, builtin.AuthServerResourceIdentifier, permission.PermissionIdentifier)
 }
 
 // Helper function to create multiple test resources for more comprehensive testing

@@ -53,7 +53,7 @@ echo "Current directory: $(pwd)"
 # standard-library frame carries it. A container can reproduce all three. The
 # same commit, toolchain and paths give byte-identical code at identical
 # addresses, so the rebuild's DWARF describes the shipped binary.
-LDFLAGS='-w -X "github.com/leodip/goiabada/core/constants.Version='${VERSION}'" -X "github.com/leodip/goiabada/core/constants.BuildDate='${BUILD_DATE}'" -X "github.com/leodip/goiabada/core/constants.GitCommit='${GIT_COMMIT}'"'
+LDFLAGS='-w -X "github.com/leodip/goiabada/core/buildinfo.Version='${VERSION}'" -X "github.com/leodip/goiabada/core/buildinfo.BuildDate='${BUILD_DATE}'" -X "github.com/leodip/goiabada/core/buildinfo.GitCommit='${GIT_COMMIT}'"'
 
 # Function to build both applications for a specific platform
 build_platform() {

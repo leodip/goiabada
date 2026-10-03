@@ -9,7 +9,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -37,15 +37,15 @@ const accountPermissionId = int64(31)
 // expectAccountPermissionLookup registers the two reads that precede the transaction: the
 // authserver resource and its permissions.
 func expectAccountPermissionLookup(db *mocks_data.Database, permissions []models.Permission) {
-	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, constants.AuthServerResourceIdentifier).
+	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
 		Return(&models.Resource{Id: 3}, nil).Once()
 	db.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return(permissions, nil).Once()
 }
 
 func accountPermissions() []models.Permission {
 	return []models.Permission{
-		{Id: 30, PermissionIdentifier: constants.ManageAccountPermissionIdentifier + "-lookalike"},
-		{Id: accountPermissionId, PermissionIdentifier: constants.ManageAccountPermissionIdentifier},
+		{Id: 30, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier + "-lookalike"},
+		{Id: accountPermissionId, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier},
 	}
 }
 
@@ -138,13 +138,13 @@ func TestUserCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTrans
 // any transaction opens (#425).
 func TestUserCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, constants.AuthServerResourceIdentifier).
+	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
 		Return(nil, nil).Once()
 
 	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to find the "+constants.AuthServerResourceIdentifier+" resource")
+	assert.Contains(t, err.Error(), "unable to find the "+builtin.AuthServerResourceIdentifier+" resource")
 	assert.Nil(t, user)
 	db.AssertNotCalled(t, "GetPermissionsByResourceId", mock.Anything, mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)

@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -133,14 +133,14 @@ func TestAPIUsersSearch_AnnotatePermission_ConflictWithGroupAnnotation(t *testin
 func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, authRes, "the seed creates the authserver resource")
 	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	require.NoError(t, err)
 	var manageAccount *models.Permission
 	for i := range perms {
-		if perms[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+		if perms[i].PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
 			manageAccount = &perms[i]
 		}
 	}

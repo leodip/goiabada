@@ -160,7 +160,7 @@ func (e DirtyError) Error() string {
 // to one.
 //
 // The type carries the facts and no wording. The "a newer release migrated this database"
-// sentence also needs the Goiabada version, which lives in core/constants, and is composed by the
+// sentence also needs the Goiabada version, which lives in core/buildinfo, and is composed by the
 // caller that has it (decision 7).
 type UnknownVersionError struct {
 	// Version is the version that is not in the source.

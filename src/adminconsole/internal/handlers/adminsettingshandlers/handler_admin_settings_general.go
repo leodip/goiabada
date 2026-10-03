@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -54,7 +54,7 @@ func HandleAdminSettingsGeneralGet(
 			ResourceOwnerPasswordCredentialsEnabled:   apiResp.ResourceOwnerPasswordCredentialsEnabled,
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -155,7 +155,7 @@ func HandleAdminSettingsGeneralPost(
 		// Check if issuer was changed
 		if originalIssuer != updatedResp.Issuer {
 			// Clear the session
-			sess, sessionErr := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+			sess, sessionErr := httpSession.Get(r, builtin.AdminConsoleSessionName)
 			if sessionErr != nil {
 				httpHelper.InternalServerError(w, r, sessionErr)
 				return
@@ -177,7 +177,7 @@ func HandleAdminSettingsGeneralPost(
 		}
 
 		// Normal flow - set success message and redirect back to settings
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

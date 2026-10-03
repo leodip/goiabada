@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -54,7 +54,7 @@ func newMemoryStore(t *testing.T) *sessionstore.ServerSideStore {
 func seedSession(t *testing.T, store sessionstore.Store, values map[string]any) []*http.Cookie {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	sess, err := store.Get(req, coreconstants.AdminConsoleSessionName)
+	sess, err := store.Get(req, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	for k, v := range values {
 		sess.Values[k] = v
@@ -73,7 +73,7 @@ func readSession(t *testing.T, store sessionstore.Store, cookies []*http.Cookie)
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
-	sess, err := store.Get(req, coreconstants.AdminConsoleSessionName)
+	sess, err := store.Get(req, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	return sess
 }
@@ -138,7 +138,7 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			store := mocks_sessionstore.NewStore(t)
-			store.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).
+			store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 				Return(&sessionstore.Session{Values: signedInValues()}, testCase.getErr)
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
@@ -172,9 +172,9 @@ func serveIndex(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) 
 // token set the reader lost on the way would read as anonymous here.
 func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.T) {
 	store := mocks_sessionstore.NewStore(t)
-	store.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).
+	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
-	authHelper := oauthclient.NewAuthHelper(store, coreconstants.AdminConsoleSessionName, "", "")
+	authHelper := oauthclient.NewAuthHelper(store, builtin.AdminConsoleSessionName, "", "")
 
 	serve := func(opts ...handlertest.Option) map[string]interface{} {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -225,7 +225,7 @@ func TestHandleIndexGet_NoNoticeWithoutTheFlash(t *testing.T) {
 // store proves by failing on a Save nobody expected.
 func TestHandleIndexGet_SavesOnlyWhenItTookTheNotice(t *testing.T) {
 	store := mocks_sessionstore.NewStore(t)
-	store.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).
+	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
 
 	assert.Equal(t, false, serveIndex(t, store, nil)["SessionEnded"])
@@ -244,7 +244,7 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			store := mocks_sessionstore.NewStore(t)
-			store.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).
+			store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 				Return(&sessionstore.Session{Values: map[string]any{flashSessionEnded: "true"}}, testCase.getErr)
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)

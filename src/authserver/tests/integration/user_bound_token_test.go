@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,7 +95,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, authserverResource)
 
@@ -117,7 +117,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	})
 	require.NoError(t, err)
 
-	requestedScope := constants.AuthServerResourceIdentifier + ":" + permissionIdentifier
+	requestedScope := builtin.AuthServerResourceIdentifier + ":" + permissionIdentifier
 	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
@@ -160,11 +160,11 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 	userinfoSubject := newUserSubjectValidAsClientIdentifier(t)
 	_, _ = createUserWithSubject(t, userinfoSubject)
 	userinfoToken := createImpersonatingClientCredentialsToken(t, userinfoSubject,
-		constants.ManageAccountPermissionIdentifier)
+		builtin.ManageAccountPermissionIdentifier)
 
 	t.Run("PUT account email is refused and the email is unchanged", func(t *testing.T) {
 		accessToken := createImpersonatingClientCredentialsToken(t, accountSubject,
-			constants.ManageAccountPermissionIdentifier)
+			builtin.ManageAccountPermissionIdentifier)
 
 		attemptedEmail := strings.ToLower(fake.LetterN(9)) + "@attacker.example.com"
 		resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/email",
@@ -262,7 +262,7 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 
 	t.Run("authorization code token", func(t *testing.T) {
 		accessToken, user := createUserAccessTokenWithScope(t,
-			"openid profile email "+constants.AuthServerResourceIdentifier+":"+constants.ManageAccountPermissionIdentifier)
+			"openid profile email "+builtin.AuthServerResourceIdentifier+":"+builtin.ManageAccountPermissionIdentifier)
 		assertEmailChangeSucceeds(t, accessToken, user)
 	})
 
@@ -309,7 +309,7 @@ func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
 	// token_amr_test.go:TestToken_Refresh_AMR_IsArray.
 	clientSecret := fake.LetterN(32)
 	scope := "openid profile email " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token/"
@@ -347,12 +347,12 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	// granted, and nothing else is needed: the token reaches /userinfo because its scope carries
 	// openid, which is not a permission (#449).
 	grantManageAccount := func(user *models.User) {
-		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 		require.NoError(t, err)
 		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 		require.NoError(t, err)
 		for i := range permissions {
-			if permissions[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+			if permissions[i].PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
 				assignPermissionToUser(t, user.Id, permissions[i].Id)
 				break
 			}
@@ -362,7 +362,7 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	// ROPC bypasses consent entirely, but offline_access is still unnecessary: the grant
 	// returns a refresh token with plain openid (see TestROPC_Success).
 	scope := "openid " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	data, user := ropcTokenResponse(t, scope, grantManageAccount)
 
 	accessToken, ok := data["access_token"].(string)

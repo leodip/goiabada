@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -129,7 +129,7 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	assert.ElementsMatch(t, []string{models.KeyStateCurrent.String(), models.KeyStateNext.String()}, states,
 		"one current key and one next key")
 
-	client, err := db.GetClientByClientIdentifier(ctx, nil, constants.AdminConsoleClientIdentifier)
+	client, err := db.GetClientByClientIdentifier(ctx, nil, builtin.AdminConsoleClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	secret, err := testDataCipher.Decrypt(client.ClientSecretEncrypted)
@@ -517,7 +517,7 @@ func TestRun_WritesOneSeededRecord(t *testing.T) {
 	for _, key := range keys {
 		byState[key.State] = key.KeyIdentifier
 	}
-	assert.Equal(t, constants.AdminConsoleClientIdentifier, seeded[0].Attrs["client_identifier"])
+	assert.Equal(t, builtin.AdminConsoleClientIdentifier, seeded[0].Attrs["client_identifier"])
 	assert.Equal(t, "admin@example.com", seeded[0].Attrs["email"])
 	assert.Equal(t, byState[models.KeyStateCurrent.String()], seeded[0].Attrs["current_key_identifier"])
 	assert.Equal(t, byState[models.KeyStateNext.String()], seeded[0].Attrs["next_key_identifier"])

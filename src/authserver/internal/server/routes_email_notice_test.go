@@ -22,7 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -102,7 +102,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		// and no current password in the body, which an administrator's change does not take.
 		adminClaims := jwt.MapClaims{
 			"sub":   "admin-console-client",
-			"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier,
+			"scope": builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier,
 		}
 		body := `{"email":"` + newEmail + `","emailVerified":true}`
 		recorder := serve(s, request(capture, "/api/v1/admin/users/1/email", body, adminClaims))

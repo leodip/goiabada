@@ -40,7 +40,7 @@ func (m *Migrator) UpToHead(ctx context.Context, goiabadaVersion string) (migrat
 // chain from a version it does not recognise would re-apply migrations that have already been
 // applied, so it refuses instead, exactly as golang-migrate's versionExists check did (#268).
 //
-// The Goiabada version is a parameter rather than read here. constants.Version is injected at
+// The Goiabada version is a parameter rather than read here. buildinfo.Version is injected at
 // build time and the runner is a library that has to work under a test binary and a generator
 // command too, neither of which is a release; the caller that knows which release it is passes
 // it in.

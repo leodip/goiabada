@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -20,7 +20,7 @@ func HandleIndexGet(
 		// The notice HandleSessionEndedGet left. TakeFlash edits only the session in memory, and
 		// the store reads the saved record again on the next request, so the session is saved
 		// here or the notice would show on every visit.
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

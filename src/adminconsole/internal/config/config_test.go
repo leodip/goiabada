@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 func TestSplitCSV(t *testing.T) {
@@ -490,7 +490,7 @@ func TestValidateRemovedAdminConsoleVars_MessageCarriesTheRemedy(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected a refusal, got nil")
 	}
-	if !strings.Contains(err.Error(), constants.AdminConsoleClientIdentifier) {
+	if !strings.Contains(err.Error(), builtin.AdminConsoleClientIdentifier) {
 		t.Errorf("the refusal %q does not name the client the admin console authenticates as", err.Error())
 	}
 	if !strings.Contains(err.Error(), "Remove") {

@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -400,7 +400,7 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	// The same browser signs in again under max_age=3600. The session its cookie names was
 	// authenticated two hours ago, so the request goes to the password page rather than reusing it.
 	const codeVerifier = testCodeVerifier + "-re-login"
-	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	scope := "openid " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(grant.redirectURI) +
 		"&response_type=code&code_challenge_method=S256" +

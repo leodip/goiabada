@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -58,7 +58,7 @@ func NewAuthServerBackend(database BrowserSessionDatabase) sessionstore.Backend 
 // apart. Fixing it in these constructors rather than accepting it from a caller makes
 // it impossible for the session endpoint to select the auth server's rows (#334).
 func NewAdminConsoleBackend(database BrowserSessionDatabase) sessionstore.Backend {
-	return newBackend(database, coreconstants.AdminConsoleSessionName)
+	return newBackend(database, builtin.AdminConsoleSessionName)
 }
 
 func newBackend(database BrowserSessionDatabase, owner string) *dbBackend {

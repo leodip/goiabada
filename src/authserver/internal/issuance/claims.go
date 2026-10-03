@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -159,8 +159,8 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 			// A claim scope is answered at /userinfo, which the authserver resource serves, so it
 			// names authserver as an audience. A groups-only grant, which carries no openid and
 			// may carry no resource scope, would otherwise have no audience at all.
-			if !slices.Contains(audCollection, coreconstants.AuthServerResourceIdentifier) {
-				audCollection = append(audCollection, coreconstants.AuthServerResourceIdentifier)
+			if !slices.Contains(audCollection, builtin.AuthServerResourceIdentifier) {
+				audCollection = append(audCollection, builtin.AuthServerResourceIdentifier)
 			}
 			continue
 		}

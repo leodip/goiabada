@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -159,7 +159,7 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
@@ -207,7 +207,7 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
@@ -220,7 +220,7 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 	// Find the "manage" built-in permission
 	var managePermId int64
 	for _, p := range existingPerms {
-		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			managePermId = p.Id
 			break
 		}
@@ -260,7 +260,7 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
@@ -273,7 +273,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 	// Build request that omits the "manage-account" built-in permission (attempt to delete)
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
-		if p.PermissionIdentifier != constants.ManageAccountPermissionIdentifier {
+		if p.PermissionIdentifier != builtin.ManageAccountPermissionIdentifier {
 			permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
 				Id:                   p.Id,
 				PermissionIdentifier: p.PermissionIdentifier,
@@ -300,7 +300,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
@@ -312,7 +312,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 	// Find the "manage" built-in permission
 	var managePermId int64
 	for _, p := range existingPerms {
-		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			managePermId = p.Id
 			break
 		}
@@ -337,7 +337,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 	// Add new row with same identifier but Id=0 (new)
 	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
 		Id:                   0,
-		PermissionIdentifier: constants.ManagePermissionIdentifier,
+		PermissionIdentifier: builtin.ManagePermissionIdentifier,
 		Description:          "Recreated manage",
 	})
 
@@ -358,7 +358,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
@@ -372,7 +372,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	var managePermId int64
 	var origDescription string
 	for _, p := range existingPerms {
-		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			managePermId = p.Id
 			origDescription = p.Description
 			break
@@ -427,7 +427,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
@@ -439,7 +439,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	// Find the "manage" built-in permission
 	var managePermId int64
 	for _, p := range existingPerms {
-		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			managePermId = p.Id
 			break
 		}
@@ -676,14 +676,14 @@ func TestAPIResourcePermissionsPut_SavedWithTheListTheAPIRead(t *testing.T) {
 func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, sysRes, "the seed creates the authserver resource")
 
 	var manageId int64
 	var manageDescription string
 	for _, p := range storedPermissionEntries(t, sysRes.Id) {
-		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			manageId, manageDescription = p.Id, p.Description
 		}
 	}
@@ -736,13 +736,13 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, sysRes, "the seed creates the authserver resource")
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	require.Len(t, constants.BuiltInAuthServerPermissionIdentifiers, 7)
+	require.Len(t, builtin.AuthServerPermissionIdentifiers(), 7)
 
-	for _, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+	for _, identifier := range builtin.AuthServerPermissionIdentifiers() {
 		for _, change := range []struct {
 			name    string
 			apply   func([]api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert

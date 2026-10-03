@@ -22,7 +22,7 @@ import (
 // describe. The rules themselves are not written here: they are the five tables in
 // ARCHITECTURE.md at the repository root, which this function parses and then checks against the
 // real tree — four against the import graph, and the fifth against the production references to
-// core/constants. That file names each rule and carries the reasoning; this one decides.
+// core/builtin. That file names each rule and carries the reasoning; this one decides.
 //
 // Putting the data in the document rather than in Go is the same choice AssertAgentDocs made for
 // the ceremony's state roster (#252). A dependency rule is prose about code, and prose about code
@@ -70,18 +70,18 @@ func assertArchitecture(r Reporter, root string) {
 		r.Fatalf("found no production Go packages under %s", root)
 	}
 
-	census, err := buildConstantsCensus(root, graph)
+	census, err := buildBuiltinCensus(root, graph)
 	if err != nil {
-		r.Fatalf("reading the %s census under %s: %v", coreConstantsPkg, root, err)
+		r.Fatalf("reading the %s census under %s: %v", builtinPkgDir, root, err)
 	}
 	// The same silent failure as the empty graph, one table down. A census that read no
 	// declaration satisfies "every symbol has a row" for nothing at all, and a census that found no
 	// reference would rest every justification on an empty set.
 	if len(census.declared) == 0 {
-		r.Fatalf("found no exported declarations in %s under %s", coreConstantsPkg, root)
+		r.Fatalf("found no exported declarations in %s under %s", builtinPkgDir, root)
 	}
 	if len(census.refs) == 0 {
-		r.Fatalf("found no production reference to any %s symbol under %s", coreConstantsPkg, root)
+		r.Fatalf("found no production reference to any %s symbol under %s", builtinPkgDir, root)
 	}
 
 	// Rule 9's walk that reached nothing. A tree in which no shipped main is found links no test
@@ -110,7 +110,7 @@ func assertArchitecture(r Reporter, root string) {
 	findings = append(findings, loadFindings...)
 
 	findings = append(findings, checkArchitecture(tables, graph, external)...)
-	findings = append(findings, checkConstantsOwnership(tables, graph, census)...)
+	findings = append(findings, checkBuiltinOwnership(tables, graph, census)...)
 
 	sort.Strings(findings)
 	for _, f := range findings {
@@ -122,8 +122,8 @@ func assertArchitecture(r Reporter, root string) {
 const architectureDoc = "ARCHITECTURE.md"
 
 // The headings whose tables are data. Each is the deepest heading of its section, so the
-// prose above it is free to change without touching the parser. The fifth, constantsHeading,
-// is declared beside the checks that read it in constants_ownership.go.
+// prose above it is free to change without touching the parser. The fifth, builtinHeading,
+// is declared beside the checks that read it in builtin_ownership.go.
 const (
 	ownershipHeading     = "### Package ownership"
 	exceptionHeading     = "### Temporary exceptions"
@@ -203,7 +203,7 @@ type architectureTables struct {
 	exceptions     []exceptionRow
 	foreign        []foreignRow
 	testFrameworks []testFrameworkRow
-	constants      []constantsRow
+	builtin        []builtinRow
 }
 
 // parseArchitectureDoc reads the five data tables. A malformed row is a finding rather than a
@@ -273,16 +273,16 @@ func parseArchitectureDoc(doc string) (architectureTables, []string) {
 		tables.testFrameworks = append(tables.testFrameworks, testFrameworkRow{pkg: row.Cells[0], line: row.Line})
 	}
 
-	constants, ok := refgraph.TableUnder(lines, constantsHeading)
+	builtinRows, ok := refgraph.TableUnder(lines, builtinHeading)
 	if !ok {
-		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, constantsHeading))
+		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, builtinHeading))
 	}
-	for _, row := range constants {
+	for _, row := range builtinRows {
 		if len(row.Cells) != 3 {
-			findings = append(findings, fmt.Sprintf("%s:%d: a core constants row needs 3 cells, found %d", architectureDoc, row.Line, len(row.Cells)))
+			findings = append(findings, fmt.Sprintf("%s:%d: a built-in identifiers row needs 3 cells, found %d", architectureDoc, row.Line, len(row.Cells)))
 			continue
 		}
-		tables.constants = append(tables.constants, constantsRow{symbol: row.Cells[0], justification: row.Cells[1], issue: row.Cells[2], line: row.Line})
+		tables.builtin = append(tables.builtin, builtinRow{symbol: row.Cells[0], justification: row.Cells[1], issue: row.Cells[2], line: row.Line})
 	}
 
 	return tables, findings

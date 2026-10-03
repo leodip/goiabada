@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
@@ -79,7 +79,7 @@ func flashInSession(t *testing.T, store *sessionstore.ServerSideStore, keys ...s
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
 	rec := httptest.NewRecorder()
 
-	sess, err := store.Get(req, coreconstants.AdminConsoleSessionName)
+	sess, err := store.Get(req, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	for _, key := range keys {
 		sess.SetFlash(key, "true")

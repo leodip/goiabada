@@ -13,7 +13,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
@@ -136,7 +136,7 @@ func TestHandleAdminGroupSettingsGet_BindsBothTokenFlags(t *testing.T) {
 	}
 
 	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, constants.AdminConsoleSessionName).
+	httpSession.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/settings", "/admin_groups_settings.html",

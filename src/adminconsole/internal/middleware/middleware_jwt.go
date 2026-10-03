@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -361,8 +361,8 @@ func (m *MiddlewareJwt) buildScopeString(customScopes []string) string {
 		"openid",
 		"email",
 		"profile",
-		coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier,
-		coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier,
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier,
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier,
 	}
 
 	scopeMap := make(map[string]bool)

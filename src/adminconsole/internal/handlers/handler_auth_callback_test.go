@@ -24,7 +24,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -147,7 +147,7 @@ func handshake() map[string]any {
 func (h *callbackHarness) seed(values map[string]any) []*http.Cookie {
 	h.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	sess, err := h.store.Get(req, coreconstants.AdminConsoleSessionName)
+	sess, err := h.store.Get(req, builtin.AdminConsoleSessionName)
 	require.NoError(h.t, err)
 	for k, v := range values {
 		sess.Values[k] = v
@@ -167,7 +167,7 @@ func (h *callbackHarness) readBack(cookies []*http.Cookie) *sessionstore.Session
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
-	sess, err := h.store.Get(req, coreconstants.AdminConsoleSessionName)
+	sess, err := h.store.Get(req, builtin.AdminConsoleSessionName)
 	require.NoError(h.t, err)
 	return sess
 }
@@ -310,7 +310,7 @@ func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testin
 		{
 			name: "a session cookie that does not decode",
 			cookies: func(h *callbackHarness) []*http.Cookie {
-				return []*http.Cookie{{Name: h.store.CookieName(coreconstants.AdminConsoleSessionName), Value: "garbage"}}
+				return []*http.Cookie{{Name: h.store.CookieName(builtin.AdminConsoleSessionName), Value: "garbage"}}
 			},
 			form: callbackForm(),
 			want: refusalNoSession,

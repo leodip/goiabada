@@ -14,7 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/buildinfo"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -167,7 +168,7 @@ func (h *HttpHelper) renderToBuffer(r *http.Request, layoutName string, template
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
-	data["goiabadaVersion"] = coreconstants.Version + " (" + coreconstants.BuildDate + ")"
+	data["goiabadaVersion"] = buildinfo.Version + " (" + buildinfo.BuildDate + ")"
 	// Inject the request context so templates can call {{ T $.ctx "..." }}
 	// and every other locale-reading template function. This is this
 	// application's one injection point; the auth server's renderer has its
@@ -216,7 +217,7 @@ func (h *HttpHelper) renderToBuffer(r *http.Request, layoutName string, template
 		}
 		// The grant the token response records, not the access token, which the console carries
 		// without decoding (#427).
-		if jwtInfo.HasScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier) {
+		if jwtInfo.HasScope(builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier) {
 			data["isAdmin"] = true
 		}
 	}

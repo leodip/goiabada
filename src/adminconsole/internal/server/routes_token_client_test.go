@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
@@ -77,7 +77,7 @@ func TestInitRoutes_TheSignInUsesTheTokenClientTheServerWasHanded(t *testing.T) 
 	transport := &recordingTransport{}
 	httpClient := &http.Client{Transport: transport, Timeout: oauthclient.TokenExchangeTimeout}
 	tokenClient := oauthclient.NewTokenClient(oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()),
-		constants.AdminConsoleClientIdentifier, cfg.AdminConsole.OAuthClientSecret, httpClient)
+		builtin.AdminConsoleClientIdentifier, cfg.AdminConsole.OAuthClientSecret, httpClient)
 
 	s := NewServer(chi.NewRouter(), newTestSessionStore(), nil, nil, cfg, httpClient, tokenClient)
 	s.initRoutes(s.router)

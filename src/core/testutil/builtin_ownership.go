@@ -16,44 +16,46 @@ import (
 	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
-// The fourth ARCHITECTURE.md table: one row per symbol surviving in core/constants, naming why it
-// is there. It is checked here, beside the three import tables, because it answers the same
+// The fourth ARCHITECTURE.md table: one row per symbol core/builtin declares, naming why it is
+// there. It is checked here, beside the three import tables, because it answers the same
 // question at a finer grain — the package ownership table can only say "split", and the line a
 // split runs along is drawn per symbol.
 //
 // The three import rules cannot see this at all. A constant is a string, so an auth-server-only
-// name sitting in core costs nothing at compile time and breaks no rule: core/constants reached
-// 139 symbols exactly that way, one reasonable-looking declaration at a time, until 108 of them
-// were named by a single process. Nothing would have gone red at any point (#351).
+// name sitting in core costs nothing at compile time and breaks no rule: core/constants, which
+// core/builtin is what remains of, reached 139 symbols exactly that way, one reasonable-looking
+// declaration at a time, until 108 of them were named by a single process. Nothing would have gone
+// red at any point (#351, #442).
 //
 // The check runs in both directions, like the others. A symbol with no row fails, so adding one to
 // core is a decision rather than a default; a row for a symbol that has moved fails, so the table
 // cannot outlive what it describes; and a row claiming less than the tree supports fails, so the
 // escape hatch stays the last resort rather than the easy answer.
-const constantsHeading = "### Core constants ownership"
+const builtinHeading = "### Built-in identifiers ownership"
 
-// coreConstantsPkg is the package the table governs, as a directory relative to the source root.
-const coreConstantsPkg = "core/constants"
+// builtinPkgDir is the package the table governs, as a directory relative to the source root.
+const builtinPkgDir = "core/builtin"
 
-type constantsRow struct {
+type builtinRow struct {
 	symbol        string
 	justification string
 	issue         string
 	line          int
 }
 
-// constantsCensus is what the tree says, against which the table is checked: every exported symbol
-// core/constants declares, and for each, the packages naming it in production.
-type constantsCensus struct {
+// builtinCensus is what the tree says, against which the table is checked: every exported symbol
+// core/builtin declares, and for each, the packages naming it in production.
+type builtinCensus struct {
 	declared []string
 	refs     map[string][]string // symbol -> import paths of the packages referencing it
 }
 
-// buildConstantsCensus reads the declarations, then the references to them.
+// buildBuiltinCensus reads the declarations, then the references to them.
 //
 // References are read from the AST, so a symbol named in a comment or a string literal is not a
-// reference and an aliased import still is one — which this change made load-bearing, since the
-// files naming both packages import core's as coreconstants. Only files whose text carries the
+// reference and an aliased import still is one — which #351 made load-bearing, when 64 files
+// imported core/constants as coreconstants, and which still holds for the next file that aliases
+// core/builtin. Only files whose text carries the
 // import path are parsed, which keeps a second full-body walk of the tree off every unit tier: a
 // file not containing the path cannot import the package, so it cannot name a symbol from it.
 //
@@ -66,14 +68,14 @@ type constantsCensus struct {
 // tree does that, and closing it means type-checking every package rather than parsing it. Revisit
 // if a row ever rests on a reference that turns out to be a false one; go/types object identity is
 // the next shape, as AssertNoDeadInterfaces already uses for one package at a time (#351).
-func buildConstantsCensus(root string, graph *refgraph.ImportGraph) (*constantsCensus, error) {
+func buildBuiltinCensus(root string, graph *refgraph.ImportGraph) (*builtinCensus, error) {
 	coreModule, ok := graph.Modules["core"]
 	if !ok {
 		return nil, errs.Errorf("the import graph knows no core module")
 	}
-	importPath := coreModule + "/constants"
+	importPath := coreModule + "/builtin"
 
-	pkgDir := filepath.Join(root, filepath.FromSlash(coreConstantsPkg))
+	pkgDir := filepath.Join(root, filepath.FromSlash(builtinPkgDir))
 	declared, err := exportedDeclarations(pkgDir)
 	if err != nil {
 		return nil, err
@@ -93,7 +95,7 @@ func buildConstantsCensus(root string, graph *refgraph.ImportGraph) (*constantsC
 			return errs.Wrapf(relErr, "relating %s to %s", path, root)
 		}
 		dir := filepath.ToSlash(filepath.Dir(rel))
-		if dir == coreConstantsPkg {
+		if dir == builtinPkgDir {
 			// A symbol named by its own package proves nothing about who consumes it.
 			return nil
 		}
@@ -137,7 +139,7 @@ func buildConstantsCensus(root string, graph *refgraph.ImportGraph) (*constantsC
 		return nil, err
 	}
 
-	return &constantsCensus{declared: declared, refs: refgraph.Flatten(refs)}, nil
+	return &builtinCensus{declared: declared, refs: refgraph.Flatten(refs)}, nil
 }
 
 // exportedDeclarations lists the exported constants, variables, types and functions a package's
@@ -220,8 +222,8 @@ func declaredPackageName(dir string) string {
 	return ""
 }
 
-// checkConstantsOwnership holds the table and the tree to each other, in both directions.
-func checkConstantsOwnership(tables architectureTables, graph *refgraph.ImportGraph, census *constantsCensus) []string {
+// checkBuiltinOwnership holds the table and the tree to each other, in both directions.
+func checkBuiltinOwnership(tables architectureTables, graph *refgraph.ImportGraph, census *builtinCensus) []string {
 	var findings []string
 
 	owners := map[string]ownerRow{}
@@ -229,11 +231,11 @@ func checkConstantsOwnership(tables architectureTables, graph *refgraph.ImportGr
 		owners[row.pkg] = row
 	}
 
-	rows := map[string]constantsRow{}
-	for _, row := range tables.constants {
+	rows := map[string]builtinRow{}
+	for _, row := range tables.builtin {
 		if first, duplicate := rows[row.symbol]; duplicate {
 			findings = append(findings, fmt.Sprintf(
-				"core constants: %s:%d gives %s a second row; the first is at line %d",
+				"built-in identifiers: %s:%d gives %s a second row; the first is at line %d",
 				architectureDoc, row.line, row.symbol, first.line))
 			continue
 		}
@@ -245,23 +247,23 @@ func checkConstantsOwnership(tables architectureTables, graph *refgraph.ImportGr
 		declared[symbol] = true
 		if _, ok := rows[symbol]; !ok {
 			findings = append(findings, fmt.Sprintf(
-				"core constants: %s holds no row for %s, which %s declares; every symbol left in core says why it is there, so that leaving one behind is a decision rather than a default",
-				architectureDoc, symbol, coreConstantsPkg))
+				"built-in identifiers: %s holds no row for %s, which %s declares; every symbol left in core says why it is there, so that leaving one behind is a decision rather than a default",
+				architectureDoc, symbol, builtinPkgDir))
 		}
 	}
 
-	for _, row := range tables.constants {
+	for _, row := range tables.builtin {
 		if !declared[row.symbol] {
 			findings = append(findings, fmt.Sprintf(
-				"core constants: %s:%d records %s, which %s no longer declares; delete the row",
-				architectureDoc, row.line, row.symbol, coreConstantsPkg))
+				"built-in identifiers: %s:%d records %s, which %s no longer declares; delete the row",
+				architectureDoc, row.line, row.symbol, builtinPkgDir))
 			continue
 		}
 		if rows[row.symbol].line != row.line {
 			// Already reported as a duplicate; checking it twice would say the same thing twice.
 			continue
 		}
-		findings = append(findings, checkConstantsRow(row, owners, graph, census.refs[row.symbol])...)
+		findings = append(findings, checkBuiltinRow(row, owners, graph, census.refs[row.symbol])...)
 	}
 
 	return findings
@@ -293,7 +295,7 @@ func backingFor(owners map[string]ownerRow, graph *refgraph.ImportGraph, refs []
 			}
 			continue
 		}
-		if top == coreConstantsPkg {
+		if top == builtinPkgDir {
 			continue
 		}
 		if owners[top].owner == ownerKernel {
@@ -309,13 +311,13 @@ func backingFor(owners map[string]ownerRow, graph *refgraph.ImportGraph, refs []
 	return backing
 }
 
-// checkConstantsRow holds one row to what the tree backs for its symbol.
-func checkConstantsRow(row constantsRow, owners map[string]ownerRow, graph *refgraph.ImportGraph, refs []string) []string {
+// checkBuiltinRow holds one row to what the tree backs for its symbol.
+func checkBuiltinRow(row builtinRow, owners map[string]ownerRow, graph *refgraph.ImportGraph, refs []string) []string {
 	switch row.justification {
 	case refgraph.JustificationKernel, refgraph.JustificationBothApps, refgraph.JustificationMoving, refgraph.JustificationContract:
 	default:
 		return []string{fmt.Sprintf(
-			"core constants: %s:%d gives %s the justification %q, which is none of %s, %s, %s, %s",
+			"built-in identifiers: %s:%d gives %s the justification %q, which is none of %s, %s, %s, %s",
 			architectureDoc, row.line, row.symbol, row.justification,
 			refgraph.JustificationKernel, refgraph.JustificationBothApps, refgraph.JustificationMoving, refgraph.JustificationContract)}
 	}
@@ -324,14 +326,14 @@ func checkConstantsRow(row constantsRow, owners map[string]ownerRow, graph *refg
 	want, because := strongestJustification(backing)
 	if row.justification != want {
 		return []string{fmt.Sprintf(
-			"core constants: %s:%d records %s as %s, but the tree backs %s: %s; a row states the strongest claim that holds",
+			"built-in identifiers: %s:%d records %s as %s, but the tree backs %s: %s; a row states the strongest claim that holds",
 			architectureDoc, row.line, row.symbol, row.justification, want, because)}
 	}
 
 	if want != refgraph.JustificationMoving {
 		if !noIssue(row.issue) {
 			return []string{fmt.Sprintf(
-				"core constants: %s:%d gives %s the issue %s; only a %s row names one, because it is the only justification that expires",
+				"built-in identifiers: %s:%d gives %s the issue %s; only a %s row names one, because it is the only justification that expires",
 				architectureDoc, row.line, row.symbol, row.issue, refgraph.JustificationMoving)}
 		}
 		return nil
@@ -361,10 +363,10 @@ func strongestJustification(backing symbolBacking) (string, string) {
 // symbol. That is what makes the row expire: when the named issue carries those packages out of
 // core, nothing in core references the symbol, the row stops being backed, and the tier fails until
 // somebody decides where the symbol belongs.
-func checkMovingIssue(row constantsRow, backing symbolBacking) []string {
+func checkMovingIssue(row builtinRow, backing symbolBacking) []string {
 	if !issueRef.MatchString(row.issue) {
 		return []string{fmt.Sprintf(
-			"core constants: %s:%d records %s as %s but names %q where an issue like #359 belongs; a justification that expires has to say when",
+			"built-in identifiers: %s:%d records %s as %s but names %q where an issue like #359 belongs; a justification that expires has to say when",
 			architectureDoc, row.line, row.symbol, refgraph.JustificationMoving, row.issue)}
 	}
 	if backing.movingIssues[row.issue] {
@@ -377,7 +379,7 @@ func checkMovingIssue(row constantsRow, backing symbolBacking) []string {
 	}
 	sort.Strings(expected)
 	return []string{fmt.Sprintf(
-		"core constants: %s:%d says %s stops being core's in %s, but the packages pinning it (%s) move in %s; the row expires with them or not at all",
+		"built-in identifiers: %s:%d says %s stops being core's in %s, but the packages pinning it (%s) move in %s; the row expires with them or not at all",
 		architectureDoc, row.line, row.symbol, row.issue,
 		strings.Join(backing.movingPkgs, ", "), strings.Join(expected, ", "))}
 }

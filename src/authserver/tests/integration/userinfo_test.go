@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -219,7 +219,7 @@ func TestUserinfo_LegacyROPCGrantNamingUserinfo(t *testing.T) {
 // that "requires higher privileges than provided by the access token".
 func TestUserinfo_TokenWithoutOpenidIsRefused(t *testing.T) {
 	accessToken, _ := createUserAccessTokenWithScope(t,
-		constants.AuthServerResourceIdentifier+":"+constants.ManageAccountPermissionIdentifier)
+		builtin.AuthServerResourceIdentifier+":"+builtin.ManageAccountPermissionIdentifier)
 
 	assertUserinfoRefuses(t, accessToken, http.StatusForbidden, "insufficient_scope")
 }
@@ -238,7 +238,7 @@ func TestUserinfo_ClaimScopesWithoutOpenid(t *testing.T) {
 		accessToken := data["access_token"].(string)
 		claims := decodeJWTPayload(t, accessToken)
 		assert.Equal(t, scope, claims["scope"])
-		assert.Equal(t, constants.AuthServerResourceIdentifier, claims["aud"])
+		assert.Equal(t, builtin.AuthServerResourceIdentifier, claims["aud"])
 		if groupIdentifier != "" {
 			assert.Equal(t, []interface{}{groupIdentifier}, claims["groups"])
 		}

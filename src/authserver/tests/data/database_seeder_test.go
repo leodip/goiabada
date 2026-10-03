@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,7 +86,7 @@ func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, bootstrap.Continue, outcome)
 
-	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, constants.AuthServerResourceIdentifier)
+	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 	permissions, err := h.DB.GetPermissionsByResourceId(ctx, nil, resource.Id)
@@ -95,7 +95,7 @@ func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
 	for _, p := range permissions {
 		identifiers = append(identifiers, p.PermissionIdentifier)
 	}
-	assert.ElementsMatchf(t, constants.BuiltInAuthServerPermissionIdentifiers, identifiers,
+	assert.ElementsMatchf(t, builtin.AuthServerPermissionIdentifiers(), identifiers,
 		"the seed must write the built-in permissions and no other on %s", dbType())
 	assert.Len(t, identifiers, 7)
 }
@@ -189,7 +189,7 @@ func TestSeed_AFailedFirstSeedLeavesNothingAndTheNextSeeds(t *testing.T) {
 			isEmpty, err = h.DB.IsEmpty(ctx)
 			require.NoError(t, err)
 			assert.False(t, isEmpty)
-			client, err := h.DB.GetClientByClientIdentifier(ctx, nil, constants.AdminConsoleClientIdentifier)
+			client, err := h.DB.GetClientByClientIdentifier(ctx, nil, builtin.AdminConsoleClientIdentifier)
 			require.NoError(t, err)
 			assert.NotNil(t, client)
 		})

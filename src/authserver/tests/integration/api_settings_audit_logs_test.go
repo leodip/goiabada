@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -284,7 +284,7 @@ func TestAPISettingsAuditLogs_ReadScopeCannotWrite(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
 
 	readOnlyToken := createClientCredentialsTokenWithScope(t,
-		constants.AuthServerResourceIdentifier, constants.AdminReadPermissionIdentifier)
+		builtin.AuthServerResourceIdentifier, builtin.AdminReadPermissionIdentifier)
 
 	getResp := makeAPIRequest(t, "GET", url, readOnlyToken, nil)
 	defer func() { _ = getResp.Body.Close() }()

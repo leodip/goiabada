@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 // The users and the groups page of the authserver resource list the permissions the API returned,
@@ -23,7 +23,7 @@ type systemResourceApiClient struct {
 }
 
 func (c *systemResourceApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: coreconstants.AuthServerResourceIdentifier}, nil
+	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil
 }
 
 // The rest of the ports systemResourceApiClient is passed to, which no test here reaches.
@@ -49,10 +49,10 @@ func (*systemResourceApiClient) UpdateUserPermissions(context.Context, string, i
 }
 
 func systemResourcePermissions() []api.PermissionResponse {
-	system := api.ResourceResponse{Id: 7, ResourceIdentifier: coreconstants.AuthServerResourceIdentifier}
+	system := api.ResourceResponse{Id: 7, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
 	return []api.PermissionResponse{
 		{Id: 41, PermissionIdentifier: "userinfo", Resource: system},
-		{Id: 42, PermissionIdentifier: coreconstants.ManagePermissionIdentifier, Resource: system},
+		{Id: 42, PermissionIdentifier: builtin.ManagePermissionIdentifier, Resource: system},
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -528,7 +528,7 @@ func TestWireJSON_PermissionAndResourceFamilies(t *testing.T) {
 			name: "ResourceResponse for the system-level resource",
 			value: ToResourceResponse(&models.Resource{
 				Id:                 1,
-				ResourceIdentifier: constants.AuthServerResourceIdentifier,
+				ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 				Description:        "Goiabada auth server",
 			}),
 			literal: `{"id":1,"resourceIdentifier":"authserver","description":"Goiabada auth server",` +
@@ -605,7 +605,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	}
 
 	systemLevel := *client
-	systemLevel.ClientIdentifier = constants.AdminConsoleClientIdentifier
+	systemLevel.ClientIdentifier = builtin.AdminConsoleClientIdentifier
 	systemLevel.RedirectURIs = nil
 	systemLevel.WebOrigins = nil
 
@@ -625,7 +625,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			name:  "nil collections, and a system-level client",
 			value: ToClientResponse(&systemLevel),
 			literal: `{"id":3,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
-				clientScalars(constants.AdminConsoleClientIdentifier, true) +
+				clientScalars(builtin.AdminConsoleClientIdentifier, true) +
 				`,"redirectURIs":null,"webOrigins":null}`,
 		},
 	})

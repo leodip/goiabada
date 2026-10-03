@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,9 +27,9 @@ import (
 // bearerKindGrant is the grant every non-access token below carries: a scope that passes the scope
 // check of each of the four bearer-guarded groups, so nothing but the token's kind can stop it.
 var bearerKindGrant = "openid " +
-	constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier + " " +
-	constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier + " " +
-	constants.AuthServerResourceIdentifier + ":" + constants.BrowserSessionsPermissionIdentifier
+	builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier + " " +
+	builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier + " " +
+	builtin.AuthServerResourceIdentifier + ":" + builtin.BrowserSessionsPermissionIdentifier
 
 // bearerKindResponse is what a bearer-guarded route answered: the three things a caller can
 // observe of a refusal.
@@ -92,7 +92,7 @@ func sendBearer(t *testing.T, route bearerRoute, token string) bearerKindRespons
 func grantAuthServerPermissionsToUser(t *testing.T, user *models.User, identifiers ...string) {
 	t.Helper()
 
-	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
 	require.NoError(t, err)
@@ -126,9 +126,9 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 	// ROPC's refresh token is always typ Offline.
 	ropcTokens, ropcUser := ropcTokenResponse(t, bearerKindGrant, func(user *models.User) {
 		grantAuthServerPermissionsToUser(t, user,
-			constants.ManageAccountPermissionIdentifier,
-			constants.ManagePermissionIdentifier,
-			constants.BrowserSessionsPermissionIdentifier)
+			builtin.ManageAccountPermissionIdentifier,
+			builtin.ManagePermissionIdentifier,
+			builtin.BrowserSessionsPermissionIdentifier)
 	})
 	offlineRefreshToken, ok := ropcTokens["refresh_token"].(string)
 	require.True(t, ok, "ROPC should yield a refresh token: %v", ropcTokens)
@@ -207,7 +207,7 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 		t.Helper()
 		aud, ok := decodeJWTPayload(t, token)["aud"].([]interface{})
 		require.True(t, ok, "aud should be an array")
-		assert.ElementsMatch(t, []interface{}{constants.AuthServerResourceIdentifier, secondResource.ResourceIdentifier}, aud)
+		assert.ElementsMatch(t, []interface{}{builtin.AuthServerResourceIdentifier, secondResource.ResourceIdentifier}, aud)
 	}
 
 	t.Run("user access token at GET and form-body POST /userinfo", func(t *testing.T) {
@@ -236,12 +236,12 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 			assert.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
 		})
 
-		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 		require.NoError(t, err)
 		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 		require.NoError(t, err)
 		for i := range permissions {
-			if permissions[i].PermissionIdentifier == constants.ManagePermissionIdentifier {
+			if permissions[i].PermissionIdentifier == builtin.ManagePermissionIdentifier {
 				require.NoError(t, database.CreateClientPermission(context.Background(), nil,
 					&models.ClientPermission{ClientId: client.Id, PermissionId: permissions[i].Id}))
 			}
@@ -249,7 +249,7 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 		require.NoError(t, database.CreateClientPermission(context.Background(), nil,
 			&models.ClientPermission{ClientId: client.Id, PermissionId: secondPermission.Id}))
 
-		scope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier + " " + secondScope
+		scope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier + " " + secondScope
 		data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"client_credentials"},
 			"client_id":     {client.ClientIdentifier},

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 func TestIsPKCERequired_ClientOverrideTrue(t *testing.T) {
@@ -157,7 +157,7 @@ func TestIsSystemLevelClient(t *testing.T) {
 		clientIdentifier string
 		expected         bool
 	}{
-		{"AdminConsoleClient", constants.AdminConsoleClientIdentifier, true},
+		{"AdminConsoleClient", builtin.AdminConsoleClientIdentifier, true},
 		{"NonSystemClient", "regular-client", false},
 		{"EmptyIdentifier", "", false},
 	}

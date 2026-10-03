@@ -12,7 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -151,7 +151,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	assert.NoError(t, err)
 
 	// Get authserver resource and permission
-	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
@@ -159,7 +159,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 
 	var adminPermission *models.Permission
 	for idx, permission := range permissions {
-		if permission.PermissionIdentifier == constants.ManagePermissionIdentifier {
+		if permission.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			adminPermission = &permissions[idx]
 			break
 		}
@@ -181,7 +181,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
-		"scope":         {constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier},
+		"scope":         {builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)

@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,7 +90,7 @@ func TestAPISessions_NoTokenIsUnauthorized(t *testing.T) {
 // that does not carry it is refused. This is what stops the admin console's secret, or any
 // other client's, being a way into everyone's sessions by holding a manage-* scope.
 func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
-	accessToken, client := createClientWithGranularScope(t, coreconstants.AdminReadPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -108,14 +108,14 @@ func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 // TestAPISessions_RoundTrip walks the whole lifecycle the admin console's store will walk:
 // create, load, touch, update, load again, delete, and load once more to find it gone.
 func TestAPISessions_RoundTrip(t *testing.T) {
-	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	id := newTestSessionId(t)
 	defer func() {
-		_ = database.DeleteBrowserSession(context.Background(), nil, coreconstants.AdminConsoleSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, builtin.AdminConsoleSessionName, hashTestSessionId(id))
 	}()
 
 	// Create. An unauthenticated session gets the flat pre-authentication lifetime, which
@@ -185,15 +185,15 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 // rows whose deadline is still ahead, so a session that ran out is already absent before
 // the reaper has been anywhere near it.
 func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
-	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	id := newTestSessionId(t)
-	createBrowserSessionFixture(t, coreconstants.AdminConsoleSessionName, id, time.Now().UTC().Add(-time.Minute))
+	createBrowserSessionFixture(t, builtin.AdminConsoleSessionName, id, time.Now().UTC().Add(-time.Minute))
 	defer func() {
-		_ = database.DeleteBrowserSession(context.Background(), nil, coreconstants.AdminConsoleSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, builtin.AdminConsoleSessionName, hashTestSessionId(id))
 	}()
 
 	for _, operation := range []string{"load", "update", "touch"} {
@@ -209,7 +209,7 @@ func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 // rests on, observed from outside: an identifier naming a live auth server session is
 // answered 404, because the owner is not something a request can name.
 func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
-	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -249,7 +249,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
 	id := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
 
-	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -268,7 +268,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 // SESSION_ID_REQUIRED and now answers VALIDATION_ERROR, one of the three generic codes the API
 // answers a 4xx condition with (#279 decision 18).
 func TestAPISessions_BadRequests(t *testing.T) {
-	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()

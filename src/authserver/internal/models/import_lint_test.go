@@ -37,7 +37,7 @@ const modelsDir = "authserver/internal/models"
 
 // modelsAllowedImports is every non-standard-library path a production file here may name.
 //
-// core/constants carries the permission identifiers Client and Resource name, and core/errs is
+// core/builtin carries the permission identifiers Client and Resource name, and core/errs is
 // this tree's one error constructor, which the four enumerations #385 moved in here -- AcrLevel,
 // KeyState, PasswordPolicy and ThreeStateSetting -- raise their refusals through, and which
 // CLAUDE.md pattern 7 requires of every error this tree constructs. Both are declarations and
@@ -50,8 +50,8 @@ const modelsDir = "authserver/internal/models"
 // one -- sql.NullTime and sql.NullString are half the fields in this package -- and it is types
 // only; the data layer holds the *sql.DB and every statement.
 var modelsAllowedImports = map[string]string{
-	"github.com/leodip/goiabada/core/constants": "the permission identifiers Client and Resource name",
-	"github.com/leodip/goiabada/core/errs":      "the error constructor pattern 7 requires",
+	"github.com/leodip/goiabada/core/builtin": "the permission identifiers Client and Resource name",
+	"github.com/leodip/goiabada/core/errs":    "the error constructor pattern 7 requires",
 }
 
 // foreignImport is one import a production file in the package names that the rule does not allow.
@@ -72,7 +72,7 @@ type foreignImport struct {
 //
 // Direct imports only, which is the rule as decision 8 states it and is also the rule worth
 // having: both methods that provoked this named their library in this directory's own import
-// block. A transitive rule would additionally hold core/errs and core/constants to what they
+// block. A transitive rule would additionally hold core/errs and core/builtin to what they
 // import, which is those packages' business and is already covered by ARCHITECTURE.md's tables.
 func findForeignImports(root, dir string, allowed map[string]string) ([]foreignImport, int, error) {
 	start := filepath.Join(root, filepath.FromSlash(dir))
@@ -210,10 +210,10 @@ type AuditLog struct{ At time.Time }
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
-var _ = constants.PermissionManageAccount
+var _ = builtin.PermissionManageAccount
 var _ sql.NullTime
 `)
 	writeImportFixture(t, root, modelsDir+"/acr_level.go", `package models
@@ -329,7 +329,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -337,7 +337,7 @@ var _ sql.NullTime
 var _ = slices.Contains[[]string, string]
 var _ = strings.TrimSpace
 var _ = time.Now
-var _ = constants.PermissionManageAccount
+var _ = builtin.PermissionManageAccount
 var _ = errs.New
 `)
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -51,7 +51,7 @@ func TestArgsFuncMap(t *testing.T) {
 }
 
 func TestVersionCommentFuncMap(t *testing.T) {
-	expectedHTML := template.HTML("<!-- version: " + constants.Version + "; build date: " + constants.BuildDate + "; git commit: " + constants.GitCommit + "-->")
+	expectedHTML := template.HTML("<!-- version: " + buildinfo.Version + "; build date: " + buildinfo.BuildDate + "; git commit: " + buildinfo.GitCommit + "-->")
 
 	result := templateFuncMap["versionComment"].(func() template.HTML)()
 

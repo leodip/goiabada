@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -63,7 +63,7 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -86,8 +86,8 @@ func HandleAdminResourcePermissionsGet(
 
 		// Prepare built-in permission identifiers for the authserver resource
 		var builtInPermissionIdentifiers []string
-		if resource.ResourceIdentifier == coreconstants.AuthServerResourceIdentifier {
-			builtInPermissionIdentifiers = coreconstants.BuiltInAuthServerPermissionIdentifiers
+		if resource.ResourceIdentifier == builtin.AuthServerResourceIdentifier {
+			builtInPermissionIdentifiers = builtin.AuthServerPermissionIdentifiers()
 		} else {
 			builtInPermissionIdentifiers = []string{}
 		}
@@ -194,7 +194,7 @@ func HandleAdminResourcePermissionsPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

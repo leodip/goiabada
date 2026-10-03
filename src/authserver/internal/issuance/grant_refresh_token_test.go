@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -141,7 +141,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
 	assert.Equal(t, user.Subject, accessClaims["sub"])
-	assert.ElementsMatch(t, []string{coreconstants.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
+	assert.ElementsMatch(t, []string{builtin.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])

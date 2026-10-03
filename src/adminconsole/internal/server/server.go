@@ -25,7 +25,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/web"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
@@ -409,7 +409,7 @@ func (s *Server) initMiddleware() chi.Router {
 
 		// Clear the session cookie and redirect if unable to decode it, and delete
 		// whatever the chunked cookie store left in this browser
-		custom_middleware.MiddlewareCookieReset(s.sessionStore, constants.AdminConsoleSessionName),
+		custom_middleware.MiddlewareCookieReset(s.sessionStore, builtin.AdminConsoleSessionName),
 	)
 
 	slog.Info("finished initializing middleware")

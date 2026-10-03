@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1171,12 +1171,12 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			name:  "authserver:userinfo, a permission the authserver resource no longer has",
 			scope: "openid authserver:userinfo",
 			setup: func(mockDB *mocks_data.Database) {
-				builtIns := make([]models.Permission, 0, len(coreconstants.BuiltInAuthServerPermissionIdentifiers))
-				for i, identifier := range coreconstants.BuiltInAuthServerPermissionIdentifiers {
+				builtIns := make([]models.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
+				for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
 					builtIns = append(builtIns, models.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
 				}
-				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, coreconstants.AuthServerResourceIdentifier).
-					Return(&models.Resource{Id: 4, ResourceIdentifier: coreconstants.AuthServerResourceIdentifier}, nil).Once()
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
+					Return(&models.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
 			},
 			wantDesc: "Scope 'authserver:userinfo' is not recognized. The resource identified by 'authserver' doesn't grant the 'userinfo' permission.",

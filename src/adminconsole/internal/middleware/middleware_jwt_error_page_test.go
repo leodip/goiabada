@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -139,10 +139,10 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				helper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 				helper.On("IsAuthenticated", jwtInfo).Return(false)
 				helper.On("RedirToAuthorize", mock.Anything, mock.Anything,
-					coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"),
+					builtin.AdminConsoleClientIdentifier, mock.AnythingOfType("string"),
 					mock.AnythingOfType("string")).Return(assert.AnError)
 
-				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName, new(mock_middleware.TokenParser), nil, helper, rec, "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier)
+				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName, new(mock_middleware.TokenParser), nil, helper, rec, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))

@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -245,7 +245,7 @@ func TestAPIClientPermissions_Put_SystemLevelAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find the system-level admin-console-client via DB
-	sysClient, err := database.GetClientByClientIdentifier(context.Background(), nil, constants.AdminConsoleClientIdentifier)
+	sysClient, err := database.GetClientByClientIdentifier(context.Background(), nil, builtin.AdminConsoleClientIdentifier)
 	assert.NoError(t, err)
 	if sysClient == nil {
 		t.Skip("system-level client not found")

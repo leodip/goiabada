@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -176,7 +176,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level resource (authserver)
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
@@ -193,7 +193,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 	var updatedRes api.GetResourceResponse
 	err = json.NewDecoder(resp.Body).Decode(&updatedRes)
 	assert.NoError(t, err)
-	assert.Equal(t, constants.AuthServerResourceIdentifier, updatedRes.Resource.ResourceIdentifier)
+	assert.Equal(t, builtin.AuthServerResourceIdentifier, updatedRes.Resource.ResourceIdentifier)
 	assert.Equal(t, newDesc, updatedRes.Resource.Description)
 }
 
@@ -201,7 +201,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level resource (authserver)
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 

@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -170,7 +170,7 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermission(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, authServerResource, "the seed creates the authserver resource")
 
@@ -201,7 +201,7 @@ func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermis
 	for _, p := range getResponse.Permissions {
 		answered = append(answered, p.PermissionIdentifier)
 	}
-	assert.Subset(t, answered, constants.BuiltInAuthServerPermissionIdentifiers, "every built-in is answered")
+	assert.Subset(t, answered, builtin.AuthServerPermissionIdentifiers(), "every built-in is answered")
 	assert.Contains(t, answered, "userinfo", "a permission identified userinfo is answered as any other")
 }
 
@@ -210,7 +210,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Get the AuthServer resource
-	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if authServerResource == nil {
 		t.Skip("AuthServer resource not found in database - skipping permission inclusion test")

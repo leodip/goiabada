@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -137,7 +137,7 @@ func (b *countingBackend) Load(ctx context.Context, id string) (*sessionstore.Re
 func seedSession(t *testing.T, store *sessionstore.ServerSideStore) *http.Cookie {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	sess, err := store.Get(req, constants.AdminConsoleSessionName)
+	sess, err := store.Get(req, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	w := httptest.NewRecorder()
 	require.NoError(t, store.Save(req, w, sess))

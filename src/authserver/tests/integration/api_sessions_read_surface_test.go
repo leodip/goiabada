@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,8 +55,8 @@ func adminUserTokenReachingAllThree(t *testing.T) (string, *models.User, *models
 	t.Helper()
 
 	scope := "openid " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier + " " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier + " " +
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	accessToken, user := createUserAccessTokenWithScope(t, scope)
 
 	sid := extractSidClaim(t, accessToken)

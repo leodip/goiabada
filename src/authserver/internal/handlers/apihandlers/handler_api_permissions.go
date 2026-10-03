@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/validators"
@@ -192,8 +192,8 @@ func HandleAPIResourcePermissionsPut(
 		}
 
 		// System-level resource protection: validate built-in permissions for the authserver resource
-		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-			for _, builtInIdentifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+		if resource.ResourceIdentifier == builtin.AuthServerResourceIdentifier {
+			for _, builtInIdentifier := range builtin.AuthServerPermissionIdentifiers() {
 				// Check if the built-in permission exists in the database
 				existingPerm, found := existingByIdentifier[builtInIdentifier]
 				if !found {
