@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The 404 page, end to end: the real HttpHelper.NotFound over the real embedded template FS, at the
+// The 404 page, end to end: the real render.Renderer.NotFound over the real embedded template FS, at the
 // HTTP seam. Everything else in this package renders a bind through RenderTemplate and reads only
 // the body; this one reads the status too, because the status is half of what decision 11 changed
 // and the console is invisible to the integration tier, which drives the auth server and only ever
@@ -31,7 +31,7 @@ func TestRender_NotFoundPage(t *testing.T) {
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 	w := httptest.NewRecorder()
-	handlerhelpers.NewHttpHelper(web.TemplateFS()).NotFound(w, req)
+	render.New(web.TemplateFS()).NotFound(w, req)
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
@@ -64,7 +64,7 @@ func TestRender_JSBootstrapNoKeyLeak(t *testing.T) {
 		"phoneCountries":               []api.PhoneCountryResponse{},
 		"savedSuccessfully":            false,
 	}
-	out := render(t, "/account_phone.html", bind)
+	out := renderMenuPage(t, "/account_phone.html", bind)
 
 	m := regexp.MustCompile(`window\.i18n=(\{.*?\});`).FindStringSubmatch(out)
 	require.Len(t, m, 2, "window.i18n bootstrap script not found in output")
@@ -104,7 +104,7 @@ func menuLabelText(t *testing.T, out string) string {
 // TestRender_MenuLabelShowsTheLoggedInUser is the case the rest of this package could not see.
 // Every other render here is an anonymous request, so `loggedInUser` is never bound and the dropdown
 // label comes back empty — which reads as "no handler binds it" if the harness is mistaken for the
-// product. The bind is real and it is central: HttpHelper.RenderTemplate builds it from the
+// product. The bind is real and it is central: render.Renderer.RenderTemplate builds it from the
 // ID token's claims, and middleware.SessionHandler puts that token on the context ahead of every route in
 // routes.go that renders a menu page. Rendering with a token is what distinguishes the two.
 func TestRender_MenuLabelShowsTheLoggedInUser(t *testing.T) {
@@ -162,6 +162,6 @@ func TestRender_MenuLabelWithSubjectOnlyIsBlankNotNoValue(t *testing.T) {
 // in this package has, and saying so here is what keeps the next reader from reading those blanks
 // as a defect in the page.
 func TestRender_MenuLabelWithNoTokenIsBlank(t *testing.T) {
-	out := render(t, "/admin_groups.html", map[string]interface{}{"groups": []api.GroupResponse{}})
+	out := renderMenuPage(t, "/admin_groups.html", map[string]interface{}{"groups": []api.GroupResponse{}})
 	assert.Empty(t, menuLabel(t, out), "an anonymous render binds no user, so not even the span is emitted")
 }

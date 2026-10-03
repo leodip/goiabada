@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/locales"
@@ -28,7 +28,7 @@ func TestRender_AccountPhone(t *testing.T) {
 		},
 		"savedSuccessfully": false,
 	}
-	out := render(t, "/account_phone.html", bind)
+	out := renderMenuPage(t, "/account_phone.html", bind)
 	// html/template escapes "+" to "&#43;", so assert on the emoji + localized
 	// country name (the part the phone-500 bug and the CLDR work affect).
 	assert.Contains(t, out, "🇧🇷 - Brasil") // RefPhoneCountry: CLDR-localized name
@@ -45,7 +45,7 @@ func TestRender_AccountAddress(t *testing.T) {
 		"countries":         countries.All(),
 		"savedSuccessfully": false,
 	}
-	out := render(t, "/account_address.html", bind)
+	out := renderMenuPage(t, "/account_address.html", bind)
 	assert.Contains(t, out, "Itália") // RefCountry: CLDR-localized name
 	assert.Contains(t, out, "México")
 }
@@ -57,7 +57,7 @@ func TestRender_AccountProfile(t *testing.T) {
 		"locales":           locales.All(),
 		"savedSuccessfully": false,
 	}
-	out := render(t, "/account_profile.html", bind)
+	out := renderMenuPage(t, "/account_profile.html", bind)
 	assert.Contains(t, out, "português (Brasil) (Portuguese (Brazil))") // LocaleLabel
 	assert.Contains(t, out, "Estados Unidos")                           // RefTimezone country portion localized
 }
@@ -67,7 +67,7 @@ func TestRender_AccountProfile(t *testing.T) {
 func TestRender_ProfilePagesLabelLocalesByName(t *testing.T) {
 	for _, page := range []string{"/account_profile.html", "/admin_users_profile.html"} {
 		t.Run(page, func(t *testing.T) {
-			out := render(t, page, map[string]interface{}{
+			out := renderMenuPage(t, page, map[string]interface{}{
 				"user":              &api.UserResponse{Id: 7},
 				"timezones":         timezones.All(),
 				"locales":           locales.All(),
@@ -94,7 +94,7 @@ func TestRender_ProfilePagesSelectTheStoredZoneRow(t *testing.T) {
 
 	for _, page := range []string{"/account_profile.html", "/admin_users_profile.html"} {
 		t.Run(page, func(t *testing.T) {
-			out := render(t, page, map[string]interface{}{
+			out := renderMenuPage(t, page, map[string]interface{}{
 				"user":              user,
 				"timezones":         timezones.All(),
 				"locales":           locales.All(),
@@ -130,7 +130,7 @@ func TestRender_ProfilePagesSelectTheStoredZoneRow(t *testing.T) {
 func TestRender_AccountOtp_Enrollment(t *testing.T) {
 	const secretKey = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
-	out := render(t, "/account_otp.html", map[string]interface{}{
+	out := renderMenuPage(t, "/account_otp.html", map[string]interface{}{
 		"otpEnabled":  false,
 		"base64Image": "aW1hZ2UtYnl0ZXM=",
 		"secretKey":   secretKey,
@@ -151,7 +151,7 @@ func TestRender_AccountOtp_Enrollment(t *testing.T) {
 // The enabled state carries neither, whatever the bind map happens to hold: a user with an
 // authenticator is not enrolling, and the page is a disable form.
 func TestRender_AccountOtp_Enabled(t *testing.T) {
-	out := render(t, "/account_otp.html", map[string]interface{}{
+	out := renderMenuPage(t, "/account_otp.html", map[string]interface{}{
 		"otpEnabled": true,
 		"error":      "Authentication failed. Check your password and try again.",
 	})
@@ -183,7 +183,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
 				}},
@@ -194,7 +194,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
 				}},
@@ -216,7 +216,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := render(t, tc.page, tc.bind)
+			out := renderMenuPage(t, tc.page, tc.bind)
 
 			// The tooltip is on the Device cell, which is also what carries the labels.
 			assert.Containsf(t, out, `<td title="`+escaped+`">Chrome 120 Desktop Linux`,
@@ -262,7 +262,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
 				}},
 			},
@@ -272,7 +272,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
 				}},
 				"page":  "1",
@@ -292,7 +292,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := render(t, tc.page, tc.bind)
+			out := renderMenuPage(t, tc.page, tc.bind)
 
 			assert.Containsf(t, out, startedCell, "%s: the Started cell is not localized", tc.page)
 			assert.Containsf(t, out, lastAccessedCell,
@@ -311,7 +311,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 // list endpoint, and a row decoded from a payload written before those columns existed carries nil
 // (#373).
 func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
-	out := render(t, "/admin_clients_usersessions.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_clients_usersessions.html", map[string]interface{}{
 		"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
 		"sessions": []adminclienthandlers.SessionInfo{{
 			UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
@@ -353,7 +353,7 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
 				}},
@@ -365,7 +365,7 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
 				}},
@@ -389,7 +389,7 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := render(t, tc.page, tc.bind)
+			out := renderMenuPage(t, tc.page, tc.bind)
 
 			// Neither the cell nor the onclick attribute carries the label as markup: the cell
 			// is HTML text and the attribute is a JavaScript string literal, and html/template
@@ -444,7 +444,7 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 			name: "account",
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
 				}},
@@ -455,7 +455,7 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []handlerhelpers.SessionInfo{{
+				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
 				}},
@@ -477,7 +477,7 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := render(t, tc.page, tc.bind)
+			out := renderMenuPage(t, tc.page, tc.bind)
 
 			decl := declRe.FindStringSubmatch(out)
 			require.NotNilf(t, decl, "%s: no endSessionClick declaration", tc.page)
@@ -514,7 +514,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 			name: "account",
 			page: "/account_manage_consents.html",
 			bind: map[string]interface{}{
-				"consents": []handlerhelpers.ConsentInfo{{
+				"consents": []render.ConsentInfo{{
 					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
 					GrantedAt: &granted, Scope: "openid profile",
 				}},
@@ -525,7 +525,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 			page: "/admin_users_consents.html",
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"consents": []handlerhelpers.ConsentInfo{{
+				"consents": []render.ConsentInfo{{
 					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
 					GrantedAt: &granted, Scope: "openid profile",
 				}},
@@ -536,7 +536,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := render(t, tc.page, tc.bind)
+			out := renderMenuPage(t, tc.page, tc.bind)
 
 			assert.Containsf(t, out, "<td>16/09/2026 12:00</td>",
 				"%s: the granted-at cell is not localized", tc.page)
@@ -551,8 +551,8 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 // an ungranted consent (#350), and the guard that used to stand in front of the Format call is now
 // the formatter's own nil answer (#373).
 func TestRender_ConsentPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
-	out := render(t, "/account_manage_consents.html", map[string]interface{}{
-		"consents": []handlerhelpers.ConsentInfo{{
+	out := renderMenuPage(t, "/account_manage_consents.html", map[string]interface{}{
+		"consents": []render.ConsentInfo{{
 			ConsentId: 1, Client: "web-app", Scope: "openid",
 		}},
 	})
@@ -599,7 +599,7 @@ func TestRender_ProfilePagesKeepTheDateOfBirthMachineFormat(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := render(t, tc.page, tc.bind)
+			out := renderMenuPage(t, tc.page, tc.bind)
 
 			assert.Containsf(t, out, `value="1990-01-02"`,
 				"%s: the dateOfBirth input must stay the machine format the server parses back", tc.page)

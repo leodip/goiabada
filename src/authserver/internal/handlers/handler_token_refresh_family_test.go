@@ -46,7 +46,7 @@ func TestHandleTokenPost_Refresh_Replay_ARecordWrittenWithNothingLiveIsAudited(t
 				Run(func(args mock.Arguments) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()
-			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*oauth.ErrorDetail)
 				return ok && detail.Code() == "invalid_grant" &&
 					detail.Description() == "This refresh token has been revoked."
@@ -83,7 +83,7 @@ func TestHandleTokenPost_Refresh_AFamilyRevokedInTheGapIsRefusedAsARevokedToken(
 
 			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, nil, issuance.ErrRefreshFamilyRevoked).Once()
-			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*oauth.ErrorDetail)
 				return ok && detail.Code() == "invalid_grant" &&
 					detail.Description() == "This refresh token has been revoked." &&

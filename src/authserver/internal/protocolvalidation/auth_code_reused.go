@@ -20,7 +20,7 @@ import (
 // they were.
 //
 // Detail is the *oauth.ErrorDetail to render to the client (invalid_grant,
-// "Code is invalid.", 400), and Unwrap exposes it, so HttpHelper.JsonError answers 400 with that
+// "Code is invalid.", 400), and Unwrap exposes it, so render.Renderer.JSONError answers 400 with that
 // description whether it is handed this wrapper or the Detail inside it. The handler still passes
 // Detail, because it reads Code first and revoking is what it is here to do; the difference is that
 // passing the wrapper is no longer a silent 500 (#279).

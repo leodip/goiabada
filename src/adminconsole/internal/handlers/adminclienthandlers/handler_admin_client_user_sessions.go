@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -49,7 +49,7 @@ func HandleAdminClientUserSessionsGet(
 		// Load client via API
 		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
@@ -60,7 +60,7 @@ func HandleAdminClientUserSessionsGet(
 		// Get the first 50 sessions (server filters invalid)
 		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -92,7 +92,7 @@ func HandleAdminClientUserSessionsGet(
 			}
 			if owner, ok := owners[es.UserId]; ok {
 				usi.UserEmail = owner.Email
-				usi.UserFullName = handlerhelpers.SessionOwnerFullName(&owner)
+				usi.UserFullName = render.SessionOwnerFullName(&owner)
 			}
 			sessionInfoArr = append(sessionInfoArr, usi)
 		}
@@ -123,41 +123,41 @@ func HandleAdminClientUserSessionsPost(
 
 		idStr := chi.URLParam(r, "clientId")
 		if len(idStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if decodeErr := decoder.Decode(&data); decodeErr != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -169,7 +169,7 @@ func HandleAdminClientUserSessionsPost(
 		// The page this request comes from is the first 50 rows, so the same page is read back.
 		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -192,14 +192,14 @@ func HandleAdminClientUserSessionsPost(
 				Success:          true,
 				IsCurrentSession: true,
 			}
-			httpHelper.EncodeJson(w, r, result)
+			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
 
 		// Delete the session via API (authserver performs audit)
 		err = apiClient.DeleteUserSessionById(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -208,6 +208,6 @@ func HandleAdminClientUserSessionsPost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

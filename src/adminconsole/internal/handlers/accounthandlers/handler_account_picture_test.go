@@ -111,7 +111,7 @@ func TestHandleAccountPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 //
 // Three of the rows are behaviour changes rather than refactors. The generic failure used to put
 // err.Error() on the wire at 500 and log nothing, so an internal message reached the browser and no
-// operator ever saw the fault; it is now JsonError's generic arm, which logs once with a stack and
+// operator ever saw the fault; it is now JSONError's generic arm, which logs once with a stack and
 // answers a request id. The missing JWT context used to answer 401, alone among the 100 sites that
 // guard the same middleware invariant, and is now the 500 they all answer. And a multipart form
 // that will not parse used to carry err.Error() into the modal, where it now carries the console's
@@ -155,7 +155,7 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 		contentType string
 		withJwt     bool
 		apiErr      error
-		// wantStatus is the status that must reach the browser; 0 means JsonError's generic 500
+		// wantStatus is the status that must reach the browser; 0 means JSONError's generic 500
 		// arm, with the detail going to the log.
 		wantStatus int
 		wantCode   string
@@ -200,7 +200,7 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			var captured error
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
@@ -227,7 +227,7 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
-					"expected JsonError's generic 500 arm, got a status-carrying %v", captured)
+					"expected JSONError's generic 500 arm, got a status-carrying %v", captured)
 				return
 			}
 			require.True(t, errors.As(captured, &detail),
@@ -282,7 +282,7 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 
 	t.Run("one byte short it is the JSON 400 and nothing is forwarded", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
-		httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+		httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			var detail *oauth.ErrorDetail
 			return errors.As(err, &detail) && detail.Code() == "invalid_request_body" &&
 				detail.HTTPStatus() == http.StatusBadRequest
@@ -327,7 +327,7 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			var captured error
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
@@ -347,7 +347,7 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
-					"expected JsonError's generic 500 arm, got a status-carrying %v", captured)
+					"expected JSONError's generic 500 arm, got a status-carrying %v", captured)
 				return
 			}
 			require.True(t, errors.As(captured, &detail),

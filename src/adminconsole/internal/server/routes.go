@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/inputvalidation"
 )
@@ -39,7 +39,7 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
-	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
+	httpHelper := render.New(s.templateFS)
 	authHelper := oauthclient.NewAuthHelper(s.sessionStore, builtin.AdminConsoleSessionName, baseURL, s.cfg.AuthServer.BaseURL)
 
 	// Initialize middleware

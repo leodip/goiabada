@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -78,7 +78,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 		name         string
 		route        string
 		target       string
-		build        func(httpHelper *handlerhelpers.HttpHelper, apiClient *grantOneApiClient) http.HandlerFunc
+		build        func(httpHelper *render.Renderer, apiClient *grantOneApiClient) http.HandlerFunc
 		current      []api.PermissionResponse
 		group        bool
 		wantWanted   []int64
@@ -88,7 +88,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			name:   "revoking from a user",
 			route:  "/admin/resources/{resourceId}/users-with-permission/remove/{userId}/{permissionId}",
 			target: "/admin/resources/2/users-with-permission/remove/5/7",
-			build: func(h *handlerhelpers.HttpHelper, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
 				return HandleAdminResourceUsersWithPermissionRemovePermissionPost(h, c)
 			},
 			current:      []api.PermissionResponse{{Id: 3}, {Id: 7}},
@@ -99,7 +99,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			name:   "granting to a user with no grants",
 			route:  "/admin/resources/{resourceId}/users-with-permission/add/{userId}/{permissionId}",
 			target: "/admin/resources/2/users-with-permission/add/5/7",
-			build: func(h *handlerhelpers.HttpHelper, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
 				return HandleAdminResourceUsersWithPermissionAddPermissionPost(h, c)
 			},
 			current:      nil,
@@ -110,7 +110,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			name:   "revoking from a group",
 			route:  "/admin/resources/{resourceId}/groups-with-permission/remove/{groupId}/{permissionId}",
 			target: "/admin/resources/2/groups-with-permission/remove/5/7",
-			build: func(h *handlerhelpers.HttpHelper, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
 				return HandleAdminResourceGroupsWithPermissionRemovePermissionPost(h, c)
 			},
 			current:      []api.PermissionResponse{{Id: 7}, {Id: 3}},
@@ -122,7 +122,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			name:   "granting to a group with no grants",
 			route:  "/admin/resources/{resourceId}/groups-with-permission/add/{groupId}/{permissionId}",
 			target: "/admin/resources/2/groups-with-permission/add/5/7",
-			build: func(h *handlerhelpers.HttpHelper, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
 				return HandleAdminResourceGroupsWithPermissionAddPermissionPost(h, c)
 			},
 			current:      nil,
@@ -134,7 +134,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := render.New(nil)
 			apiClient := &grantOneApiClient{current: tc.current}
 			router := chi.NewRouter()
 			router.Post(tc.route, tc.build(httpHelper, apiClient))

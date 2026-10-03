@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -52,7 +52,7 @@ func HandleAdminClientRedirectURIsGet(
 
 		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
@@ -68,7 +68,7 @@ func HandleAdminClientRedirectURIsGet(
 		// PUT /api/v1/admin/clients/{id}/redirect-uris asks the same question.
 		settingsResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -137,21 +137,21 @@ func HandleAdminClientRedirectURIsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data RedirectURIsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -162,25 +162,25 @@ func HandleAdminClientRedirectURIsPost(
 		}
 		_, err = apiClient.UpdateClientRedirectURIs(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {
-			// Not JsonError directly: the API refuses a redirect URI with a 400 whose
+			// Not JSONError directly: the API refuses a redirect URI with a 400 whose
 			// description names the offending value, and that sentence is the only thing
 			// telling the administrator which of their URIs was rejected and why. Handed
-			// to JsonError as a plain error it becomes a generic 500 and the sentence goes
+			// to JSONError as a plain error it becomes a generic 500 and the sentence goes
 			// to the log instead of the screen (#122).
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
 		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
@@ -189,6 +189,6 @@ func HandleAdminClientRedirectURIsPost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

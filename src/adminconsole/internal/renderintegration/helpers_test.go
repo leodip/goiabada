@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
@@ -23,12 +23,12 @@ import (
 // rawKeyRe matches a leaked catalog key (dotted, in visible HTML).
 var rawKeyRe = regexp.MustCompile(`\b(adminconsole|common|auth|account|admin|consent|validator|handler|email|system)\.[a-z0-9_]+(?:\.[a-z0-9_]+)+`)
 
-func render(t *testing.T, page string, bind map[string]interface{}) string {
+func renderMenuPage(t *testing.T, page string, bind map[string]interface{}) string {
 	t.Helper()
 	return renderWithLayout(t, "/layouts/menu_layout.html", page, bind)
 }
 
-// renderWithLayout is render with the layout named, for the one page that is not a menu page: the
+// renderWithLayout is renderMenuPage with the layout named, for the one page that is not a menu page: the
 // logout form binding renders under no_menu_layout, the same layout the 404 and 500 pages use.
 func renderWithLayout(t *testing.T, layout, page string, bind map[string]interface{}) string {
 	t.Helper()
@@ -37,7 +37,7 @@ func renderWithLayout(t *testing.T, layout, page string, bind map[string]interfa
 
 // renderWithLayoutAs is renderWithLayout with an ID token on the context, which is how every
 // authenticated page reaches the renderer in production: middleware.SessionHandler puts an oauthclient.JwtInfo
-// there and HttpHelper.RenderTemplate turns its claims into the `loggedInUser` bind that
+// there and render.Renderer.RenderTemplate turns its claims into the `loggedInUser` bind that
 // menu_layout.html reads for the dropdown label. Passing nil claims is the anonymous request, which
 // is what every other case in this package renders and why the label is blank in all of them.
 func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]interface{},
@@ -53,7 +53,7 @@ func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]inter
 	}
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
-	h := handlerhelpers.NewHttpHelper(web.TemplateFS())
+	h := render.New(web.TemplateFS())
 	w := httptest.NewRecorder()
 	err := h.RenderTemplate(w, req, layout, page, bind)
 	require.NoErrorf(t, err, "render %s in pt-BR (template referenced data the bind lacks?)", page)

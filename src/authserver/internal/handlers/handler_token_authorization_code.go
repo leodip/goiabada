@@ -19,12 +19,12 @@ func (tr tokenResponder) respondAuthorizationCode(w http.ResponseWriter, r *http
 
 	tokenResponse, err := tr.issuer.IssueAuthorizationCodeGrant(r.Context(), settings, grant.Code)
 	if errors.Is(err, issuance.ErrCodeNotClaimed) {
-		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+		tr.jsonWriter.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest))
 		return
 	}
 	if err != nil {
-		tr.jsonWriter.JsonError(w, r, err)
+		tr.jsonWriter.JSONError(w, r, err)
 		return
 	}
 

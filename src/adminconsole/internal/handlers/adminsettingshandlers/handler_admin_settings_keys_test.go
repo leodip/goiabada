@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -42,9 +42,9 @@ func (*stubApiClient) DeleteSettingsKey(context.Context, string, int64) error {
 }
 
 // TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser owns the wiring between
-// the rotate handler and HandleAPIErrorJson. The helper's own forwarding is pinned in
-// handlerhelpers' api_error_helper_test.go, but that test cannot see which of the two error paths
-// this handler calls: swapping HandleAPIErrorJson back to a direct JsonError leaves the
+// the rotate handler and HandleAPIErrorJSON. The helper's own forwarding is pinned in
+// render's api_error_helper_test.go, but that test cannot see which of the two error paths
+// this handler calls: swapping HandleAPIErrorJSON back to a direct JSONError leaves the
 // helper's tests and the whole admin console suite green while putting the 409 back behind
 // "An unexpected server error has occurred" and a request id.
 //
@@ -101,10 +101,10 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			// templateFS is nil because JsonError renders no template. This is the real
+			// templateFS is nil because JSONError renders no template. This is the real
 			// helper rather than a mock so the assertions below are on the bytes the
 			// browser receives.
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := render.New(nil)
 
 			req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
 				handlertest.WithAccessToken(),
@@ -137,7 +137,7 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 // failure path through a different helper cannot alter what a successful rotation answers.
 func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 
-	httpHelper := handlerhelpers.NewHttpHelper(nil)
+	httpHelper := render.New(nil)
 
 	req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
 

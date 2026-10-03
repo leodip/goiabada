@@ -10,7 +10,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -39,7 +39,7 @@ type faultFormat struct {
 func faultFormats() []faultFormat {
 	return []faultFormat{
 		{name: "page", faults: PageFaults},
-		{name: "protocol", faults: func() ServerFaults { return ProtocolFaults(handlerhelpers.NewHttpHelper(nil)) },
+		{name: "protocol", faults: func() ServerFaults { return ProtocolFaults(render.New(nil)) },
 			body: `{"error":"server_error","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestId + `"}`},
 		{name: "api", faults: APIFaults,
 			body: `{"error_code":"INTERNAL_SERVER_ERROR","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestId + `"}`},

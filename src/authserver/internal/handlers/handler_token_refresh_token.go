@@ -42,7 +42,7 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 	switch {
 	case errors.As(err, &replayed):
 		tr.auditRefreshTokenReplay(r.Context(), grant, replayed.FamilyRevokedCount, replayed.FamilyRecorded)
-		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+		tr.jsonWriter.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			revokedRefreshTokenMessage, http.StatusBadRequest))
 		return
 	case errors.Is(err, issuance.ErrRefreshFlowDisabled):
@@ -50,18 +50,18 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		if grant.IsROPC {
 			description = protocolvalidation.ROPCNotAuthorizedErrorMsg
 		}
-		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
+		tr.jsonWriter.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			description, http.StatusBadRequest))
 		return
 	case errors.Is(err, issuance.ErrRefreshTokenNotClaimed), errors.Is(err, issuance.ErrRefreshFamilyRevoked):
 		// A family revoked between the validator's read and the rotation gets the lost claim's
 		// answer: the client can act on neither differently, and the record says nothing about
 		// why (#132, #259).
-		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+		tr.jsonWriter.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			revokedRefreshTokenMessage, http.StatusBadRequest))
 		return
 	case err != nil:
-		tr.jsonWriter.JsonError(w, r, err)
+		tr.jsonWriter.JSONError(w, r, err)
 		return
 	}
 

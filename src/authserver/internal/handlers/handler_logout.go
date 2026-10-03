@@ -11,10 +11,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
@@ -39,7 +39,7 @@ type logoutDatabase interface {
 // HandleLogoutGet and HandleLogoutPost serve /auth/logout, the OpenID Connect RP-Initiated
 // Logout 1.0 endpoint that discovery advertises as end_session_endpoint. Section 2: "The OP MUST
 // support the use of the HTTP GET and POST methods", so every parameter is read through
-// handlerhelpers' query-then-form functions, the ones the CSRF middleware reads id_token_hint with.
+// render's query-then-form functions, the ones the CSRF middleware reads id_token_hint with.
 func HandleLogoutGet(
 	pageRenderer PageRenderer,
 	httpSession sessionstore.Store,
@@ -92,20 +92,20 @@ func refineLogoutLocale(r *http.Request) *http.Request {
 // MUST be aborted", and once as "the OP MUST not perform post-logout redirection to an RP" upon
 // detecting errors (#109).
 func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, hint hintState) {
-	state, statePresent := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "state")
+	state, statePresent := render.LookupQueryOrFormValue(r, "state")
 
 	clientId := ""
 	if hint == hintAbsent {
-		clientId = handlerhelpers.GetFromUrlQueryOrFormPost(r, "client_id")
+		clientId = render.QueryOrFormValue(r, "client_id")
 	}
 
 	bind := map[string]interface{}{
 		"formAction":            logoutFormPath,
-		"postLogoutRedirectUri": handlerhelpers.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri"),
+		"postLogoutRedirectUri": render.QueryOrFormValue(r, "post_logout_redirect_uri"),
 		"clientId":              clientId,
 		"state":                 state,
 		"statePresent":          statePresent,
-		"uiLocales":             handlerhelpers.GetFromUrlQueryOrFormPost(r, "ui_locales"),
+		"uiLocales":             render.QueryOrFormValue(r, "ui_locales"),
 	}
 
 	err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/logout_consent.html", bind)
@@ -298,7 +298,7 @@ func classifyIdTokenHint(
 	dataCipher *encryption.DataCipher,
 ) (hintClassification, error) {
 
-	hint, present := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "id_token_hint")
+	hint, present := render.LookupQueryOrFormValue(r, "id_token_hint")
 	if !present {
 		return hintClassification{state: hintAbsent}, nil
 	}
@@ -309,7 +309,7 @@ func classifyIdTokenHint(
 	// Presence-aware, like the hint above and for the same reason: the client_id gate further down
 	// fires when the parameter is PRESENT, and a value-only read cannot tell "client_id=" from no
 	// client_id at all. See the comment on that gate for why the difference matters (#109).
-	clientId, clientIdPresent := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "client_id")
+	clientId, clientIdPresent := render.LookupQueryOrFormValue(r, "client_id")
 
 	// An encrypted hint is a Nested JWT (OpenID Connect Core 1.0 section 2) and must be decrypted
 	// before anything can be read from it. The key derives from a client secret, so client_id is what
@@ -670,7 +670,7 @@ func doLogout(
 	}
 
 	// 3. Resolve the redirect target, independently of step 2 above and of step 4 below.
-	postLogoutRedirectURI := handlerhelpers.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri")
+	postLogoutRedirectURI := render.QueryOrFormValue(r, "post_logout_redirect_uri")
 	location := ""
 	if len(postLogoutRedirectURI) > 0 {
 		// A confirmed hint carries its own client, resolved from the aud it is signed over. Only step
@@ -686,7 +686,7 @@ func doLogout(
 		// redirect (#109 decision 15).
 		client := hint.client
 		if hint.state == hintAbsent {
-			client = clientForPostLogoutRedirect(r.Context(), handlerhelpers.GetFromUrlQueryOrFormPost(r, "client_id"), database)
+			client = clientForPostLogoutRedirect(r.Context(), render.QueryOrFormValue(r, "client_id"), database)
 		}
 		location = postLogoutRedirectLocation(r, database, client, postLogoutRedirectURI)
 	}
@@ -769,15 +769,15 @@ func doLogout(
 // which is the intended outcome for a hint that failed to validate (#109 decision 15).
 func redirectToHintlessLogout(w http.ResponseWriter, r *http.Request) {
 	query := url.Values{}
-	if postLogoutRedirectURI := handlerhelpers.GetFromUrlQueryOrFormPost(r, "post_logout_redirect_uri"); len(postLogoutRedirectURI) > 0 {
+	if postLogoutRedirectURI := render.QueryOrFormValue(r, "post_logout_redirect_uri"); len(postLogoutRedirectURI) > 0 {
 		query.Set("post_logout_redirect_uri", postLogoutRedirectURI)
 	}
 	// Presence-aware, so a state supplied empty survives as "state=" and an absent one stays absent,
 	// which is the contract the consent form's hidden field keeps too (#109 decision 16).
-	if state, statePresent := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "state"); statePresent {
+	if state, statePresent := render.LookupQueryOrFormValue(r, "state"); statePresent {
 		query.Set("state", state)
 	}
-	if uiLocales := handlerhelpers.GetFromUrlQueryOrFormPost(r, "ui_locales"); len(uiLocales) > 0 {
+	if uiLocales := render.QueryOrFormValue(r, "ui_locales"); len(uiLocales) > 0 {
 		query.Set("ui_locales", uiLocales)
 	}
 
@@ -935,7 +935,7 @@ func postLogoutRedirectLocation(
 
 	// Presence-aware, because "state=" and no state at all are different requests and the RP can
 	// tell the difference in what comes back.
-	state, statePresent := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "state")
+	state, statePresent := render.LookupQueryOrFormValue(r, "state")
 	location, err := buildPostLogoutRedirect(postLogoutRedirectURI, state, statePresent)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to build the post-logout redirect, not redirecting",

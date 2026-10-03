@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -39,7 +39,7 @@ func HandleAccountEmailVerificationGet(
 		}
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -95,13 +95,13 @@ func HandleAccountEmailSendVerificationPost(
 		// Get JWT info to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		resp, err := apiClient.SendAccountEmailVerification(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -110,7 +110,7 @@ func HandleAccountEmailSendVerificationPost(
 		result.EmailDestination = resp.EmailDestination
 		result.TooManyRequests = resp.TooManyRequests
 		result.WaitInSeconds = resp.WaitInSeconds
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }
 
@@ -132,7 +132,7 @@ func HandleAccountEmailVerificationPost(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -174,7 +174,7 @@ func HandleAccountEmailVerificationPost(
 			}
 
 			// Delegate other errors to generic handler
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, renderRefused)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, renderRefused)
 			return
 		}
 

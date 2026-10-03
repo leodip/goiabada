@@ -19,10 +19,10 @@ import (
 // something the API refused" and "the API broke" all arrive at the caller as one
 // *apiclient.APIError and are told apart only by its StatusCode. Three helpers do that telling
 // apart, one per response shape: HandleAPIError for a page, HandleAPIErrorWithCallback for a page
-// with a form to redraw, HandleAPIErrorJson for JSON. A guard that writes the error itself picks
+// with a form to redraw, HandleAPIErrorJSON for JSON. A guard that writes the error itself picks
 // one meaning for all of them, and which meaning it picks is wrong in both directions:
 //
-//   - httpHelper.InternalServerError(w, r, err) or httpHelper.JsonError(w, r, err) turns an
+//   - httpHelper.InternalServerError(w, r, err) or httpHelper.JSONError(w, r, err) turns an
 //     upstream 404 into a 500. Following a stale link to a deleted client then tells the
 //     administrator the server has broken, and spends a stack, a log record and a request id
 //     saying so.
@@ -87,12 +87,12 @@ func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
 	sort.Strings(problems)
 	if len(problems) > 0 {
 		t.Errorf("%d problem(s) across %d apiClient error guard(s):\n\t%s\n\n"+
-			"Call handlerhelpers.HandleAPIError for a page, HandleAPIErrorWithCallback for a page with a "+
-			"form to redraw, or HandleAPIErrorJson for JSON. Each routes 401 to the session-ended "+
+			"Call render.HandleAPIError for a page, HandleAPIErrorWithCallback for a page with a "+
+			"form to redraw, or HandleAPIErrorJSON for JSON. Each routes 401 to the session-ended "+
 			"route, 404 to the console's own not-found answer, 400 (and 409) to the caller, and "+
 			"everything else to the 500 writer, which is where the stack and the request id belong "+
 			"(#279, #427). A read the page can do without keeps its fallback for everything but "+
-			"handlerhelpers.IsSessionEnded.",
+			"render.IsSessionEnded.",
 			len(problems), guards, strings.Join(problems, "\n\t"))
 	}
 }
@@ -149,8 +149,8 @@ func apiClientGuardProblems(fset *token.FileSet, file *ast.File, rel string) ([]
 				continue
 			}
 			problems = append(problems, at(guard.stmt)+"the error from "+guard.method+
-				" is answered here without reaching handlerhelpers.HandleAPIError, "+
-				"HandleAPIErrorWithCallback or HandleAPIErrorJson")
+				" is answered here without reaching render.HandleAPIError, "+
+				"HandleAPIErrorWithCallback or HandleAPIErrorJSON")
 		}
 		return true
 	})
@@ -350,9 +350,9 @@ func guardAnswersTheRequest(body *ast.BlockStmt) bool {
 			name = fun.Sel.Name
 		}
 		switch name {
-		case "InternalServerError", "NotFound", "JsonError", "JsonNotFound", "JsonBadRequestBody",
-			"EncodeJson", "RenderTemplate", "Redirect", "As",
-			"HandleAPIError", "HandleAPIErrorWithCallback", "HandleAPIErrorJson":
+		case "InternalServerError", "NotFound", "JSONError", "JSONNotFound", "JSONBadRequestBody",
+			"EncodeJSON", "RenderTemplate", "Redirect", "As",
+			"HandleAPIError", "HandleAPIErrorWithCallback", "HandleAPIErrorJSON":
 			answers = true
 		}
 		return !answers
@@ -393,7 +393,7 @@ func guardReturnsTheError(body *ast.BlockStmt, errVar string) bool {
 // first; what the rule holds is that the fall-through is the classifier and not a writer chosen by
 // hand.
 //
-// The call has to name handlerhelpers, where the three have lived since #440 took them out of
+// The call has to name render, where the three have lived since #440 took them out of
 // this package so the children could stop importing it. A bare HandleAPIError in a handler file
 // is a function of that package spelled the same, which classifies nothing this rule has read.
 //
@@ -417,11 +417,11 @@ func guardReachesClassifier(body *ast.BlockStmt) bool {
 		if !ok {
 			return true
 		}
-		if pkg, ok := sel.X.(*ast.Ident); !ok || pkg.Name != "handlerhelpers" {
+		if pkg, ok := sel.X.(*ast.Ident); !ok || pkg.Name != "render" {
 			return true
 		}
 		switch sel.Sel.Name {
-		case "HandleAPIError", "HandleAPIErrorWithCallback", "HandleAPIErrorJson":
+		case "HandleAPIError", "HandleAPIErrorWithCallback", "HandleAPIErrorJSON":
 			found = true
 		}
 		return !found
@@ -445,17 +445,17 @@ func TestHandlers_BlindCatchRuleTable(t *testing.T) {
 	}{
 		{
 			name:  "a bare catch that reads nothing is blind",
-			body:  "if errors.As(err, &apiErr) { httpHelper.JsonError(w, r, err); return }",
+			body:  "if errors.As(err, &apiErr) { httpHelper.JSONError(w, r, err); return }",
 			blind: true,
 		},
 		{
 			name:  "the same catch in brackets is the same catch",
-			body:  "if (errors.As(err, &apiErr)) { httpHelper.JsonError(w, r, err); return }",
+			body:  "if (errors.As(err, &apiErr)) { httpHelper.JSONError(w, r, err); return }",
 			blind: true,
 		},
 		{
 			name:  "brackets around the callee, which calls what the bare form calls",
-			body:  "if (errors.As)(err, &apiErr) { httpHelper.JsonError(w, r, err); return }",
+			body:  "if (errors.As)(err, &apiErr) { httpHelper.JSONError(w, r, err); return }",
 			blind: true,
 		},
 		{
@@ -475,7 +475,7 @@ func TestHandlers_BlindCatchRuleTable(t *testing.T) {
 		},
 		{
 			name:  "a guard with no As call in it at all",
-			body:  "httpHelper.JsonError(w, r, err)",
+			body:  "httpHelper.JSONError(w, r, err)",
 			blind: false,
 		},
 	}
@@ -529,8 +529,8 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 			name: "the optional read that answers a 401 and warns on the rest",
 			body: `logoInfo, err := apiClient.GetClientLogo(ctx, token, id)
 				if err != nil {
-					if handlerhelpers.IsSessionEnded(err) {
-						handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+					if render.IsSessionEnded(err) {
+						render.HandleAPIError(httpHelper, w, r, err)
 						return
 					}
 					slog.WarnContext(ctx, "unable to fetch the client logo info", "error", err)
@@ -541,8 +541,8 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 			name: "the redraw that answers a 401 and carries on without the list otherwise",
 			body: `apiResp, err := apiClient.GetSettingsUITheme(ctx, token)
 				if err != nil {
-					if handlerhelpers.IsSessionEnded(err) {
-						handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+					if render.IsSessionEnded(err) {
+						render.HandleAPIError(httpHelper, w, r, err)
 						return
 					}
 				} else {
@@ -640,7 +640,7 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 			name: "nor is one named on another package",
 			body: `client, err := apiClient.GetClientById(ctx, token, id)
 				if err != nil {
-					handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+					handlers.HandleAPIErrorJSON(httpHelper, w, r, err)
 					return
 				}`,
 			guards:   1,
@@ -650,7 +650,7 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 			name: "the classifier where it lives",
 			body: `client, err := apiClient.GetClientById(ctx, token, id)
 				if err != nil {
-					handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+					render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 					return
 				}`,
 			guards: 1,
@@ -663,7 +663,7 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 						renderError(apiErr.Message)
 						return
 					}
-					handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+					render.HandleAPIError(httpHelper, w, r, err)
 					return
 				}`,
 			guards:   1,

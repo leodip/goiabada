@@ -8,7 +8,7 @@ import (
 )
 
 // AuthCodeReusedError.Unwrap puts its Detail on the chain, so the writers and the sentinels reach
-// it. Before Unwrap, handing this wrapper to JsonError answered 500 with the description in the log
+// it. Before Unwrap, handing this wrapper to JSONError answered 500 with the description in the log
 // instead of 400 with it on the wire.
 func TestAuthCodeReusedError_UnwrapsToItsDetail(t *testing.T) {
 	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", 400)

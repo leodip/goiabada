@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -25,7 +25,7 @@ func HandleAdminGetPermissionsGet(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -37,7 +37,7 @@ func HandleAdminGetPermissionsGet(
 		resourceIdStr := r.URL.Query().Get("resourceId")
 		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -49,7 +49,7 @@ func HandleAdminGetPermissionsGet(
 			// upstream 500 was written twice, and a 400, 404 or 409 that the classifier forwards
 			// silently on purpose was still announced at ERROR. errors.As sees the
 			// *apiclient.APIError through this wrap, so the forwarding is unaffected (#279).
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r,
+			render.HandleAPIErrorJSON(httpHelper, w, r,
 				errs.Wrapf(err, "unable to get the permissions of resource %d", resourceId))
 			return
 		}
@@ -60,6 +60,6 @@ func HandleAdminGetPermissionsGet(
 		}
 
 		result.Permissions = permissions
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

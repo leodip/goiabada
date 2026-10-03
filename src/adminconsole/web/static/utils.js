@@ -37,7 +37,7 @@ function escapeHtml(str) {
 
 // The error code the console answers an AJAX request with when the admin API refused its access
 // token, and the route that then signs the administrator out and says why on the home page. The
-// code is HandleAPIErrorJson's sessionEndedCode and the path its sessionEndedPath; a drift test in
+// code is HandleAPIErrorJSON's sessionEndedCode and the path its sessionEndedPath; a drift test in
 // internal/handlers holds the three to each other. Every fetch site here and in image-upload.js
 // keys on the code rather than on the 403 it arrives with, so no other 403 signs anybody out (#427).
 const SESSION_ENDED_CODE = "session_ended";

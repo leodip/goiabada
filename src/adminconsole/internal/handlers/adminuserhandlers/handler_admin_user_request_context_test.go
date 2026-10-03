@@ -440,8 +440,8 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 			// held by TestHandlers_AjaxHandlersDoNotUsePageWriters and the classifier guard, not
 			// here. What this case needs is only that the handler answered rather than carrying on.
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-			httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Maybe()
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
+			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -465,7 +465,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 func TestAdminUserHandlers_ThePhoneWriteCarriesTheRequestsContext(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything).Return(nil).Maybe()
 

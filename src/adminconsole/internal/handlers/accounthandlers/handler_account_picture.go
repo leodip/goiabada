@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -39,7 +39,7 @@ func HandleAccountPictureGet(
 		// real failure and is answered as one rather than drawn as an empty picture (#425).
 		pictureInfo, err := apiClient.GetAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if pictureInfo != nil && pictureInfo.HasPicture {
@@ -65,7 +65,7 @@ func HandleAccountPictureGet(
 // rest of the console's AJAX paths use.
 //
 // The generic branch wrote err.Error() straight onto the wire at 500 and logged nothing, so an
-// internal message reached the browser and no operator ever saw the failure. JsonError logs it
+// internal message reached the browser and no operator ever saw the failure. JSONError logs it
 // once with a stack and answers the request id sentence instead.
 //
 // The multipart branches answered a client's mistake correctly at 400 but with their own wording,
@@ -92,7 +92,7 @@ func HandleAccountProfilePicturePost(
 		// Get JWT info to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -101,14 +101,14 @@ func HandleAccountProfilePicturePost(
 		// held in memory before the rest spills to temporary files.
 		//nolint:gosec // G120: bounded by uploadBodyLimit, as above; G120 flags every multipart parse
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Get file from form
 		file, header, err := r.FormFile("picture")
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 		defer func() { _ = file.Close() }()
@@ -116,14 +116,14 @@ func HandleAccountProfilePicturePost(
 		// Read file data
 		pictureData, err := io.ReadAll(file)
 		if err != nil {
-			httpHelper.JsonError(w, r, errs.Wrap(err, "failed to read picture data"))
+			httpHelper.JSONError(w, r, errs.Wrap(err, "failed to read picture data"))
 			return
 		}
 
 		// Call API client to upload
 		response, err := apiClient.UploadAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, pictureData, header.Filename)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -144,14 +144,14 @@ func HandleAccountProfilePictureDelete(
 		// Get JWT info to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		// Call API client to delete
 		err := apiClient.DeleteAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 

@@ -13,9 +13,9 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -163,11 +163,11 @@ func TestCeremonyMatches(t *testing.T) {
 	}
 }
 
-// stateMismatchPageRenderer is a real HttpHelper over the two templates the state-mismatch page
+// stateMismatchPageRenderer is a real render.Renderer over the two templates the state-mismatch page
 // renders through, so a case sees the status on the wire and the page's text rather than a bind
 // map handed to a mock.
-func stateMismatchPageRenderer() *handlerhelpers.HttpHelper {
-	return handlerhelpers.NewHttpHelper(fstest.MapFS{
+func stateMismatchPageRenderer() *render.Renderer {
+	return render.New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
 		"auth_error.html":             {Data: []byte(`{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`)},
 	})
@@ -177,7 +177,7 @@ func stateMismatchPageRenderer() *handlerhelpers.HttpHelper {
 // writer, so nothing there sees the status on the wire or the log line. The predicate's table is
 // ceremony's TestInState; this one owns what the gate does with its answer.
 //
-// The status is asserted on a real recorder through a real HttpHelper rather than on the bind map,
+// The status is asserted on a real recorder through a real render.Renderer rather than on the bind map,
 // because "_httpStatus" is only a request to RenderTemplate and a helper that passed 400 to a
 // writer which ignored it would satisfy the map assertion (#279 decision 21, #436 seam 3).
 func TestRequireAuthState(t *testing.T) {
@@ -537,7 +537,7 @@ func TestCeremonyStepURL(t *testing.T) {
 	})
 }
 
-// renderableRequest carries the settings the real HttpHelper reads out of the context on every
+// renderableRequest carries the settings the real render.Renderer reads out of the context on every
 // render. Without it RenderTemplateToBuffer panics on a nil assertion, which is a property of the
 // renderer rather than of anything under test here.
 func renderableRequest(target string) *http.Request {

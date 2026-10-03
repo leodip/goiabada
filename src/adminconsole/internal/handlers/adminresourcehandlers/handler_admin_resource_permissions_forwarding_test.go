@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -32,7 +32,7 @@ import (
 //
 // The handler is exercised through the real HttpHelper rather than the mock, because the status on
 // the wire is the whole of what this pins; NewHttpHelper(nil) never reaches a template on a
-// JsonError path carrying a status.
+// JSONError path carrying a status.
 type savePermissionsApiClient struct {
 	resource  *api.ResourceResponse
 	updateErr error
@@ -125,7 +125,7 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 			router := chi.NewRouter()
 			router.Post("/admin/resources/{resourceId}/permissions",
 				HandleAdminResourcePermissionsPost(
-					handlerhelpers.NewHttpHelper(nil),
+					render.New(nil),
 					nil,
 					&savePermissionsApiClient{
 						resource:  &api.ResourceResponse{Id: 3},

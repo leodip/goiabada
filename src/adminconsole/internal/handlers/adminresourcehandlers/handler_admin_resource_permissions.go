@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -55,7 +55,7 @@ func HandleAdminResourcePermissionsGet(
 
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
@@ -80,7 +80,7 @@ func HandleAdminResourcePermissionsGet(
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -122,40 +122,40 @@ func HandleAdminResourcePermissionsPost(
 
 		idStr := chi.URLParam(r, "resourceId")
 		if len(idStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		// Get JWT info
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		if resource == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		var data SavePermissionsInput
 		err = json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		if data.ResourceId != resource.Id {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -190,25 +190,25 @@ func HandleAdminResourcePermissionsPost(
 			// in, where the 200 path passed the value straight to showModalDialog, which assigns
 			// innerHTML. Answering 200 also reported a save that had not happened to anything
 			// reading the status rather than the body (#279 decision 13).
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, updateResourcePermissionsErr)
+			render.HandleAPIErrorJSON(httpHelper, w, r, updateResourcePermissionsErr)
 			return
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
 		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
 		result.Success = true
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }
 
@@ -240,7 +240,7 @@ func HandleAdminResourceValidatePermissionPost(
 		var data map[string]string
 		err := json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -250,13 +250,13 @@ func HandleAdminResourceValidatePermissionPost(
 		// i18n surface: A — admin browser-flow, JSON to in-page handler.
 		if inputvalidation.ContainsAngleBrackets(description) {
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).Localize(r.Context())
-			httpHelper.EncodeJson(w, r, result)
+			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
 
 		if len(permissionIdentifier) == 0 {
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsIdentifierRequired, nil).Localize(r.Context())
-			httpHelper.EncodeJson(w, r, result)
+			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
 
@@ -272,12 +272,12 @@ func HandleAdminResourceValidatePermissionPost(
 			switch {
 			case errors.As(err, &localizedErr):
 				result.Error = localizedErr.Localize(r.Context())
-				httpHelper.EncodeJson(w, r, result)
+				httpHelper.EncodeJSON(w, r, result)
 			case errors.As(err, &errorDetail):
 				result.Error = errorDetail.Description()
-				httpHelper.EncodeJson(w, r, result)
+				httpHelper.EncodeJSON(w, r, result)
 			default:
-				httpHelper.JsonError(w, r, err)
+				httpHelper.JSONError(w, r, err)
 			}
 			return
 		}
@@ -286,11 +286,11 @@ func HandleAdminResourceValidatePermissionPost(
 		if len(description) > maxLengthDescription {
 			// i18n surface: A — admin browser-flow, JSON to in-page handler.
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}).Localize(r.Context())
-			httpHelper.EncodeJson(w, r, result)
+			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
 
 		result.Valid = true
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

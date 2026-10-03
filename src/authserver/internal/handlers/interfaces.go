@@ -19,7 +19,7 @@ import (
 // an HTML error page on one of them is a compile error rather than a review finding: a client
 // parsing those endpoints as JSON got an HTML 500 on 23 fault paths while one port carried both
 // writers (#435). Every other handler answers pages and takes PageRenderer. The concrete
-// handlerhelpers.HttpHelper satisfies both, so routes.go builds it once.
+// render.Renderer satisfies both, so routes.go builds it once.
 type PageRenderer interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
 	NotFound(w http.ResponseWriter, r *http.Request)
@@ -29,11 +29,11 @@ type PageRenderer interface {
 		data map[string]interface{}) (*bytes.Buffer, error)
 }
 
-// JSONWriter answers the JSON endpoints. JsonError writes an ErrorDetail in the RFC 6749 section
+// JSONWriter answers the JSON endpoints. JSONError writes an ErrorDetail in the RFC 6749 section
 // 5.2 shape and anything else as a 500 server_error.
 type JSONWriter interface {
-	JsonError(w http.ResponseWriter, r *http.Request, err error)
-	EncodeJson(w http.ResponseWriter, r *http.Request, data interface{})
+	JSONError(w http.ResponseWriter, r *http.Request, err error)
+	EncodeJSON(w http.ResponseWriter, r *http.Request, data interface{})
 }
 
 // CeremonyStore is what the ceremony handlers call on ceremony.Store, which keeps the

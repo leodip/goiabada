@@ -13,12 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -76,7 +76,7 @@ func pictureForm(t *testing.T) []handlertest.Option {
 	return []handlertest.Option{handlertest.WithBody(body), handlertest.WithContentType(writer.FormDataContentType())}
 }
 
-// The six image handlers are the ones that answer through HandleAPIErrorJson to image-upload.js,
+// The six image handlers are the ones that answer through HandleAPIErrorJSON to image-upload.js,
 // which follows the session-ended code rather than reading the status. This is the Go half of that
 // contract at each of them, through the production JSON writer, so what is asserted is the wire: a
 // 403 whose body carries the code (#427 decisions 17 and 18; plan review round 2, finding 1).
@@ -152,7 +152,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			httpHelper := handlerhelpers.NewHttpHelper(web.TemplateFS())
+			httpHelper := render.New(web.TemplateFS())
 			testCase.handler(httpHelper).ServeHTTP(w, handlertest.Request(testCase.method, "/image", opts...))
 
 			assert.Equal(t, http.StatusForbidden, w.Code)

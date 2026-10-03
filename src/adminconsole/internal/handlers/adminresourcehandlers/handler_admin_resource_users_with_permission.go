@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -38,7 +38,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			return
 		}
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		resource, permissions, accessToken := loaded.resource, loaded.permissions, loaded.accessToken
@@ -81,7 +81,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		if selectedPermission > 0 {
 			usersWithPermission, total, err = apiClient.GetUsersByPermission(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 			if err != nil {
-				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+				render.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 
@@ -92,7 +92,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 				pageInt = clamped
 				usersWithPermission, total, err = apiClient.GetUsersByPermission(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 				if err != nil {
-					handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+					render.HandleAPIError(httpHelper, w, r, err)
 					return
 				}
 			}
@@ -153,44 +153,44 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		loaded, err := loadResourcePermissions(r, apiClient)
 		if errors.Is(err, errNoSuchResource) {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		found := false
@@ -201,7 +201,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			}
 		}
 		if !found {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -213,7 +213,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			}
 		}
 		if !found {
-			handlerhelpers.JsonConflict(httpHelper, w, r)
+			render.JSONConflict(httpHelper, w, r)
 			return
 		}
 
@@ -226,12 +226,12 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 		}
 		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
 		result := struct{ Success bool }{Success: true}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }
 
@@ -246,7 +246,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			return
 		}
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		resource, permissions := loaded.resource, loaded.permissions
@@ -312,11 +312,11 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 		loaded, err := loadResourcePermissions(r, apiClient)
 		if errors.Is(err, errNoSuchResource) {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
@@ -330,7 +330,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		}
 		selectedPermission, err := strconv.ParseInt(selectedPermissionStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		// check if permission belongs to resource
@@ -342,19 +342,19 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			}
 		}
 		if !found {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		query := strings.TrimSpace(r.URL.Query().Get("query"))
 		if len(query) == 0 {
-			httpHelper.EncodeJson(w, r, result)
+			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
 
 		annotatedUsers, _, err := apiClient.SearchUsersWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, query, 1, 15)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		usersResult := make([]UserResult, 0, len(annotatedUsers))
@@ -371,7 +371,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			})
 		}
 		result.Users = usersResult
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }
 
@@ -382,44 +382,44 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		loaded, err := loadResourcePermissions(r, apiClient)
 		if errors.Is(err, errNoSuchResource) {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		permissionIdStr := chi.URLParam(r, "permissionId")
 		if len(permissionIdStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -431,13 +431,13 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			}
 		}
 		if !found {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		for _, permission := range currentPerms {
 			if permission.Id == permissionId {
-				handlerhelpers.JsonConflict(httpHelper, w, r)
+				render.JSONConflict(httpHelper, w, r)
 				return
 			}
 		}
@@ -449,11 +449,11 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		newIds = append(newIds, permissionId)
 		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
 		result := struct{ Success bool }{Success: true}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

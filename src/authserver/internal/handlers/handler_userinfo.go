@@ -38,19 +38,19 @@ func HandleUserInfoGetPost(
 		// Authentication and authorization handled by middleware
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		if !ok {
-			jsonWriter.JsonError(w, r, errs.New("unable to get validated token from context"))
+			jsonWriter.JSONError(w, r, errs.New("unable to get validated token from context"))
 			return
 		}
 
 		sub := jwtToken.StringClaim("sub")
 		if len(sub) == 0 {
-			jsonWriter.JsonError(w, r, errs.New("unable to get the sub claim from the access token"))
+			jsonWriter.JSONError(w, r, errs.New("unable to get the sub claim from the access token"))
 			return
 		}
 
 		user, err := database.GetUserBySubject(r.Context(), nil, sub)
 		if err != nil {
-			jsonWriter.JsonError(w, r, err)
+			jsonWriter.JSONError(w, r, err)
 			return
 		}
 
@@ -62,7 +62,7 @@ func HandleUserInfoGetPost(
 			// permitted but told the client to retry a request that can only fail again,
 			// where 401 tells it to obtain a new token, which is the whole point of the
 			// distinction (#279 decision 14).
-			jsonWriter.JsonError(w, r, invalidTokenRefusal("The user could not be found."))
+			jsonWriter.JSONError(w, r, invalidTokenRefusal("The user could not be found."))
 			return
 		}
 
@@ -74,25 +74,25 @@ func HandleUserInfoGetPost(
 			// 401 invalid_token, for the reason the not-found branch above gives: the
 			// token is no longer valid for this account and the client's remedy is a new
 			// one, not a retry (#279 decision 14).
-			jsonWriter.JsonError(w, r, invalidTokenRefusal("The user account is disabled."))
+			jsonWriter.JSONError(w, r, invalidTokenRefusal("The user account is disabled."))
 			return
 		}
 
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			jsonWriter.JsonError(w, r, err)
+			jsonWriter.JSONError(w, r, err)
 			return
 		}
 
 		err = database.GroupsLoadAttributes(r.Context(), nil, user.Groups)
 		if err != nil {
-			jsonWriter.JsonError(w, r, err)
+			jsonWriter.JSONError(w, r, err)
 			return
 		}
 
 		err = database.UserLoadAttributes(r.Context(), nil, user)
 		if err != nil {
-			jsonWriter.JsonError(w, r, err)
+			jsonWriter.JSONError(w, r, err)
 			return
 		}
 
@@ -120,7 +120,7 @@ func HandleUserInfoGetPost(
 		mapper.AddGroupClaims(claims, user, scopes)
 		mapper.AddAttributeClaims(claims, user, scopes)
 
-		jsonWriter.EncodeJson(w, r, claims)
+		jsonWriter.EncodeJSON(w, r, claims)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -46,7 +46,7 @@ func HandleAdminUserDeleteGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -60,13 +60,13 @@ func HandleAdminUserDeleteGet(
 		// destructive action, so under-reporting what it discards is the whole defect (#350).
 		_, groups, err := apiClient.GetUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
 			"user":         user,
-			"userFullName": handlerhelpers.UserFullName(user),
+			"userFullName": render.UserFullName(user),
 			"groups":       groups,
 			"page":         r.URL.Query().Get("page"),
 			"query":        r.URL.Query().Get("query"),
@@ -108,7 +108,7 @@ func HandleAdminUserDeletePost(
 
 		err = apiClient.DeleteUser(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

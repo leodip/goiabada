@@ -320,8 +320,8 @@ type slogPlainSite struct {
 // slogNoRequestDirs: the auth server's also serves the OpenAPI document on every request, so both
 // are admitted function by function, the way core/i18n's startup records are (#442).
 var slogPlainSites = []slogPlainSite{
-	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "addUrlParam"},
-	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "convertToString"},
+	{scope: "adminconsole/internal/render/template_funcs.go", name: "addUrlParam"},
+	{scope: "adminconsole/internal/render/template_funcs.go", name: "convertToString"},
 	{scope: "core/i18n/overrides.go", name: "loadOverrideCatalogs"},
 	{scope: "core/i18n/i18n.go", name: "orEmpty"},
 	{scope: "authserver/web/embed_fs.go", name: "StaticFS"},

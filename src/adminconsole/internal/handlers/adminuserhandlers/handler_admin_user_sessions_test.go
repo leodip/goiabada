@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -47,7 +47,7 @@ func (c *userSessionsApiClient) DeleteUserSessionById(_ context.Context, accessT
 	return nil
 }
 
-// The admin-side twin of the account page's case. The mapping is handlerhelpers.SessionInfos,
+// The admin-side twin of the account page's case. The mapping is render.SessionInfos,
 // shared with the account page and tested there (#440); this case pins that this page's rows still
 // come through it. A guard added at one call site and absent from its sibling is exactly the shape
 // a change like this ships with (#281 decision 6).
@@ -74,7 +74,7 @@ func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	bind := handlertest.Bind(t, httpHelper)
 
-	sessions, ok := bind["sessions"].([]handlerhelpers.SessionInfo)
+	sessions, ok := bind["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
 	assert.Equal(t, header, sessions[0].UserAgent)
@@ -105,7 +105,7 @@ func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
 	require.NotNil(t, sessions[0].Started)
@@ -139,7 +139,7 @@ func TestHandleAdminUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) 
 
 	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 
@@ -208,7 +208,7 @@ func TestHandleAdminUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testin
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
-			handlertest.ExpectEncodeJson(httpHelper).Once()
+			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
 			apiClient := &userSessionsApiClient{
 				user:     &api.UserResponse{Id: 7},
@@ -255,7 +255,7 @@ func TestHandleAdminUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testin
 func TestHandleAdminUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
-	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()

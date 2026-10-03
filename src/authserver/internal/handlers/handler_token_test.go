@@ -60,7 +60,7 @@ func TestHandleTokenPost(t *testing.T) {
 				req = withSettings(req, &models.Settings{})
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-				jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 					detail, ok := err.(*oauth.ErrorDetail)
 					return ok && detail.Code() == "invalid_request" &&
 						detail.HTTPStatus() == http.StatusBadRequest &&
@@ -93,7 +93,7 @@ func TestHandleTokenPost(t *testing.T) {
 			req = withSettings(req, &models.Settings{})
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*oauth.ErrorDetail)
 				return ok && detail.Code() == "invalid_client"
 			})).Return().Once()
@@ -121,7 +121,7 @@ func TestHandleTokenPost(t *testing.T) {
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1}))
 			require.Error(t, req.ParseForm(), "the limiter's parse fails")
 
-			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*oauth.ErrorDetail)
 				return ok && detail.Code() == "invalid_request" &&
 					detail.HTTPStatus() == http.StatusBadRequest &&
@@ -139,7 +139,7 @@ func TestHandleTokenPost(t *testing.T) {
 	// TestExtractClientCredentials'.
 	t.Run("two client authentication methods are refused before the validator", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
-		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			detail, ok := err.(*oauth.ErrorDetail)
 			return ok && detail.Code() == "invalid_request" &&
 				detail.HTTPStatus() == http.StatusBadRequest &&
@@ -177,7 +177,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(nil, validationError)
 
-		jsonWriter.On("JsonError", rr, req, validationError).Return()
+		jsonWriter.On("JSONError", rr, req, validationError).Return()
 
 		handler.ServeHTTP(rr, req)
 
@@ -192,7 +192,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 		failure := oauth.NewErrorDetailWithHTTPStatus("server_error", "Failed to generate token", http.StatusInternalServerError)
 		endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code).Return(nil, failure).Once()
-		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, failure).Return().Once()
 
 		endpoint.post(t, "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client")
 
@@ -214,7 +214,7 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
 			"codeId": code.Id,
 		}).Return().Once()
-		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
+		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
 		rr := endpoint.post(t, "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client")
 
@@ -237,7 +237,7 @@ func TestHandleTokenPost(t *testing.T) {
 			"clientId": client.Id,
 			"scope":    "test_scope",
 		}).Return().Once()
-		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
+		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
 		rr := endpoint.post(t, "grant_type=client_credentials&client_id=test_client&client_secret=test_secret&scope=test_scope")
 
@@ -254,7 +254,7 @@ func TestHandleTokenPost(t *testing.T) {
 		failure := errs.New("signing key unavailable")
 		endpoint.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "test_scope").
 			Return(nil, failure).Once()
-		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, failure).Return().Once()
 
 		endpoint.post(t, "grant_type=client_credentials&client_id=test_client&client_secret=test_secret&scope=test_scope")
 
@@ -273,7 +273,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 		failure := errs.New("signing key unavailable")
 		endpoint.issuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).Return(nil, failure).Once()
-		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, failure).Return().Once()
 
 		endpoint.post(t, "grant_type=password&client_id=test_client&username=u&password=p&scope=openid")
 
@@ -298,7 +298,7 @@ func TestHandleTokenPost(t *testing.T) {
 			"userId":   int64(42),
 			"clientId": int64(1),
 		}).Return().Once()
-		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
+		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
 		rr := endpoint.post(t, "grant_type=password&client_id=test_client&username=u&password=p&scope=openid")
 
@@ -314,7 +314,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 		failure := oauth.NewErrorDetailWithHTTPStatus("server_error", "Failed to generate token", http.StatusInternalServerError)
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil, failure).Once()
-		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, failure).Return().Once()
 
 		endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
 
@@ -340,7 +340,7 @@ func TestHandleTokenPost(t *testing.T) {
 				ScopeRequested: "openid",
 				IsROPC:         isROPC,
 			}).Return(nil, nil, issuance.ErrRefreshTokenNotClaimed).Once()
-			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token&scope=openid")
 
@@ -367,7 +367,7 @@ func TestHandleTokenPost(t *testing.T) {
 			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
 			"flow":            "auth_code",
 		}).Run(func(mock.Arguments) { order = append(order, audit.EventTokenIssuedRefreshTokenResponse) }).Return().Once()
-		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
+		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
 		rr := endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
 
@@ -391,7 +391,7 @@ func TestHandleTokenPost(t *testing.T) {
 			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
 			"flow":            "auth_code",
 		}).Return().Once()
-		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
+		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
 		rr := endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
 
@@ -414,7 +414,7 @@ func TestHandleTokenPost(t *testing.T) {
 			"refreshTokenJti": grant.RefreshToken.RefreshTokenJti,
 			"flow":            "ropc",
 		}).Return().Once()
-		endpoint.jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, tokenResponse).Return().Once()
+		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
 		endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
 
@@ -429,7 +429,7 @@ func TestHandleTokenPost(t *testing.T) {
 		// produces. A zero count means no audit event (#128).
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil, &issuance.RefreshTokenReplayedError{FamilyRevokedCount: 0}).Once()
-		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			detail, ok := err.(*oauth.ErrorDetail)
 			return ok && detail.Code() == "invalid_grant" &&
 				detail.Description() == "This refresh token has been revoked." &&
@@ -449,7 +449,7 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		endpoint.validates(unansweredGrant{})
 
-		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			var detail *oauth.ErrorDetail
 			return !errors.As(err, &detail) && strings.Contains(err.Error(), "does not answer")
 		})).Return().Once()
@@ -857,7 +857,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, "sid-reused").
 		Return(nil, dbErr).Once()
 
-	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "connection refused")
 	})).Return().Once()
 
@@ -873,8 +873,8 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	// post-commit success path where revokedJtis are real.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	// invalid_grant response must NOT be sent: the client gets 500 instead.
-	// The one JsonError call is the 500 matched above; a second would be the invalid_grant.
-	jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
+	// The one JSONError call is the 500 matched above; a second would be the invalid_grant.
+	jsonWriter.AssertNumberOfCalls(t, "JSONError", 1)
 }
 
 // TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500 covers
@@ -909,7 +909,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	beginErr := errors.New("tx begin failed")
 	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
 
-	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+	jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "tx begin failed")
 	})).Return().Once()
 
@@ -920,7 +920,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	database.AssertExpectations(t)
 
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
+	jsonWriter.AssertNumberOfCalls(t, "JSONError", 1)
 }
 
 // TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit pins where the reuse audit row falls: after
@@ -970,7 +970,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 			order = append(order, "audit")
 			audited, _ = args.Get(2).(map[string]interface{})
 		}).Return().Once()
-	jsonWriter.On("JsonError", rr, req, reuseErr.Detail).Run(note("answer")).Return().Once()
+	jsonWriter.On("JSONError", rr, req, reuseErr.Detail).Run(note("answer")).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
@@ -995,7 +995,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 
 	endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, racedCode).
 		Return(nil, issuance.ErrCodeNotClaimed).Once()
-	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+	endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*oauth.ErrorDetail)
 		return ok && detail.Code() == "invalid_grant" && detail.Description() == "Code is invalid." &&
 			detail.HTTPStatus() == http.StatusBadRequest
@@ -1024,7 +1024,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 
 	endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil, issuance.ErrRefreshTokenNotClaimed).Once()
-	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+	endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*oauth.ErrorDetail)
 		return ok && detail.Code() == "invalid_grant" &&
 			detail.Description() == "This refresh token has been revoked." &&
@@ -1087,7 +1087,7 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()
 
-			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*oauth.ErrorDetail)
 				return ok && detail.Code() == "invalid_grant" &&
 					detail.Description() == "This refresh token has been revoked."
@@ -1124,7 +1124,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	failure := oauth.NewErrorDetailWithHTTPStatus("server_error", "Failed to contain family", http.StatusInternalServerError)
 	endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil, failure).Once()
-	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
+	endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, failure).Return().Once()
 
 	endpoint.post(t, "grant_type=refresh_token&refresh_token=replayed")
 
@@ -1132,7 +1132,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	// No event, and no invalid_grant either: the request did not get a clean refusal,
 	// it got a server error.
 	endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	endpoint.jsonWriter.AssertNumberOfCalls(t, "JsonError", 1)
+	endpoint.jsonWriter.AssertNumberOfCalls(t, "JSONError", 1)
 }
 
 // TestHandleTokenPost_ScopeNormalizationWiring proves the handler normalizes the scope with
@@ -1301,7 +1301,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 					func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 						return input.Scope == tc.wantScope
 					})).Return(nil, validationError).Once()
-				jsonWriter.On("JsonError", rr, req, validationError).Return()
+				jsonWriter.On("JSONError", rr, req, validationError).Return()
 
 				handler.ServeHTTP(rr, req)
 
@@ -1316,7 +1316,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			// test if ValidateTokenRequest is called with no expectation registered, so registering
 			// none is the assertion that it was not reached.
 			var rejection *oauth.ErrorDetail
-			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+			jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*oauth.ErrorDetail)
 				if !ok {
 					return false
@@ -1414,7 +1414,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 						details["scope"] == tc.wantScope
 				})).Return()
 
-			jsonWriter.On("JsonError", rr, req, denial).Return()
+			jsonWriter.On("JSONError", rr, req, denial).Return()
 
 			handler.ServeHTTP(rr, req)
 
@@ -1441,7 +1441,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		var rejection *oauth.ErrorDetail
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			detail, ok := err.(*oauth.ErrorDetail)
 			if !ok {
 				return false
@@ -1488,7 +1488,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 				return ok && clientId == mockClient.Id && details["scope"] == "billing-api:read"
 			})).Return()
 
-		jsonWriter.On("EncodeJson", rr, req, tokenResponse).Return()
+		jsonWriter.On("EncodeJSON", rr, req, tokenResponse).Return()
 
 		handler.ServeHTTP(rr, req)
 
@@ -1548,7 +1548,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 		Return(&oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedROPCResponse, mock.Anything).Return()
-	jsonWriter.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
+	jsonWriter.On("EncodeJSON", rr, mock.Anything, mock.Anything).Return()
 
 	handler.ServeHTTP(rr, req)
 
@@ -1591,7 +1591,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, supersededErr)
 
-	jsonWriter.On("JsonError", rr, req, supersededErr).Return().Once()
+	jsonWriter.On("JSONError", rr, req, supersededErr).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
@@ -1630,7 +1630,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		if failure != nil {
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, failure)
-			jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return()
+			jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return()
 		} else {
 			client := &models.Client{Id: 1, ClientIdentifier: "app"}
 			user := &models.User{Id: 42, Subject: fake.UUID()}
@@ -1638,7 +1638,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 				Return(&protocolvalidation.PasswordGrant{Client: client, User: user, Scope: "openid"}, nil)
 			tokenIssuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).
 				Return(&oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
-			jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
+			jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Return()
 		}
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
@@ -1650,7 +1650,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 
 	// post submits one password grant from a fixed host and reports the status. A refusal
 	// is the limiter's 429; anything the handler answers leaves the recorder's default 200,
-	// since JsonError and EncodeJson are mocks that write nothing.
+	// since JSONError and EncodeJSON are mocks that write nothing.
 	post := func(handler http.Handler) int {
 		form := url.Values{
 			"grant_type": {"password"},
@@ -1819,7 +1819,7 @@ func TestHandleTokenPost_Refresh_FlowDisabledAnswer(t *testing.T) {
 
 			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, nil, issuance.ErrRefreshFlowDisabled).Once()
-			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 				detail, ok := err.(*oauth.ErrorDetail)
 				return ok && detail.Code() == "unauthorized_client" &&
 					detail.Description() == tc.wantRefusal &&
@@ -1879,7 +1879,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 				return details["clientIdentifier"] == "test_client"
 			})).Return()
 
-		jsonWriter.On("JsonError", rr, req, mock.Anything).Return()
+		jsonWriter.On("JSONError", rr, req, mock.Anything).Return()
 
 		handler.ServeHTTP(rr, req)
 
@@ -1905,7 +1905,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, refusal)
 
-		jsonWriter.On("JsonError", rr, req, mock.Anything).Return()
+		jsonWriter.On("JSONError", rr, req, mock.Anything).Return()
 
 		handler.ServeHTTP(rr, req)
 	})

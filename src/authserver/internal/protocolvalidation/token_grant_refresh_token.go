@@ -93,7 +93,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		// A validly signed, unexpired refresh token with no row. RFC 6749 Section 5.2
 		// classifies an invalid, expired or revoked refresh token as invalid_grant, so
 		// this is a 400 rather than the 500 a plain error would produce through
-		// JsonError's fallback mapping (#128).
+		// JSONError's fallback mapping (#128).
 		//
 		// Retention (DeleteExpiredRefreshTokens) makes this rare but cannot remove it:
 		// user deletion, referential cascades and database restores all leave a signed

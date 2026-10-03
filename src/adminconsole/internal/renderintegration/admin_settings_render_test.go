@@ -22,7 +22,7 @@ import (
 func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	auditWritten := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
 
-	out := render(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
 		"pageResult": adminsettingshandlers.AuditLogsPageResult{
 			AuditLogs: []api.AuditLogResponse{
 				{Id: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
@@ -78,7 +78,7 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 func TestRender_AdminSettingsKeysLocalizesTheCreatedAtCell(t *testing.T) {
 	created := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 
-	out := render(t, "/admin_settings_keys.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_settings_keys.html", map[string]interface{}{
 		"keys": []adminsettingshandlers.SettingsKey{{
 			Id: 1, CreatedAt: &created, State: "current", KeyIdentifier: "key-1",
 			Type: "RSA", Algorithm: "RS256",

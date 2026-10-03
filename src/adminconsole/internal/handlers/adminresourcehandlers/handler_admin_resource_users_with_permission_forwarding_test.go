@@ -23,14 +23,14 @@ import (
 // had just corrected on the page beside it.
 //
 // The permission grid loads a resource before it does anything, and that read's guard called
-// httpHelper.JsonError(w, r, err) with the *apiclient.APIError untouched. JsonError preserves a
+// httpHelper.JSONError(w, r, err) with the *apiclient.APIError untouched. JSONError preserves a
 // status only for a *oauth.ErrorDetail, so an upstream 404 took the generic arm: HTTP 500,
 // a stack and a request id in the log, and a modal telling the administrator the server had broken
 // when what had happened is that somebody deleted the resource while their page was open. The guard
 // two calls further down, on GetGroupPermissions, was already going through the classifier, which is
 // what makes this the kind of gap a reader cannot see: both guards look the same and only one was.
 //
-// The 400 row is the reason the classifier rather than a bare JsonNotFound: forwarding the API's
+// The 400 row is the reason the classifier rather than a bare JSONNotFound: forwarding the API's
 // own sentence is what the browser shows.
 type usersWithPermissionApiClient struct {
 	err error
@@ -66,7 +66,7 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 	testCases := []struct {
 		name   string
 		apiErr error
-		// wantStatus 0 means JsonError's generic 500 arm, with the detail going to the log.
+		// wantStatus 0 means JSONError's generic 500 arm, with the detail going to the log.
 		wantStatus  int
 		wantCode    string
 		wantMessage string
@@ -106,7 +106,7 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			var captured error
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()

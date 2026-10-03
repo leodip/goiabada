@@ -23,7 +23,7 @@ func TestRender_AdminClients(t *testing.T) {
 			{Id: 2, ClientIdentifier: "web-app", Enabled: true, CreatedViaDCR: false},
 		},
 	}
-	out := render(t, "/admin_clients.html", bind)
+	out := renderMenuPage(t, "/admin_clients.html", bind)
 
 	// Both clients render, so the count is what carries the claim: one badge, not two and not zero.
 	assert.Equal(t, 1, strings.Count(out, "Autorregistrado"),
@@ -35,12 +35,12 @@ func TestRender_AdminClients(t *testing.T) {
 // TestRender_AdminClientRedirectURIs is the template hop of the redirect-flow gate. The handler
 // resolves the per-client implicit override against the global setting and binds one boolean, so
 // what is left to prove here is that the page shows the form for a client that can redirect and
-// the explaining sentence for one that cannot (#250). render's own raw-key check is what proves
+// the explaining sentence for one that cannot (#250). renderMenuPage's own raw-key check is what proves
 // the new catalog key exists in pt-BR: a missing key leaks its own name into the HTML.
 func TestRender_AdminClientRedirectURIs(t *testing.T) {
 
 	page := func(canManage bool) string {
-		return render(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
+		return renderMenuPage(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
 			"client": struct {
 				ClientId              int64
 				ClientIdentifier      string
@@ -76,7 +76,7 @@ func TestRender_AdminClientRedirectURIs(t *testing.T) {
 // edited, or the page would send its edited list as the loaded one and every save would pass.
 func TestRender_AdminClientRedirectURIs_SendsTheLoadedList(t *testing.T) {
 
-	out := render(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
 		"client": struct {
 			ClientId              int64
 			ClientIdentifier      string
@@ -116,7 +116,7 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 		ClientIdentifier string
 	}
 
-	out := render(t, "/admin_clients_web_origins.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_clients_web_origins.html", map[string]interface{}{
 		"client": struct {
 			ClientId            int64
 			ClientIdentifier    string
@@ -161,7 +161,7 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 // pass.
 func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
 
-	out := render(t, "/admin_clients_web_origins.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_clients_web_origins.html", map[string]interface{}{
 		"client": struct {
 			ClientId            int64
 			ClientIdentifier    string
@@ -190,7 +190,7 @@ func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
 
 // The client permissions page does the same (#428).
 func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
-	out := render(t, "/admin_clients_permissions.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_clients_permissions.html", map[string]interface{}{
 		"client": struct {
 			ClientId                 int64
 			ClientIdentifier         string

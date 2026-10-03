@@ -378,7 +378,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `LocalizedError` | both-apps | — |
 | `core/i18n` | `MiddlewareLocale` | both-apps | — |
 | `core/i18n` | `NewLocalizedError` | kernel | — |
-| `core/i18n` | `Raw` | contract | The un-templated half of the message catalog both processes compile. Only the admin console's `JSBootstrap` template function calls it today, the auth server's pages serving no client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. The six template helpers that shared this argument read nothing of that state but `T` and `LocaleTag`, and moved into the admin console's `internal/handlerhelpers` in #442. |
+| `core/i18n` | `Raw` | contract | The un-templated half of the message catalog both processes compile. Only the admin console's `JSBootstrap` template function calls it today, the auth server's pages serving no client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. The six template helpers that shared this argument read nothing of that state but `T` and `LocaleTag`, and moved into the admin console's `internal/render` in #442. |
 | `core/i18n` | `ResolveRequestLocale` | kernel | — |
 | `core/i18n` | `SanitizeUILocales` | own-package | — |
 | `core/i18n` | `T` | kernel | — |

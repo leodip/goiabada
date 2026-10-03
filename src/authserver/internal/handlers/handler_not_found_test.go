@@ -11,8 +11,8 @@ import (
 )
 
 // The handler is now a delegate, so this proves the delegation and nothing else: the page, its
-// status, its headers and the render-failure fallback are HttpHelper.NotFound's, and they are
-// pinned at the HTTP seam in core/handlerhelpers/http_helper_test.go rather than through a mock
+// status, its headers and the render-failure fallback are render.Renderer.NotFound's, and they are
+// pinned at the HTTP seam in internal/render/http_helper_test.go rather than through a mock
 // that can only report what it was told to return (#279).
 func TestHandleNotFoundGet(t *testing.T) {
 	pageRenderer := mocks_handlers.NewPageRenderer(t)

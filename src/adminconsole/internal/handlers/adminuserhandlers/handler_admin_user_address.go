@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -56,7 +56,7 @@ func HandleAdminUserAddressGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -150,11 +150,11 @@ func HandleAdminUserAddressPost(
 		user, err := apiClient.UpdateUserAddress(r.Context(), jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
 			// Handle validation errors by showing them in the form
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Get user data for form display
 				userForDisplay, userErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {
-					handlerhelpers.HandleAPIError(httpHelper, w, r, userErr)
+					render.HandleAPIError(httpHelper, w, r, userErr)
 					return
 				}
 

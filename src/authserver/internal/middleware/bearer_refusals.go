@@ -74,9 +74,9 @@ func (apiBearerRefusals) internalError(w http.ResponseWriter, r *http.Request, e
 
 // jsonErrorWriter is the one thing the /userinfo refusals and LimitROPC need of the auth server's
 // JSON writer: the RFC 6749 error writer the userinfo and token handlers answer through.
-// handlerhelpers.HttpHelper satisfies it.
+// render.Renderer satisfies it.
 type jsonErrorWriter interface {
-	JsonError(w http.ResponseWriter, r *http.Request, err error)
+	JSONError(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // userinfoBearerRefusals answers /userinfo's refusals as {error, error_description}, mirroring the
@@ -107,17 +107,17 @@ func (u userinfoBearerRefusals) forbidden(w http.ResponseWriter, r *http.Request
 }
 
 // internalError answers server_error at 500 through the writer, which logs the one record.
-// JsonError's record carries the error and nothing else, so the session identifier rides in the
+// JSONError's record carries the error and nothing else, so the session identifier rides in the
 // error's text instead, where that one record still shows it; answering through any other writer
 // would log twice or answer the API's envelope here.
 func (u userinfoBearerRefusals) internalError(w http.ResponseWriter, r *http.Request, err error, sid string) {
 	if sid != "" {
 		err = errs.Wrapf(err, "sid %s", sid)
 	}
-	u.jsonWriter.JsonError(w, r, err)
+	u.jsonWriter.JSONError(w, r, err)
 }
 
 func (u userinfoBearerRefusals) refuse(w http.ResponseWriter, r *http.Request, errorCode, description string, status int) {
-	u.jsonWriter.JsonError(w, r, protocolvalidation.NewErrorDetailWithHTTPStatusAndWWWAuthenticate(
+	u.jsonWriter.JSONError(w, r, protocolvalidation.NewErrorDetailWithHTTPStatusAndWWWAuthenticate(
 		errorCode, description, status, BearerChallenge(errorCode, description)))
 }

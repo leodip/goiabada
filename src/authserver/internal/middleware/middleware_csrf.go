@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
+	"github.com/leodip/goiabada/authserver/internal/render"
 )
 
 // LogoutIdTokenHintPresent reports whether this is a POST to the logout endpoint carrying an
@@ -19,8 +19,8 @@ import (
 // PRESENCE, not a value, and read through the same function the handler classifies the parameter
 // with. The two readings must agree in one direction above all: this saying "present" where the
 // handler reads "absent" would exempt a cross-site POST and then send it down the hintless branch,
-// which tears the whole session down with no consent. Sharing handlerhelpers'
-// LookupFromUrlQueryOrFormPost is what makes that agreement structural rather than a promise, and
+// which tears the whole session down with no consent. Sharing render's
+// LookupQueryOrFormValue is what makes that agreement structural rather than a promise, and
 // it is why "id_token_hint=" is exempt here and Rejected there (#109). Both ends are in this module
 // now: the predicate left core/middleware with the policy that named it, and the handler it has to
 // agree with is handlers.HandleLogoutPost two packages away (#385).
@@ -46,6 +46,6 @@ func LogoutIdTokenHintPresent(r *http.Request) bool {
 	// Reads the query first and only then the body, so a hint in the query costs no parse. When it
 	// does parse, Go caches the result in r.PostForm and the handler's own r.FormValue reuses it,
 	// which is what stops this middleware consuming the body the handler is about to read.
-	_, present := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "id_token_hint")
+	_, present := render.LookupQueryOrFormValue(r, "id_token_hint")
 	return present
 }

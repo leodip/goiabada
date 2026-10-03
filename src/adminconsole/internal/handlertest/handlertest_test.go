@@ -182,14 +182,14 @@ func TestBind_StopsTheTestWhenTheHandlerRenderedNothing(t *testing.T) {
 }
 
 // The AJAX half of the case above, and unbounded for the same reason.
-func TestExpectEncodeJson_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
+func TestExpectEncodeJSON_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
-	call := ExpectEncodeJson(httpHelper)
+	call := ExpectEncodeJSON(httpHelper)
 
-	assert.Equal(t, "EncodeJson", call.Method)
-	assert.Equal(t, 0, call.Repeatability, "ExpectEncodeJson must not bound the call itself")
+	assert.Equal(t, "EncodeJSON", call.Method)
+	assert.Equal(t, 0, call.Repeatability, "ExpectEncodeJSON must not bound the call itself")
 
-	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
+	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
 		struct{ Success bool }{Success: true})
 }
 
@@ -197,14 +197,14 @@ func TestExpectEncodeJson_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
 // the handler left off its struct is absent from the map rather than present and false.
 func TestEncoded_ReturnsTheLastAnswerAsTheBrowserReadsIt(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
-	ExpectEncodeJson(httpHelper).Twice()
+	ExpectEncodeJSON(httpHelper).Twice()
 
 	req := Request(http.MethodPost, "/account/sessions")
-	httpHelper.EncodeJson(httptest.NewRecorder(), req, struct {
+	httpHelper.EncodeJSON(httptest.NewRecorder(), req, struct {
 		Success          bool
 		IsCurrentSession bool
 	}{Success: false, IsCurrentSession: true})
-	httpHelper.EncodeJson(httptest.NewRecorder(), req, struct{ Success bool }{Success: true})
+	httpHelper.EncodeJSON(httptest.NewRecorder(), req, struct{ Success bool }{Success: true})
 
 	answer := Encoded(t, httpHelper)
 
@@ -228,9 +228,9 @@ func TestEncoded_StopsTheTestWhenTheHandlerAnsweredNothing(t *testing.T) {
 // map a case would then assert against and pass.
 func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
-	ExpectEncodeJson(httpHelper).Once()
+	ExpectEncodeJSON(httpHelper).Once()
 
-	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
+	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
 		struct{ Ch chan int }{Ch: make(chan int)})
 
 	report := guard.Run(func(reporter guard.Reporter) {
@@ -247,9 +247,9 @@ func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
 // that answered nothing at all.
 func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
-	ExpectEncodeJson(httpHelper).Once()
+	ExpectEncodeJSON(httpHelper).Once()
 
-	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"), nil)
+	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"), nil)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		Encoded(reporter, httpHelper)
@@ -263,9 +263,9 @@ func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
 // rather than reporting a nil map the caller would index into.
 func TestEncoded_StopsTheTestWhenTheAnswerIsNotAnObject(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
-	ExpectEncodeJson(httpHelper).Once()
+	ExpectEncodeJSON(httpHelper).Once()
 
-	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
+	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
 		[]int{1, 2, 3})
 
 	report := guard.Run(func(reporter guard.Reporter) {

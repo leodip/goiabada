@@ -109,7 +109,7 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			var answered []error
 			record := func(args mock.Arguments) { answered = append(answered, args.Get(2).(error)) }
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()
 
 			apiClient := &ctxRecordingApiClient{}
 			tc.build(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), tc.request)

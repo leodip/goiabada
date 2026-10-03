@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -33,7 +33,7 @@ func HandleAdminSettingsKeysGet(
 
 		apiKeys, err := apiClient.GetSettingsKeys(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -82,17 +82,17 @@ func HandleAdminSettingsKeysRotatePost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		if err := apiClient.RotateSettingsKeys(r.Context(), jwtInfo.TokenResponse.AccessToken); err != nil {
-			// Not JsonError directly: the API answers 409 when another rotation won the race,
-			// and JsonError's generic branch would show the administrator "An unexpected
+			// Not JSONError directly: the API answers 409 when another rotation won the race,
+			// and JSONError's generic branch would show the administrator "An unexpected
 			// server error has occurred" with a request id, for something neither unexpected
-			// nor a server error. HandleAPIErrorJson forwards the API's description instead,
+			// nor a server error. HandleAPIErrorJSON forwards the API's description instead,
 			// so the modal reads "Another key rotation is in progress" (#251).
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -101,7 +101,7 @@ func HandleAdminSettingsKeysRotatePost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }
 
@@ -115,26 +115,26 @@ func HandleAdminSettingsKeysRevokePost(
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		id, ok := data["id"].(float64)
 		if !ok {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		// Let the API enforce state=previous and handle auditing
 		if err := apiClient.DeleteSettingsKey(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(id)); err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -143,6 +143,6 @@ func HandleAdminSettingsKeysRevokePost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -141,7 +141,7 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 
 // The API's refusal has to reach the administrator's screen.
 //
-// This handler passed the error to httpHelper.JsonError directly, which preserves a status and a
+// This handler passed the error to httpHelper.JSONError directly, which preserves a status and a
 // description only for a *oauth.ErrorDetail. An *apiclient.APIError took the generic branch,
 // so a 400 became "An unexpected server error has occurred" and the sentence naming the offending
 // value went to the log. That is #122's defect, fixed there for the Redirect URIs page and missed
@@ -192,8 +192,8 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 
 			// The real helper rather than a mock, so the assertions are on the bytes the
-			// browser receives. templateFS is nil because JsonError renders no template.
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			// browser receives. templateFS is nil because JSONError renders no template.
+			httpHelper := render.New(nil)
 
 			body := `{"clientId":1,"webOrigins":["https://[2001:db8::1]"]}`
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
@@ -258,7 +258,7 @@ func TestHandleAdminClientWebOriginsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := render.New(nil)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
 				handlertest.WithAccessToken(),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),

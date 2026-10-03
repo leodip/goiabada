@@ -33,7 +33,7 @@ func PageFaults() ServerFaults {
 // through jsonWriter, the writer the token, userinfo, JWKS and discovery handlers answer through.
 // Dynamic client registration's error body, RFC 7591 section 3.2.2, is the same two members.
 func ProtocolFaults(jsonWriter jsonErrorWriter) ServerFaults {
-	return ServerFaults{write: jsonWriter.JsonError}
+	return ServerFaults{write: jsonWriter.JSONError}
 }
 
 // APIFaults answers the admin and account API's documented {error_code, error_description} envelope

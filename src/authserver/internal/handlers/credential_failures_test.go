@@ -17,7 +17,7 @@ type noCredentialFailures struct{}
 func (noCredentialFailures) RecordCredentialFailure(r *http.Request) {}
 
 // rateLimitTestRenderer is the ErrorRenderer a live limiter rejects browser routes through.
-// It writes the status the bind map carries, which is the half of the real HttpHelper the
+// It writes the status the bind map carries, which is the half of the real render.Renderer the
 // cases below need: the status is what tells a refusal apart from a handler that ran.
 type rateLimitTestRenderer struct{}
 

@@ -384,7 +384,7 @@ import "log/slog"
 
 func parseCIDRs(entries []string) { slog.Warn("ignoring invalid trusted proxy entry", "entry", entries[0]) }
 `)
-	tree.write("adminconsole/internal/handlerhelpers/template_funcs.go", `package handlerhelpers
+	tree.write("adminconsole/internal/render/template_funcs.go", `package render
 
 import "log/slog"
 
@@ -392,7 +392,7 @@ func addUrlParam(u string) string { slog.Warn("unable to parse url", "url", u); 
 
 func convertToString(v any) string { slog.Warn("unable to convert value", "value", v); return "" }
 `)
-	tree.write("adminconsole/internal/handlerhelpers/namesake.go", `package handlerhelpers
+	tree.write("adminconsole/internal/render/namesake.go", `package render
 
 import "log/slog"
 
@@ -424,7 +424,7 @@ func LogToConsole(event string) { slog.Info("audit event", "event", event) }
 `)
 	// An admitted name in a package of its own: the admission is the file slogPlainSites names, so
 	// a namesake in a directory no list mentions is checked like any other function there.
-	tree.write("core/handlerhelpers/template_funcs.go", `package handlerhelpers
+	tree.write("core/render/template_funcs.go", `package render
 
 import "log/slog"
 
@@ -555,8 +555,8 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"authserver/internal/handlers/plain.go:13 a plain slog.Warn in a request-path package",
 		"authserver/internal/handlers/plain.go:14 a plain slog.Debug in a request-path package",
 		"core/httpmw/middleware_realip.go:5 a plain slog.Warn in a request-path package",
-		"adminconsole/internal/handlerhelpers/namesake.go:5 a plain slog.Warn in a request-path package",
-		"adminconsole/internal/handlerhelpers/namesake.go:7 a plain slog.Warn in a request-path package",
+		"adminconsole/internal/render/namesake.go:5 a plain slog.Warn in a request-path package",
+		"adminconsole/internal/render/namesake.go:7 a plain slog.Warn in a request-path package",
 		// rule 5 in packages no list names, which is every package but the ones with no request
 		"core/caught/openers.go:9 a plain slog.Info in a request-path package",
 		"core/caught/openers.go:10 a plain slog.Error in a request-path package",
@@ -565,7 +565,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"core/caught/nonliteral.go:9 a plain slog.Warn in a request-path package",
 		"core/caught/nonliteral.go:10 a plain slog.Info in a request-path package",
 		"core/caught/path_base_collision.go:11 a plain slog.Info in a request-path package",
-		"core/handlerhelpers/template_funcs.go:5 a plain slog.Warn in a request-path package",
+		"core/render/template_funcs.go:5 a plain slog.Warn in a request-path package",
 		"authserver/internal/newpackage/plain.go:5 a plain slog.Warn in a request-path package",
 		"authserver/internal/cleanup/jobs/plain.go:5 a plain slog.Info in a request-path package",
 		"core/i18n/middleware.go:5 a plain slog.Debug in a request-path package",

@@ -61,7 +61,7 @@ func serveDiscovery(t *testing.T, settings *models.Settings) oidc.WellKnownConfi
 	rr := httptest.NewRecorder()
 
 	var published oidc.WellKnownConfig
-	jsonWriter.On("EncodeJson", rr, req, mock.AnythingOfType("oidc.WellKnownConfig")).Run(func(args mock.Arguments) {
+	jsonWriter.On("EncodeJSON", rr, req, mock.AnythingOfType("oidc.WellKnownConfig")).Run(func(args mock.Arguments) {
 		published = args.Get(2).(oidc.WellKnownConfig)
 	}).Return()
 

@@ -22,8 +22,8 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -87,7 +87,7 @@ func (s *stubAuditLogger) count(name string) int {
 	return n
 }
 
-// newTestMiddleware builds the middleware with a real HttpHelper over testTemplateFS and a
+// newTestMiddleware builds the middleware with a real render.Renderer over testTemplateFS and a
 // throwaway audit logger, for the cases that do not look at what was audited.
 func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimiter {
 	m, _ := newAuditedTestMiddleware(ceremonyStore, enabled)
@@ -96,7 +96,7 @@ func newTestMiddleware(ceremonyStore authContextGetter, enabled bool) *RateLimit
 
 func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiter, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
-	httpHelper := handlerhelpers.NewHttpHelper(testTemplateFS)
+	httpHelper := render.New(testTemplateFS)
 	return NewRateLimiter(ceremonyStore, httpHelper, httpHelper, auditLog, enabled), auditLog
 }
 
