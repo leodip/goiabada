@@ -65,7 +65,8 @@ const contextValueSelector = "Value"
 //
 // module is relative to the source root ("authserver"); accessorDir and each exemption's File are
 // relative to the module. Test files are not walked: a test builds contexts through the accessors
-// too, but what the rule protects is the production channel. The admin console's twin is #440.
+// too, but what the rule protects is the production channel. Both applications call it, each with
+// its own internal/reqctx: the auth server since #433 and the admin console since #440.
 func AssertContextValuesThroughAccessors(
 	t *testing.T, module, accessorDir string, exemptions ...ContextValueExemption,
 ) {

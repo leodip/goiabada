@@ -8,5 +8,5 @@ package constants
 // The auth server's own name is not here. Nothing outside that module names it (#351).
 //
 // The keys inside that session are not here either. Only the admin console writes or reads
-// them, so they are declared in adminconsole/internal/constants (#385).
+// them, so they are declared in adminconsole/internal/sessionkeys (#385, #440).
 const AdminConsoleSessionName string = "adminconsole"

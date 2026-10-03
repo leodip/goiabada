@@ -1,6 +1,8 @@
-package constants
-
-// The admin console's own session keys.
+// Package sessionkeys names the keys of the admin console's browser session. Every value here is
+// stored data: a live session carries these spellings, so renaming one signs every administrator
+// out at deploy, and a sign-in in flight across it fails at the callback. Request-scoped values are
+// not session keys and live in reqctx. It was internal/constants until the two context keys left
+// for reqctx, as the auth server's twin was (#433, #440).
 //
 // They name entries in the admin console's own browser session, written and read by
 // this process alone: the authenticated-session key with the access token's recorded
@@ -8,10 +10,11 @@ package constants
 // and the callback. The auth server stores that
 // session server-side but never opens it, so there is nothing for the two binaries to
 // agree on beyond the session's name, which is the one key core still declares (#385).
-//
-// The string values are the ones core declared, byte for byte. A session written before
-// this move and read after it must still resolve, since the admin console's sessions
-// outlive a deployment.
+package sessionkeys
+
+// SessionKeyJwt is the authenticated-session key. Its string value, like every one here, is the
+// one core declared, byte for byte: a session written before #385 moved them and read after it
+// must still resolve, since the admin console's sessions outlive a deployment.
 const SessionKeyJwt string = "Jwt"
 
 // SessionKeyJwtExpiresAt is the Unix second the stored access token lapses at, computed from

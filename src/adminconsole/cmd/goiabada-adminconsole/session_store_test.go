@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
@@ -34,7 +34,7 @@ func TestNewSessionStore_TheAdministratorsCookieEndsWithTheBrowser(t *testing.T)
 			w := httptest.NewRecorder()
 			session, err := store.Get(req, coreconstants.AdminConsoleSessionName)
 			require.NoError(t, err)
-			session.Values[constants.SessionKeyJwt] = "a-token-set"
+			session.Values[sessionkeys.SessionKeyJwt] = "a-token-set"
 			require.NoError(t, store.Save(req, w, session))
 
 			setCookie := w.Result().Header.Values("Set-Cookie")

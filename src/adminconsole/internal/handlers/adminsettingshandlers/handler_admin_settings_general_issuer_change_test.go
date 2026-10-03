@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -48,8 +48,8 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	seedReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	seeded, err := store.Get(seedReq, coreconstants.AdminConsoleSessionName)
 	require.NoError(t, err)
-	seeded.Values[constants.SessionKeyJwt] = oauth.TokenResponse{AccessToken: "the-access-token"}
-	seeded.Values[constants.SessionKeyJwtExpiresAt] = int64(1_900_000_000)
+	seeded.Values[sessionkeys.SessionKeyJwt] = oauth.TokenResponse{AccessToken: "the-access-token"}
+	seeded.Values[sessionkeys.SessionKeyJwtExpiresAt] = int64(1_900_000_000)
 	seeded.Values["Unrelated"] = "kept"
 	seedW := httptest.NewRecorder()
 	require.NoError(t, store.Save(seedReq, seedW, seeded))
@@ -85,7 +85,7 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	readBack, err := store.Get(readReq, coreconstants.AdminConsoleSessionName)
 	require.NoError(t, err)
 	require.False(t, readBack.IsNew, "the session is still there")
-	assert.NotContains(t, readBack.Values, constants.SessionKeyJwt)
-	assert.NotContains(t, readBack.Values, constants.SessionKeyJwtExpiresAt)
+	assert.NotContains(t, readBack.Values, sessionkeys.SessionKeyJwt)
+	assert.NotContains(t, readBack.Values, sessionkeys.SessionKeyJwtExpiresAt)
 	assert.Equal(t, "kept", readBack.Values["Unrelated"])
 }

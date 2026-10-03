@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/boundedread"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -129,11 +129,11 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 				return
 			}
 
-			if sess.Values[constants.SessionKeyJwt] == nil {
+			if sess.Values[sessionkeys.SessionKeyJwt] == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
-			tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
+			tokenResponse, ok := sess.Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
 			if !ok {
 				m.errorRenderer.InternalServerError(w, r,
 					errs.New("unable to cast the session value to TokenResponse"))
@@ -143,7 +143,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 			// Step 2. The expiry is a plain int64 beside the token response rather than a field of
 			// a new persisted type, so a session written before it existed still decodes and is
 			// recognised here by the value's absence (#427 decision 15).
-			expiresAt, hasExpiry := sess.Values[constants.SessionKeyJwtExpiresAt].(int64)
+			expiresAt, hasExpiry := sess.Values[sessionkeys.SessionKeyJwtExpiresAt].(int64)
 			if !hasExpiry {
 				slog.WarnContext(ctx, "the session holds a token response with no recorded expiry, signing it out")
 				m.signOut(w, r, sess, next)
@@ -205,8 +205,8 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 // clearTokens deletes the token values from the session and saves it, answering the error page
 // when the save fails. It reports whether the session was saved.
 func (m *MiddlewareJwt) clearTokens(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session) bool {
-	delete(sess.Values, constants.SessionKeyJwt)
-	delete(sess.Values, constants.SessionKeyJwtExpiresAt)
+	delete(sess.Values, sessionkeys.SessionKeyJwt)
+	delete(sess.Values, sessionkeys.SessionKeyJwtExpiresAt)
 	if err := m.sessionStore.Save(r, w, sess); err != nil {
 		m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
 		return false
@@ -367,8 +367,8 @@ func (m *MiddlewareJwt) refreshToken(
 		return nil, nil, errs.Errorf("unable to get session: %v", err)
 	}
 
-	sess.Values[constants.SessionKeyJwt] = accepted.TokenResponse
-	sess.Values[constants.SessionKeyJwtExpiresAt] = oauthclient.ExpiresAt(&accepted.TokenResponse, time.Now())
+	sess.Values[sessionkeys.SessionKeyJwt] = accepted.TokenResponse
+	sess.Values[sessionkeys.SessionKeyJwtExpiresAt] = oauthclient.ExpiresAt(&accepted.TokenResponse, time.Now())
 	err = m.sessionStore.Save(detachedReq, w, sess)
 	if err != nil {
 		return nil, nil, errs.Errorf("unable to save the session: %v", err)

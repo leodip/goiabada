@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
@@ -24,7 +24,7 @@ func newTestSessionStore() *sessionstore.ServerSideStore {
 func newTestSessionStoreOver(backend sessionstore.Backend) *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		backend,
-		constants.SessionKeyJwt,
+		sessionkeys.SessionKeyJwt,
 		false,
 		sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{

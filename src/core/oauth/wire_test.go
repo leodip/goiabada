@@ -42,7 +42,7 @@ func TestTokenResponse_GobSessionIdentity(t *testing.T) {
 
 	// The shape the session store encodes: the value arrives at the encoder through an
 	// interface, which is what makes gob write the concrete type's name into the stream.
-	// The key is written out because adminconsole/internal/constants declares it and core
+	// The key is written out because adminconsole/internal/sessionkeys declares it and core
 	// may not import a process module; what this test is about is the encoded value, not
 	// the key it sits under (#385).
 	values := map[interface{}]interface{}{

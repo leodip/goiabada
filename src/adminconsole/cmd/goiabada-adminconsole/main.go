@@ -16,8 +16,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/server"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/localzone"
@@ -256,6 +256,6 @@ func logBootstrapCredentialsNotConfigured() {
 // each lifetime writes, and this package's pin which one this binary passes (#431).
 func newSessionStore(backend sessionstore.Backend, secure bool,
 	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ServerSideStore, error) {
-	return sessionstore.NewServerSideStore(backend, constants.SessionKeyJwt, secure,
+	return sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeyJwt, secure,
 		sessionstore.BrowserSessionCookie, current, previous)
 }
