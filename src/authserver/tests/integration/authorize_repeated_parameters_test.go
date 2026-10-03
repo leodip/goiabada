@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // RFC 6749 sections 3.1 and 3.2: "Request and response parameters MUST NOT be included more than

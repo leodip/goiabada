@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // Verifies OIDC Core 3.1.2.1: the authorization endpoint MUST support POST

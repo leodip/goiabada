@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // valueAtTheBound is one value of exactly the bound's bytes.

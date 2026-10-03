@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // #244's remaining parts over HTTP: what the authorization and token endpoints now refuse or ignore,

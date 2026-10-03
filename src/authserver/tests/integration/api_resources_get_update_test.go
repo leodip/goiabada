@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"

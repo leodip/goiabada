@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted is the data half of #139 decision 2.

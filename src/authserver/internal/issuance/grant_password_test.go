@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

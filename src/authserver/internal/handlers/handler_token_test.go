@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"

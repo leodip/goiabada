@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // testUserAgent and testUserAgentUpdated are raw User-Agent headers, not parsed labels: the

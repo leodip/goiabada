@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"golang.org/x/crypto/bcrypt"
 )
 

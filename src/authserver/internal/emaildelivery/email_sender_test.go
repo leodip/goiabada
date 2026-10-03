@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"

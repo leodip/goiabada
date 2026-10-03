@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 func TestCreateKeyPair(t *testing.T) {

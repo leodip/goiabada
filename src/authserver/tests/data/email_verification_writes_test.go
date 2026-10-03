@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // The three conditional writes behind the self-service email change, the verification send and
