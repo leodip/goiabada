@@ -116,7 +116,7 @@ func instantOf(v any) *time.Time {
 
 var templateFuncMap = template.FuncMap{
 	// T translates key against the localizer carried on ctx. ctx is the
-	// request context, injected into bind maps by RenderTemplateToBuffer
+	// request context, injected into bind maps by renderToBuffer
 	// (see http_helper.go), so templates write {{ T $.ctx "auth.pwd.title" }}.
 	//
 	// Variadic kv pairs build a map[string]any for parameterized messages:

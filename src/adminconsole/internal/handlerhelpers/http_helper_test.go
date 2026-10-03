@@ -1,7 +1,6 @@
 package handlerhelpers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -197,7 +197,7 @@ func TestRenderTemplate(t *testing.T) {
 
 	// A failed render must leave the response completely untouched, so the caller's
 	// InternalServerError owns every header as well as the status. That is the property the
-	// placement of the Cache-Control write depends on: it sits after RenderTemplateToBuffer has
+	// placement of the Cache-Control write depends on: it sits after renderToBuffer has
 	// returned successfully, and moving it above the error return would put a directive on a
 	// response this function never wrote a body for (#247).
 	t.Run("A failed render writes no headers at all", func(t *testing.T) {
@@ -220,7 +220,17 @@ func TestRenderTemplate(t *testing.T) {
 	})
 }
 
-func TestRenderTemplateToBuffer(t *testing.T) {
+// renderPage renders through RenderTemplate, the renderer's one way to a page, and answers what the
+// response carries. A render RenderTemplate refuses writes nothing, so the body is empty then.
+func renderPage(h *HttpHelper, r *http.Request, layoutName, templateName string,
+	data map[string]interface{}) (string, error) {
+
+	w := httptest.NewRecorder()
+	err := h.RenderTemplate(w, r, layoutName, templateName, data)
+	return w.Body.String(), err
+}
+
+func TestRenderTemplate_Binds(t *testing.T) {
 	templateFS := fstest.MapFS{
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}")},
@@ -231,23 +241,21 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		data := map[string]interface{}{}
 
-		buf, err := httpHelper.RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", data)
+		body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", data)
 
 		assert.NoError(t, err)
-		assert.NotNil(t, buf)
-		assert.Contains(t, buf.String(), "Hello, Guest!")
+		assert.Contains(t, body, "Hello, Guest!")
 	})
 
 	t.Run("With ID Token", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		ctx := req.Context()
 
-		// Mock JwtInfo with ID Token
 		jwtInfo := oauthclient.JwtInfo{
 			IdToken: &oauth.JwtToken{
 				Claims: map[string]interface{}{
 					"sub":  "user123",
-					"name": "Guest",
+					"name": "Alice",
 				},
 			},
 		}
@@ -256,12 +264,26 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 
 		data := map[string]interface{}{}
 
-		buf, err := httpHelper.RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", data)
+		body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", data)
 
 		assert.NoError(t, err)
-		assert.NotNil(t, buf)
 		// With ID token containing "name" claim, it should render that name
-		assert.Contains(t, buf.String(), "Hello, Guest!")
+		assert.Contains(t, body, "Hello, Alice!")
+	})
+
+	// The context value under the token set's key is read as an oauthclient.JwtInfo or the render is
+	// refused. The refusal names the type it expected, which once named dtos.JwtInfo, a package this
+	// tree no longer has (#440).
+	t.Run("A token set of another type refuses the render", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, "not a token set"))
+
+		body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "oauthclient.JwtInfo")
+		assert.NotContains(t, err.Error(), "dtos")
+		assert.Empty(t, body)
 	})
 
 	// The isAdmin bind is the other half of the enrichment #385 moved here out of core, and
@@ -282,13 +304,13 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
 
 		data := map[string]interface{}{}
-		_, err := httpHelper.RenderTemplateToBuffer(
+		_, err := renderPage(httpHelper,
 			withAccessToken(manageScope), "layouts/layout.html", "page.html", data)
 		require.NoError(t, err)
 		assert.Equal(t, true, data["isAdmin"])
 
 		other := map[string]interface{}{}
-		_, err = httpHelper.RenderTemplateToBuffer(
+		_, err = renderPage(httpHelper,
 			withAccessToken(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.ManageAccountPermissionIdentifier),
 			"layouts/layout.html", "page.html", other)
 		require.NoError(t, err)
@@ -306,59 +328,97 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 			SMTPEnabled: true,
 		}})
 
-		buf, err := httpHelper.RenderTemplateToBuffer(
+		body, err := renderPage(httpHelper,
 			httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
 
 		require.NoError(t, err)
-		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", buf.String())
+		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", body)
 	})
 
 	t.Run("A settings reader panic is propagated", func(t *testing.T) {
 		httpHelper := NewHttpHelper(templateFS, stubSettingsReader{panic: true})
 
 		require.Panics(t, func() {
-			_, _ = httpHelper.RenderTemplateToBuffer(
+			_, _ = renderPage(httpHelper,
 				httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
 		})
 	})
 }
 
+// The page named is the page rendered, in every locale. The per-locale lookup copied from the auth
+// server tried <name>.<locale>.html first for anything under emails/, which this binary has no
+// template under and never sends; the case is a tree that has both files, so a locale variant
+// served here could only come from that lookup (#440).
+func TestRenderTemplate_RendersTheTemplateNamedWhateverTheLocale(t *testing.T) {
+	templateFS := fstest.MapFS{
+		"layouts/layout.html":        {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"emails/note.html":           {Data: []byte("{{define \"content\"}}the page named{{end}}")},
+		"emails/note.pt-BR.html":     {Data: []byte("{{define \"content\"}}a locale variant{{end}}")},
+		"account_profile.html":       {Data: []byte("{{define \"content\"}}the profile{{end}}")},
+		"account_profile.pt-BR.html": {Data: []byte("{{define \"content\"}}a locale variant{{end}}")},
+	}
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
+
+	for _, templateName := range []string{"/emails/note.html", "emails/note.html"} {
+		t.Run(templateName, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
+			require.Equal(t, "pt-BR", i18n.LocaleTag(req.Context()), "the request is in the variant's locale")
+
+			body, err := renderPage(httpHelper, req, "/layouts/layout.html", templateName, map[string]interface{}{})
+
+			require.NoError(t, err)
+			assert.Equal(t, "<html>the page named</html>", body)
+		})
+	}
+
+	t.Run("a page outside emails/", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
+
+		body, err := renderPage(httpHelper, req, "/layouts/layout.html", "/account_profile.html", map[string]interface{}{})
+
+		require.NoError(t, err)
+		assert.Equal(t, "<html>the profile</html>", body)
+	})
+}
+
 // A nil bind map is allocated rather than written into, which would panic. The render still binds
 // the layout's values, so the page sees the settings as it would through a caller's own map (#435).
-func TestRenderTemplateToBuffer_NilDataMap(t *testing.T) {
+func TestRenderTemplate_NilDataMap(t *testing.T) {
 	templateFS := fstest.MapFS{
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.urlPath}}{{end}}")},
 	}
 	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{settings: LayoutSettings{AppName: "sentinel app"}})
 
-	buf, err := httpHelper.RenderTemplateToBuffer(
+	body, err := renderPage(httpHelper,
 		httptest.NewRequest("GET", "/some/page", nil), "layouts/layout.html", "page.html", nil)
 
 	require.NoError(t, err)
-	assert.Equal(t, "<html>sentinel app|/some/page</html>", buf.String())
+	assert.Equal(t, "<html>sentinel app|/some/page</html>", body)
 }
 
 // Every file under partials/ is parsed beside the layout and the page, which is how a page calls a
 // fragment it does not define. The second case is the first one's tree without the fragment, so a
 // pass there cannot come from anything but the partials branch (#431).
-func TestRenderTemplateToBuffer_Partials(t *testing.T) {
+func TestRenderTemplate_Partials(t *testing.T) {
 	layout := []byte(`<html>{{template "content" .}}</html>`)
 	page := []byte(`{{define "content"}}[{{template "badge" .}}]{{end}}`)
-	render := func(templateFS fstest.MapFS) (*bytes.Buffer, error) {
-		return NewHttpHelper(templateFS, stubSettingsReader{}).RenderTemplateToBuffer(
+	render := func(templateFS fstest.MapFS) (string, error) {
+		return renderPage(NewHttpHelper(templateFS, stubSettingsReader{}),
 			httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
 	}
 
 	t.Run("A template defined under partials is parsed with the page", func(t *testing.T) {
-		buf, err := render(fstest.MapFS{
+		body, err := render(fstest.MapFS{
 			"layouts/layout.html": {Data: layout},
 			"page.html":           {Data: page},
 			"partials/badge.html": {Data: []byte(`{{define "badge"}}the badge{{end}}`)},
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "<html>[the badge]</html>", buf.String())
+		assert.Equal(t, "<html>[the badge]</html>", body)
 	})
 
 	t.Run("Without the partial the page does not render", func(t *testing.T) {
@@ -372,14 +432,14 @@ func TestRenderTemplateToBuffer_Partials(t *testing.T) {
 	})
 
 	t.Run("An empty partials directory renders as if absent", func(t *testing.T) {
-		buf, err := render(fstest.MapFS{
+		body, err := render(fstest.MapFS{
 			"layouts/layout.html": {Data: layout},
 			"page.html":           {Data: []byte(`{{define "content"}}no fragments{{end}}`)},
 			"partials":            {Mode: fs.ModeDir},
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "<html>no fragments</html>", buf.String())
+		assert.Equal(t, "<html>no fragments</html>", body)
 	})
 }
 

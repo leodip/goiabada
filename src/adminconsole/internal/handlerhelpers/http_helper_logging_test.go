@@ -372,10 +372,13 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	assert.Empty(t, logs.Records(), "a client's mistake answered as a client's mistake is not a server fault")
 }
 
-// The WWW-Authenticate header travels with the detail through a wrapper too, and it is the half of
-// RFC 6749 section 5.2 a bare assertion would have dropped in silence: the status would have become
-// 500 and the header simply would not be written.
-func TestJsonError_ReadsAWrappedErrorDetailsWWWAuthenticate(t *testing.T) {
+// The console's JSON error writer sends no WWW-Authenticate challenge, whatever the detail carries.
+// The arm that wrote one was copied from the auth server, whose token endpoint owes it under RFC
+// 6749 section 5.2; nothing in this module builds a detail carrying one, and the console signs in
+// with a cookie and has no challenge to send (handler_unauthorized.go). The detail's status still
+// decides the answer through a wrapper, which is the half of this row decision 6 is about (#279,
+// #440).
+func TestJsonError_SendsNoWWWAuthenticateChallenge(t *testing.T) {
 	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_token",
@@ -393,5 +396,10 @@ func TestJsonError_ReadsAWrappedErrorDetailsWWWAuthenticate(t *testing.T) {
 	defer func() { _ = res.Body.Close() }()
 
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
-	assert.Equal(t, "Bearer error=\"invalid_token\"", res.Header.Get("WWW-Authenticate"))
+	assert.NotContains(t, res.Header, "Www-Authenticate")
+
+	var response map[string]string
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, "invalid_token", response["error"])
+	assert.Equal(t, "The access token is invalid.", response["error_description"])
 }

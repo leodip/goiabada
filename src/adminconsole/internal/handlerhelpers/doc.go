@@ -6,7 +6,7 @@
 // session's ID token, and no auth server template binds either; the template FuncMap has
 // twenty-two entries where that server's templates call four, five of the rest being predicates
 // over this console's own URL paths. The auth server has its own copy in
-// authserver/internal/handlerhelpers, and the roughly 238 lines the two share can drift: that is
+// authserver/internal/handlerhelpers, and the roughly 210 lines the two share can drift: that is
 // what owning a renderer costs, and it is cheaper than one package behaving two ways for its two
 // callers (#385).
 package handlerhelpers
