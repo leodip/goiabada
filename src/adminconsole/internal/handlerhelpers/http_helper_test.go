@@ -305,7 +305,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
 		}
-		httpHelper := NewHttpHelper(layoutFS)
+		layoutHelper := NewHttpHelper(layoutFS)
 		req := httptest.NewRequest("GET", "/", nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &api.PublicSettingsResponse{
 			AppName:     "sentinel app",
@@ -313,7 +313,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 			SMTPEnabled: true,
 		}))
 
-		body, err := renderPage(httpHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
+		body, err := renderPage(layoutHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
 
 		require.NoError(t, err)
 		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", body)

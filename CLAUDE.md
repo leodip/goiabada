@@ -401,24 +401,26 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Twenty-six guards follow this -- fourteen in `core/testutil`, the newest
+does. Twenty-six guards follow this -- fifteen in `core/testutil`, the newest
+`AssertNoParentImport`, which holds each child handler package a caller names to naming no import
+of its parent, which the auth server calls over `apihandlers` and `accounthandlers` and which #387
+wrote as that server's own lint before #440 moved it here for both applications, and before it
 `AssertContextValuesThroughAccessors`, which refuses a `context.WithValue` or a context `Value`
 read in a production file outside the module's accessor package, resolved with `go/types`, and
-which the auth server calls with `internal/reqctx` (#433), and before it
-`AssertNoAgreementPointers`, which refuses a comment pointing at an issue's agreement or a probe
-file instead of stating the fact with its issue number (#428), plus `authserver/internal/data`'s
+which the auth server calls with `internal/reqctx` (#433), and `AssertNoAgreementPointers`, which
+refuses a comment pointing at an issue's agreement or a probe file instead of stating the fact
+with its issue number (#428), plus `authserver/internal/data`'s
 begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and
 SQL-context lints, the auth server's API error-code and audit-catalog lints, its discarded-error lint
 in `internal/server`, which refuses `_` in the error position of a hash, encryption or
 key-generation call (#409) and resolves the data cipher's methods by receiver type with `go/types` (#434),
 its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
-outside `HandleAuthorizeGet`, resolved with `go/types` (#436), and the two import
-rules #387 added: `models/import_lint_test.go`, which holds that package to the standard library,
-`core/constants` and `core/errs`, and `handlers/child_package_import_lint_test.go`, which holds
-`apihandlers` and `accounthandlers` to naming no import of the parent -- both parse imports with
-`go/parser` rather than matching text, because an alias binds a different name to the same path and
-one of the 39 production files did exactly that. Each owes three cases: a tree that must fail, a tree that must
-pass, and the walk that reached nothing. One of the fourteen, `AssertNotCalledArity`, owes a fourth: a
+outside `HandleAuthorizeGet`, resolved with `go/types` (#436), and the import rule #387 added
+beside the child-package one: `models/import_lint_test.go`, which holds that package to the
+standard library, `core/constants` and `core/errs` -- both parse imports with `go/parser` rather
+than matching text, because an alias binds a different name to the same path and one of the 39
+production files did exactly that. Each owes three cases: a tree that must fail, a tree that must
+pass, and the walk that reached nothing. One of the fifteen, `AssertNotCalledArity`, owes a fourth: a
 test that measures testify's matching against testify, because a guard whose premise is a reading
 of a dependency stops meaning anything the moment that dependency changes and nothing says so
 (#421). Without the last two the first proves nothing, and without
