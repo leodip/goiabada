@@ -2,11 +2,9 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -14,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
-	"github.com/leodip/goiabada/core/boundedread"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -36,8 +33,12 @@ type AuthHelper interface {
 	IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool
 }
 
-type HTTPClient interface {
-	Do(req *http.Request) (*http.Response, error)
+// tokenRefresher is the part of oauthclient.TokenClient this middleware calls: the refresh grant,
+// transport only. It detaches the grant from the browser's cancellation and keeps the old refresh
+// token when the answer carries none; the check of the answer and the session write are this
+// middleware's (#441 decision 2).
+type tokenRefresher interface {
+	Refresh(ctx context.Context, refreshToken string) (*oauth.TokenResponse, error)
 }
 
 // ServerErrorRenderer answers a request this middleware cannot complete with the
@@ -59,43 +60,37 @@ type ServerErrorRenderer interface {
 }
 
 type MiddlewareJwt struct {
-	sessionStore      sessionstore.Store
-	sessionName       string
-	tokenParser       tokenParser
-	authHelper        AuthHelper
-	errorRenderer     ServerErrorRenderer
-	httpClient        HTTPClient
-	authServerBaseURL string
-	baseURL           string
-	clientID          string
-	clientSecret      string
+	sessionStore   sessionstore.Store
+	sessionName    string
+	tokenParser    tokenParser
+	tokenRefresher tokenRefresher
+	authHelper     AuthHelper
+	errorRenderer  ServerErrorRenderer
+	baseURL        string
+	clientID       string
 }
 
-// NewMiddlewareJwt constructs a DB-free JWT middleware. It uses provided client
-// credentials for refresh operations. If credentials are empty, refresh is disabled.
+// NewMiddlewareJwt constructs a DB-free JWT middleware. tokenRefresher sends the refresh grant;
+// clientID is the client the sign-in redirect names.
 func NewMiddlewareJwt(
 	sessionStore sessionstore.Store,
 	sessionName string,
 	tokenParser tokenParser,
+	tokenRefresher tokenRefresher,
 	authHelper AuthHelper,
 	errorRenderer ServerErrorRenderer,
-	httpClient HTTPClient,
-	authServerBaseURL string,
 	baseURL string,
 	clientID string,
-	clientSecret string,
 ) *MiddlewareJwt {
 	return &MiddlewareJwt{
-		sessionStore:      sessionStore,
-		sessionName:       sessionName,
-		tokenParser:       tokenParser,
-		authHelper:        authHelper,
-		errorRenderer:     errorRenderer,
-		httpClient:        httpClient,
-		authServerBaseURL: authServerBaseURL,
-		baseURL:           baseURL,
-		clientID:          clientID,
-		clientSecret:      clientSecret,
+		sessionStore:   sessionStore,
+		sessionName:    sessionName,
+		tokenParser:    tokenParser,
+		tokenRefresher: tokenRefresher,
+		authHelper:     authHelper,
+		errorRenderer:  errorRenderer,
+		baseURL:        baseURL,
+		clientID:       clientID,
 	}
 }
 
@@ -257,90 +252,32 @@ func (m *MiddlewareJwt) refreshToken(
 		return nil, nil, nil
 	}
 
-	// Require configured confidential client
-	clientID := m.clientID
-	clientSecret := m.clientSecret
-	if strings.TrimSpace(clientID) == "" || strings.TrimSpace(clientSecret) == "" {
-		slog.ErrorContext(r.Context(), "missing client credentials, so the token refresh is skipped")
-		return nil, nil, errs.Errorf("missing client credentials for refresh")
+	// The token client detaches the grant itself and bounds it at its own deadline.
+	newTokenResponse, err := m.tokenRefresher.Refresh(r.Context(), stored.RefreshToken)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	// Prepare the refresh token request
-	data := url.Values{}
-	data.Set("grant_type", "refresh_token")
-	data.Set("refresh_token", stored.RefreshToken)
-	data.Set("client_id", clientID)
-	data.Set("client_secret", clientSecret)
-
-	// The browser may be gone; the auth server is not. refresh_token is single use, so the
-	// server revokes the old token as part of issuing the new one, and abandoning the read
-	// loses the only copy of what it issued -- the administrator would then hold a revoked
-	// token and be signed out on their next page load. WithoutCancel keeps the request's
-	// values, so request_id still reaches every record below, and drops only its
-	// cancellation; context.Background() would drop the request id with it. The deadline is
-	// what bounds this instead (#338).
+	// The refresh is not done when the grant returns; it is done when the new token is written
+	// down. The auth server has already revoked the old one, so a check or a write refused because
+	// the browser went away leaves the administrator holding a dead token -- the very outcome the
+	// grant's detachment exists to prevent, arriving two lines later instead. So what follows runs
+	// on a context of its own, detached the same way: WithoutCancel keeps the request's values, so
+	// request_id still reaches every record, and TokenExchangeTimeout bounds the check and the
+	// write together. That is a second budget after the grant's, so against a hung auth server
+	// the worst case is twice the timeout, still under the listener's write timeout (#338, #441
+	// decision 2).
+	//
+	// The sign-in callback deliberately does not do this: there the session being built is the
+	// one the browser will never receive a cookie for, so persisting it past the browser's
+	// departure leaves an authenticated row nobody can reach (#338).
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauthclient.TokenExchangeTimeout)
 	defer cancel()
 
-	// Create the HTTP request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.authServerBaseURL+"/auth/token",
-		strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, nil, errs.Errorf("error creating refresh token request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	// Send the request
-	if m.httpClient == nil {
-		// Returning rather than logging and carrying on: the next line dereferences
-		// m.httpClient, so this record was the last thing written before the process panicked.
-		// The caller already treats a refresh error as "clear the session and continue", which
-		// is the behaviour a nil client should have had all along (#320).
-		return nil, nil, errs.New("no http client is configured, so the token cannot be refreshed")
-	}
-	resp, err := m.httpClient.Do(req)
-	if err != nil {
-		return nil, nil, errs.Errorf("error sending refresh token request: %v", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read the response, bounded: a peer answering with an endless body would otherwise be
-	// read into memory until the process dies. An answer over the ceiling is refused rather
-	// than cut, so it is reported as boundedread.ErrResponseTooLarge rather than as a parse
-	// failure indistinguishable from a malformed body; either way the caller clears the
-	// session and carries on, and nothing below this line runs (#386 decision 4).
-	body, err := boundedread.Read(resp.Body, oauthclient.MaxTokenResponseBytes)
-	if err != nil {
-		// %w rather than %v, which is what the line said before: the message is byte for
-		// byte the same and the sentinel stays reachable through errors.Is, which is the
-		// whole point of classifying the overrun.
-		return nil, nil, errs.Errorf("error reading refresh token response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, nil, errs.Errorf("error response from server: %s", body)
-	}
-
-	// Parse the new token response
-	var newTokenResponse oauth.TokenResponse
-	err = json.Unmarshal(body, &newTokenResponse)
-	if err != nil {
-		return nil, nil, errs.Errorf("error parsing refresh token response: %v", err)
-	}
-
-	// RFC 6749 section 6: "The authorization server MAY issue a new refresh token, in which case
-	// the client MUST discard the old refresh token". One that issues none leaves the old one the
-	// client's, and storing the answer as it came would drop it and sign the administrator out at
-	// the next refresh. golang.org/x/oauth2 keeps it the same way (#427).
-	if newTokenResponse.RefreshToken == "" {
-		newTokenResponse.RefreshToken = stored.RefreshToken
-	}
-
-	// Validated before anything is stored, on the detached context: the old refresh token is
-	// already spent, so the parser's JWKS fetch must not be abandoned with the browser either.
-	// A response with no ID token keeps previous (OIDC Core 12.2) (#427 decision 14).
-	accepted, err := m.tokenParser.DecodeAndValidateRefreshResponse(ctx, &newTokenResponse, previous)
+	// Validated before anything is stored: the parser may fetch the JWKS, which must not be
+	// abandoned with the browser either. A response with no ID token keeps previous (OIDC Core
+	// 12.2) (#427 decision 14).
+	accepted, err := m.tokenParser.DecodeAndValidateRefreshResponse(ctx, newTokenResponse, previous)
 	if err != nil {
 		return nil, err, nil
 	}
@@ -349,17 +286,8 @@ func (m *MiddlewareJwt) refreshToken(
 	// arrived.
 	accepted.TokenResponse.Scope = oauthclient.EffectiveScope(accepted.TokenResponse.Scope, stored.Scope)
 
-	// The refresh is not done when the call returns; it is done when the new token is written
-	// down. The auth server has already revoked the old one, so a read or a write refused
-	// because the browser went away leaves the administrator holding a dead token -- the very
-	// outcome the detached context above exists to prevent, arriving two lines later instead.
 	// ServerSideStore hands the request's own context to its backend, so the store has to be
-	// given a request carrying the detached context rather than the browser's. The deadline
-	// set above covers the call, its validation and these two writes together.
-	//
-	// The sign-in callback deliberately does not do this: there the session being built is the
-	// one the browser will never receive a cookie for, so persisting it past the browser's
-	// departure leaves an authenticated row nobody can reach (#338).
+	// given a request carrying the detached context rather than the browser's.
 	detachedReq := r.WithContext(ctx)
 
 	sess, err := m.sessionStore.Get(detachedReq, m.sessionName)

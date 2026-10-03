@@ -127,6 +127,40 @@ func (c *TokenClient) ExchangeCode(ctx context.Context, code, redirectURI, codeV
 	return c.post(ctx, form)
 }
 
+// Refresh sends the refresh grant for refreshToken: the JWT middleware's, when the stored access
+// token is due. It is transport only; the caller checks the answer through the parser and writes
+// the session (#441 decision 2).
+//
+// refresh_token is single use: the auth server revokes the old token as part of issuing the new
+// one, so abandoning the read loses the only copy of what it issued, and the administrator would
+// hold a revoked token and be signed out on their next page load. So the request runs on ctx
+// detached from its cancellation, under TokenExchangeTimeout, as ExchangeCode's does.
+func (c *TokenClient) Refresh(ctx context.Context, refreshToken string) (*oauth.TokenResponse, error) {
+	form := url.Values{}
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", refreshToken)
+	form.Set("client_id", c.clientID)
+	form.Set("client_secret", c.clientSecret)
+
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), TokenExchangeTimeout)
+	defer cancel()
+
+	tokenResponse, err := c.post(ctx, form)
+	if err != nil {
+		return nil, err
+	}
+
+	// RFC 6749 section 6: "The authorization server MAY issue a new refresh token, in which case
+	// the client MUST discard the old refresh token". One that issues none leaves the old one the
+	// client's, and returning the answer as it came would have the caller store it away as empty
+	// and sign the administrator out at the next refresh. golang.org/x/oauth2 keeps it the same
+	// way (#427).
+	if tokenResponse.RefreshToken == "" {
+		tokenResponse.RefreshToken = refreshToken
+	}
+	return tokenResponse, nil
+}
+
 // post sends one grant's form to the token endpoint and decodes the answer.
 func (c *TokenClient) post(ctx context.Context, form url.Values) (*oauth.TokenResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.tokenURL, strings.NewReader(form.Encode()))

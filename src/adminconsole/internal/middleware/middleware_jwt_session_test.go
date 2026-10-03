@@ -4,16 +4,14 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,61 +45,144 @@ const (
 	storedGrant         = "openid email profile authserver:manage"
 )
 
-// recordingRefreshClient is the auth server's token endpoint: it answers every refresh grant with
-// one scripted status and body and records what it was sent.
-type recordingRefreshClient struct {
-	status int
-	body   string
+// fakeRefresher is the token client's refresh grant, which owns the transport, the kept refresh
+// token and the grant's own detachment (#441 decision 2): it answers every call with one scripted
+// response or error and records what it was handed. during, when set, runs inside the call, which is
+// where a browser that goes away mid-refresh goes away.
+type fakeRefresher struct {
+	answer *oauth.TokenResponse
+	err    error
+	during func()
 
-	mu    sync.Mutex
-	calls int
-	form  url.Values
+	mu           sync.Mutex
+	calls        int
+	refreshToken string
+	requestID    string
+	returnedAt   time.Time
 }
 
-func (c *recordingRefreshClient) Do(req *http.Request) (*http.Response, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.calls++
-	sent, err := io.ReadAll(req.Body)
-	if err != nil {
-		return nil, err
+func (f *fakeRefresher) Refresh(ctx context.Context, refreshToken string) (*oauth.TokenResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.refreshToken = refreshToken
+	f.requestID = chimiddleware.GetReqID(ctx)
+	if f.during != nil {
+		f.during()
 	}
-	c.form, err = url.ParseQuery(string(sent))
-	if err != nil {
-		return nil, err
+	f.returnedAt = time.Now()
+	if f.err != nil {
+		return nil, f.err
 	}
-	return &http.Response{StatusCode: c.status, Body: io.NopCloser(strings.NewReader(c.body))}, nil
+	answer := *f.answer
+	return &answer, nil
 }
 
-func (c *recordingRefreshClient) sent() (int, url.Values) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.calls, c.form
+func (f *fakeRefresher) sent() (int, string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls, f.refreshToken
+}
+
+// contextHonouringBackend is the memory backend refusing a call on a context that is done, which is
+// what the console's real backend, an HTTP call to the auth server, does. It records the context of
+// every write, so a case can read what the write was handed.
+type contextHonouringBackend struct {
+	*sessiontest.MemoryBackend
+
+	mu     sync.Mutex
+	writes []observedContext
+}
+
+// observedContext is what a context looked like at the moment it was handed over.
+type observedContext struct {
+	err         error
+	deadline    time.Time
+	hasDeadline bool
+	requestID   string
+}
+
+func observe(ctx context.Context) observedContext {
+	deadline, hasDeadline := ctx.Deadline()
+	return observedContext{err: ctx.Err(), deadline: deadline, hasDeadline: hasDeadline,
+		requestID: chimiddleware.GetReqID(ctx)}
+}
+
+func (b *contextHonouringBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return b.MemoryBackend.Load(ctx, id)
+}
+
+func (b *contextHonouringBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	b.record(ctx)
+	if err := ctx.Err(); err != nil {
+		return time.Time{}, err
+	}
+	return b.MemoryBackend.Create(ctx, id, data, authenticated)
+}
+
+func (b *contextHonouringBackend) Update(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	b.record(ctx)
+	if err := ctx.Err(); err != nil {
+		return time.Time{}, err
+	}
+	return b.MemoryBackend.Update(ctx, id, data, authenticated)
+}
+
+func (b *contextHonouringBackend) Touch(ctx context.Context, id string, authenticated bool) (time.Time, error) {
+	if err := ctx.Err(); err != nil {
+		return time.Time{}, err
+	}
+	return b.MemoryBackend.Touch(ctx, id, authenticated)
+}
+
+func (b *contextHonouringBackend) Delete(ctx context.Context, id string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return b.MemoryBackend.Delete(ctx, id)
+}
+
+func (b *contextHonouringBackend) record(ctx context.Context) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.writes = append(b.writes, observe(ctx))
+}
+
+func (b *contextHonouringBackend) recordedWrites() []observedContext {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]observedContext(nil), b.writes...)
 }
 
 type sessionHarness struct {
-	t      *testing.T
-	store  *sessionstore.ServerSideStore
-	parser *mock_middleware.TokenParser
-	client *recordingRefreshClient
-	logs   *logtest.SlogCapture
+	t         *testing.T
+	store     *sessionstore.ServerSideStore
+	backend   *contextHonouringBackend
+	parser    *mock_middleware.TokenParser
+	refresher *fakeRefresher
+	logs      *logtest.SlogCapture
 }
 
 func newSessionHarness(t *testing.T) *sessionHarness {
 	t.Helper()
 	gob.Register(oauth.TokenResponse{})
-	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), sessionkeys.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
+	backend := &contextHonouringBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
 		}, nil)
 	require.NoError(t, err)
 	return &sessionHarness{
-		t:      t,
-		store:  store,
-		parser: mock_middleware.NewTokenParser(t),
-		client: &recordingRefreshClient{status: http.StatusOK},
-		logs:   logtest.CaptureSlog(t),
+		t:         t,
+		store:     store,
+		backend:   backend,
+		parser:    mock_middleware.NewTokenParser(t),
+		refresher: &fakeRefresher{},
+		logs:      logtest.CaptureSlog(t),
 	}
 }
 
@@ -143,11 +224,16 @@ type served struct {
 // serve sends one request carrying cookies through JwtSessionHandler over parser.
 func (h *sessionHarness) serve(parser tokenParser, cookies []*http.Cookie) served {
 	h.t.Helper()
-	m := NewMiddlewareJwt(h.store, sessionTestName, parser, new(mock_middleware.AuthHelper),
-		stubErrorRenderer{}, h.client, "http://auth.example", "http://console.example",
-		"admin-console-client", "the-client-secret")
+	return h.serveOn(context.Background(), parser, cookies)
+}
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
+// serveOn is serve with the request on ctx, the browser's own context.
+func (h *sessionHarness) serveOn(ctx context.Context, parser tokenParser, cookies []*http.Cookie) served {
+	h.t.Helper()
+	m := NewMiddlewareJwt(h.store, sessionTestName, parser, h.refresher, new(mock_middleware.AuthHelper),
+		stubErrorRenderer{}, "http://console.example", "admin-console-client")
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil).WithContext(ctx)
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -213,7 +299,7 @@ func (h *sessionHarness) assertOneRecord(level slog.Level, message, cause string
 
 func (h *sessionHarness) assertNoRefreshSent() {
 	h.t.Helper()
-	calls, _ := h.client.sent()
+	calls, _ := h.refresher.sent()
 	assert.Zero(h.t, calls, "no refresh grant is sent")
 }
 
@@ -348,7 +434,7 @@ func TestJwtSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSi
 		sessionkeys.SessionKeyJwtExpiresAt: due(),
 		"unrelated":                        "kept",
 	})
-	h.client.body = `{"access_token":"new","id_token":"new","refresh_token":"new","expires_in":300}`
+	h.refresher.answer = &oauth.TokenResponse{AccessToken: "new", IdToken: "new", RefreshToken: "new", ExpiresIn: 300}
 
 	out := h.serve(parser, cookies)
 
@@ -502,8 +588,8 @@ func TestJwtSessionHandler_ARefusedRefreshEndsTheSession(t *testing.T) {
 			h := newSessionHarness(t)
 			cookies := h.seed(signedIn(due()))
 			h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
-			h.client.body = `{"access_token":"the-new-access-token","id_token":"` + refreshedIDTokenRaw +
-				`","refresh_token":"the-new-refresh-token","expires_in":300}`
+			h.refresher.answer = &oauth.TokenResponse{AccessToken: "the-new-access-token",
+				IdToken: refreshedIDTokenRaw, RefreshToken: "the-new-refresh-token", ExpiresIn: 300}
 			var held any
 			h.expectRefreshValidation(cookies, nil, tc.refused, &held)
 
@@ -519,22 +605,39 @@ func TestJwtSessionHandler_ARefusedRefreshEndsTheSession(t *testing.T) {
 
 // Step 5, a grant that never produced an answer to validate: the auth server refused the refresh
 // token, or there is none to send. The session is signed out as it always was on a failed refresh,
-// and the chain continues unauthenticated.
+// and the chain continues unauthenticated. The refusal is the token client's one error (#441
+// decision 3), and the record names it as the client wrote it.
 func TestJwtSessionHandler_AFailedRefreshGrantSignsTheSessionOut(t *testing.T) {
 	t.Run("the auth server refuses the grant", func(t *testing.T) {
 		h := newSessionHarness(t)
 		cookies := h.seed(signedIn(due()))
 		h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
-		h.client.status = http.StatusBadRequest
-		h.client.body = `{"error":"invalid_grant"}`
+		h.refresher.err = errs.WithStack(&oauthclient.TokenEndpointError{
+			StatusCode: http.StatusBadRequest, ErrorCode: "invalid_grant"})
 
 		out := h.serve(h.parser, cookies)
 
 		h.assertContinuedUnauthenticated(out)
 		h.assertSignedOut(cookies)
-		calls, _ := h.client.sent()
+		calls, sent := h.refresher.sent()
 		assert.Equal(t, 1, calls)
-		h.assertOneRecord(slog.LevelWarn, "unable to refresh the access token, signing the session out", "invalid_grant")
+		assert.Equal(t, storedRefreshToken, sent)
+		h.assertOneRecord(slog.LevelWarn, "unable to refresh the access token, signing the session out",
+			"the auth server's token endpoint answered 400 (invalid_grant)")
+	})
+
+	t.Run("the grant fails in transport", func(t *testing.T) {
+		h := newSessionHarness(t)
+		cookies := h.seed(signedIn(due()))
+		h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
+		h.refresher.err = errs.New("error sending request: connection refused")
+
+		out := h.serve(h.parser, cookies)
+
+		h.assertContinuedUnauthenticated(out)
+		h.assertSignedOut(cookies)
+		h.assertOneRecord(slog.LevelWarn, "unable to refresh the access token, signing the session out",
+			"connection refused")
 	})
 
 	t.Run("there is no refresh token", func(t *testing.T) {
@@ -564,8 +667,9 @@ func TestJwtSessionHandler_AFailedRefreshGrantSignsTheSessionOut(t *testing.T) {
 func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 	testCases := []struct {
 		name string
-		// body is the token endpoint's answer.
-		body string
+		// answer is the token client's, the refresh token already kept when the endpoint issued
+		// none (the client's rule, which its own tests hold).
+		answer oauth.TokenResponse
 		// accepted is the response the parser hands back, having filled in a kept ID token when
 		// the answer carried none (the parser's rule, which this row only shows the middleware
 		// storing).
@@ -578,8 +682,8 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 	}{
 		{
 			name: "the answer names its own scope",
-			body: `{"access_token":"the-new-access-token","id_token":"` + refreshedIDTokenRaw +
-				`","refresh_token":"the-new-refresh-token","expires_in":600,"scope":"openid authserver:manage"}`,
+			answer: oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
+				RefreshToken: "the-new-refresh-token", ExpiresIn: 600, Scope: "openid authserver:manage"},
 			accepted: oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
 				RefreshToken: "the-new-refresh-token", ExpiresIn: 600, Scope: "openid authserver:manage"},
 			acceptedID:   &oauth.JwtToken{TokenBase64: refreshedIDTokenRaw},
@@ -590,8 +694,8 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 		},
 		{
 			name: "the answer omits scope",
-			body: `{"access_token":"the-new-access-token","id_token":"` + refreshedIDTokenRaw +
-				`","refresh_token":"the-new-refresh-token","expires_in":600}`,
+			answer: oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
+				RefreshToken: "the-new-refresh-token", ExpiresIn: 600},
 			accepted: oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
 				RefreshToken: "the-new-refresh-token", ExpiresIn: 600},
 			acceptedID:   &oauth.JwtToken{TokenBase64: refreshedIDTokenRaw},
@@ -602,7 +706,8 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 		},
 		{
 			name: "the answer carries no id token, and the parser keeps the stored one",
-			body: `{"access_token":"the-new-access-token","refresh_token":"the-new-refresh-token","expires_in":600}`,
+			answer: oauth.TokenResponse{AccessToken: "the-new-access-token",
+				RefreshToken: "the-new-refresh-token", ExpiresIn: 600},
 			accepted: oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: storedIDTokenRaw,
 				RefreshToken: "the-new-refresh-token", ExpiresIn: 600},
 			acceptedID:   verifiedStored,
@@ -613,8 +718,8 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 		},
 		{
 			name: "the answer carries no expires_in, an unknown expiry",
-			body: `{"access_token":"the-new-access-token","id_token":"` + refreshedIDTokenRaw +
-				`","refresh_token":"the-new-refresh-token"}`,
+			answer: oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
+				RefreshToken: "the-new-refresh-token"},
 			accepted: oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
 				RefreshToken: "the-new-refresh-token"},
 			acceptedID:  &oauth.JwtToken{TokenBase64: refreshedIDTokenRaw},
@@ -629,7 +734,7 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 			h := newSessionHarness(t)
 			cookies := h.seed(signedIn(due()))
 			h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
-			h.client.body = tc.body
+			h.refresher.answer = &tc.answer
 			var held any
 			h.expectRefreshValidation(cookies,
 				&oauthclient.JwtInfo{TokenResponse: tc.accepted, IdToken: tc.acceptedID}, nil, &held)
@@ -638,11 +743,11 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 			out := h.serve(h.parser, cookies)
 			after := time.Now().Unix()
 
-			calls, form := h.client.sent()
+			calls, sent := h.refresher.sent()
 			require.Equal(t, 1, calls, "one refresh grant")
-			assert.Equal(t, "refresh_token", form.Get("grant_type"))
-			assert.Equal(t, storedRefreshToken, form.Get("refresh_token"))
+			assert.Equal(t, storedRefreshToken, sent, "the stored refresh token is the one sent")
 			assert.Equal(t, storedResponse(), held, "nothing is stored before the answer is validated")
+			h.parser.AssertCalled(t, "DecodeAndValidateRefreshResponse", mock.Anything, &tc.answer, verifiedStored)
 
 			sess := h.readBack(cookies)
 			stored, ok := sess.Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
@@ -670,26 +775,79 @@ func TestJwtSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 	}
 }
 
-// RFC 6749 section 6 lets the auth server issue a new refresh token or not. An answer that issues
-// none leaves the old one the client's, so it is kept rather than stored away as empty, which would
-// sign the administrator out at the next refresh. The kept token is also what the parser is shown.
-func TestJwtSessionHandler_ARefreshThatIssuesNoRefreshTokenKeepsTheOldOne(t *testing.T) {
+// Decision 2 of #441: the refresh is done when the new token is written down, not when the grant
+// returns. The auth server revoked the old refresh token when it issued the new one, so a check or a
+// write refused because the browser went away leaves the administrator holding a dead token and signs
+// them out on their next page load. The token client detaches the grant itself; what follows it, the
+// parser's check of the answer, which may fetch the JWKS, and the session write, runs on one context
+// of the middleware's own, detached the same way and deadlined at TokenExchangeTimeout.
+//
+// The browser goes away while the grant is in flight, which is where it goes away in practice, and
+// the backend refuses a done context as the real one does, so a check or a write still on the
+// browser's context fails this case by what it leaves in the session as well as by what it observed.
+func TestJwtSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
 	h := newSessionHarness(t)
 	cookies := h.seed(signedIn(due()))
+
+	const wantRequestID = "the-inbound-request-id"
+	ctx, cancel := context.WithCancel(
+		context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID))
+	defer cancel()
+
 	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
-	h.client.body = `{"access_token":"the-new-access-token","id_token":"` + refreshedIDTokenRaw + `","expires_in":600}`
-	h.parser.EXPECT().DecodeAndValidateRefreshResponse(mock.Anything,
-		mock.MatchedBy(func(tr *oauth.TokenResponse) bool { return tr.RefreshToken == storedRefreshToken }),
-		verifiedStored).
-		RunAndReturn(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JwtToken) (*oauthclient.JwtInfo, error) {
+	h.refresher.answer = &oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
+		RefreshToken: "the-new-refresh-token", ExpiresIn: 600}
+	h.refresher.during = func() {
+		cancel()
+		// The check's budget starts when the grant's ends; the pause is what makes the two
+		// distinguishable below.
+		time.Sleep(20 * time.Millisecond)
+	}
+	var checked observedContext
+	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
+		Run(func(args mock.Arguments) {
+			checked = observe(args.Get(0).(context.Context))
+		}).
+		Return(func(_ context.Context, tr *oauth.TokenResponse, previous *oauth.JwtToken) (*oauthclient.JwtInfo, error) {
 			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: &oauth.JwtToken{TokenBase64: refreshedIDTokenRaw}}, nil
 		})
+	h.backend.mu.Lock()
+	h.backend.writes = nil
+	h.backend.mu.Unlock()
 
-	out := h.serve(h.parser, cookies)
+	out := h.serveOn(ctx, h.parser, cookies)
 
-	require.True(t, out.reached)
+	assert.True(t, out.reached, "the chain continues")
 	stored, ok := h.readBack(cookies).Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
-	require.True(t, ok)
+	require.True(t, ok, "the refreshed response reached the session")
 	assert.Equal(t, "the-new-access-token", stored.AccessToken)
-	assert.Equal(t, storedRefreshToken, stored.RefreshToken, "the old refresh token is kept")
+	assert.Equal(t, "the-new-refresh-token", stored.RefreshToken)
+	assert.Empty(t, h.logs.Records(), h.logs.Text())
+
+	// The grant is handed the request's values; its detachment is the token client's to make.
+	h.refresher.mu.Lock()
+	grantRequestID, grantReturnedAt := h.refresher.requestID, h.refresher.returnedAt
+	h.refresher.mu.Unlock()
+	assert.Equal(t, wantRequestID, grantRequestID, "the grant is sent with the request's values")
+
+	// The check.
+	assert.NoError(t, checked.err, "the answer is checked on a context the browser's departure did not cancel")
+	require.True(t, checked.hasDeadline, "detached, but not unbounded")
+	assert.Equal(t, wantRequestID, checked.requestID, "and keeping request_id for the parser's records")
+
+	// Two budgets, not one: the check's deadline is taken once the grant has returned, so it is at
+	// least TokenExchangeTimeout past that moment, and no more than that past now.
+	assert.False(t, checked.deadline.Before(grantReturnedAt.Add(oauthclient.TokenExchangeTimeout)),
+		"the check and the write have a budget of their own, taken after the grant's")
+	assert.LessOrEqual(t, time.Until(checked.deadline), oauthclient.TokenExchangeTimeout,
+		"bounded by TokenExchangeTimeout")
+
+	// The write: the same context as the check, so one deadline covers both.
+	writes := h.backend.recordedWrites()
+	require.Len(t, writes, 1, "one write, the refreshed session")
+	assert.NoError(t, writes[0].err, "the session write runs on the detached context too")
+	require.True(t, writes[0].hasDeadline)
+	assert.True(t, checked.deadline.Equal(writes[0].deadline),
+		"one deadline covers the check and the write together")
+	assert.Equal(t, wantRequestID, writes[0].requestID, "and the write keeps request_id")
 }

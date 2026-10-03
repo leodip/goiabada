@@ -46,13 +46,11 @@ func (s *Server) initRoutes(root chi.Router) {
 		s.sessionStore,
 		constants.AdminConsoleSessionName,
 		tokenParser,
+		tokenClient,
 		authHelper,
 		httpHelper,
-		authServerClient,
-		authBase,
 		config.GetAdminConsole().BaseURL,
 		constants.AdminConsoleClientIdentifier,
-		config.GetAdminConsole().OAuthClientSecret,
 	)
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManagePermissionIdentifier)})

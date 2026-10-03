@@ -67,9 +67,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				store := new(mock_sessionstore.Store)
 				store.On("Get", mock.Anything, sessionName).Return(nil, assert.AnError)
 
-				m := NewMiddlewareJwt(store, sessionName, new(mock_middleware.TokenParser),
-					new(mock_middleware.AuthHelper), rec, nil,
-					"http://localhost:9090", "http://localhost:9091", "", "")
+				m := NewMiddlewareJwt(store, sessionName, new(mock_middleware.TokenParser), nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -83,9 +81,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 					Values: map[string]any{sessionkeys.SessionKeyJwt: "not a token response"},
 				}, nil)
 
-				m := NewMiddlewareJwt(store, sessionName, new(mock_middleware.TokenParser),
-					new(mock_middleware.AuthHelper), rec, nil,
-					"http://localhost:9090", "http://localhost:9091", "", "")
+				m := NewMiddlewareJwt(store, sessionName, new(mock_middleware.TokenParser), nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -104,9 +100,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-				m := NewMiddlewareJwt(store, sessionName, mock_middleware.NewTokenParser(t),
-					new(mock_middleware.AuthHelper), rec, nil,
-					"http://localhost:9090", "http://localhost:9091", "", "")
+				m := NewMiddlewareJwt(store, sessionName, mock_middleware.NewTokenParser(t), nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -128,9 +122,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				parser.On("DecodeAndValidateStoredIDToken", mock.Anything, "foreign").
 					Return(nil, errs.Wrap(oauthclient.ErrForeignToken, "the id token's iss is another"))
 
-				m := NewMiddlewareJwt(store, sessionName, parser,
-					new(mock_middleware.AuthHelper), rec, nil,
-					"http://localhost:9090", "http://localhost:9091", "", "")
+				m := NewMiddlewareJwt(store, sessionName, parser, nil, new(mock_middleware.AuthHelper), rec, "http://localhost:9091", "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -150,10 +142,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 					coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"),
 					mock.AnythingOfType("string")).Return(assert.AnError)
 
-				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName,
-					new(mock_middleware.TokenParser), helper, rec, nil,
-					"http://localhost:9090", "http://localhost:9091",
-					coreconstants.AdminConsoleClientIdentifier, "")
+				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName, new(mock_middleware.TokenParser), nil, helper, rec, "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier)
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
