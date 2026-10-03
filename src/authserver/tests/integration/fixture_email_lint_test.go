@@ -154,7 +154,7 @@ func TestIntegration_UniqueEmailDrawsADistinctAddress(t *testing.T) {
 		if strings.Count(got, "@") != 1 {
 			t.Errorf("%q is not a single address", got)
 		}
-		// validators.email_validator refuses an address over 60 bytes, and fixtures
+		// accountvalidation.EmailValidator refuses an address over 60 bytes, and fixtures
 		// reach the endpoints that run it. This is the tier's longest label, so the
 		// run added here has to leave it inside the limit.
 		if len(got) > 60 {

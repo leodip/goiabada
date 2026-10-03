@@ -395,7 +395,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testi
 // outright would take the remedy away along with the risk.
 //
 // The second is decision 17. A self-registered client's identifier is "dcr_" plus a UUID, which is
-// 40 characters, and ValidateIdentifier caps an identifier at 38. While the update re-checked an
+// 40 characters, and IdentifierValidator.Validate caps an identifier at 38. While the update re-checked an
 // unchanged identifier, that arithmetic rejected every update to every self-registered client, so
 // this screen could not save anything at all: not consent, not Enabled, nothing. The length is
 // asserted here rather than assumed, because it is the whole reason the check has to be
@@ -408,7 +408,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 	assert.True(t, client.ConsentRequired, "registration turns consent on, which is what is being turned off here")
 	assert.Greater(t, len(client.ClientIdentifier), 38,
-		"a generated identifier is longer than ValidateIdentifier accepts, which is what makes this the regression guard")
+		"a generated identifier is longer than IdentifierValidator.Validate accepts, which is what makes this the regression guard")
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{

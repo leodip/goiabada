@@ -93,7 +93,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 	}{
 		{"empty identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "", Description: "x"}}}, http.StatusBadRequest, "Permission identifier is required", ""},
 		{"invalid format", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "__bad", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", ""},
-		// The identifier reaches ValidateIdentifier as it was sent. It used to be run through the
+		// The identifier reaches IdentifierValidator.Validate as it was sent. It used to be run through the
 		// HTML sanitizer first, which turned "valid<b" into "valid" and created a permission under
 		// a name the caller never asked for (#275).
 		{"html in identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "valid<b", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", ""},

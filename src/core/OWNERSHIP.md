@@ -347,6 +347,9 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `T` | kernel | — |
 | `core/i18n` | `UILocalesReader` | reachable | — |
 | `core/i18n` | `WithLocale` | both-apps | — |
+| `core/inputvalidation` | `ContainsAngleBrackets` | both-apps | — |
+| `core/inputvalidation` | `IdentifierValidator` | own-package | — |
+| `core/inputvalidation` | `NewIdentifierValidator` | both-apps | — |
 | `core/internal/pinnedfetch` | `CheckSHA256` | kernel | — |
 | `core/internal/pinnedfetch` | `Doer` | kernel | — |
 | `core/internal/pinnedfetch` | `Get` | kernel | — |
@@ -460,6 +463,3 @@ command itself and fails on a tree it changed.
 | `core/timezones` | `All` | contract | The list half of the time zone table whose lookup the auth server validates against. Moving it would put one zone table in two places. |
 | `core/timezones` | `ByZone` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
 | `core/timezones` | `Zone` | contract | The row type both halves of the table share. |
-| `core/validators` | `ContainsAngleBrackets` | both-apps | — |
-| `core/validators` | `IdentifierValidator` | own-package | — |
-| `core/validators` | `NewIdentifierValidator` | both-apps | — |

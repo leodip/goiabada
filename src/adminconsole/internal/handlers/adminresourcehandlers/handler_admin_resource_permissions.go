@@ -14,9 +14,9 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // resourcePermissionsAPI is what the resource permissions page needs: the resource, its
@@ -215,7 +215,7 @@ func HandleAdminResourcePermissionsPost(
 // IdentifierValidator is the one check the permission form's pre-save asks, the same one the API
 // asks before the save (#275). It lives beside its one consumer (#440).
 type IdentifierValidator interface {
-	ValidateIdentifier(identifier string, enforceMinLength bool) error
+	Validate(identifier string, enforceMinLength bool) error
 }
 
 // HandleAdminResourceValidatePermissionPost answers the permission form's pre-save check, and it
@@ -248,7 +248,7 @@ func HandleAdminResourceValidatePermissionPost(
 		description := strings.TrimSpace(data["description"])
 
 		// i18n surface: A — admin browser-flow, JSON to in-page handler.
-		if validators.ContainsAngleBrackets(description) {
+		if inputvalidation.ContainsAngleBrackets(description) {
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).Localize(r.Context())
 			httpHelper.EncodeJson(w, r, result)
 			return
@@ -260,7 +260,7 @@ func HandleAdminResourceValidatePermissionPost(
 			return
 		}
 
-		err = identifierValidator.ValidateIdentifier(permissionIdentifier, true)
+		err = identifierValidator.Validate(permissionIdentifier, true)
 		if err != nil {
 			// i18n surface: A — admin browser-flow, JSON to in-page handler.
 			// errors.As in the switch's own order, not a type switch: both read the dynamic type,

@@ -2,7 +2,7 @@ package accountvalidation
 
 import (
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // ValidateNoAngleBrackets refuses a value holding "<" or ">" with the caller's code, so the
@@ -19,7 +19,7 @@ import (
 // Only "<" and ">" are refused. Ampersands and entities are harmless at every sink this repository
 // has, and refusing "&" would break "Tom & Jerry" in a description.
 func ValidateNoAngleBrackets(value string, code string) error {
-	if validators.ContainsAngleBrackets(value) {
+	if inputvalidation.ContainsAngleBrackets(value) {
 		return i18n.NewLocalizedError(code, nil)
 	}
 	return nil

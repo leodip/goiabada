@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // usersAttributesDatabase is what the user attribute endpoints need: the user and the attributes
@@ -122,7 +122,7 @@ func HandleAPIUserAttributeGet(
 // HandleAPIUserAttributeCreatePost - POST /api/v1/admin/user-attributes
 func HandleAPIUserAttributeCreatePost(
 	database usersAttributesDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func HandleAPIUserAttributeCreatePost(
 		}
 
 		// Validate attribute key
-		err = identifierValidator.ValidateIdentifier(req.Key, false)
+		err = identifierValidator.Validate(req.Key, false)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -213,7 +213,7 @@ func HandleAPIUserAttributeCreatePost(
 // HandleAPIUserAttributeUpdatePut - PUT /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeUpdatePut(
 	database usersAttributesDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +257,7 @@ func HandleAPIUserAttributeUpdatePut(
 		}
 
 		// Validate attribute key
-		err = identifierValidator.ValidateIdentifier(req.Key, false)
+		err = identifierValidator.Validate(req.Key, false)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return

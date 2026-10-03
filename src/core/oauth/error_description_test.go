@@ -9,7 +9,7 @@ import (
 // interpolated into it, measured from the tree at 214 characters:
 //
 //	grep -ohE '"[A-Z][^"]{40,}"' src/authserver/internal/*validation/*_validator.go \
-//	    src/core/validators/*_validator.go | awk '{print length($0)-2}' | sort -rn | head -1
+//	    src/core/inputvalidation/*_validator.go | awk '{print length($0)-2}' | sort -rn | head -1
 //
 // It is here rather than as a literal count so the passthrough row asserts against the real text.
 const longestStaticDescription = "Id token scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces."

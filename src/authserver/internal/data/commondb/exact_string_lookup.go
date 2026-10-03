@@ -14,7 +14,7 @@ package commondb
 //     character spelled as a base letter plus a combining mark. SQLite and PostgreSQL
 //     compare them unequal.
 //
-// Neither is reachable through a WRITE: ValidateIdentifier admits no space and no
+// Neither is reachable through a WRITE: IdentifierValidator.Validate admits no space and no
 // non-ASCII, and every email write path is trimmed and lowercased in Go. Neither validator
 // runs on a READ. ValidateTokenRequest and ValidateClientAndRedirectURI check only that
 // client_id is non-empty before handing it to GetClientByClientIdentifier, so a token

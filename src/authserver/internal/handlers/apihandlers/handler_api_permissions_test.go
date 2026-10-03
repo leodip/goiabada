@@ -19,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -68,7 +68,7 @@ func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t
 func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
-	identifierValidator := validators.NewIdentifierValidator()
+	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	handler := HandleAPIResourcePermissionsPut(database, identifierValidator, auditLogger)
 
@@ -175,7 +175,7 @@ func serveResourcePerms(database *mocks_data.Database, auditLogger *mocks_handle
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/7/permissions", strings.NewReader(body))
 	r = setChiURLParam(r, "resourceId", "7")
 	rr := httptest.NewRecorder()
-	HandleAPIResourcePermissionsPut(database, validators.NewIdentifierValidator(), auditLogger).ServeHTTP(rr, r)
+	HandleAPIResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), auditLogger).ServeHTTP(rr, r)
 	return rr
 }
 

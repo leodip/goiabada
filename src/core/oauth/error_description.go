@@ -11,7 +11,7 @@ import (
 // interpolated into it is 214 characters:
 //
 //	grep -ohE '"[A-Z][^"]{40,}"' src/authserver/internal/*validation/*_validator.go \
-//	    src/core/validators/*_validator.go | awk '{print length($0)-2}' | sort -rn | head -1
+//	    src/core/inputvalidation/*_validator.go | awk '{print length($0)-2}' | sort -rn | head -1
 //
 // so the bound is more than double the longest legitimate text and truncates nothing the server says
 // on its own account. What it does bound is the part a caller chose: a description interpolates

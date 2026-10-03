@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // resourcesDatabase is what the resource endpoints need: the resource row.
@@ -56,7 +56,7 @@ func HandleAPIResourcesGet(
 // HandleAPIResourceCreatePost - POST /api/v1/admin/resources
 func HandleAPIResourceCreatePost(
 	database resourcesDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +85,7 @@ func HandleAPIResourceCreatePost(
 		}
 
 		// Validate identifier format
-		if err := identifierValidator.ValidateIdentifier(createReq.ResourceIdentifier, true); err != nil {
+		if err := identifierValidator.Validate(createReq.ResourceIdentifier, true); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -163,7 +163,7 @@ func HandleAPIResourceGet(
 // HandleAPIResourceUpdatePut - PUT /api/v1/admin/resources/{id}
 func HandleAPIResourceUpdatePut(
 	database resourcesDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -214,7 +214,7 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		// Validate identifier format
-		if validateIdentifierErr := identifierValidator.ValidateIdentifier(updateReq.ResourceIdentifier, true); validateIdentifierErr != nil {
+		if validateIdentifierErr := identifierValidator.Validate(updateReq.ResourceIdentifier, true); validateIdentifierErr != nil {
 			writeValidationError(w, r, validateIdentifierErr)
 			return
 		}

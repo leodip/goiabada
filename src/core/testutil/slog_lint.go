@@ -243,9 +243,9 @@ var slogSpreadSites = []slogSpreadSite{
 // application. The auth server's half joined authserver/internal/handlerhelpers, already listed.
 //
 // authserver/internal/protocolvalidation carries the one record any of the three writes, the
-// redirect_uri refusal in authorize_validator.go. accountvalidation and what is left of
-// core/validators carry none, which is the same reason every other quiet directory here is listed
-// rather than left out: the rule is what refuses a plain slog.Warn written beside a validator
+// redirect_uri refusal in authorize_validator.go. accountvalidation and core/inputvalidation, which
+// was core/validators until #442, carry none, which is the same reason every other quiet directory
+// here is listed rather than left out: the rule is what refuses a plain slog.Warn written beside a validator
 // later, and a directory absent from this list costs coverage silently, since the walk only fails
 // when it reaches no files at all.
 //
@@ -355,7 +355,7 @@ var slogRequestPathDirs = []string{
 	"adminconsole/internal/publicsettings",
 	"adminconsole/internal/handlerhelpers",
 	"core/middleware",
-	"core/validators",
+	"core/inputvalidation",
 	"core/oauth",
 	"core/sessionstore",
 }

@@ -22,8 +22,8 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/securerandom"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // clientsDatabase is what the client endpoints need: the client row, its redirect URIs and web
@@ -274,7 +274,7 @@ func HandleAPIClientDelete(
 // HandleAPIClientCreatePost - POST /api/v1/admin/clients
 func HandleAPIClientCreatePost(
 	database clientsDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
@@ -319,7 +319,7 @@ func HandleAPIClientCreatePost(
 		}
 
 		// Validate identifier format
-		if err := identifierValidator.ValidateIdentifier(req.ClientIdentifier, true); err != nil {
+		if err := identifierValidator.Validate(req.ClientIdentifier, true); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -392,7 +392,7 @@ func HandleAPIClientCreatePost(
 // HandleAPIClientUpdatePut - PUT /api/v1/admin/clients/{id}
 func HandleAPIClientUpdatePut(
 	database clientsDatabase,
-	identifierValidator *validators.IdentifierValidator,
+	identifierValidator *inputvalidation.IdentifierValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
@@ -448,7 +448,7 @@ func HandleAPIClientUpdatePut(
 
 		// The identifier is checked only when the request actually submits a different one, and
 		// that is load bearing rather than an optimisation. A client that registered itself is
-		// given "dcr_" plus a UUID, which is 40 characters, and ValidateIdentifier caps an
+		// given "dcr_" plus a UUID, which is 40 characters, and IdentifierValidator.Validate caps an
 		// identifier at 38: re-checking an unchanged value therefore rejected every update to every
 		// self-registered client, whatever the request was trying to change. That made the escape
 		// hatch this change depends on unusable, since turning consent off for one reviewed client
@@ -465,7 +465,7 @@ func HandleAPIClientUpdatePut(
 		// current client, so an unchanged identifier can only ever match the row being updated.
 		if updateReq.ClientIdentifier != client.ClientIdentifier {
 			// Validate identifier format
-			if err := identifierValidator.ValidateIdentifier(updateReq.ClientIdentifier, true); err != nil {
+			if err := identifierValidator.Validate(updateReq.ClientIdentifier, true); err != nil {
 				writeValidationError(w, r, err)
 				return
 			}
