@@ -14,7 +14,6 @@ package testutil
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -408,13 +407,18 @@ func wordSet(words ...string) map[string]bool {
 
 // readBuildFlags reads a go build's flags, which end at its first argument that is not one, and
 // reports whether they set the production tag, or why they cannot be read. The go command keeps the
-// last -tags it is given, so the last one is the one read.
+// last -tags it is given, so the last one is the one read. A word beginning with an expansion, quoted
+// or not, can begin with a dash once expanded, "$FLAGS" or "${FLAGS[@]}" holding -tags=dev, so where
+// a flag could be it cannot be read; as a flag's value, the next word -o or -ldflags consumes, it can.
 func readBuildFlags(args []shellWord) (bool, string) {
 	tags := ""
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a.splits {
 			return false, a.raw + " is an unquoted expansion"
+		}
+		if a.expands && (strings.HasPrefix(a.value, "$") || strings.HasPrefix(a.value, "`")) {
+			return false, a.raw + " is an expansion that could supply a flag"
 		}
 		if a.value == "--" || !strings.HasPrefix(a.value, "-") {
 			break
@@ -599,6 +603,17 @@ func TestReleaseBuilds_GoBuildCommands(t *testing.T) {
 		{"a -tags set through an expansion cannot be read", `go build -tags="$TAGS" .` + "\n", []goBuild{{1, false, "-tags takes its value from an expansion"}}, nil},
 		{"a flag the reader does not know cannot be read", "go build -frobnicate -tags=production .\n", []goBuild{{1, false, "-frobnicate is a flag it does not know"}}, nil},
 		{"a quoted expansion in another flag's value is read", `go build -tags=production -ldflags "-X main.v=$V" -o "$OUT" .` + "\n", []goBuild{{1, true, ""}}, nil},
+		{"a quoted expansion in a package path is read", `go build -tags=production -o out "./cmd/$NAME"` + "\n", []goBuild{{1, true, ""}}, nil},
+		{
+			"a quoted expansion where a flag could be cannot be read",
+			`go build -tags=production "$FLAGS" -o out .` + "\n",
+			[]goBuild{{1, false, `"$FLAGS" is an expansion that could supply a flag`}}, nil,
+		},
+		{
+			"a quoted array expansion where a flag could be cannot be read",
+			`go build -tags=production "${FLAGS[@]}" -o out .` + "\n",
+			[]goBuild{{1, false, `"${FLAGS[@]}" is an expansion that could supply a flag`}}, nil,
+		},
 		{"a command named through an expansion cannot be read", "$GO build -o x .\n", nil, []shellProblem{{1, "runs a command named through an expansion"}}},
 		{"a quote that never closes stops the reading", "go build -tags=production .\necho \"unclosed\n", nil, []shellProblem{{2, `opens a " that never closes`}}},
 		{"a heredoc stops the reading", "cat <<EOF\ngo build -tags=production .\nEOF\n", nil, []shellProblem{{1, "opens a heredoc, whose lines this reader cannot tell from commands"}}},
@@ -763,6 +778,16 @@ func TestReleaseBuilds_Check(t *testing.T) {
 			"release builds: build/Dockerfile-one:2 runs go build with flags this reader cannot read: $FLAGS is an unquoted expansion")
 	})
 
+	t.Run("a quoted expansion that could override the tag fails", func(t *testing.T) {
+		for _, flags := range []string{`"$FLAGS"`, `"${FLAGS[@]}"`} {
+			root := writeReleaseFixture(t, map[string]string{
+				"build/build.sh": strings.Replace(cleanReleaseScript, "go build -tags=production -o out ./cmd/two", "go build -tags=production "+flags+" -o out ./cmd/two", 1),
+			})
+			assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
+				"release builds: build/build.sh:7 runs go build with flags this reader cannot read: "+flags+" is an expansion that could supply a flag")
+		}
+	})
+
 	t.Run("a file whose only go build is echoed holds no go build", func(t *testing.T) {
 		root := writeReleaseFixture(t, map[string]string{
 			"build/Dockerfile-one": "FROM golang AS build\nRUN echo go build -tags=production .\n",
@@ -839,14 +864,19 @@ const wizardMakefile = "cmd/goiabada-setup/Makefile"
 
 // makeRecipes returns a Makefile's text with every line blanked but the recipe lines of target, or of
 // every target when target is empty, each as make hands it to the shell: its leading tab removed,
-// and make's @, - and + prefixes too where it begins a command. It reports whether target is defined.
-// A recipe is the tab-indented lines under a rule; a variable assignment is not a rule.
-func makeRecipes(text, target string) (string, bool) {
+// and make's @, - and + prefixes too where it begins a command. It also returns the text with every
+// recipe line of any target blanked instead, and reports whether target is defined. A recipe is the
+// tab-indented lines under a rule; a variable assignment is not a rule.
+func makeRecipes(text, target string) (string, string, bool) {
 	lines := strings.Split(text, "\n")
 	out := make([]string, len(lines))
-	in, defined, continued := false, false, false
+	others := slices.Clone(lines)
+	rule, in, defined, continued := false, false, false, false
 	for i, l := range lines {
 		if strings.HasPrefix(l, "\t") {
+			if rule {
+				others[i] = ""
+			}
 			if in {
 				l = strings.TrimPrefix(l, "\t")
 				if !continued {
@@ -858,28 +888,41 @@ func makeRecipes(text, target string) (string, bool) {
 			continue
 		}
 		names, rest, ok := strings.Cut(l, ":")
-		in = ok && !strings.HasPrefix(rest, "=") && !strings.HasPrefix(strings.TrimSpace(l), "#") &&
-			(target == "" || slices.Contains(strings.Fields(names), target))
+		rule = ok && !strings.HasPrefix(rest, "=") && !strings.HasPrefix(strings.TrimSpace(l), "#")
+		in = rule && (target == "" || slices.Contains(strings.Fields(names), target))
 		defined = defined || in
 		continued = false
 	}
-	return strings.Join(out, "\n"), defined
+	return strings.Join(out, "\n"), strings.Join(others, "\n"), defined
 }
 
-// runsReleaseScript reports whether a command runs the wizard's build-binaries.sh with
-// --version $(VERSION).
-func runsReleaseScript(c shellCommand) bool {
-	if len(c.words) == 0 || path.Base(c.words[0].value) != "build-binaries.sh" {
-		return false
-	}
-	args := c.words[1:]
-	for j := 0; j+1 < len(args); j++ {
-		if args[j].value == "--version" && args[j+1].value == "$(VERSION)" {
+// runsReleaseScript reports whether one of a recipe's commands runs the wizard's own
+// build-binaries.sh, the one beside the Makefile, with --version $(VERSION) and nothing else: the
+// script keeps the last --version it is given, so a later one would override the Makefile's. The
+// script is named as ./build-binaries.sh, and nothing earlier on its logical line changes directory,
+// so it is the wizard's script and not the servers' one at build/build-binaries.sh.
+func runsReleaseScript(commands []shellCommand) bool {
+	moved := map[int]bool{}
+	for _, c := range commands {
+		if len(c.words) == 0 {
+			continue
+		}
+		if name := c.words[0].value; name == "cd" || name == "pushd" {
+			moved[c.logical] = true
+		}
+		if !moved[c.logical] && !c.words[0].expands && c.words[0].value == "./build-binaries.sh" &&
+			len(c.words) == 3 && c.words[1].value == "--version" && c.words[2].value == "$(VERSION)" {
 			return true
 		}
 	}
 	return false
 }
+
+// makePlatformVariable finds GOOS or GOARCH named outside a recipe: make hands a variable it exports,
+// globally or for a target, to every recipe line it runs, so a go build there picks that platform
+// with nothing on its own line saying so. Rather than read make's assignment, export and override
+// forms, any mention outside a recipe and a comment is refused.
+var makePlatformVariable = regexp.MustCompile(`\bGO(OS|ARCH)\b`)
 
 // checkWizardMakefile holds the wizard's Makefile to delegating its cross-compile, and returns what
 // does not hold. make runs each logical line of a recipe in a shell of its own, so a go build picks a
@@ -887,13 +930,19 @@ func runsReleaseScript(c shellCommand) bool {
 func checkWizardMakefile(text string) []string {
 	var findings []string
 
-	if recipe, ok := makeRecipes(text, "build-all"); !ok {
+	if recipe, _, ok := makeRecipes(text, "build-all"); !ok {
 		findings = append(findings, "wizard makefile: no build-all target")
-	} else if !slices.ContainsFunc(readShell(recipe).commands, runsReleaseScript) {
-		findings = append(findings, "wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)")
+	} else if !runsReleaseScript(readShell(recipe).commands) {
+		findings = append(findings, "wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)")
 	}
 
-	recipes, _ := makeRecipes(text, "")
+	recipes, others, _ := makeRecipes(text, "")
+	for i, l := range strings.Split(others, "\n") {
+		l, _, _ = strings.Cut(l, "#")
+		if makePlatformVariable.MatchString(l) {
+			findings = append(findings, fmt.Sprintf("wizard makefile: line %d sets GOOS or GOARCH outside a recipe, where make can hand it to every go build", i+1))
+		}
+	}
 	s := readShell(recipes)
 	for _, p := range s.problems {
 		findings = append(findings, fmt.Sprintf("wizard makefile: line %d %s", p.line, p.what))
@@ -944,29 +993,44 @@ func TestReleaseBuilds_WizardMakefile(t *testing.T) {
 			"a build-all not running the release script fails",
 			strings.Replace(delegating, "\t@./build-binaries.sh --version \"$(VERSION)\"\n", "\tGOOS=linux go build -o build/x .\n", 1),
 			[]string{
-				"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)",
+				"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)",
 				"wizard makefile: line 10 cross-compiles with its own go build",
 			},
 		},
 		{
 			"running the release script without the version fails",
 			strings.Replace(delegating, ` --version "$(VERSION)"`, "", 1),
-			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+			[]string{"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)"},
 		},
 		{
 			"running the release script with a fixed version fails",
 			strings.Replace(delegating, `"$(VERSION)"`, "dev", 1),
-			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+			[]string{"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)"},
+		},
+		{
+			"running the servers' release script fails",
+			strings.Replace(delegating, "./build-binaries.sh", "../../build/build-binaries.sh", 1),
+			[]string{"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)"},
+		},
+		{
+			"running the release script from another directory fails",
+			strings.Replace(delegating, "\t@./build-binaries.sh", "\t@cd ../../build && ./build-binaries.sh", 1),
+			[]string{"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)"},
+		},
+		{
+			"a later fixed version overriding it fails",
+			strings.Replace(delegating, `"$(VERSION)"`, `"$(VERSION)" --version dev`, 1),
+			[]string{"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)"},
 		},
 		{
 			"the release script run by another target does not count",
 			strings.Replace(delegating, "build-all:\n", "build-all:\n\techo building\n\nother:\n", 1),
-			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+			[]string{"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)"},
 		},
 		{
 			"a build-all that only echoes the release script fails",
 			strings.Replace(delegating, "\t@./build-binaries.sh", "\t@echo ./build-binaries.sh", 1),
-			[]string{"wizard makefile: build-all does not run build-binaries.sh --version $(VERSION)"},
+			[]string{"wizard makefile: build-all does not run ./build-binaries.sh --version $(VERSION)"},
 		},
 		{
 			"the release script run after a separator is read",
@@ -991,6 +1055,27 @@ func TestReleaseBuilds_WizardMakefile(t *testing.T) {
 		{
 			"a GOOS set by another recipe line picks no platform for this one",
 			delegating + "\nbuild-local:\n\texport GOOS=linux\n\tgo build -o build/x .\n",
+			nil,
+		},
+		{
+			"a platform exported from the Makefile itself fails",
+			"export GOOS := linux\nexport GOARCH := arm64\n" + delegating,
+			[]string{
+				"wizard makefile: line 1 sets GOOS or GOARCH outside a recipe, where make can hand it to every go build",
+				"wizard makefile: line 2 sets GOOS or GOARCH outside a recipe, where make can hand it to every go build",
+			},
+		},
+		{
+			"a platform exported for one target fails",
+			delegating + "build: export GOOS = linux\nbuild: export GOARCH = arm64\n",
+			[]string{
+				"wizard makefile: line 11 sets GOOS or GOARCH outside a recipe, where make can hand it to every go build",
+				"wizard makefile: line 12 sets GOOS or GOARCH outside a recipe, where make can hand it to every go build",
+			},
+		},
+		{
+			"a GOOS in a comment outside a recipe sets nothing",
+			"# export GOOS := linux\n" + delegating,
 			nil,
 		},
 	}
