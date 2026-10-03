@@ -5,10 +5,10 @@
 // the zone database (time/tzdata) so that a name resolves on a host without one. The embedded
 // copy registers itself during package initialization, and github.com/BurntSushi/toml, which
 // core/i18n imports, asks for the local zone in a package-level initializer that runs first. So
-// on a host with no zone database the local zone was fixed at UTC whatever TZ said, and a TZ the
-// runtime could not load gave UTC in silence everywhere (#331).
+// on a host with no zone database the local zone would be fixed at UTC whatever TZ said, and a TZ
+// the runtime could not load would give UTC in silence everywhere (#331).
 //
-// Install, called by each server's main before its first record, resolves TZ again now that the
+// Install, called by each server's main before its first record, resolves TZ again once the
 // embedded database is reachable, and refuses a value that names no zone.
 package localzone
 

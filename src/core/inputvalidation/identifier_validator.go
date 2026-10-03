@@ -2,7 +2,7 @@
 // administrator or a registering client supplies: IdentifierValidator, which admits a resource,
 // permission, group or client identifier or an attribute key, and ContainsAngleBrackets, the
 // predicate the auth server wraps in a localized refusal and the admin console checks a
-// permission's description with. It was core/validators until #442.
+// permission's description with.
 package inputvalidation
 
 import (

@@ -1,15 +1,14 @@
 // Package sessionkeys names the keys of the admin console's browser session. Every value here is
 // stored data: a live session carries these spellings, so renaming one signs every administrator
 // out at deploy, and a sign-in in flight across it fails at the callback. Request-scoped values are
-// not session keys and live in reqctx. It was internal/constants until the two context keys left
-// for reqctx, as the auth server's twin was (#433, #440).
+// not session keys and live in reqctx (#440).
 //
 // They name entries in the admin console's own browser session, written and read by
 // this process alone: the authenticated-session key with the access token's recorded
 // expiry beside it, and the six the OAuth ceremony parks between the authorize redirect
-// and the callback. The auth server stores that
-// session server-side but never opens it, so there is nothing for the two binaries to
-// agree on beyond the session's name, which is the one key core still declares (#385).
+// and the callback. The auth server stores that session server-side but never opens it,
+// so there is nothing for the two binaries to agree on beyond the session's name, which
+// core/builtin declares (#385).
 package sessionkeys
 
 // JWT is the authenticated-session key. Its string value, like every one here, is the

@@ -1,15 +1,13 @@
 // Package userclaims owns the one conversion from a stored user row to the OIDC claims a client
 // reads: the profile, email, address and phone block, and the group and attribute blocks.
 //
-// It exists because that conversion was written twice -- once in
-// authserver/internal/handlers/handler_userinfo.go and once in
-// authserver/internal/issuance/token_issuer.go -- and the two copies had drifted in three places
-// that no test and no document named. Building the address claim sat on record.User besides,
-// which is a persistence record with no business constructing an OIDC claim (#387 decision 5).
+// Both /userinfo and issuance build their claims here, so the two cannot drift apart, and building
+// the address claim is not on record.User, which is a persistence record with no business
+// constructing an OIDC claim (#387 decision 5).
 //
-// Two of the three divergences are inputs here, not merges. Each is observable on the wire, so
-// collapsing one changes what a client receives, which #387 was not permitted to do; #387
-// decision 6 pinned all three with tests before this package existed:
+// The two places where the two callers legitimately differ are inputs here, not merges. Each is
+// observable on the wire, so collapsing one would change what a client receives, and tests pin
+// both (#387 decision 6):
 //
 //   - the base URL the profile and picture claims are built from. /userinfo reads the global
 //     configuration, issuance the one injected into TokenIssuer. That is Mapper.BaseURL.
@@ -17,16 +15,9 @@
 //     IncludeInIdToken at all three of its filter sites; issuance reads IncludeInAccessToken in
 //     the access token and IncludeInIdToken in the ID token. That is Mapper.Inclusion.
 //
-// The third was the gate on updated_at, and it is no longer an input: both sites now write the
-// claim inside the profile arm. It was a defect rather than a difference two callers wanted.
-// /userinfo already gated on profile, which is the scope OIDC Core 5.4 lists updated_at under and
-// the scope this repository's own documentation has always assigned it to; issuance wrote it for
-// any scope but a lone openid, so a grant of "openid email" carried a profile claim nobody asked
-// for. In an access token issuance wrote it always, including for a lone openid, because
-// generateAccessTokenCore then appended a scope to the slice for the audience before the claim
-// block read it -- so the same grant produced an access token carrying updated_at and
-// an ID token without it, which nothing chose. Emitting it under the profile scope alone is one
-// rule for all three sites, and it is the rule the wire documentation already stated.
+// updated_at is not an input: every site writes it under the profile scope alone, which is the
+// scope OIDC Core 5.4 lists it under and the scope this repository's documentation assigns it to,
+// so a grant of "openid email" carries no updated_at in either token or at /userinfo (#422).
 //
 // Staying with the caller: every gate above these ones -- the openid requirement and the
 // per-client IncludeOpenIDConnectClaimsInAccessToken / InIdToken settings issuance applies, and

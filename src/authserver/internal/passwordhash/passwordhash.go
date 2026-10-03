@@ -1,7 +1,7 @@
-// Package passwordhash holds the bcrypt half of what used to be core/hashutil: hashing a user's
-// password and checking one, plus the dummy hash the enumeration-safe login path compares against.
-// It belongs to the auth server because the auth server is the only process that ever sees a
-// password; the admin console talks to it over HTTP and must not compile bcrypt at all (#360).
+// Package passwordhash hashes a user's password with bcrypt and checks one, and holds the dummy
+// hash the enumeration-safe login path compares against. It belongs to the auth server because the
+// auth server is the only process that ever sees a password; the admin console talks to it over
+// HTTP and must not compile bcrypt at all (#360).
 package passwordhash
 
 import (

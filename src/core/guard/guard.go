@@ -6,7 +6,7 @@
 // said, and SourceRoot, where every walk starts.
 //
 // It is test support, compiled into no binary: its files carry no _test.go suffix only so that
-// other modules' tests can import it. It was core/testutil until #442.
+// other modules' tests can import it.
 package guard
 
 import (

@@ -4,7 +4,7 @@
 // twin of the auth server's package of the same name, which is the database backend behind that
 // endpoint. The bearer it presents comes through TokenSource, its consumer's port, which
 // oauthclient.SessionTokenSource implements and main wires in; the backend knows nothing of the
-// grant behind it. It left apiclient, which is the admin API client and nothing else, in #441.
+// grant behind it. It is not in apiclient, which is the admin API client and nothing else (#441).
 package sessionbackend
 
 import (

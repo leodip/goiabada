@@ -1,3 +1,17 @@
+// Command goiabada-setup writes the configuration a Goiabada deployment starts from: a Docker
+// Compose file for local testing or for production behind a reverse proxy, a Kubernetes manifest,
+// or an environment file for the native binaries, with the session keys, the data encryption key,
+// the admin console's client secret and any password not given generated for it.
+//
+//	goiabada-setup             ask for every answer
+//	goiabada-setup --type ...  take every answer from flags, asking for none
+//
+// Every secret it generates is drawn from crypto/rand, and the file holding them is written 0600,
+// through a temporary file renamed over the destination (#426). Every value the operator answers
+// is quoted for the format it lands in, so no answer can change the file's meaning (#430). It may
+// not import the auth server (ARCHITECTURE.md rule 3), so the database connection it tests for a
+// Kubernetes or native configuration is dialled with copies of the server's connection strings,
+// which a shared fixture pins to the originals.
 package main
 
 import (

@@ -4,7 +4,7 @@
 // The data lives in data_generated.go, which is regenerated from the datahub
 // `datasets/country-codes` dataset by generate/main.go (see that file, or run
 // `version-manager.sh generate countries`). This package intentionally has no
-// third-party dependencies — it replaced github.com/biter777/countries.
+// third-party dependencies (#272).
 package countries
 
 // Country holds ISO 3166-1 reference data for a single country/territory.

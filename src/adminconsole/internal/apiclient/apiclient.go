@@ -8,9 +8,8 @@
 //
 // executor.go and this file aside, each file is named for the resource its methods call, and the
 // wire characterization table holds every method to the request it sends and the answer it reads.
-// The package also held the console's session backend, the client-credentials token source behind
-// it and the public settings client until #441, which moved them to sessionbackend, oauthclient
-// and publicsettings.
+// The console's session backend, its client-credentials token source and its public settings
+// client are sessionbackend's, oauthclient's and publicsettings' (#441).
 package apiclient
 
 import (

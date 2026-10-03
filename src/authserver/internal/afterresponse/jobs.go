@@ -1,13 +1,12 @@
 // Package afterresponse runs the work a handler hands off so that its response does not wait for
 // it, and lets the server wait for that work on shutdown.
 //
-// Forgot-password is why it exists: a request that mailed a link waited for the code write, the
-// render and the SMTP round trip while every other outcome returned at once, and a mail failure
-// answered 500 only for a real, eligible account, so the response told an observer which addresses
-// were live accounts. The work after the lookup now runs here, after the "link sent" page has gone,
-// so every well-formed request answers alike (#404 decisions 7 and 8). The self-service email change
-// sends its notice to the previous address here too, so a mail that fails never fails the change
-// (#404 decision 11).
+// Forgot-password runs the work after its lookup here, after the "link sent" page has gone, so
+// every well-formed request answers alike: a request that waited for the code write, the render and
+// the SMTP round trip, or answered 500 when the mail failed, only for a real, eligible account
+// would tell an observer which addresses are live accounts (#404 decisions 7 and 8). The
+// self-service email change sends its notice to the previous address here too, so a mail that fails
+// never fails the change (#404 decision 11).
 package afterresponse
 
 import (

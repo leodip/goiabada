@@ -3,7 +3,7 @@
 // It carries only what this process reads: its own settings, the database, the initial-admin and
 // app-name values, the two data-encryption keys, and the two admin console values the auth server
 // genuinely needs. The admin console's listener, logging, directory and session settings are not
-// this binary's to load, and it no longer registers flags for them (#351).
+// this binary's to load, and it registers no flags for them (#351).
 package config
 
 import (
