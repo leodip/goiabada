@@ -1,4 +1,4 @@
-package apiclient
+package publicsettings
 
 import (
 	"context"
@@ -12,7 +12,21 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// SettingsClient fetches PUBLIC settings from the authserver's unauthenticated API.
+// clientTimeout bounds the one request the client makes. Ten seconds, the value
+// apiclient's generalAPITimeout, oauthclient.TokenExchangeTimeout and sessionbackend's
+// httpBackendTimeout share: all four sit on the page-load path, and a fourth distinct value
+// there would only invite the question of why they differ (#386 decision 6). It also bounds
+// the cache's shared fetch, which no caller's cancellation ends (#441 decision 4).
+const clientTimeout = 10 * time.Second
+
+// maxResponseBytes is the ceiling on the public settings answer. 1 MiB, the same value as
+// apiclient's ceiling, oauthclient.MaxTokenResponseBytes and the session wire's, declared here
+// because apiclient's is unexported and this package does not reach into the admin API client
+// for a number (#441). The answer is four short fields, so anything near it is a peer replying
+// with something absurd, and it is refused rather than cut by boundedread.Read.
+const maxResponseBytes = 1 << 20
+
+// Client fetches PUBLIC settings from the authserver's unauthenticated API.
 // This is used by the middleware to populate settings that need to be available on every request
 // (e.g., appName for page titles, uiTheme for styling, smtpEnabled for feature flags, issuer
 // for validating the iss claim on the administrator's own tokens).
@@ -20,17 +34,17 @@ import (
 // IMPORTANT: This client calls /api/public/settings which does NOT require authentication.
 // It returns a minimal subset of settings that are safe to expose publicly.
 //
-// For AUTHENTICATED settings operations (create/update/delete), see settings_general_client.go
-// and other settings_*_client.go files which use the /api/v1/admin/settings/* endpoints.
-type SettingsClient struct {
+// For AUTHENTICATED settings operations (create/update/delete), see apiclient's settings
+// methods, which use the /api/v1/admin/settings/* endpoints.
+type Client struct {
 	httpClient        *http.Client
 	authServerBaseURL string
 }
 
-func NewSettingsClient(authServerBaseURL string) *SettingsClient {
-	return &SettingsClient{
+func NewClient(authServerBaseURL string) *Client {
+	return &Client{
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: clientTimeout,
 		},
 		authServerBaseURL: authServerBaseURL,
 	}
@@ -46,9 +60,8 @@ func NewSettingsClient(authServerBaseURL string) *SettingsClient {
 // context on the same terms as the general client (#386). Both arms read through boundedread.Read
 // before anything looks at them: the success arm used to decode straight off the wire through a
 // json.Decoder, which stops at the first complete value and would therefore accept a truncated
-// prefix with keys missing and say nothing, and the failure arm discarded its read error. The 10
-// second timeout stays as it was.
-func (c *SettingsClient) GetPublicSettings(ctx context.Context) (*api.PublicSettingsResponse, error) {
+// prefix with keys missing and say nothing, and the failure arm discarded its read error.
+func (c *Client) GetPublicSettings(ctx context.Context) (*api.PublicSettingsResponse, error) {
 	url := fmt.Sprintf("%s/api/public/settings", c.authServerBaseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -62,7 +75,7 @@ func (c *SettingsClient) GetPublicSettings(ctx context.Context) (*api.PublicSett
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := boundedread.Read(resp.Body, maxAPIResponseBytes)
+	body, err := boundedread.Read(resp.Body, maxResponseBytes)
 	if err != nil {
 		return nil, err
 	}

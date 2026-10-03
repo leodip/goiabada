@@ -11,7 +11,7 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -73,7 +73,7 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	// decision 2).
 	chimiddleware.RequestID(
 		i18n.MiddlewareLocale(nil)(
-			MiddlewareSettingsCache(cache.NewSettingsCache(authServerBaseURL))(next),
+			MiddlewareSettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL), publicsettings.DefaultTTL))(next),
 		),
 	).ServeHTTP(recorder, req)
 
@@ -293,15 +293,17 @@ func TestMiddlewareSettingsCache_TheIssuerRefusalLogsAStackedErrorOfItsOwn(t *te
 		"this arm refuses a successful response, so it has to raise its own error to be locatable")
 }
 
-// The request's own cancellation reaches the auth server call this middleware makes, two hops
-// down: SettingsCache.Get hands it to fetchAndCache, which hands it to GetPublicSettings (#386).
+// A cancelled request stops waiting for the settings. Until #441 the request's own cancellation
+// reached the auth server call itself, two hops down, and abandoned the fetch; since the fetch is
+// shared by every request that arrives during it, it is no one caller's to abandon, and what the
+// request's end does is end that request's wait (#441 decision 4).
 //
 // Asserted by how long the refusal takes rather than by a marker, because the context cannot cross
 // the wire. An auth server that accepts the connection and never answers is exactly the failure
-// the deadline exists for: with the request's context the middleware refuses at once, and with a
-// context.Background() in its place it would sit on SettingsClient's own ten second timeout while
-// holding this handler goroutine open. Nothing else in the tree can see that substitution.
-func TestMiddlewareSettingsCache_ACancelledRequestAbandonsTheFetch(t *testing.T) {
+// the deadline exists for: a waiter that honours its request's end refuses at once, and one that
+// waited on the fetch regardless would sit on the client's own ten second timeout while holding
+// this handler goroutine open.
+func TestMiddlewareSettingsCache_ACancelledRequestStopsWaiting(t *testing.T) {
 	released := make(chan struct{})
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		<-released
@@ -323,5 +325,5 @@ func TestMiddlewareSettingsCache_ACancelledRequestAbandonsTheFetch(t *testing.T)
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 	assert.Nil(t, seen, "the next handler is never reached without settings")
 	assert.Less(t, elapsed, 5*time.Second,
-		"the fetch must end with the request rather than on the client's own timeout")
+		"the wait must end with the request rather than on the client's own timeout")
 }

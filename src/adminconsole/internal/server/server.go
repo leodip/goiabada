@@ -20,9 +20,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	adminconsole_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
@@ -35,7 +35,7 @@ type Server struct {
 	// callback, whose port names Regenerate, which is what proves at compile time that the
 	// store this console runs rotates the session identifier at sign-in (#431).
 	sessionStore  *sessionstore.ServerSideStore
-	settingsCache *cache.SettingsCache
+	settingsCache *publicsettings.Cache
 
 	// Parsed by main, which refuses to start on a malformed entry (#425), so the real-IP
 	// middleware takes ranges and has no error path of its own.
@@ -45,7 +45,7 @@ type Server struct {
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *cache.SettingsCache, trustedProxies []*net.IPNet) *Server {
+func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache, trustedProxies []*net.IPNet) *Server {
 
 	s := Server{
 		router:        router,

@@ -12,27 +12,27 @@ import (
 // This file implements methods on AuthServerClient for AUTHENTICATED operations on general settings.
 // These methods call /api/v1/admin/settings/general which REQUIRES a valid access token with admin permissions.
 //
-// Key differences from settings_client.go (SettingsClient):
+// Key differences from publicsettings.Client:
 //
 //  1. AUTHENTICATION:
 //     - This file: REQUIRES authentication (Bearer token) - used for admin operations
-//     - settings_client.go: NO authentication - used by middleware for public data
+//     - publicsettings.Client: NO authentication - used by middleware for public data
 //
 //  2. ENDPOINT:
 //     - This file: /api/v1/admin/settings/general (authenticated admin API)
-//     - settings_client.go: /api/public/settings (public unauthenticated API)
+//     - publicsettings.Client: /api/public/settings (public unauthenticated API)
 //
 //  3. DATA SCOPE:
 //     - This file: Full general settings (appName, issuer, passwordPolicy, selfRegistration, etc.)
-//     - settings_client.go: Minimal public subset (appName, uiTheme, smtpEnabled)
+//     - publicsettings.Client: Minimal public subset (appName, uiTheme, smtpEnabled)
 //
 //  4. OPERATIONS:
 //     - This file: GET (read) and PUT (update) operations
-//     - settings_client.go: GET only (read-only public access)
+//     - publicsettings.Client: GET only (read-only public access)
 //
 //  5. USE CASE:
 //     - This file: Admin UI pages for configuring general settings
-//     - settings_client.go: Middleware that needs settings on every request (cached)
+//     - publicsettings.Client: Middleware that needs settings on every request (cached)
 
 // GetSettingsGeneral fetches general settings via the authenticated admin API.
 // Requires an access token with admin permissions.
