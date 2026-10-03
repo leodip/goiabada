@@ -14,7 +14,6 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -50,7 +49,7 @@ func (s *stubApiClient) GetSettingsGeneral(_ context.Context, accessToken string
 // in renderintegration, from a bind the test hands it; that case cannot see whether this handler
 // built the bind correctly, which is what these cases are for.
 type stubHttpHelper struct {
-	handlers.HttpHelper
+	HttpHelper
 	bind map[string]interface{}
 	err  error
 }

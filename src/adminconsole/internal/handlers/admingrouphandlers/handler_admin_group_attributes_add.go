@@ -7,12 +7,9 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // groupAttributesAddAPI is what the add group attribute page needs: the group it belongs to, and
@@ -23,7 +20,7 @@ type groupAttributesAddAPI interface {
 }
 
 func HandleAdminGroupAttributesAddGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {
 
@@ -42,9 +39,9 @@ func HandleAdminGroupAttributesAddGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -76,7 +73,7 @@ func HandleAdminGroupAttributesAddGet(
 }
 
 func HandleAdminGroupAttributesAddPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {
 
@@ -95,9 +92,9 @@ func HandleAdminGroupAttributesAddPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
