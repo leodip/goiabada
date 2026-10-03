@@ -9,7 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,7 +71,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level resource (authserver)
-	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 

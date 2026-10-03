@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 // settingsSessionsAPI is what the session settings page needs: the settings, and the write.
@@ -47,7 +47,7 @@ func HandleAdminSettingsSessionsGet(
 			UserSessionMaxLifetimeInSeconds: apiResp.UserSessionMaxLifetimeInSeconds,
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -133,7 +133,7 @@ func HandleAdminSettingsSessionsPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

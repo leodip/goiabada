@@ -22,7 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/web"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -215,7 +215,7 @@ func apiRequest(method string, target string, body string) *http.Request {
 func accountAPIToken() oauth.JwtToken {
 	return oauth.JwtToken{Claims: jwt.MapClaims{
 		"sub":       routesTestSubject,
-		"scope":     coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier,
+		"scope":     builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier,
 		"auth_time": float64(time.Now().Add(-time.Minute).Unix()),
 	}}
 }

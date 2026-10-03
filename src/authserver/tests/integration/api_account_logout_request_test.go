@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ import (
 // Helper to get a user access token with account scope and also the auth code details (client, redirect, sid)
 // Returns (httpClientWithCookies, accessToken, code)
 func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, string, *models.Code) {
-	scope := "openid profile email " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 
@@ -297,7 +297,7 @@ func sessionBoundGrantOnSameSession(t *testing.T, grant *offlineGrant) (string, 
 	t.Helper()
 
 	const codeVerifier = testCodeVerifier + "-logout"
-	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	scope := "openid " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	exchanged := grant.exchange(t, grant.codeFromSameSession(t, scope, codeVerifier), codeVerifier)
 
 	idToken, ok := exchanged["id_token"].(string)

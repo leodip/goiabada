@@ -10,7 +10,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
@@ -90,12 +90,12 @@ func TestValidateScopes(t *testing.T) {
 			name:  "authserver:userinfo, a permission the authserver resource no longer has",
 			scope: "openid authserver:userinfo",
 			mockSetup: func() {
-				builtIns := make([]models.Permission, 0, len(constants.BuiltInAuthServerPermissionIdentifiers))
-				for i, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+				builtIns := make([]models.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
+				for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
 					builtIns = append(builtIns, models.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
 				}
-				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, constants.AuthServerResourceIdentifier).
-					Return(&models.Resource{Id: 4, ResourceIdentifier: constants.AuthServerResourceIdentifier}, nil).Once()
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
+					Return(&models.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
 			},
 			expectedError: "Scope 'authserver:userinfo' is invalid. The resource identified by 'authserver' does not have a permission with identifier 'userinfo'.",

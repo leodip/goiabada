@@ -865,7 +865,7 @@ More prose.
 | ` + "`testing`" + ` | the standard test framework |
 | ` + "`github.com/stretchr/testify`" + ` | assertions and mocks |
 
-### Core constants ownership
+### Built-in identifiers ownership
 
 | symbol | justification | issue |
 |---|---|---|
@@ -891,10 +891,10 @@ More prose.
 		{pkg: "testing", line: 31},
 		{pkg: "github.com/stretchr/testify", line: 32},
 	}, tables.testFrameworks)
-	assert.Equal(t, []constantsRow{
+	assert.Equal(t, []builtinRow{
 		{symbol: "Version", justification: "kernel", issue: "—", line: 38},
 		{symbol: "ManageUsersPermissionIdentifier", justification: "moving", issue: "#359", line: 39},
-	}, tables.constants)
+	}, tables.builtin)
 }
 
 func TestArchitecture_DocParsingRejects(t *testing.T) {
@@ -903,7 +903,7 @@ func TestArchitecture_DocParsingRejects(t *testing.T) {
 		require.Len(t, findings, 5)
 		assert.Contains(t, findings[0], `has no "### Package ownership" table`)
 		assert.Contains(t, findings[3], `has no "### Test frameworks" table`)
-		assert.Contains(t, findings[4], `has no "### Core constants ownership" table`)
+		assert.Contains(t, findings[4], `has no "### Built-in identifiers ownership" table`)
 	})
 
 	t.Run("a test-framework row with the wrong number of cells", func(t *testing.T) {
@@ -1101,17 +1101,17 @@ func architectureFixture(t *testing.T, doc string, files map[string]string) stri
 }
 
 // architectureDocWith renders a document carrying the five headings the parser needs, with the
-// ownership, test-framework and core-constants tables populated. The other two are left as a header
+// ownership, test-framework and built-in identifiers tables populated. The other two are left as a header
 // and a separator, which is what an empty table looks like to refgraph.TableUnder.
 //
-// The two ownership rows and the one constants row it always writes are the baseline rule 7 needs:
-// the guard is fatal on a tree declaring no core constant or referencing none, so every fixture
-// driving the reporting half carries constantsBaselineFiles alongside its own.
+// The two ownership rows and the one built-in identifiers row it always writes are the baseline rule
+// 7 needs: the guard is fatal on a tree declaring no built-in identifier or referencing none, so every fixture
+// driving the reporting half carries builtinBaselineFiles alongside its own.
 func architectureDocWith(ownership ...string) string {
 	var b strings.Builder
 	b.WriteString("# Architecture\n\nProse that mentions | pipes | and is not a row.\n\n")
 	b.WriteString("### Package ownership\n\n| package | owner | moves in |\n|---|---|---|\n")
-	b.WriteString("| `core/constants` | kernel | — |\n")
+	b.WriteString("| `core/builtin` | kernel | — |\n")
 	b.WriteString("| `core/errs` | kernel | — |\n")
 	for _, row := range ownership {
 		b.WriteString(row + "\n")
@@ -1121,7 +1121,7 @@ func architectureDocWith(ownership ...string) string {
 	b.WriteString("\n### Test frameworks\n\n| package | what it is |\n|---|---|\n")
 	b.WriteString("| `testing` | the standard test framework |\n")
 	b.WriteString("| `github.com/stretchr/testify` | assertions and mocks |\n")
-	b.WriteString("\n### Core constants ownership\n\n| symbol | justification | issue |\n|---|---|---|\n")
+	b.WriteString("\n### Built-in identifiers ownership\n\n| symbol | justification | issue |\n|---|---|---|\n")
 	b.WriteString("| `Shared` | kernel | — |\n")
 	return b.String()
 }
@@ -1129,7 +1129,7 @@ func architectureDocWith(ownership ...string) string {
 // TestArchitecture_TheGuardPassesATreeItsTablesDescribe is the clean direction, and it is what keeps
 // every case below from passing for the wrong reason.
 func TestArchitecture_TheGuardPassesATreeItsTablesDescribe(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go": pkg("api"),
 	})))
 
@@ -1142,7 +1142,7 @@ func TestArchitecture_TheGuardPassesATreeItsTablesDescribe(t *testing.T) {
 // rule that makes the document a burn-down list rather than a wish: a new top-level core package
 // fails the tier until the table says where it belongs.
 func TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go":      pkg("api"),
 		"core/newcomer/new.go": pkg("newcomer"),
 	})))
@@ -1158,7 +1158,7 @@ func TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName(t *testing.T) {
 // TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge is the rule with no exceptions, and the one
 // a reader is likeliest to meet: core depends on neither process.
 func TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go": pkg("api", "example.test/authserver/internal/handlers"),
 	})))
 
@@ -1179,7 +1179,7 @@ func TestArchitecture_TheGuardFailsOnAStaleExceptionRow(t *testing.T) {
 		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n",
 		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n| `core/api` | `core/models` | #350 |\n",
 		1)
-	root := architectureFixture(t, doc, withShippedMains(withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, doc, withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go":       pkg("api"),
 		"core/models/models.go": pkg("models"),
 	})))
@@ -1194,7 +1194,7 @@ func TestArchitecture_TheGuardFailsOnAStaleExceptionRow(t *testing.T) {
 // TestArchitecture_TheGuardFailsOnTestCodeInAShippedBinary is rule 9 through the path the three
 // module tiers take: a shipped main reaching testify through a first-party helper.
 func TestArchitecture_TheGuardFailsOnTestCodeInAShippedBinary(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |", "| `core/testutil` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |", "| `core/testutil` | kernel | — |"), withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go":             pkg("api"),
 		adminconsoleMain + "/main.go": pkg("main", "example.test/core/testutil"),
 		"core/testutil/testutil.go":   pkg("testutil", "github.com/stretchr/testify/mock"),
@@ -1213,7 +1213,7 @@ func TestArchitecture_TheGuardFailsOnTestCodeInAShippedBinary(t *testing.T) {
 // testing. The source graph never reads that module, so only the go command's listing can show the
 // edge (#331, review R1-2).
 func TestArchitecture_TheGuardFailsOnTestCodeBehindAThirdPartyModule(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go": pkg("api"),
 		"authserver/go.mod": "module example.test/authserver\n\ngo 1.21\n\n" +
 			"require example.net/helper v0.0.0\n\nreplace example.net/helper => ../../helper\n",
@@ -1237,7 +1237,7 @@ func TestArchitecture_TheGuardFailsOnTestCodeBehindAThirdPartyModule(t *testing.
 // nothing: a dependency the go command cannot load lists no imports, so it must be a finding rather
 // than a package that silently imports nothing.
 func TestArchitecture_TheGuardReportsAPackageTheGoCommandCannotLoad(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go":           pkg("api"),
 		authserverMain + "/main.go": pkg("main", "example.net/missing"),
 	})))
@@ -1254,7 +1254,7 @@ func TestArchitecture_TheGuardReportsAPackageTheGoCommandCannotLoad(t *testing.T
 // rename of all three, or a source root resolved somewhere else, would otherwise read as a clean
 // tree.
 func TestArchitecture_TheGuardIsFatalWithNoShippedMain(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withBuiltinBaseline(map[string]string{
 		"core/api/api.go":                   pkg("api"),
 		"authserver/cmd/schemadump/main.go": pkg("main"),
 	}))
@@ -1268,7 +1268,7 @@ func TestArchitecture_TheGuardIsFatalWithNoShippedMain(t *testing.T) {
 // TestArchitecture_TheGuardFailsWithOneShippedMainMissing is the same failure one binary at a time:
 // a renamed main would leave rule 9 walking two binaries of three with nothing going red.
 func TestArchitecture_TheGuardFailsWithOneShippedMainMissing(t *testing.T) {
-	files := withShippedMains(withConstantsBaseline(map[string]string{
+	files := withShippedMains(withBuiltinBaseline(map[string]string{
 		"core/api/api.go": pkg("api"),
 	}))
 	delete(files, setupMain+"/main.go")

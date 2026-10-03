@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +31,7 @@ func extractSidClaim(t *testing.T, accessToken string) string {
 // JWT itself remains cryptographically valid until expiry. This is the
 // guarantee that closes the auth-code reuse / RFC 6749 §4.1.2 gap.
 func TestSession_AdminAPI_DeletedSessionRejectsBearer(t *testing.T) {
-	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier
+	scope := "openid " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 	accessToken, _ := createUserAccessTokenWithScope(t, scope)
 
 	sid := extractSidClaim(t, accessToken)

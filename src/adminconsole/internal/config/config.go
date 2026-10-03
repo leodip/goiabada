@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -315,11 +315,11 @@ func ValidateRemovedAdminConsoleVars() error {
 		value := os.Getenv(k)
 		switch k {
 		case removedClientIDVar:
-			if strings.TrimSpace(value) == constants.AdminConsoleClientIdentifier {
+			if strings.TrimSpace(value) == builtin.AdminConsoleClientIdentifier {
 				continue
 			}
 			return errs.Errorf("%s is set to %q but is no longer configuration: the admin console always authenticates as %q, the client the auth server seeds. Remove %s from the deployment's configuration",
-				removedClientIDVar, value, constants.AdminConsoleClientIdentifier, removedClientIDVar)
+				removedClientIDVar, value, builtin.AdminConsoleClientIdentifier, removedClientIDVar)
 		case removedIssuerVar:
 			return errs.Errorf("%s is set to %q but is no longer configuration: the admin console takes the issuer from the auth server that stamps it into tokens, so this value is never read. Remove %s from the deployment's configuration",
 				removedIssuerVar, value, removedIssuerVar)

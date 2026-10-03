@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -138,7 +138,7 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 
 	var sysId int64
 	for _, c := range listResp.Clients {
-		if c.ClientIdentifier == constants.AdminConsoleClientIdentifier {
+		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
 			sysId = c.Id
 			break
 		}

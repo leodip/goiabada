@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -202,7 +202,7 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 
 	var sysId int64
 	for _, c := range listResp.Clients {
-		if c.ClientIdentifier == constants.AdminConsoleClientIdentifier {
+		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
 			sysId = c.Id
 			break
 		}

@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -284,7 +284,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 			}
 			return req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
 		}
-		manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
+		manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
 		data := map[string]interface{}{}
 		_, err := renderPage(httpHelper,
@@ -294,7 +294,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 
 		other := map[string]interface{}{}
 		_, err = renderPage(httpHelper,
-			withAccessToken(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.ManageAccountPermissionIdentifier),
+			withAccessToken(builtin.AuthServerResourceIdentifier+":"+builtin.ManageAccountPermissionIdentifier),
 			"layouts/layout.html", "page.html", other)
 		require.NoError(t, err)
 		assert.NotContains(t, other, "isAdmin")

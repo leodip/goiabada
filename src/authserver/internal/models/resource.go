@@ -3,7 +3,7 @@ package models
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 type Resource struct {
@@ -16,7 +16,7 @@ type Resource struct {
 
 func (r *Resource) IsSystemLevelResource() bool {
 	systemLevelResources := []string{
-		constants.AuthServerResourceIdentifier,
+		builtin.AuthServerResourceIdentifier,
 	}
 	for _, systemLevelResource := range systemLevelResources {
 		if r.ResourceIdentifier == systemLevelResource {

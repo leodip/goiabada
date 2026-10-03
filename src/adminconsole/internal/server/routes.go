@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -34,28 +34,28 @@ func (s *Server) initRoutes(root chi.Router) {
 	// The HTTP client and the token client are main's, the same pair the session token source
 	// was built on, so the sign-in's exchange, the refresh and the client-credentials grant are one
 	// client with one token URL, and the JWKS fetch shares its HTTP client (#441).
-	tokenParser := oauthclient.NewJWKSTokenParser(authBase, s.authServerHTTPClient, constants.AdminConsoleClientIdentifier, middleware.SettingsReader{})
+	tokenParser := oauthclient.NewJWKSTokenParser(authBase, s.authServerHTTPClient, builtin.AdminConsoleClientIdentifier, middleware.SettingsReader{})
 	tokenClient := s.tokenClient
 
 	identifierValidator := validators.NewIdentifierValidator()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
-	authHelper := oauthclient.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, baseURL, s.cfg.AuthServer.BaseURL)
+	authHelper := oauthclient.NewAuthHelper(s.sessionStore, builtin.AdminConsoleSessionName, baseURL, s.cfg.AuthServer.BaseURL)
 
 	// Initialize middleware
 	middlewareJwt := middleware.NewMiddlewareJwt(
 		s.sessionStore,
-		constants.AdminConsoleSessionName,
+		builtin.AdminConsoleSessionName,
 		tokenParser,
 		tokenClient,
 		authHelper,
 		httpHelper,
 		baseURL,
-		constants.AdminConsoleClientIdentifier,
+		builtin.AdminConsoleClientIdentifier,
 	)
 	jwtSessionHandler := middlewareJwt.JwtSessionHandler()
-	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManagePermissionIdentifier)})
-	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.ManageAccountPermissionIdentifier)})
+	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)})
+	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManageAccountPermissionIdentifier)})
 	// User-locale refinement sits inside each authenticated chain immediately
 	// after JWT validation. It reads the locale claim from the validated JWT
 	// (requires the profile scope, see middleware_jwt.buildScopeString) and

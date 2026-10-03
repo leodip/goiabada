@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -278,7 +278,7 @@ func migrateTo(ctx context.Context, database emailCaseReader, m *migrator.Migrat
 			"Goiabada %s onwards, whose schema version is %06d, and no lower target is safe because "+
 			"earlier releases changed data in ways no migration reverses. Start this server normally "+
 			"to migrate up instead.\n",
-			target, constants.Version, floor)
+			target, buildinfo.Version, floor)
 		return migrateExitError
 	}
 	if target > m.Head() {

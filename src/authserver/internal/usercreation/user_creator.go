@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -56,14 +56,14 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 		PasswordHash:  input.PasswordHash,
 	}
 
-	authServerResource, err := uc.database.GetResourceByResourceIdentifier(ctx, nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := uc.database.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
 	if err != nil {
 		return nil, err
 	}
 	// The seed creates this resource and nothing deletes it through the product, but a lookup
 	// answers (nil, nil) for a row that is not there, and the id below dereferenced it (#425).
 	if authServerResource == nil {
-		return nil, errs.Errorf("unable to find the %v resource", constants.AuthServerResourceIdentifier)
+		return nil, errs.Errorf("unable to find the %v resource", builtin.AuthServerResourceIdentifier)
 	}
 
 	permissions, err := uc.database.GetPermissionsByResourceId(ctx, nil, authServerResource.Id)
@@ -73,7 +73,7 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 
 	var accountPermission *models.Permission
 	for idx, permission := range permissions {
-		if permission.PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+		if permission.PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
 			accountPermission = &permissions[idx]
 			break
 		}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"html/template"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -51,6 +51,6 @@ var templateFuncMap = template.FuncMap{
 	},
 	"versionComment": func() template.HTML {
 		//nolint:gosec // G203: build-time constants stamped by the linker, never request input
-		return template.HTML("<!-- version: " + constants.Version + "; build date: " + constants.BuildDate + "; git commit: " + constants.GitCommit + "-->")
+		return template.HTML("<!-- version: " + buildinfo.Version + "; build date: " + buildinfo.BuildDate + "; git commit: " + buildinfo.GitCommit + "-->")
 	},
 }

@@ -1,7 +1,7 @@
 # Architecture
 
 This file records which module owns what, and it is executable. The five tables below —
-[package ownership](#package-ownership), [core constants ownership](#core-constants-ownership),
+[package ownership](#package-ownership), [built-in identifiers ownership](#built-in-identifiers-ownership),
 [temporary exceptions](#temporary-exceptions),
 [foreign modules](#foreign-modules-the-admin-console-must-not-compile) and
 [test frameworks](#test-code-no-shipped-binary-may-link) — are parsed by
@@ -94,8 +94,9 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 |---|---|---|
 | `core/api` | kernel | — |
 | `core/boundedread` | kernel | — |
+| `core/buildinfo` | kernel | — |
+| `core/builtin` | kernel | — |
 | `core/cmd` | kernel | — |
-| `core/constants` | kernel | — |
 | `core/countries` | kernel | — |
 | `core/customerrors` | kernel | — |
 | `core/errs` | kernel | — |
@@ -139,21 +140,24 @@ Notes on rows that are not self-evident:
   gone; what remains is the wire contract the admin console decodes. The mapping was once #349's
   alone, but moving it without the fields would have left every exception row below standing, so
   the two were one issue.
-- `core/constants` is `kernel`, and it is the one package whose ownership is also recorded symbol
+- `core/builtin` is `kernel`, and it is the one package whose ownership is also recorded symbol
   by symbol, in the table below. Package granularity cannot hold it: a constant is a string, so an
   auth-server-only name declared there costs nothing at compile time and breaks none of the rules
-  below.
+  below. It and `core/buildinfo` are what `core/constants` split into: the identifiers both
+  processes agree on here, and the build stamp the release builds set with `-ldflags -X` there,
+  which as values the linker writes rather than names two processes share is held by
+  `src/core/OWNERSHIP.md` alone (#442).
 
-## Core constants ownership
+## Built-in identifiers ownership
 
-Every exported symbol `core/constants` declares has a row saying why core still declares it, as one
+Every exported symbol `core/builtin` declares has a row saying why core still declares it, as one
 of four justifications, checked against the real reference graph the way the tables above and below
 are checked against the import graph. Production references only, for the same reason rules 2 and 3
 read production files: a test may name anything from anywhere.
 
-This table exists because nothing else could have caught what it catches. The package reached 139
-symbols, 108 of them named by a single process, with every import rule satisfied at every step
-(#351).
+This table exists because nothing else could have caught what it catches. `core/constants`, which
+`core/builtin` is what remains of, reached 139 symbols, 108 of them named by a single process, with
+every import rule satisfied at every step (#351, #442).
 
 | justification | means |
 |---|---|
@@ -167,24 +171,21 @@ the tree supports fails. So `contract` is reachable only when nothing else holds
 point of it: making somebody write the word turns it into a claim a reviewer can argue with, where
 silence is not. Four rows carry it, the permission identifiers #359 left behind.
 
-### Core constants ownership
+### Built-in identifiers ownership
 
 | symbol | justification | issue |
 |---|---|---|
 | `AdminConsoleClientIdentifier` | both-apps | — |
 | `AdminConsoleSessionName` | both-apps | — |
 | `AdminReadPermissionIdentifier` | contract | — |
+| `AuthServerPermissionIdentifiers` | both-apps | — |
 | `AuthServerResourceIdentifier` | both-apps | — |
 | `BrowserSessionsPermissionIdentifier` | both-apps | — |
-| `BuildDate` | both-apps | — |
-| `BuiltInAuthServerPermissionIdentifiers` | both-apps | — |
-| `GitCommit` | both-apps | — |
 | `ManageAccountPermissionIdentifier` | both-apps | — |
 | `ManageClientsPermissionIdentifier` | contract | — |
 | `ManagePermissionIdentifier` | both-apps | — |
 | `ManageSettingsPermissionIdentifier` | contract | — |
 | `ManageUsersPermissionIdentifier` | contract | — |
-| `Version` | both-apps | — |
 
 Notes on rows that are not self-evident:
 
@@ -199,7 +200,7 @@ Notes on rows that are not self-evident:
   identifiers are `contract`, their only referrers being `authserver/internal/server/routes.go`
   and that seeder. The word is earned and
   not conceded to the guard: they are the scope strings a client asks for and a token carries, and
-  the admin console compiles all four through `BuiltInAuthServerPermissionIdentifiers`, which is
+  the admin console compiles all four through `AuthServerPermissionIdentifiers`, which is
   `both-apps` on its own account and cannot leave core — moving them out beside it would spell
   eight scope strings twice with nothing holding the two spellings equal.
 - There is no `ContextKeySettings` row because the two processes share nothing but its spelling.
@@ -213,8 +214,9 @@ Notes on rows that are not self-evident:
   put `Version`, `BuildDate` and `GitCommit` into every rendered page's template data and read
   `AuthServerResourceIdentifier` and `ManagePermissionIdentifier` to decide `isAdmin`. That
   renderer was two applications' renderers in one package, so #385 split it, and the five dropped
-  to `both-apps` in the same commit with nothing else in the tree changing. They are still named
-  by both binaries, which is why they are still here.
+  to `both-apps` in the same commit with nothing else in the tree changing. The two identifiers are
+  still named by both binaries, which is why they are still here; the three build-stamp variables
+  left for `core/buildinfo` when `core/constants` split (#442).
 - The six `SessionKey*`, `ContextKeyBearerToken` and `ContextKeyJwtInfo` were here until #385 and
   are not any more, so core declares no context key at all and `core/constants/context_key.go` is
   gone. Each was `kernel` on the strength of one core package: `core/handlerhelpers/auth_helper.go`
@@ -252,8 +254,8 @@ The guard reports findings by these names.
 6. **table hygiene** — every top-level `core` package has exactly one ownership row; every non-kernel
    row names an issue and every kernel row names none; every exception corresponds to a violation
    that exists right now; every violation has an exception.
-7. **core constants** — every exported symbol `core/constants` declares has exactly one row in
-   [Core constants ownership](#core-constants-ownership-1), and each row states the strongest
+7. **built-in identifiers** — every exported symbol `core/builtin` declares has exactly one row in
+   [Built-in identifiers ownership](#built-in-identifiers-ownership-1), and each row states the strongest
    justification the reference graph backs. A symbol with no row fails, a row for a symbol that is
    gone fails, and a row claiming less than the tree supports fails. Only a `moving` row names an
    issue, because it is the only justification that expires.
@@ -432,8 +434,8 @@ is not a finding and a renamed import alias still is one. Rule 9 is the one rule
 go command, for what the packages outside the four modules import, since no source of theirs is
 under the source root. It parses production and test files
 separately because the rules above treat them differently. Rule 7 reads the same way, one level
-down: `src/core/testutil/constants_ownership.go` reads the exported declarations of
-`core/constants` and, from every production file that imports it, the symbols selected off whatever
+down: `src/core/testutil/builtin_ownership.go` reads the exported declarations of
+`core/builtin` and, from every production file that imports it, the symbols selected off whatever
 identifier that file binds the import to.
 
 Rule 8 lives beside them rather than in this file. `AssertSymbolOwnership` in
@@ -447,7 +449,7 @@ justify its namesake.
 
 `src/core/testutil/architecture_lint_test.go` is the core tier's caller;
 `src/core/testutil/architecture_rules_test.go`,
-`src/core/testutil/constants_ownership_rules_test.go`,
+`src/core/testutil/builtin_ownership_rules_test.go`,
 `src/core/testutil/symbol_ownership_rules_test.go` and
 `src/core/internal/refgraph/symbol_ownership_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate

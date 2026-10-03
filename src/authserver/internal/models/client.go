@@ -3,7 +3,7 @@ package models
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 type Client struct {
@@ -53,7 +53,7 @@ type Client struct {
 
 func (c *Client) IsSystemLevelClient() bool {
 	systemLevelClients := []string{
-		constants.AdminConsoleClientIdentifier,
+		builtin.AdminConsoleClientIdentifier,
 	}
 	for _, systemLevelClient := range systemLevelClients {
 		if c.ClientIdentifier == systemLevelClient {

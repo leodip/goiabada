@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 // The one token client main builds, and hands to both the session token source and the server,
@@ -46,7 +46,7 @@ func TestNewTokenClient_ReachesTheTokenEndpointUnderTheEffectiveBaseURL(t *testi
 			mu.Lock()
 			defer mu.Unlock()
 			assert.Equal(t, []string{"/auth/token"}, paths)
-			assert.Equal(t, coreconstants.AdminConsoleClientIdentifier, clientID)
+			assert.Equal(t, builtin.AdminConsoleClientIdentifier, clientID)
 			assert.Equal(t, "the-secret", clientSecret)
 		})
 	}

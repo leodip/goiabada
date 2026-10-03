@@ -9,7 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -217,7 +217,7 @@ func isAccessTokenForAuthServer(ctx context.Context, token *oauth.JwtToken) bool
 		slog.WarnContext(ctx, "rejecting bearer token: aud is malformed", "error", err)
 		return false
 	}
-	if !slices.Contains(audiences, coreconstants.AuthServerResourceIdentifier) {
+	if !slices.Contains(audiences, builtin.AuthServerResourceIdentifier) {
 		slog.WarnContext(ctx, "rejecting bearer token: aud does not name this server's resource")
 		return false
 	}

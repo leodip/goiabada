@@ -6,7 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +51,7 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, before), "migrate an empty database up to %d on %s", before, dbType())
 
 	f := &userinfoFixture000050{h: h}
-	f.resource = &models.Resource{ResourceIdentifier: constants.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
+	f.resource = &models.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
 	require.NoError(t, h.DB.CreateResource(ctx, nil, f.resource))
 	f.userinfo = &models.Permission{PermissionIdentifier: "userinfo", Description: userinfoDescription000050, ResourceId: f.resource.Id}
 	require.NoError(t, h.DB.CreatePermission(ctx, nil, f.userinfo))
@@ -238,7 +238,7 @@ func TestMigration000050_AnEmptyDatabase(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, deleteUserinfoPermission000050), "migrate an empty database through 000050 on %s", dbType())
-	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, constants.AuthServerResourceIdentifier)
+	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.Nil(t, resource, "the chain creates no authserver resource; the seed does")
 

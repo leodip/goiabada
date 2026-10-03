@@ -21,7 +21,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/server"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionbackend"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/buildinfo"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
@@ -74,9 +75,9 @@ func main() {
 
 	slog.Info("admin console started")
 	slog.Info("build information",
-		"version", coreconstants.Version,
-		"build_date", coreconstants.BuildDate,
-		"git_commit", coreconstants.GitCommit)
+		"version", buildinfo.Version,
+		"build_date", buildinfo.BuildDate,
+		"git_commit", buildinfo.GitCommit)
 	slog.Info("config loaded")
 
 	// Refuse a configuration carried over from a release where the client id and the issuer
@@ -225,7 +226,7 @@ func main() {
 func newTokenClient(cfg *config.Config, httpClient *http.Client) *oauthclient.TokenClient {
 	return oauthclient.NewTokenClient(
 		oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()),
-		coreconstants.AdminConsoleClientIdentifier,
+		builtin.AdminConsoleClientIdentifier,
 		cfg.AdminConsole.OAuthClientSecret,
 		httpClient,
 	)

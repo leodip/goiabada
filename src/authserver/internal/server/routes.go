@@ -20,7 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -165,47 +165,47 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// Scope helper function
 		scope := func(perm string) string {
-			return coreconstants.AuthServerResourceIdentifier + ":" + perm
+			return builtin.AuthServerResourceIdentifier + ":" + perm
 		}
 
 		// Scope sets for granular authorization
 		// Read-only: admin-read OR manage
 		scopesRead := []string{
-			scope(coreconstants.AdminReadPermissionIdentifier),
-			scope(coreconstants.ManagePermissionIdentifier),
+			scope(builtin.AdminReadPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
 		}
 		// Users domain: manage-users OR manage
 		scopesUsers := []string{
-			scope(coreconstants.ManageUsersPermissionIdentifier),
-			scope(coreconstants.ManagePermissionIdentifier),
+			scope(builtin.ManageUsersPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
 		}
 		// Users read: admin-read OR manage-users OR manage
 		scopesUsersRead := []string{
-			scope(coreconstants.AdminReadPermissionIdentifier),
-			scope(coreconstants.ManageUsersPermissionIdentifier),
-			scope(coreconstants.ManagePermissionIdentifier),
+			scope(builtin.AdminReadPermissionIdentifier),
+			scope(builtin.ManageUsersPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
 		}
 		// Clients domain: manage-clients OR manage
 		scopesClients := []string{
-			scope(coreconstants.ManageClientsPermissionIdentifier),
-			scope(coreconstants.ManagePermissionIdentifier),
+			scope(builtin.ManageClientsPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
 		}
 		// Clients read: admin-read OR manage-clients OR manage
 		scopesClientsRead := []string{
-			scope(coreconstants.AdminReadPermissionIdentifier),
-			scope(coreconstants.ManageClientsPermissionIdentifier),
-			scope(coreconstants.ManagePermissionIdentifier),
+			scope(builtin.AdminReadPermissionIdentifier),
+			scope(builtin.ManageClientsPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
 		}
 		// Settings domain: manage-settings OR manage
 		scopesSettings := []string{
-			scope(coreconstants.ManageSettingsPermissionIdentifier),
-			scope(coreconstants.ManagePermissionIdentifier),
+			scope(builtin.ManageSettingsPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
 		}
 		// Settings read: admin-read OR manage-settings OR manage
 		scopesSettingsRead := []string{
-			scope(coreconstants.AdminReadPermissionIdentifier),
-			scope(coreconstants.ManageSettingsPermissionIdentifier),
-			scope(coreconstants.ManagePermissionIdentifier),
+			scope(builtin.AdminReadPermissionIdentifier),
+			scope(builtin.ManageSettingsPermissionIdentifier),
+			scope(builtin.ManagePermissionIdentifier),
 		}
 
 		// User management routes
@@ -348,7 +348,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Use(middleware.MiddlewareNoStore())
 		r.Use(middleware.APIDebugMiddleware(authServerConfig.DebugAPIRequests))
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
-		r.Use(apiBearer.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier))
+		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier))
 		// After the scope check, so an insufficient-scope caller still receives the 403 it
 		// receives today. These handlers resolve the acting user from `sub`, which is the
 		// client identifier on a client_credentials token, so the token type must be gated.
@@ -426,7 +426,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// One narrow permission of its own, deliberately not one of the manage-* admin
 		// API scopes: holding the admin console's client secret must not be a way to
 		// drive the whole admin API with no user present.
-		r.Use(apiBearer.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.BrowserSessionsPermissionIdentifier))
+		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.BrowserSessionsPermissionIdentifier))
 
 		// No RequireUserBoundToken and no RequireValidSession here, and both absences are
 		// deliberate. This endpoint is reached only by a client_credentials token, which

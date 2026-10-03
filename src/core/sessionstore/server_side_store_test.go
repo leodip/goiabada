@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"errors"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -504,7 +504,7 @@ func TestServerSideStore_ACookieSealedUnderAnotherNameDoesNotOpen(t *testing.T) 
 	_, err := store.OpenCookie(storeTestName, cookie.Value)
 	require.NoError(t, err, "the name it was sealed under opens it")
 
-	_, err = store.OpenCookie(constants.AdminConsoleSessionName, cookie.Value)
+	_, err = store.OpenCookie(builtin.AdminConsoleSessionName, cookie.Value)
 	require.Error(t, err, "and no other name does, because the name is associated data")
 }
 
@@ -689,7 +689,7 @@ func TestServerSideStore_ABlobDoesNotOpenUnderAnotherSessionName(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	// One store, one key, two logical names: the name is the only thing that differs.
-	otherName := constants.AdminConsoleSessionName
+	otherName := builtin.AdminConsoleSessionName
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 	otherSession, err := store.New(req, otherName)
@@ -1502,7 +1502,7 @@ type matrixOwner struct {
 // passing (#351, #385, #433, #440).
 var matrixOwners = []matrixOwner{
 	{"authserver", "authserver", "SessionIdentifier", PersistentCookie},
-	{"adminconsole", constants.AdminConsoleSessionName, "Jwt", BrowserSessionCookie},
+	{"adminconsole", builtin.AdminConsoleSessionName, "Jwt", BrowserSessionCookie},
 }
 
 func newMatrixStore(owner matrixOwner, backend Backend, secure bool) *ServerSideStore {

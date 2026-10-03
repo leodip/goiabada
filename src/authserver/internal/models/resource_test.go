@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 func TestIsSystemLevelResource(t *testing.T) {
@@ -12,7 +12,7 @@ func TestIsSystemLevelResource(t *testing.T) {
 		resourceIdentifier string
 		expected           bool
 	}{
-		{"AuthServer", constants.AuthServerResourceIdentifier, true},
+		{"AuthServer", builtin.AuthServerResourceIdentifier, true},
 		{"AdminConsole", "adminconsole", false}, // adminconsole is no longer a system-level resource
 		{"CustomResource", "custom-resource", false},
 		{"EmptyIdentifier", "", false},

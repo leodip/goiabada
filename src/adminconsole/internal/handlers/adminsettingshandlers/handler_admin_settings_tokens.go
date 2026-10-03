@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 // settingsTokensAPI is what the token settings page needs: the settings, and the write.
@@ -50,7 +50,7 @@ func HandleAdminSettingsTokensGet(
 			IncludeOpenIDConnectClaimsInIdToken:     apiResp.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -148,7 +148,7 @@ func HandleAdminSettingsTokensPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

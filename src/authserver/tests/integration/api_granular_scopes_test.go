@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,7 +32,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 	assert.NoError(t, err)
 
 	// Get authserver resource
-	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 
 	// Find the specified permission
@@ -63,7 +63,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
-		"scope":         {constants.AuthServerResourceIdentifier + ":" + permissionIdentifier},
+		"scope":         {builtin.AuthServerResourceIdentifier + ":" + permissionIdentifier},
 	}
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
@@ -78,7 +78,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 // can access GET endpoints but not PUT/POST/DELETE endpoints for users
 func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
-	accessToken, client := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -132,7 +132,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 // can access GET endpoints but not PUT/POST/DELETE endpoints for clients
 func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
-	accessToken, client := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -186,7 +186,7 @@ func TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints(t *testing.T) {
 	restoreSettings(t)
 
 	// Create client with admin-read scope only
-	accessToken, client := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -227,7 +227,7 @@ func TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints(t *testing.T) {
 // can access user endpoints but cannot access client or settings endpoints
 func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	// Create client with manage-users scope only
-	accessToken, client := createClientWithGranularScope(t, constants.ManageUsersPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -286,7 +286,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 // can access client endpoints but cannot access user or settings endpoints
 func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) {
 	// Create client with manage-clients scope only
-	accessToken, client := createClientWithGranularScope(t, constants.ManageClientsPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -345,7 +345,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 // can access settings endpoints but cannot access user or client endpoints
 func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.T) {
 	// Create client with manage-settings scope only
-	accessToken, client := createClientWithGranularScope(t, constants.ManageSettingsPermissionIdentifier)
+	accessToken, client := createClientWithGranularScope(t, builtin.ManageSettingsPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
@@ -497,10 +497,10 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 		permissionId       string
 		expectedStatusCode int
 	}{
-		{"admin-read", constants.AdminReadPermissionIdentifier, http.StatusOK},
-		{"manage-users", constants.ManageUsersPermissionIdentifier, http.StatusForbidden}, // Only scopesRead allows this
-		{"manage-clients", constants.ManageClientsPermissionIdentifier, http.StatusForbidden},
-		{"manage-settings", constants.ManageSettingsPermissionIdentifier, http.StatusForbidden},
+		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
+		{"manage-users", builtin.ManageUsersPermissionIdentifier, http.StatusForbidden}, // Only scopesRead allows this
+		{"manage-clients", builtin.ManageClientsPermissionIdentifier, http.StatusForbidden},
+		{"manage-settings", builtin.ManageSettingsPermissionIdentifier, http.StatusForbidden},
 	}
 
 	for _, tc := range testCases {
@@ -547,10 +547,10 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 		permissionId       string
 		expectedReadStatus int
 	}{
-		{"admin-read", constants.AdminReadPermissionIdentifier, http.StatusOK},
-		{"manage-users", constants.ManageUsersPermissionIdentifier, http.StatusOK},
-		{"manage-clients", constants.ManageClientsPermissionIdentifier, http.StatusForbidden},
-		{"manage-settings", constants.ManageSettingsPermissionIdentifier, http.StatusForbidden},
+		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
+		{"manage-users", builtin.ManageUsersPermissionIdentifier, http.StatusOK},
+		{"manage-clients", builtin.ManageClientsPermissionIdentifier, http.StatusForbidden},
+		{"manage-settings", builtin.ManageSettingsPermissionIdentifier, http.StatusForbidden},
 	}
 
 	for _, tc := range testCases {
@@ -579,10 +579,10 @@ func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
 		permissionId       string
 		expectedReadStatus int
 	}{
-		{"admin-read", constants.AdminReadPermissionIdentifier, http.StatusOK},
-		{"manage-users", constants.ManageUsersPermissionIdentifier, http.StatusForbidden},
-		{"manage-clients", constants.ManageClientsPermissionIdentifier, http.StatusForbidden},
-		{"manage-settings", constants.ManageSettingsPermissionIdentifier, http.StatusOK},
+		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
+		{"manage-users", builtin.ManageUsersPermissionIdentifier, http.StatusForbidden},
+		{"manage-clients", builtin.ManageClientsPermissionIdentifier, http.StatusForbidden},
+		{"manage-settings", builtin.ManageSettingsPermissionIdentifier, http.StatusOK},
 	}
 
 	for _, tc := range testCases {
@@ -624,10 +624,10 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 		permissionId       string
 		expectedReadStatus int
 	}{
-		{"admin-read", constants.AdminReadPermissionIdentifier, http.StatusOK},
-		{"manage-users", constants.ManageUsersPermissionIdentifier, http.StatusOK},
-		{"manage-clients", constants.ManageClientsPermissionIdentifier, http.StatusForbidden},
-		{"manage-settings", constants.ManageSettingsPermissionIdentifier, http.StatusForbidden},
+		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
+		{"manage-users", builtin.ManageUsersPermissionIdentifier, http.StatusOK},
+		{"manage-clients", builtin.ManageClientsPermissionIdentifier, http.StatusForbidden},
+		{"manage-settings", builtin.ManageSettingsPermissionIdentifier, http.StatusForbidden},
 	}
 
 	for _, tc := range testCases {
@@ -667,10 +667,10 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 		permissionId       string
 		expectedReadStatus int
 	}{
-		{"admin-read", constants.AdminReadPermissionIdentifier, http.StatusOK},
-		{"manage-users", constants.ManageUsersPermissionIdentifier, http.StatusForbidden},
-		{"manage-clients", constants.ManageClientsPermissionIdentifier, http.StatusOK},
-		{"manage-settings", constants.ManageSettingsPermissionIdentifier, http.StatusForbidden},
+		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
+		{"manage-users", builtin.ManageUsersPermissionIdentifier, http.StatusForbidden},
+		{"manage-clients", builtin.ManageClientsPermissionIdentifier, http.StatusOK},
+		{"manage-settings", builtin.ManageSettingsPermissionIdentifier, http.StatusForbidden},
 	}
 
 	for _, tc := range testCases {
@@ -695,13 +695,13 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 	baseURL := appConfig.AuthServer.BaseURL
 
 	// Create admin-read client (read-only)
-	readOnlyToken, readOnlyClient := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
+	readOnlyToken, readOnlyClient := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, readOnlyClient.Id)
 	}()
 
 	// Create manage-users client (full user access)
-	usersToken, usersClient := createClientWithGranularScope(t, constants.ManageUsersPermissionIdentifier)
+	usersToken, usersClient := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
 	defer func() {
 		_ = database.DeleteClient(context.Background(), nil, usersClient.Id)
 	}()

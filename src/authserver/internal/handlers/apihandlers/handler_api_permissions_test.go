@@ -17,7 +17,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
@@ -31,11 +31,11 @@ import (
 func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	system := &models.Resource{Id: 1, ResourceIdentifier: constants.AuthServerResourceIdentifier}
+	system := &models.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
 	stored := []models.Permission{
 		{Id: 10, PermissionIdentifier: "userinfo", ResourceId: 1, Description: "Created by an administrator"},
-		{Id: 11, PermissionIdentifier: constants.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
-		{Id: 12, PermissionIdentifier: constants.ManagePermissionIdentifier, ResourceId: 1, Description: "Manage"},
+		{Id: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
+		{Id: 12, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceId: 1, Description: "Manage"},
 	}
 	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(stored, nil).Once()
 	database.On("PermissionsLoadResources", mock.Anything, (*sql.Tx)(nil), mock.Anything).
@@ -56,7 +56,7 @@ func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t
 	for _, p := range response.Permissions {
 		identifiers = append(identifiers, p.PermissionIdentifier)
 	}
-	assert.Equal(t, []string{"userinfo", constants.ManageAccountPermissionIdentifier, constants.ManagePermissionIdentifier}, identifiers)
+	assert.Equal(t, []string{"userinfo", builtin.ManageAccountPermissionIdentifier, builtin.ManagePermissionIdentifier}, identifiers)
 	database.AssertExpectations(t)
 }
 
@@ -75,17 +75,17 @@ func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testi
 	// System-level resource (authserver)
 	resource := &models.Resource{
 		Id:                 1,
-		ResourceIdentifier: constants.AuthServerResourceIdentifier,
+		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 	}
 
 	// Return existing permissions that are MISSING the "manage" built-in permission
 	existingPerms := []models.Permission{
-		{Id: 11, PermissionIdentifier: constants.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
+		{Id: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
 		// "manage" is intentionally missing
-		{Id: 13, PermissionIdentifier: constants.AdminReadPermissionIdentifier, ResourceId: 1, Description: "Admin read"},
-		{Id: 14, PermissionIdentifier: constants.ManageUsersPermissionIdentifier, ResourceId: 1, Description: "Manage users"},
-		{Id: 15, PermissionIdentifier: constants.ManageClientsPermissionIdentifier, ResourceId: 1, Description: "Manage clients"},
-		{Id: 16, PermissionIdentifier: constants.ManageSettingsPermissionIdentifier, ResourceId: 1, Description: "Manage settings"},
+		{Id: 13, PermissionIdentifier: builtin.AdminReadPermissionIdentifier, ResourceId: 1, Description: "Admin read"},
+		{Id: 14, PermissionIdentifier: builtin.ManageUsersPermissionIdentifier, ResourceId: 1, Description: "Manage users"},
+		{Id: 15, PermissionIdentifier: builtin.ManageClientsPermissionIdentifier, ResourceId: 1, Description: "Manage clients"},
+		{Id: 16, PermissionIdentifier: builtin.ManageSettingsPermissionIdentifier, ResourceId: 1, Description: "Manage settings"},
 	}
 
 	database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(resource, nil)
@@ -532,8 +532,8 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 		return wanted
 	}
 
-	builtIns := make([]models.Permission, 0, len(constants.BuiltInAuthServerPermissionIdentifiers))
-	for i, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+	builtIns := make([]models.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
+	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
 		builtIns = append(builtIns, models.Permission{Id: int64(40 + i), ResourceId: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
 	}
 	without := func(i int) []api.ResourcePermissionUpsert {
@@ -606,11 +606,11 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 			wantDescription: "Permission identifier read is already in use.",
 		},
 	}
-	for i, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
 		variants = append(variants,
 			refusedSave{
 				name:               "the system resource's list without " + identifier,
-				resourceIdentifier: constants.AuthServerResourceIdentifier,
+				resourceIdentifier: builtin.AuthServerResourceIdentifier,
 				stored:             builtIns,
 				body:               resourcePermsBody(t, without(i), loadedEntries(builtIns)),
 				wantStatus:         http.StatusBadRequest,
@@ -619,7 +619,7 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 			},
 			refusedSave{
 				name:               "the system resource's list with " + identifier + " renamed",
-				resourceIdentifier: constants.AuthServerResourceIdentifier,
+				resourceIdentifier: builtin.AuthServerResourceIdentifier,
 				stored:             builtIns,
 				body:               resourcePermsBody(t, renamed(i), loadedEntries(builtIns)),
 				wantStatus:         http.StatusBadRequest,

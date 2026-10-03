@@ -25,7 +25,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -175,7 +175,7 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, preflightEmailCaseErr
 	}
 
-	migrated, err := m.UpToHead(ctx, constants.Version)
+	migrated, err := m.UpToHead(ctx, buildinfo.Version)
 	if err != nil {
 		return nil, err
 	}

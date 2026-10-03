@@ -1,4 +1,4 @@
-package constants
+package builtin
 
 // AdminConsoleSessionName is the name of the admin console's browser session, and it is in
 // core because both processes name it: the auth server's session backend stores the admin

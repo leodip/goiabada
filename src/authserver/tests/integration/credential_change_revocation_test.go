@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -129,7 +129,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1")
 	const codeVerifier = testCodeVerifier + "-second-device"
 	scope := "openid " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 
 	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(grant.redirectURI) +
@@ -208,7 +208,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 		"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
 	const codeVerifier = testCodeVerifier + "-second-offline"
 	scope := "openid offline_access " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 
 	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + base.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(base.redirectURI) +
@@ -351,19 +351,19 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 
 	// Only manage-account is granted. openid is what lets the resulting token call /userinfo
 	// below, and it is not a permission (#449).
-	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 	require.NoError(t, err)
 	for i := range permissions {
-		if permissions[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+		if permissions[i].PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
 			assignPermissionToUser(t, user.Id, permissions[i].Id)
 			break
 		}
 	}
 
 	scope := "openid offline_access " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 
 	httpClient := createHttpClient(t)
 	codeVerifier := testCodeVerifier
@@ -641,7 +641,7 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 	// The caller's own session-bound bearer, on the session the offline family came from.
 	const verifier = testCodeVerifier + "-session-bound"
 	sessionScope := "openid " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	exchanged := grant.exchange(t, grant.codeFromSameSession(t, sessionScope, verifier), verifier)
 	callerToken, ok := exchanged["access_token"].(string)
 	require.True(t, ok, "expected a session-bound access token: %v", exchanged)
@@ -700,7 +700,7 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 // up here and nowhere else in this file.
 func TestCredentialChange_AnotherUserIsUnaffected(t *testing.T) {
 	victimToken, _ := createUserAccessTokenWithScope(t,
-		"openid "+constants.AuthServerResourceIdentifier+":"+constants.ManageAccountPermissionIdentifier)
+		"openid "+builtin.AuthServerResourceIdentifier+":"+builtin.ManageAccountPermissionIdentifier)
 
 	grant := createOfflineGrant(t)
 	resetPasswordFor(t, grant.user, "R3setP4ss!word")
@@ -725,7 +725,7 @@ func TestCredentialChange_OutstandingAuthCodeIsRejected(t *testing.T) {
 	// A second authorization on the live session, stopping at the code rather than exchanging it.
 	const verifier = testCodeVerifier + "-outstanding"
 	scope := "openid " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	code := grant.codeFromSameSession(t, scope, verifier)
 
 	// NOW reset, with the code still outstanding.
@@ -840,7 +840,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 	// offline_access, obtained by SSO.
 	const verifier = testCodeVerifier + "-session-bound"
 	sessionScope := "openid " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	exchanged := grant.exchange(t, grant.codeFromSameSession(t, sessionScope, verifier), verifier)
 	callerToken, ok := exchanged["access_token"].(string)
 	require.True(t, ok, "expected a session-bound access token: %v", exchanged)

@@ -24,11 +24,9 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ### Core (`src/core/`)
 - `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350). One file per resource, each holding its requests beside its responses (#441)
 - `boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Nine callers: the admin console's seven reads from the auth server, `internal/pinnedfetch`, which the generators download through, and the timezones generator's read of the decompressed tarball (#386, #432)
+- `buildinfo/` - The build stamp both servers report, `Version`, `BuildDate` and `GitCommit`, which the release builds set with `-ldflags -X` and which read `development` in any other build. It left `core/constants` beside `builtin/` when that package split, because the linker writes these values rather than the two processes agreeing on them (#442)
+- `builtin/` - The identifiers both processes must agree on: the `authserver` resource, the seven permissions on it, listed by `AuthServerPermissionIdentifiers()`, which returns a fresh copy on every call, the admin console's client identifier, and its session name in `session_name.go`. No context key and no other session key: each process declares its own, the auth server and the admin console alike their context keys in `internal/reqctx` and their session keys in `internal/sessionkeys`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more. It was `core/constants` until #442 moved the build stamp to `buildinfo/` (#351, #385, #433, #440, #442)
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It reads nothing but the source tree, so unlike `schemadump` it needs no container, and it refuses to invent a justification rather than fill the one cell a human owes (#385)
-- `constants/` - Permission identifiers, the version stamp, and the one session name both processes
-  must agree on. No context key and no other session key: each process declares its own, the auth
-  server and the admin console alike their context keys in `internal/reqctx` and their session keys in
-  `internal/sessionkeys`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more (#351, #385, #433, #440)
 - `countries/` - Self-maintained ISO 3166-1 reference data: names, alpha-2 and alpha-3 codes, flag emoji and ITU-T E.164 calling codes, generated into `data_generated.go` from the datahub dataset. It replaced `github.com/biter777/countries` and deliberately depends on nothing (#272)
 - `customerrors/` - The OAuth error payload both processes pass around: `ErrorDetail`, and `ConformErrorDescription`, which replaces every character RFC 6749 Appendix A.8 forbids in an `error_description` and bounds the result to 512 bytes, because a description interpolates request text and, since #213's deferral, is parked on an auth context every request of that ceremony then carries
 - There is no `enums/` here: the six auth-server-only enumerations it held went to the domains that own them — `AcrLevel`, `PasswordPolicy`, `ThreeStateSetting` and `KeyState` to `authserver/internal/models`, forced there because `internal/data` names them and imports nothing above it, `AuthMethod` to `ceremony` and since to `oidc` (#437), `TokenType` to `issuance` and `SMTPEncryption` to `emaildelivery` — leaving `Gender` as `core/gender`. A package named for a Go construct is what invites the next unrelated one in beside it (#385)
@@ -66,7 +64,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/afterresponse/` - The work a handler hands off so its response does not wait for it: `Go` runs a job under the request's context detached from its cancellation, so its records keep the request id, and `Wait`, called by the server once the listeners have drained, waits for the jobs in flight. Forgot-password's code store, audit record and mail run here, so every well-formed request answers alike, and so does the self-service email change's notice to the previous address, which never fails the change (#404)
 - `internal/emaillinks/` - The emailed-link round trip for password reset and activation: build the link, mark it followed, redeem it once. Beside `emaildelivery`, which sends it (#387)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlutil,uuidutil}/` - The authserver-only utilities #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and origin predicates, UUIDs (#360); `oidc` also holds the grant type list every grant-type reader consults and the `amr` values (#437); the encrypted id_token_hint's JWE, keyed from a client secret and sharing nothing with the data cipher, left `encryption` for `internal/idtokenhint` (#434)
-- `internal/models/` - All domain models (Client, User, Permission, Group, etc.). Persistence records only: no cryptography, no claim construction, and nothing imported but the standard library, `core/constants` and `core/errs` (#359, #387)
+- `internal/models/` - All domain models (Client, User, Permission, Group, etc.). Persistence records only: no cryptography, no claim construction, and nothing imported but the standard library, `core/builtin` and `core/errs` (#359, #387, #442)
 - `internal/data/` - The composition-only `Database` interface, `commondb/`, the four engine adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359, #386)
 - `internal/data/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353, #438)
 - `internal/bootstrap/` - The first run: which of the three bootstrap modes applies, and the seed, whose 18 writes commit in one transaction with the bootstrap file published only after it (#424)
@@ -426,7 +424,7 @@ key-generation call (#409) and resolves the data cipher's methods by receiver ty
 its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
 outside `HandleAuthorizeGet`, resolved with `go/types` (#436), and the import rule #387 added
 beside the child-package one: `models/import_lint_test.go`, which holds that package to the
-standard library, `core/constants` and `core/errs` -- both parse imports with `go/parser` rather
+standard library, `core/builtin` and `core/errs` -- both parse imports with `go/parser` rather
 than matching text, because an alias binds a different name to the same path and one of the 39
 production files did exactly that. Each owes three cases: a tree that must fail, a tree that must
 pass, and the walk that reached nothing. One of the fifteen, `AssertNotCalledArity`, owes a fourth: a
@@ -444,16 +442,16 @@ guards. CI's Lint job checks the same thing per module, where an unformatted fil
 module its vet, unparam and golangci-lint run.
 
 **Architecture guard**: `ARCHITECTURE.md` at the repository root records the allowed module edges,
-the intended final owner of every top-level `core` package, why each symbol left in `core/constants`
+the intended final owner of every top-level `core` package, why each symbol in `core/builtin`
 is still there, the temporary exceptions to those rules, the third-party modules the admin
 console must not compile, and the test frameworks no shipped binary may link. Its five tables are
 data, not prose: `AssertArchitecture` in `core/testutil/architecture.go` parses them and checks four
-against the real import graph and the constants table against every production reference to
-`core/constants`; all three module unit tiers call it. The check runs in both directions,
+against the real import graph and the built-in identifiers table against every production reference
+to `core/builtin`; all three module unit tiers call it. The check runs in both directions,
 which is what makes the document a burn-down list rather than a wish — an edge the tables do not
 allow is a failure, and so is an exception left standing for an edge that no longer exists, so the
 issue that removes an edge has to remove its row with it (#332). A new top-level `core` package
-fails the tier until the table says where it belongs, and so does a new symbol in `core/constants`,
+fails the tier until the table says where it belongs, and so does a new symbol in `core/builtin`,
 whose row has to name the strongest of `kernel`, `both-apps`, `moving` and `contract` that the
 reference graph backs (#351). A sixth table lives in `src/core/OWNERSHIP.md`, one row per exported
 symbol any `core` package declares: `core/testutil.AssertSymbolOwnership` reads it from the same

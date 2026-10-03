@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -111,7 +111,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 }
 
 // TestRequiresScope_Unauthenticated, _NoJwtInfo and _RedirectError construct with
-// coreconstants.AdminConsoleClientIdentifier rather than "" on purpose: RequiresScope used to
+// builtin.AdminConsoleClientIdentifier rather than "" on purpose: RequiresScope used to
 // substitute that constant itself when the field was blank, so with "" these three asserted
 // the substitution and nothing about the caller. The middleware no longer names any module's
 // identity, and the argument here is what reaches RedirToAuthorize (#285).
@@ -121,7 +121,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier)
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -133,7 +133,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 	mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
-	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Next handler should not have been called")
@@ -151,14 +151,14 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier)
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
 	mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
-	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Next handler should not have been called")
@@ -176,7 +176,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier)
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -188,7 +188,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 	mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
-	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(assert.AnError)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(assert.AnError)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Next handler should not have been called")
@@ -216,14 +216,14 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			mockAuthHelper := new(mock_middleware.AuthHelper)
-			middleware := NewMiddlewareJwt(new(mock_sessionstore.Store), "test-session", new(mock_middleware.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier)
+			middleware := NewMiddlewareJwt(new(mock_sessionstore.Store), "test-session", new(mock_middleware.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 			req := httptest.NewRequest("GET", testCase.requestLine, nil)
 			require.Equal(t, testCase.requestLine, req.RequestURI, "the request line did not reach the request as sent")
 
 			mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
 			mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
-			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier,
+			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier,
 				mock.AnythingOfType("string"), "http://localhost:9091/admin/users?page=2&query=a%26b").Return(nil)
 
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -240,8 +240,8 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 func TestBuildScopeString(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
-	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
+	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
+	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
 	tests := []struct {
 		name     string
@@ -301,8 +301,8 @@ func TestBuildScopeString(t *testing.T) {
 func TestBuildScopeString_Consistency(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
-	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
+	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
+	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
 	input := []string{"scope1", "scope2", "scope3"}
 	expectedScopes := []string{
@@ -334,8 +334,8 @@ func TestBuildScopeString_Consistency(t *testing.T) {
 func TestBuildScopeString_LargeInput(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
-	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
+	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
+	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
 	// Create a large input slice
 	input := make([]string, 1000)
@@ -361,8 +361,8 @@ func TestBuildScopeString_LargeInput(t *testing.T) {
 func TestBuildScopeString_SpecialCharacters(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
-	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
+	manageAccountScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
+	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
 	input := []string{"scope:with:colons", "scope-with-dashes", "scope_with_underscores", "scope.with.dots"}
 	result := middleware.buildScopeString(input)

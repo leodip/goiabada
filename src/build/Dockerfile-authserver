@@ -43,7 +43,7 @@ WORKDIR /app/src/authserver
 # commit, Go image and source path (/app/src, fixed above) give byte-identical
 # code at identical addresses, so the rebuild's DWARF describes the shipped
 # binary.
-RUN go build -buildvcs=false -tags=production -ldflags="-w -X 'github.com/leodip/goiabada/core/constants.Version=${version}' -X 'github.com/leodip/goiabada/core/constants.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/constants.GitCommit=${gitCommit}'" -o ../../bin/goiabada-authserver ./cmd/goiabada-authserver
+RUN go build -buildvcs=false -tags=production -ldflags="-w -X 'github.com/leodip/goiabada/core/buildinfo.Version=${version}' -X 'github.com/leodip/goiabada/core/buildinfo.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/buildinfo.GitCommit=${gitCommit}'" -o ../../bin/goiabada-authserver ./cmd/goiabada-authserver
 
 # ------------------------------------------------------------------------------
 

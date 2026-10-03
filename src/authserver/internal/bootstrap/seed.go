@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/stringutil"
 )
@@ -204,7 +204,7 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 	// One record after the commit where there was one per row: written inside the transaction,
 	// those announced rows a rollback then removed, and would repeat on a deadlock rerun.
 	slog.InfoContext(ctx, "database seeded",
-		"client_identifier", constants.AdminConsoleClientIdentifier,
+		"client_identifier", builtin.AdminConsoleClientIdentifier,
 		"email", adminEmail,
 		"current_key_identifier", currentKey.KeyIdentifier,
 		"next_key_identifier", nextKey.KeyIdentifier)
@@ -218,7 +218,7 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 // connection hangs instead.
 func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValues) error {
 	client := &models.Client{
-		ClientIdentifier:         constants.AdminConsoleClientIdentifier,
+		ClientIdentifier:         builtin.AdminConsoleClientIdentifier,
 		Description:              "Admin console client (system-level)",
 		DisplayName:              "Admin console",
 		Enabled:                  true,
@@ -258,7 +258,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	}
 
 	resource := &models.Resource{
-		ResourceIdentifier: constants.AuthServerResourceIdentifier,
+		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
 	if err := r.db.CreateResource(ctx, tx, resource); err != nil {
@@ -267,14 +267,14 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 
 	permissions := make(map[string]*models.Permission)
 	for _, p := range []struct{ identifier, description string }{
-		{constants.ManageAccountPermissionIdentifier, "View and update user account data for the current user"},
-		{constants.ManagePermissionIdentifier, "Manage the authorization server via the admin console"},
+		{builtin.ManageAccountPermissionIdentifier, "View and update user account data for the current user"},
+		{builtin.ManagePermissionIdentifier, "Manage the authorization server via the admin console"},
 		// Granular admin API scopes
-		{constants.AdminReadPermissionIdentifier, "Read-only access to all admin API endpoints"},
-		{constants.ManageUsersPermissionIdentifier, "Manage users, groups, and permissions"},
-		{constants.ManageClientsPermissionIdentifier, "Manage OAuth2 clients"},
-		{constants.ManageSettingsPermissionIdentifier, "Manage system settings and signing keys"},
-		{constants.BrowserSessionsPermissionIdentifier, "Read and write admin console browser sessions"},
+		{builtin.AdminReadPermissionIdentifier, "Read-only access to all admin API endpoints"},
+		{builtin.ManageUsersPermissionIdentifier, "Manage users, groups, and permissions"},
+		{builtin.ManageClientsPermissionIdentifier, "Manage OAuth2 clients"},
+		{builtin.ManageSettingsPermissionIdentifier, "Manage system settings and signing keys"},
+		{builtin.BrowserSessionsPermissionIdentifier, "Read and write admin console browser sessions"},
 	} {
 		permission := &models.Permission{
 			PermissionIdentifier: p.identifier,
@@ -292,12 +292,12 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	// the grant to the admin console client, and client_credentials_enabled on it.
 	if err := r.db.CreateClientPermission(ctx, tx, &models.ClientPermission{
 		ClientId:     client.Id,
-		PermissionId: permissions[constants.BrowserSessionsPermissionIdentifier].Id,
+		PermissionId: permissions[builtin.BrowserSessionsPermissionIdentifier].Id,
 	}); err != nil {
 		return err
 	}
 
-	for _, identifier := range []string{constants.ManageAccountPermissionIdentifier, constants.ManagePermissionIdentifier} {
+	for _, identifier := range []string{builtin.ManageAccountPermissionIdentifier, builtin.ManagePermissionIdentifier} {
 		if err := r.db.CreateUserPermission(ctx, tx, &models.UserPermission{
 			UserId:       user.Id,
 			PermissionId: permissions[identifier].Id,
@@ -391,7 +391,7 @@ func logBootstrapCredentialsGenerated(ctx context.Context, bootstrapEnvOutFile s
 }
 
 // bootstrapEnvContent renders the legacy two-step bootstrap file. It carries no client id: the
-// admin console always authenticates as constants.AdminConsoleClientIdentifier, which the seed
+// admin console always authenticates as builtin.AdminConsoleClientIdentifier, which the seed
 // writes and the migrations grant against, so there is nothing for an operator to copy across
 // (#285). Kept a pure function so the file's contents can be tested without a database.
 func bootstrapEnvContent(clientSecret, authServerAuthKey, authServerEncKey,

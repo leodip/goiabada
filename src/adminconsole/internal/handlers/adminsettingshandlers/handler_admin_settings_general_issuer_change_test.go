@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -45,7 +45,7 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	store := newSettingsTestStore()
 
 	seedReq := httptest.NewRequest(http.MethodGet, "/", nil)
-	seeded, err := store.Get(seedReq, coreconstants.AdminConsoleSessionName)
+	seeded, err := store.Get(seedReq, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	seeded.Values[sessionkeys.SessionKeyJwt] = oauth.TokenResponse{AccessToken: "the-access-token"}
 	seeded.Values[sessionkeys.SessionKeyJwtExpiresAt] = int64(1_900_000_000)
@@ -82,7 +82,7 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	for _, c := range answered {
 		readReq.AddCookie(c)
 	}
-	readBack, err := store.Get(readReq, coreconstants.AdminConsoleSessionName)
+	readBack, err := store.Get(readReq, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	require.False(t, readBack.IsNew, "the session is still there")
 	assert.NotContains(t, readBack.Values, sessionkeys.SessionKeyJwt)

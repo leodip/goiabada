@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
@@ -496,7 +496,7 @@ func TestDatabaseBackend_ConstructorsFixEveryOperationOwner(t *testing.T) {
 		},
 		{
 			name:  "admin console",
-			owner: coreconstants.AdminConsoleSessionName,
+			owner: builtin.AdminConsoleSessionName,
 			new:   func(database *mocks_data.Database) sessionstore.Backend { return NewAdminConsoleBackend(database) },
 		},
 	} {

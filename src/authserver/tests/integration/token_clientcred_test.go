@@ -9,7 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -508,7 +508,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	// A custom resource whose permission identifier collides with the built-in one.
 	customResourceIdentifier := "billing-api-" + fake.LetterN(8)
 	customResource := createResourceWithId(t, customResourceIdentifier)
-	customManage := createPermissionWithId(t, customResource.Id, constants.ManagePermissionIdentifier)
+	customManage := createPermissionWithId(t, customResource.Id, builtin.ManagePermissionIdentifier)
 
 	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
@@ -518,14 +518,14 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 
 	// Confirm the collision really exists against the seeded authserver resource,
 	// otherwise this test could pass because there was nothing to collide with.
-	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, authserverResource)
 	authserverPermissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 	assert.NoError(t, err)
 	foundBuiltInManage := false
 	for _, perm := range authserverPermissions {
-		if perm.PermissionIdentifier == constants.ManagePermissionIdentifier {
+		if perm.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			foundBuiltInManage = true
 			assert.NotEqual(t, customManage.Id, perm.Id,
 				"the fixture must be two distinct permission rows sharing one identifier")
@@ -535,7 +535,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	assert.True(t, foundBuiltInManage,
 		"the authserver resource must define the built-in 'manage' permission for this test to mean anything")
 
-	escalatedScope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier
+	escalatedScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
 	httpClient := createHttpClient(t)
 	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
@@ -552,7 +552,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	assert.Nil(t, data["access_token"], "an admin-capable token must not be issued")
 
 	// The client's genuine grant is unaffected.
-	genuineScope := fmt.Sprintf("%s:%s", customResourceIdentifier, constants.ManagePermissionIdentifier)
+	genuineScope := fmt.Sprintf("%s:%s", customResourceIdentifier, builtin.ManagePermissionIdentifier)
 	data = postToTokenEndpoint(t, httpClient, destUrl, url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},

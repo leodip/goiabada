@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -150,7 +150,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
-	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
+	data["goiabadaVersion"] = buildinfo.Version + " (" + buildinfo.BuildDate + ")"
 	// Inject the request context so templates can call {{ T $.ctx "..." }}
 	// and every other locale-reading template function. This is this
 	// application's one injection point; the admin console's renderer has its

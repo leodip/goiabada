@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -157,7 +157,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get system-level client from DB so we can save/restore state
-	sysClient, err := database.GetClientByClientIdentifier(context.Background(), nil, constants.AdminConsoleClientIdentifier)
+	sysClient, err := database.GetClientByClientIdentifier(context.Background(), nil, builtin.AdminConsoleClientIdentifier)
 	assert.NoError(t, err)
 	if sysClient == nil {
 		t.Skip("system-level client not found")
@@ -169,7 +169,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 	origCCEnabled := sysClient.ClientCredentialsEnabled
 	defer func() {
 		// Re-fetch to get current DB state, then restore original fields
-		c, _ := database.GetClientByClientIdentifier(context.Background(), nil, constants.AdminConsoleClientIdentifier)
+		c, _ := database.GetClientByClientIdentifier(context.Background(), nil, builtin.AdminConsoleClientIdentifier)
 		if c != nil {
 			c.IsPublic = origIsPublic
 			c.ClientSecretEncrypted = origSecretEncrypted

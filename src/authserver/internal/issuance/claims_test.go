@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -82,7 +82,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, user.Subject, claims["sub"])
-	assert.Equal(t, coreconstants.AuthServerResourceIdentifier, claims["aud"])
+	assert.Equal(t, builtin.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
@@ -254,7 +254,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, user.Subject, claims["sub"])
-	assert.Equal(t, coreconstants.AuthServerResourceIdentifier, claims["aud"])
+	assert.Equal(t, builtin.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
@@ -2362,7 +2362,7 @@ func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 				assert.Equal(t, grant, accessClaims["scope"], "access token scope claim")
 
 				audience := audienceOf(t, accessClaims)
-				assert.Equal(t, hasClaimScope, slices.Contains(audience, coreconstants.AuthServerResourceIdentifier),
+				assert.Equal(t, hasClaimScope, slices.Contains(audience, builtin.AuthServerResourceIdentifier),
 					"aud names authserver exactly when the grant has a claim scope: %v", audience)
 				assert.Equal(t, slices.Contains(grantScopes, "resource1:read"), slices.Contains(audience, "resource1"),
 					"aud names resource1 exactly when the grant does: %v", audience)
@@ -2402,7 +2402,7 @@ func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 				}
 				accessClaims := verifyAndDecodeToken(t, issued.accessToken, publicKeyBytes)
 				assert.Equal(t, grant, accessClaims["scope"], "access token scope claim")
-				assert.Contains(t, audienceOf(t, accessClaims), coreconstants.AuthServerResourceIdentifier)
+				assert.Contains(t, audienceOf(t, accessClaims), builtin.AuthServerResourceIdentifier)
 			})
 		}
 	}

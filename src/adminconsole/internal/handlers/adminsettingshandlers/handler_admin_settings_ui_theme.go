@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 // settingsUIThemeAPI is what the UI theme page needs: the theme, and the write.
@@ -46,7 +46,7 @@ func HandleAdminSettingsUIThemeGet(
 			UITheme: apiResp.UITheme,
 		}
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -138,7 +138,7 @@ func HandleAdminSettingsUIThemePost(
 		// Invalidate settings cache since we just updated settings
 		settingsCache.Invalidate()
 
-		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

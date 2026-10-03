@@ -2,7 +2,7 @@
 
 Every exported symbol a package under `src/core` declares has a row here saying why `core` declares
 it. `ARCHITECTURE.md` records the same thing two grains coarser — which module each top-level `core`
-package must end up in, and why each symbol left in `core/constants` is still there — and this table
+package must end up in, and why each symbol in `core/builtin` is still there — and this table
 is the rest of that question, asked per symbol because that is the grain at which it decays.
 
 Nothing else could catch what this catches. A package both processes genuinely share can still hide
@@ -67,9 +67,10 @@ note names an issue; the reviewer does the rest.
   are two packages, so nothing hides in a subdirectory the table never enumerated. A package whose
   every file carries `//go:build !production` — the generated mock subpackages — declares nothing any
   build includes and has no rows.
-- **`core/constants` is here too**, and is also the subject of `ARCHITECTURE.md`'s fourth table. That
-  table is stricter rather than looser: in a constants-only package, a constant naming its own
-  sibling is not use at all, so `own-package` would be vacuous there.
+- **`core/builtin` is here too**, and is also the subject of `ARCHITECTURE.md`'s fourth table. That
+  table is stricter rather than looser: in a package of identifiers, an identifier its own sibling
+  names is not use at all, so `own-package` would be vacuous there. `core/buildinfo`, the build
+  stamp that left `core/constants` beside it, is held by this table alone (#442).
 
 **ceiling:** a reference from outside the declaring package is a selector on the identifier the
 import binds, resolved by name within the file. A package-level declaration shadowing that name is
@@ -230,20 +231,20 @@ command itself and fails on a tree it changed.
 | `core/api` | `WebOriginResponse` | reachable | — |
 | `core/boundedread` | `ErrResponseTooLarge` | own-package | — |
 | `core/boundedread` | `Read` | kernel | — |
-| `core/constants` | `AdminConsoleClientIdentifier` | both-apps | — |
-| `core/constants` | `AdminConsoleSessionName` | both-apps | — |
-| `core/constants` | `AdminReadPermissionIdentifier` | own-package | — |
-| `core/constants` | `AuthServerResourceIdentifier` | both-apps | — |
-| `core/constants` | `BrowserSessionsPermissionIdentifier` | both-apps | — |
-| `core/constants` | `BuildDate` | both-apps | — |
-| `core/constants` | `BuiltInAuthServerPermissionIdentifiers` | both-apps | — |
-| `core/constants` | `GitCommit` | both-apps | — |
-| `core/constants` | `ManageAccountPermissionIdentifier` | both-apps | — |
-| `core/constants` | `ManageClientsPermissionIdentifier` | own-package | — |
-| `core/constants` | `ManagePermissionIdentifier` | both-apps | — |
-| `core/constants` | `ManageSettingsPermissionIdentifier` | own-package | — |
-| `core/constants` | `ManageUsersPermissionIdentifier` | own-package | — |
-| `core/constants` | `Version` | both-apps | — |
+| `core/buildinfo` | `BuildDate` | both-apps | — |
+| `core/buildinfo` | `GitCommit` | both-apps | — |
+| `core/buildinfo` | `Version` | both-apps | — |
+| `core/builtin` | `AdminConsoleClientIdentifier` | both-apps | — |
+| `core/builtin` | `AdminConsoleSessionName` | both-apps | — |
+| `core/builtin` | `AdminReadPermissionIdentifier` | own-package | — |
+| `core/builtin` | `AuthServerPermissionIdentifiers` | both-apps | — |
+| `core/builtin` | `AuthServerResourceIdentifier` | both-apps | — |
+| `core/builtin` | `BrowserSessionsPermissionIdentifier` | both-apps | — |
+| `core/builtin` | `ManageAccountPermissionIdentifier` | both-apps | — |
+| `core/builtin` | `ManageClientsPermissionIdentifier` | own-package | — |
+| `core/builtin` | `ManagePermissionIdentifier` | both-apps | — |
+| `core/builtin` | `ManageSettingsPermissionIdentifier` | own-package | — |
+| `core/builtin` | `ManageUsersPermissionIdentifier` | own-package | — |
 | `core/countries` | `All` | both-apps | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | own-package | — |
