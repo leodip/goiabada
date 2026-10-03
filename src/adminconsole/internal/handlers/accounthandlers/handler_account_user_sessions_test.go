@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -67,7 +68,7 @@ func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	bind := handlertest.Bind(t, httpHelper)
 
-	sessions, ok := bind["sessions"].([]SessionInfo)
+	sessions, ok := bind["sessions"].([]handlerhelpers.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 
@@ -101,7 +102,7 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
 	require.NotNil(t, sessions[0].Started)
@@ -111,8 +112,8 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 }
 
 // This page always believed the field; the other two do now. Written here as well so the trio is
-// symmetric: the copy is made by hand in three files, and a case in two of them cannot see the
-// third going wrong (#373 decision 1).
+// symmetric: the mapping is shared with the admin user page since #440 but the client page keeps
+// its own, and a case in two of them cannot see the third going wrong (#373 decision 1).
 func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
@@ -129,7 +130,7 @@ func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 
 	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 

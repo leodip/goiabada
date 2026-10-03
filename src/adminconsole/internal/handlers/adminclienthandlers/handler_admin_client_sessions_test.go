@@ -93,8 +93,9 @@ func TestHandleAdminClientUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	assert.Equal(t, header, sessions[0].UserAgent)
 }
 
-// The third of the three session pages, and the third hand-built SessionInfo literal, so the two
-// instants the page formats are pinned here for the reason they are pinned on the other two (#373).
+// The third of the three session pages, whose SessionInfo is its own because its rows also name
+// the session's user, so the two instants the page formats are pinned here for the reason they
+// are pinned on the other two (#373, #440).
 func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
