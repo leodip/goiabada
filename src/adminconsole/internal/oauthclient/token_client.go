@@ -240,13 +240,13 @@ func (c *TokenClient) clientCredentialsRemedy(code, scope string) string {
 func (c *TokenClient) post(ctx context.Context, form url.Values) (*oauth.TokenResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return nil, errs.Errorf("error creating request: %v", err)
+		return nil, errs.Wrap(err, "error creating request")
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, errs.Errorf("error sending request: %v", err)
+		return nil, errs.Wrap(err, "error sending request")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -265,7 +265,7 @@ func (c *TokenClient) post(ctx context.Context, form url.Values) (*oauth.TokenRe
 
 	var tokenResponse oauth.TokenResponse
 	if err := json.Unmarshal(body, &tokenResponse); err != nil {
-		return nil, errs.Errorf("error parsing response: %v", err)
+		return nil, errs.Wrap(err, "error parsing response")
 	}
 	return &tokenResponse, nil
 }

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -168,14 +169,13 @@ func main() {
 	// and split the ciphertext across up to fifty of them (#266).
 	//
 	// The bearer is a client_credentials token from the one token client, cached by
-	// SessionTokenSource; the backend asks it for one and knows nothing of the grant (#441).
+	// SessionTokenSource; the backend asks it for one and knows nothing of the grant. The same
+	// token client and HTTP client go to the server, for the sign-in's exchange, the refresh and
+	// the JWKS fetch, so no second construction can drift from this one (#441).
 	authServerBaseURL := cfg.AuthServer.GetEffectiveBaseURL()
-	tokenSource := oauthclient.NewSessionTokenSource(oauthclient.NewTokenClient(
-		oauthclient.TokenEndpointURL(authServerBaseURL),
-		coreconstants.AdminConsoleClientIdentifier,
-		cfg.AdminConsole.OAuthClientSecret,
-		oauthclient.NewAuthServerHTTPClient(),
-	))
+	authServerHTTPClient := oauthclient.NewAuthServerHTTPClient()
+	tokenClient := newTokenClient(cfg, authServerHTTPClient)
+	tokenSource := oauthclient.NewSessionTokenSource(tokenClient)
 
 	sessionStore, err := newSessionStore(
 		sessionbackend.New(authServerBaseURL, tokenSource),
@@ -197,7 +197,7 @@ func main() {
 	slog.Info("initialized settings cache with 30s TTL")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg)
+	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg, authServerHTTPClient, tokenClient)
 
 	// The process owns the signals, as the auth server's does; the console just gets told when to
 	// stop. On SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and Start
@@ -215,6 +215,20 @@ func main() {
 	}
 
 	slog.Info("admin console stopped")
+}
+
+// newTokenClient builds the console's one token client, which makes all three of its grants. The
+// token URL is the effective auth server base URL joined through TokenEndpointURL, so a configured
+// base URL ending in a slash still reaches /auth/token. The admin console is always the client the
+// seeder provisions, so the identifier is the constant and only the secret is per deployment
+// (#285, #441).
+func newTokenClient(cfg *config.Config, httpClient *http.Client) *oauthclient.TokenClient {
+	return oauthclient.NewTokenClient(
+		oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()),
+		coreconstants.AdminConsoleClientIdentifier,
+		cfg.AdminConsole.OAuthClientSecret,
+		httpClient,
+	)
 }
 
 // logSessionKeysNotConfigured reports session keys the console cannot use, which
