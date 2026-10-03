@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -27,7 +27,7 @@ import (
 // matches nothing, and the route it was written for silently falls to the default. Walking the
 // real registrations is what catches a pattern renamed in routes.go and not here.
 func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
-	s := newStaticBranchTestServer(mocks_data.NewDatabase(t))
+	s := newStaticBranchTestServer(datamocks.NewDatabase(t))
 	s.templateFS = web.TemplateFS()
 	s.initRoutes(s.initMiddleware())
 
@@ -76,7 +76,7 @@ func TestBodyLimitPolicy_EachRowAtItsBoundary(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			s := newStaticBranchTestServer(mocks_data.NewDatabase(t))
+			s := newStaticBranchTestServer(datamocks.NewDatabase(t))
 			s.initMiddleware()
 			s.router.Method(test.method, test.pattern, http.HandlerFunc(readWholeBody))
 

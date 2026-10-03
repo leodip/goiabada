@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -323,7 +323,7 @@ func TestValidateDCRRedirectURIs_Bounds(t *testing.T) {
 var dcrTx = &sql.Tx{}
 
 func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest,
-	database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
+	database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) *httptest.ResponseRecorder {
 
 	t.Helper()
 	body, err := json.Marshal(request)
@@ -365,13 +365,13 @@ var confidentialTwoURIRegistration = oidc.DynamicClientRegistrationRequest{
 // The client and every redirect URI are written on the one transaction, and the audit event
 // follows its commit, so an event never names a client that was rolled back (#428).
 func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsInOneTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	var events []string
 	note := func(event string) { events = append(events, event) }
 
-	mocks_data.ExpectRunInTransaction(database, dcrTx, note)
+	datamocks.ExpectRunInTransaction(database, dcrTx, note)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			args.Get(2).(*record.Client).Id = 42
@@ -399,11 +399,11 @@ func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsIn
 // failing hands the helper an error, which is what rolls back the client and the first URI, and the
 // requester gets one server_error with nothing audited and no registration answered.
 func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	refused := errs.New("the engine refused the second redirect URI")
-	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
+	stub := datamocks.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(refused).Once()
@@ -420,11 +420,11 @@ func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t
 }
 
 func TestHandleDynamicClientRegistrationPost_AFailedClientInsertWritesNoRedirectURI(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	refused := errs.New("the engine refused the client")
-	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
+	stub := datamocks.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(refused).Once()
 
 	rr := serveDCR(t, confidentialTwoURIRegistration, database, auditLogger)
@@ -439,10 +439,10 @@ func TestHandleDynamicClientRegistrationPost_AFailedClientInsertWritesNoRedirect
 // A public client is written through the one public-client rule: PKCE an explicit true, client
 // credentials off (#245, #428).
 func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublicClientInvariants(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	mocks_data.ExpectRunInTransaction(database, dcrTx)
+	datamocks.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.MatchedBy(func(c *record.Client) bool {
 		return c.IsPublic && c.PKCERequired != nil && *c.PKCERequired && !c.ClientCredentialsEnabled
 	})).Return(nil).Once()
@@ -466,10 +466,10 @@ func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublic
 // names the address every other audit entry names: httptest's "192.0.2.1:1234" is recorded as
 // "192.0.2.1". This handler returned r.RemoteAddr as is until #435.
 func TestHandleDynamicClientRegistrationPost_AuditsTheClientIPWithoutItsPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	mocks_data.ExpectRunInTransaction(database, dcrTx)
+	datamocks.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration,
@@ -528,9 +528,9 @@ func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 
-			rr := serveDCR(t, tc.request, database, mocks_handlers.NewAuditLogger(t))
+			rr := serveDCR(t, tc.request, database, handlersmocks.NewAuditLogger(t))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.Equal(t, tc.code, decodeDCRError(t, rr).Error)
@@ -551,7 +551,7 @@ func TestHandleDynamicClientRegistrationPost_ADescriptionEchoingRequestTextIsCon
 	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{"https://client.example.com/cb"},
 		GrantTypes:   []string{grantType},
-	}, mocks_data.NewDatabase(t), mocks_handlers.NewAuditLogger(t))
+	}, datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	envelope := decodeDCRError(t, rr)

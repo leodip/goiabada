@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -33,11 +33,11 @@ import (
 // on the root, one page view would cost seven settings reads and seven session reads for
 // files that can use neither.
 //
-// mocks_data.NewDatabase(t) fails the test on any call nobody expected, so the absence of a
+// datamocks.NewDatabase(t) fails the test on any call nobody expected, so the absence of a
 // GetSettingsById expectation in the static case IS the assertion.
 
 func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	s := newStaticBranchTestServer(database)
 	app := s.initMiddleware().pages
@@ -59,7 +59,7 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 // TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain is the other half, and
 // without it the case above is satisfied by a chain that was never mounted at all.
 func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil).Once()
 
 	s := newStaticBranchTestServer(database)
@@ -90,7 +90,7 @@ var nilTx = (*sql.Tx)(nil)
 // TestBodyLimitPolicy_EachRowAtItsBoundary (#434).
 const testProfilePictureMaxSizeBytes = 100 << 10
 
-func newStaticBranchTestServer(database *mocks_data.Database) *Server {
+func newStaticBranchTestServer(database *datamocks.Database) *Server {
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +13,7 @@ import (
 )
 
 func TestIssueClientCredentialsGrant(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -124,7 +124,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 }
 
 func TestIssueClientCredentialsGrant_InvalidScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{

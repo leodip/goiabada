@@ -1,4 +1,4 @@
-# A generated mock lives in <declaring package>/mocks, package mocks_<declaring package>,
+# A generated mock lives in <declaring package>/mocks, package <declaring package>mocks,
 # beside the interface it doubles rather than beside whatever implements it. A child
 # package's port is satisfied structurally by its parent's mock, which lives beside the
 # parent's port: apihandlers and accounthandlers restate internal/handlers' ports and
@@ -26,61 +26,61 @@ packages:
       Database:
         config:
           dir: "./internal/data/mocks"
-          pkgname: "mocks_data"
+          pkgname: "datamocks"
   github.com/leodip/goiabada/authserver/internal/handlers:
     interfaces:
       AuthorizeValidator:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       TokenValidator:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       CodeIssuer:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       TokenIssuer:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       ImplicitTokenIssuer:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       TokenParser:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       CeremonyStore:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       PageRenderer:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       JSONWriter:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       AuditLogger:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       PermissionChecker:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       UserSessionManager:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
       OtpSecretGenerator:
         config:
           dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          pkgname: "handlersmocks"
   # accounthandlers declares EmailValidator and UserCreator, which internal/handlers stopped
   # naming in #387, so both are generated from it and live beside it (#431); EmailSender and
   # PasswordValidator followed when the forgot and reset password handlers, their last callers
@@ -91,19 +91,19 @@ packages:
       EmailSender:
         config:
           dir: "./internal/handlers/accounthandlers/mocks"
-          pkgname: "mocks_accounthandlers"
+          pkgname: "accounthandlersmocks"
       EmailValidator:
         config:
           dir: "./internal/handlers/accounthandlers/mocks"
-          pkgname: "mocks_accounthandlers"
+          pkgname: "accounthandlersmocks"
       PasswordValidator:
         config:
           dir: "./internal/handlers/accounthandlers/mocks"
-          pkgname: "mocks_accounthandlers"
+          pkgname: "accounthandlersmocks"
       UserCreator:
         config:
           dir: "./internal/handlers/accounthandlers/mocks"
-          pkgname: "mocks_accounthandlers"
+          pkgname: "accounthandlersmocks"
   # protocolvalidation's own ports. Its in-package tests used internal/handlers' mocks of
   # the same names until #431. They cannot any more: the validator mocks in
   # internal/handlers/mocks import protocolvalidation for their input types, so that
@@ -113,11 +113,11 @@ packages:
       PermissionChecker:
         config:
           dir: "./internal/protocolvalidation/mocks"
-          pkgname: "mocks_protocolvalidation"
+          pkgname: "protocolvalidationmocks"
       TokenParser:
         config:
           dir: "./internal/protocolvalidation/mocks"
-          pkgname: "mocks_protocolvalidation"
+          pkgname: "protocolvalidationmocks"
   # Bearer-token middleware, this module's since #385 moved it out of core/middleware
   github.com/leodip/goiabada/authserver/internal/middleware:
     interfaces:
@@ -126,5 +126,5 @@ packages:
       tokenParser:
         config:
           dir: "./internal/middleware/mocks"
-          pkgname: "mocks_middleware"
+          pkgname: "middlewaremocks"
           structname: "TokenParser"

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -54,7 +54,7 @@ func propagationCodeInput() *CreateCodeInput {
 // own transaction with it. The matchers are assertions rather than stubs -- a mock.Anything in
 // either position would pass on an issuer that opened its own.
 func TestIssueAuthCode_IssuesUnderTheCallersContext(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	issuanceTx := &sql.Tx{}
 
 	mockDB.On("AcquireUserSessionRow", theIssuersCallersContext(), issuanceTx, "session-propagation").
@@ -75,7 +75,7 @@ func TestIssueAuthCode_IssuesUnderTheCallersContext(t *testing.T) {
 // ErrIssuingClientGone before the insert, so no code is written and there is no context to get
 // wrong. Without it the accept arm would also pass on an issuer that inserted unconditionally.
 func TestIssueAuthCode_AGoneClientReachesNoInsert(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	issuanceTx := &sql.Tx{}
 
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issuanceTx, "session-propagation").Return(true, nil).Once()

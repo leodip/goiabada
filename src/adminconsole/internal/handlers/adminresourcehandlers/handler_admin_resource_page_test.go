@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -166,7 +166,7 @@ func testStore() *sessionstore.ServerSideStore {
 // asked the API for. A 500 fails the test with the error it carried, since
 // answering 500 to a typed page is half of what is being fixed.
 func renderPermissionPage(t *testing.T, handler http.HandlerFunc, template, rawPage string,
-	httpHelper *mocks_handlers.HttpHelper) map[string]interface{} {
+	httpHelper *handlersmocks.HttpHelper) map[string]interface{} {
 
 	t.Helper()
 
@@ -185,10 +185,10 @@ func renderPermissionPage(t *testing.T, handler http.HandlerFunc, template, rawP
 
 // newHelper is a helper mock that renders, and that fails the test rather than
 // the request if the handler reaches for a 500.
-func newHelper(t *testing.T) *mocks_handlers.HttpHelper {
+func newHelper(t *testing.T) *handlersmocks.HttpHelper {
 	t.Helper()
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 	return httpHelper

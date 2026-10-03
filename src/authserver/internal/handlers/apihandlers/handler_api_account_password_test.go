@@ -11,9 +11,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -35,8 +35,8 @@ var apiRevokeTx = &sql.Tx{}
 // stubSweep registers the sweep calls for a user with no sessions and no refresh tokens. Thin on
 // purpose: the sweep table is owned exhaustively by revocation_test.go in internal/revocation,
 // and restating it here would mean two places to update.
-func stubSweep(database *mocks_data.Database, userId int64, newGeneration int64) {
-	mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
+func stubSweep(database *datamocks.Database, userId int64, newGeneration int64) {
+	datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).
@@ -65,9 +65,9 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 // The new password is held to the request's policy: the handler passes settings.PasswordPolicy,
 // and a refusal answers the validator's localized message with nothing written (#433).
 func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	passwordValidator := mocks_accounthandlers.NewPasswordValidator(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 
 	const currentPassword = "0ldP4ss!word"
 	currentHash, err := passwordhash.Hash(currentPassword)
@@ -94,8 +94,8 @@ func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T
 // assertion on the new audit payload (decision 7), because this is the only site where
 // preservedSessionIdentifier is non-empty.
 func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
@@ -118,7 +118,7 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	// The sweep, with the caller's session preserved. Registering the sid-scoped query is what
 	// proves exceptSid was threaded through: with an empty exceptSid the helper never calls it,
 	// and the strict mock would report the expectation unmet.
-	mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
+	datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(8), nil).Once()
 	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, int64(42)).
@@ -185,8 +185,8 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 // to preserve. Keep this case. Someone "fixing" it by falling back to another source for the sid
 // would let a caller preserve a session they did not authenticate with.
 func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
@@ -235,8 +235,8 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 // two events are adjacent in the code and it would be easy to leave the first one outside the
 // error check.
 func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
@@ -245,7 +245,7 @@ func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
 		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
-	stub := mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
+	stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(0), errors.New("increment failed")).Once()

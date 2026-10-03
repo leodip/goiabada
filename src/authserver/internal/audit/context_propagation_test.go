@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -44,7 +44,7 @@ func aLiveContext() interface{} {
 // switches read is the one worth naming -- it is what finds the request's settings, and on a
 // context of Log's own the adapter would read the settings row for every event.
 func TestLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	switches := databaseOnly()
 
 	mockDB.On("CreateAuditLog", theCallersContext(), mock.Anything, mock.Anything).
@@ -69,7 +69,7 @@ func TestLogger_Log_ReadsAndWritesUnderTheCallersContext(t *testing.T) {
 // detached context with no bound at all is how a stuck dependency holds the handler's goroutine
 // for ever, which is what the request's context used to prevent by accident.
 func TestLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	switches := databaseOnly()
 
 	mockDB.On("CreateAuditLog", aLiveContext(), mock.Anything, mock.Anything).
@@ -89,7 +89,7 @@ func TestLogger_Log_ACancelledCallerStillGetsItsEventWritten(t *testing.T) {
 // And the detached context is bounded rather than open-ended, asserted at both ports because the
 // bound is the whole reason the detachment is safe.
 func TestLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	switches := databaseOnly()
 
 	bounded := mock.MatchedBy(func(ctx context.Context) bool {
@@ -110,7 +110,7 @@ func TestLogger_Log_TheDetachedContextCarriesADeadline(t *testing.T) {
 // context to get wrong. Without it the accept arm would also pass on a logger that wrote
 // unconditionally.
 func TestLogger_Log_DatabasePersistenceOffReachesNoInsertPort(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	NewLogger(mockDB, noTarget()).Log(auditCallersContext(), EventAuthSuccessPwd, map[string]interface{}{"userId": 1})
 

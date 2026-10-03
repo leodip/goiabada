@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 )
@@ -24,63 +24,63 @@ import (
 func TestAdminSettingsHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T) {
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
-		{"HandleAuditLogsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleAuditLogsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAuditLogsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/audit-logs")},
-		{"HandleAuditLogsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleAuditLogsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAuditLogsPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/audit-logs", handlertest.WithForm(url.Values{}))},
-		{"HandleAuditLogViewerGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleAuditLogViewerGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAuditLogViewerGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/audit-log-viewer")},
-		{"HandleEmailGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleEmailGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleEmailGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/email")},
-		{"HandleEmailPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleEmailPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleEmailPost(h, nil, c, nil, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/email", handlertest.WithForm(url.Values{}))},
-		{"HandleEmailSendTestGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleEmailSendTestGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleEmailSendTestGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/email/send-test-email")},
-		{"HandleEmailSendTestPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleEmailSendTestPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleEmailSendTestPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/email/send-test-email",
 			handlertest.WithForm(url.Values{"destinationEmail": {"jane@example.com"}}))},
-		{"HandleGeneralGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleGeneralGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleGeneralGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/general")},
-		{"HandleGeneralPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleGeneralPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleGeneralPost(h, nil, c, nil, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/general", handlertest.WithForm(url.Values{}))},
-		{"HandleKeysGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleKeysGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleKeysGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/keys")},
-		{"HandleKeysRotatePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleKeysRotatePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleKeysRotatePost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate")},
-		{"HandleKeysRevokePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleKeysRevokePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleKeysRevokePost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/keys/revoke",
 			handlertest.WithBody(strings.NewReader(`{"id":7}`)))},
-		{"HandleSessionsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleSessionsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleSessionsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/sessions")},
-		{"HandleSessionsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleSessionsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleSessionsPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/sessions", handlertest.WithForm(url.Values{}))},
-		{"HandleTokensGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleTokensGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleTokensGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/tokens")},
-		{"HandleTokensPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleTokensPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleTokensPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/tokens", handlertest.WithForm(url.Values{}))},
-		{"HandleUIThemeGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleUIThemeGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleUIThemeGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/ui-theme")},
-		{"HandleUIThemePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+		{"HandleUIThemePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleUIThemePost(h, nil, c, nil, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/ui-theme",
 			handlertest.WithForm(url.Values{"themeSelection": {"dark"}}))},
@@ -88,7 +88,7 @@ func TestAdminSettingsHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			var answered []error
 			record := func(args mock.Arguments) { answered = append(answered, args.Get(2).(error)) }
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()

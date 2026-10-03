@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -25,8 +25,8 @@ import (
 
 // armImplicitTransaction arms what IssueImplicitTx does before it signs anything: it opens one
 // transaction, issueTx, and takes the session row on it.
-func armImplicitTransaction(mockDB *mocks_data.Database, sessionIdentifier string) {
-	mocks_data.ExpectRunInTransaction(mockDB, issueTx)
+func armImplicitTransaction(mockDB *datamocks.Database, sessionIdentifier string) {
+	datamocks.ExpectRunInTransaction(mockDB, issueTx)
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, sessionIdentifier).Return(true, nil).Once()
 }
 
@@ -35,7 +35,7 @@ const implicitBaseURL = "http://localhost:8081"
 // implicitFixture is an implicit ceremony that can issue both tokens with the profile claims on, so
 // the claim mapper's picture read is reached by the access token and by the ID token.
 type implicitFixture struct {
-	mockDB   *mocks_data.Database
+	mockDB   *datamocks.Database
 	issuer   *TokenIssuer
 	settings *record.Settings
 	input    *ImplicitGrantInput
@@ -45,7 +45,7 @@ type implicitFixture struct {
 func newImplicitFixture(t *testing.T) *implicitFixture {
 	t.Helper()
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	return &implicitFixture{
 		mockDB: mockDB,
 		issuer: NewTokenIssuer(mockDB, implicitBaseURL, testDataCipher, nil),
@@ -91,7 +91,7 @@ func TestIssueImplicitTx_TakesTheSessionRowFirstAndReadsOnTheTransaction(t *test
 	f := newImplicitFixture(t)
 
 	var order []string
-	mocks_data.ExpectRunInTransaction(f.mockDB, issueTx, func(edge string) { order = append(order, edge) })
+	datamocks.ExpectRunInTransaction(f.mockDB, issueTx, func(edge string) { order = append(order, edge) })
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").
 		Run(func(mock.Arguments) { order = append(order, "session row") }).Return(true, nil).Once()
 	f.expectEveryRead(&order, true)
@@ -113,7 +113,7 @@ func TestIssueImplicitTx_TakesTheSessionRowFirstAndReadsOnTheTransaction(t *test
 func TestIssueImplicitTx_KeepsThePictureInBothTokens(t *testing.T) {
 	f := newImplicitFixture(t)
 	var order []string
-	mocks_data.ExpectRunInTransaction(f.mockDB, issueTx)
+	datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(true, nil).Once()
 	f.expectEveryRead(&order, true)
 
@@ -131,7 +131,7 @@ func TestIssueImplicitTx_KeepsThePictureInBothTokens(t *testing.T) {
 func TestIssueImplicitTx_NoPictureNoClaim(t *testing.T) {
 	f := newImplicitFixture(t)
 	var order []string
-	mocks_data.ExpectRunInTransaction(f.mockDB, issueTx)
+	datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(true, nil).Once()
 	f.expectEveryRead(&order, false)
 
@@ -149,7 +149,7 @@ func TestIssueImplicitTx_NoPictureNoClaim(t *testing.T) {
 // request (#197).
 func TestIssueImplicitTx_NoSessionRowIsRefusedBeforeAnythingIsRead(t *testing.T) {
 	f := newImplicitFixture(t)
-	stub := mocks_data.ExpectRunInTransaction(f.mockDB, issueTx)
+	stub := datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(false, nil).Once()
 
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
@@ -169,7 +169,7 @@ func TestIssueImplicitTx_AnEmptySessionIdentifierIsTheCallersErrorNotAGoneSessio
 	f := newImplicitFixture(t)
 	f.input.SessionIdentifier = ""
 	refused := errors.New("can't acquire a user session row with an empty session identifier")
-	mocks_data.ExpectRunInTransaction(f.mockDB, issueTx)
+	datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "").Return(false, refused).Once()
 
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
@@ -184,7 +184,7 @@ func TestIssueImplicitTx_AnEmptySessionIdentifierIsTheCallersErrorNotAGoneSessio
 func TestIssueImplicitTx_AFailedAcquisitionIsNotASessionGone(t *testing.T) {
 	f := newImplicitFixture(t)
 	boom := errors.New("the row could not be taken")
-	mocks_data.ExpectRunInTransaction(f.mockDB, issueTx)
+	datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(false, boom).Once()
 
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
@@ -224,7 +224,7 @@ func TestIssueImplicitTx_AFailedReadStopsTheSigning(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newImplicitFixture(t)
-			mocks_data.ExpectRunInTransaction(f.mockDB, issueTx)
+			datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
 			f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(true, nil).Once()
 			tc.arm(f)
 
@@ -242,7 +242,7 @@ func TestIssueImplicitTx_AFailedReadStopsTheSigning(t *testing.T) {
 func TestIssueImplicitTx_AFailedCommitIsNotAResponse(t *testing.T) {
 	f := newImplicitFixture(t)
 	boom := errors.New("commit refused")
-	mocks_data.ExpectRunInTransactionThenFail(f.mockDB, issueTx, boom)
+	datamocks.ExpectRunInTransactionThenFail(f.mockDB, issueTx, boom)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(true, nil).Once()
 	var order []string
 	f.expectEveryRead(&order, true)
@@ -257,7 +257,7 @@ func TestIssueImplicitTx_AFailedCommitIsNotAResponse(t *testing.T) {
 func TestIssueImplicitTx_ATransactionThatCannotOpenIsAnError(t *testing.T) {
 	f := newImplicitFixture(t)
 	boom := errors.New("cannot begin")
-	mocks_data.ExpectRunInTransactionRefused(f.mockDB, boom)
+	datamocks.ExpectRunInTransactionRefused(f.mockDB, boom)
 
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
 
@@ -270,7 +270,7 @@ func TestIssueImplicitTx_ATransactionThatCannotOpenIsAnError(t *testing.T) {
 // input reaches the tokens.
 func TestIssueImplicitTx_ARerunBodySignsAgainFromScratch(t *testing.T) {
 	f := newImplicitFixture(t)
-	mocks_data.ExpectRunInTransactionRerun(f.mockDB, issueTx)
+	datamocks.ExpectRunInTransactionRerun(f.mockDB, issueTx)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(true, nil).Twice()
 	f.mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(f.keyPair, nil).Twice()
 	f.mockDB.On("UserLoadGroups", mock.Anything, issueTx, mock.Anything).Return(nil).Twice()
@@ -306,7 +306,7 @@ func TestIssueImplicit_RequiresATransaction(t *testing.T) {
 func TestIssueImplicitTx_SignsWhatTheInputSays(t *testing.T) {
 	f := newImplicitFixture(t)
 	f.input.Client.TokenExpirationInSeconds = 90
-	mocks_data.ExpectRunInTransaction(f.mockDB, issueTx)
+	datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").Return(true, nil).Once()
 	var order []string
 	f.expectEveryRead(&order, false)

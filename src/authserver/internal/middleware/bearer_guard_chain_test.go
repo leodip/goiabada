@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -278,7 +278,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 		}
 		for _, surface := range chainSurfaces() {
 			t.Run(surface.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
+				mockDB := datamocks.NewDatabase(t)
 				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "u1").Return(nil, nil)
 
 				req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
@@ -297,7 +297,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 		for _, surface := range chainSurfaces() {
 			t.Run(surface.name, func(t *testing.T) {
 				logs := logtest.CaptureSlog(t)
-				mockDB := mocks_data.NewDatabase(t)
+				mockDB := datamocks.NewDatabase(t)
 				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "u1").
 					Return(&record.User{Id: 7, Enabled: true}, nil)
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").

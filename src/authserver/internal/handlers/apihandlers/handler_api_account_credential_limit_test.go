@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -40,7 +40,7 @@ type credentialEnv struct {
 	password http.Handler
 	otp      http.Handler
 	email    http.Handler
-	database *mocks_data.Database
+	database *datamocks.Database
 }
 
 const (
@@ -52,8 +52,8 @@ const (
 func newCredentialEnv(t *testing.T) *credentialEnv {
 	t.Helper()
 
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	hash, err := passwordhash.Hash(credentialPassword)
 	require.NoError(t, err)
@@ -80,8 +80,8 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 		otp: rateLimiter.LimitAccountPassword(
 			HandleAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher)),
 		email: rateLimiter.LimitAccountPassword(
-			HandleAccountEmailPut(mocks_handlers.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
-				mocks_accounthandlers.NewEmailSender(t), auditLogger, rateLimiter, &heldJobs{})),
+			HandleAccountEmailPut(handlersmocks.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
+				accounthandlersmocks.NewEmailSender(t), auditLogger, rateLimiter, &heldJobs{})),
 		database: database,
 	}
 }

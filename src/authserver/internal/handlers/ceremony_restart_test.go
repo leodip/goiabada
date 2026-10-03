@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // The two restart routes send a ceremony back to requires_level_1 through AuthContext.Restart,
@@ -88,12 +88,12 @@ func restartedRequest() ceremony.AuthContext {
 }
 
 func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
 		auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
@@ -130,14 +130,14 @@ func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 }
 
 func TestRestartRoute2_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-	codeIssuer := mocks_handlers.NewCodeIssuer(t)
-	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	codeIssuer := handlersmocks.NewCodeIssuer(t)
+	implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	handler := HandleIssueGet(pageRenderer, ceremonyStore, fstest.MapFS{}, codeIssuer, implicitTokenIssuer,
 		database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
@@ -174,12 +174,12 @@ func TestRestartRoute2_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 // answer is the existing access_denied refusal with the context cleared first; nothing is saved and
 // nothing is issued. That is decision 2's no-fallback rule met at the hop that enforces it (#436).
 func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	database := mocks_data.NewDatabase(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	database := datamocks.NewDatabase(t)
 	stubRegisteredRedirectURI(database, "https://example.com/callback")
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
 		auditLogger, permissions.NewChecker(database), testBaseURL, testAdminConsoleBaseURL)

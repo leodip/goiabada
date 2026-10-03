@@ -13,8 +13,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -29,7 +29,7 @@ import (
 // row, which the save then demanded as a built-in, so a save built from the read was refused
 // (#449); nothing is special-cased now, a row that happens to be identified userinfo included.
 func TestHandlePermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	system := &record.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
 	stored := []record.Permission{
@@ -66,8 +66,8 @@ func TestHandlePermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *t
 // This is a unit test because simulating a missing built-in permission in integration tests
 // would cascade FK deletions that can't be rolled back.
 func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	handler := HandleResourcePermissionsPut(database, identifierValidator, auditLogger)
@@ -171,7 +171,7 @@ func resourcePermsBody(t *testing.T, permissions, expected []api.ResourcePermiss
 }
 
 // serveResourcePerms runs the save on a PUT carrying body.
-func serveResourcePerms(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, body string) *httptest.ResponseRecorder {
+func serveResourcePerms(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/7/permissions", strings.NewReader(body))
 	r = setChiURLParam(r, "resourceId", "7")
 	rr := httptest.NewRecorder()
@@ -180,24 +180,24 @@ func serveResourcePerms(database *mocks_data.Database, auditLogger *mocks_handle
 }
 
 // expectResourcePermsResource registers the resource read the save makes first.
-func expectResourcePermsResource(database *mocks_data.Database, resourceIdentifier string) {
+func expectResourcePermsResource(database *datamocks.Database, resourceIdentifier string) {
 	database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), resourcePermsId).
 		Return(&record.Resource{Id: resourcePermsId, ResourceIdentifier: resourceIdentifier}, nil).Once()
 }
 
 // expectResourcePermsChecked registers the read of the stored rows step 1 refuses against,
 // outside the transaction.
-func expectResourcePermsChecked(database *mocks_data.Database, stored []record.Permission) {
+func expectResourcePermsChecked(database *datamocks.Database, stored []record.Permission) {
 	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), resourcePermsId).Return(stored, nil).Once()
 }
 
 // expectResourcePermsRead registers the read of the stored rows on the save's transaction.
-func expectResourcePermsRead(database *mocks_data.Database, stored []record.Permission) {
+func expectResourcePermsRead(database *datamocks.Database, stored []record.Permission) {
 	database.On("GetPermissionsByResourceId", mock.Anything, resourcePermsTx, resourcePermsId).Return(stored, nil).Once()
 }
 
 // expectResourcePermsAudit accepts the one consolidated event and counts it.
-func expectResourcePermsAudit(t *testing.T, auditLogger *mocks_handlers.AuditLogger, order *[]string) *int {
+func expectResourcePermsAudit(t *testing.T, auditLogger *handlersmocks.AuditLogger, order *[]string) *int {
 	count := new(int)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedResourcePermissions, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -217,13 +217,13 @@ func expectResourcePermsAudit(t *testing.T, auditLogger *mocks_handlers.AuditLog
 // the dropped row deleted, the re-described row updated, the unchanged row left alone, the new
 // entry created. The one audit event follows the commit (#406, #428).
 func TestHandleResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
 	var order []string
-	stub := mocks_data.ExpectRunInTransaction(database, resourcePermsTx, func(edge string) { order = append(order, edge) })
+	stub := datamocks.ExpectRunInTransaction(database, resourcePermsTx, func(edge string) { order = append(order, edge) })
 	expectResourcePermsRead(database, resourcePermsStored())
 	database.On("DeletePermission", mock.Anything, resourcePermsTx, int64(33)).
 		Run(func(mock.Arguments) { order = append(order, "delete") }).Return(nil).Once()
@@ -258,13 +258,13 @@ func TestHandleResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testi
 
 // A rename is an update of the named row, on the transaction, and nothing else.
 func TestHandleResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	stored := resourcePermsStored()
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, stored)
-	mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
+	datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 	expectResourcePermsRead(database, stored)
 	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.MatchedBy(func(p *record.Permission) bool {
 		return p.Id == 33 && p.PermissionIdentifier == "manage" && p.Description == "Admin"
@@ -285,12 +285,12 @@ func TestHandleResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T) {
 // autocommitted, as this save was, the updates before the failure stayed committed under the 500
 // (#406, #428).
 func TestHandleResourcePermissionsPut_AFailedWriteCommitsNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
-	stub := mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
+	stub := datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 	expectResourcePermsRead(database, resourcePermsStored())
 	database.On("DeletePermission", mock.Anything, resourcePermsTx, int64(33)).Return(nil).Once()
 	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.Anything).Return(nil).Once()
@@ -311,12 +311,12 @@ func TestHandleResourcePermissionsPut_AFailedWriteCommitsNothing(t *testing.T) {
 // identifier at the same moment: 409 CONCURRENT_UPDATE, the whole save rolled back and nothing
 // audited, where the autocommitted writes answered it 500 with the earlier writes kept (#428).
 func TestHandleResourcePermissionsPut_AUniqueKeyRaceAnswersConflict(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
-	stub := mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
+	stub := datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 	expectResourcePermsRead(database, resourcePermsStored())
 	database.On("DeletePermission", mock.Anything, resourcePermsTx, int64(33)).Return(nil).Once()
 	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.Anything).Return(nil).Once()
@@ -349,12 +349,12 @@ func TestHandleResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectResourcePermsResource(database, "a-resource")
 			expectResourcePermsChecked(database, variant.checked)
-			stub := mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
+			stub := datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 			loadErr := errors.New("the read failed")
 			database.On("GetPermissionsByResourceId", mock.Anything, resourcePermsTx, resourcePermsId).Return(nil, loadErr).Once()
 
@@ -375,8 +375,8 @@ func TestHandleResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 // and audits once: the plan is recomputed from a fresh read on each attempt, and the event is
 // emitted after the attempt that committed (#301, #428).
 func TestHandleResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
@@ -415,12 +415,12 @@ func TestHandleResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *testi
 
 // The helper giving up, a deadlock on every attempt, is one 500 and no audit event.
 func TestHandleResourcePermissionsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
-	mocks_data.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
+	datamocks.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
 
 	rr := serveResourcePerms(database, auditLogger, resourcePermsBody(t, resourcePermsEdit(), loadedEntries(resourcePermsStored())))
 
@@ -459,12 +459,12 @@ func TestHandleResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T
 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectResourcePermsResource(database, "a-resource")
 			expectResourcePermsChecked(database, resourcePermsStored())
-			stub := mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
+			stub := datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 			expectResourcePermsRead(database, variant.stored())
 
 			rr := serveResourcePerms(database, auditLogger, resourcePermsBody(t, resourcePermsEdit(), loadedEntries(resourcePermsStored())))
@@ -499,12 +499,12 @@ func TestHandleResourcePermissionsPut_ALoadedListEqualAsASetProceeds(t *testing.
 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectResourcePermsResource(database, "a-resource")
 			expectResourcePermsChecked(database, variant.stored)
-			mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
+			datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 			expectResourcePermsRead(database, variant.stored)
 			audits := expectResourcePermsAudit(t, auditLogger, nil)
 
@@ -631,8 +631,8 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			resourceIdentifier := variant.resourceIdentifier
 			if resourceIdentifier == "" {
@@ -660,13 +660,13 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 // list still equal to the transaction's read, is a list that changed and changed back between the
 // two reads: refused 409 with nothing written, rather than an update of a row that is gone (#428).
 func TestHandleResourcePermissionsPut_ANamedRowGoneByTheTransactionIsRefused(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	stored := resourcePermsStored()
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, stored)
-	stub := mocks_data.ExpectRunInTransaction(database, resourcePermsTx)
+	stub := datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 	expectResourcePermsRead(database, stored[:2])
 
 	rr := serveResourcePerms(database, auditLogger, resourcePermsBody(t, loadedEntries(stored), loadedEntries(stored[:2])))

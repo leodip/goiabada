@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -139,33 +139,33 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleAuditLogsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAuditLogsGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAuditLogViewerGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleAuditLogViewerGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs/viewer", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleEmailGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/email", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailPost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleEmailPost(h, newSettingsTestStore(), c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/email",
@@ -176,7 +176,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleEmailSendTestGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleEmailSendTestGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/email/send-test",
@@ -184,7 +184,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleEmailSendTestPost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleEmailSendTestPost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/email/send-test",
@@ -194,14 +194,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleGeneralGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleGeneralGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/general", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleGeneralPost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleGeneralPost(h, newSettingsTestStore(), c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/general",
@@ -212,14 +212,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleKeysGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleKeysGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/keys", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleKeysRotatePost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleKeysRotatePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
@@ -227,7 +227,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleKeysRevokePost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleKeysRevokePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/keys/revoke",
@@ -235,14 +235,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleSessionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleSessionsGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/sessions", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleSessionsPost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleSessionsPost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/sessions",
@@ -253,14 +253,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleTokensGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleTokensGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/tokens", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleTokensPost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleTokensPost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/tokens",
@@ -272,14 +272,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleUIThemeGet",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleUIThemeGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/ui-theme", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleUIThemePost",
-			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleUIThemePost(h, newSettingsTestStore(), c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/ui-theme",
@@ -289,7 +289,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()

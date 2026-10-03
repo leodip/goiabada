@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // stubAuthenticatedBrowser gives HandleAuthorizeGet a browser that has already authenticated.
@@ -50,7 +50,7 @@ import (
 // The gate's own answers are TestRedirectWillBeEmitted's table, which owns every one of them.
 // Nothing here asserts the gate; this is the fixture that lets the cases about something else stay
 // about that something else.
-func stubRegisteredRedirectURI(database *mocks_data.Database, registered ...string) {
+func stubRegisteredRedirectURI(database *datamocks.Database, registered ...string) {
 	uris := make([]record.RedirectURI, 0, len(registered))
 	for _, uri := range registered {
 		uris = append(uris, record.RedirectURI{URI: uri})
@@ -58,7 +58,7 @@ func stubRegisteredRedirectURI(database *mocks_data.Database, registered ...stri
 	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 }
 
-func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager) {
+func stubAuthenticatedBrowser(database *datamocks.Database, userSessionManager *handlersmocks.UserSessionManager) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(&record.UserSession{Id: 1, UserId: 1}, nil)
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
@@ -67,16 +67,16 @@ func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager 
 
 func TestHandleAuthorizeGet(t *testing.T) {
 	t.Run("Valid request with existing session", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
@@ -148,16 +148,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Valid request without existing session", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
@@ -210,15 +210,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Invalid client and redirect URI", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
@@ -257,15 +257,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// redirecting validations would each fail this test if the branch let the request through to
 	// them. That is what pins the branch's position rather than merely its existence.
 	t.Run("Unsupported response_mode is answered 400 on a page, above everything that redirects", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		// jwt is JARM, which this server does not implement, and it is what a client asking for an
@@ -310,16 +310,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// refusal arriving in the query component until #231 (decision 15) moved it: the emitter
 	// answers an implicit request in the fragment whatever mode was asked for, form_post apart.
 	t.Run("A supported response_mode the request may not use still reaches the client, in the fragment", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -369,15 +369,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	// The request takes the no-session path, the commonest exit that saves: a refused request saves
 	// nothing since #436, so the id is read off the one context the ceremony's first hop stores.
 	t.Run("The saved auth context names a fresh ceremony", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		stubRegisteredRedirectURI(database, "https://example.com")
@@ -423,16 +423,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Invalid request", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -474,16 +474,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Invalid scopes", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -535,16 +535,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Invalid scopes with a failing clear - server_error to the client", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -591,16 +591,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Invalid scopes with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
@@ -656,16 +656,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Invalid scopes with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
@@ -715,16 +715,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Disabled user account", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
@@ -786,15 +786,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("A failed save answers 500 and sends the browser nowhere", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
@@ -830,16 +830,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("Valid request with AcrLevel2Optional", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
@@ -906,16 +906,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("POST request with form body succeeds", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		form := url.Values{}
@@ -971,16 +971,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 	})
 
 	t.Run("POST validation error redirects with form-body params", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -1037,16 +1037,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// AuthContext that's persisted to the session, so subsequent steps
 		// of the multi-step auth flow (/auth/pwd, /auth/otp, /auth/consent)
 		// see the same locale preference.
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET",
@@ -1101,16 +1101,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// body. r.FormValue covers both, so the same code path runs — but this
 		// pins behaviour that's easy to break if anything in the request
 		// pre-processing chain consumes the body.
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		form := url.Values{}
@@ -1164,7 +1164,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 // error redirect, so that the redirect knows whose redirect URI it is about to use. It answers with
 // an administrator-created client, the case in which weighing provenance changes nothing, so a
 // refusal case still asserts the redirect it was written to assert (#108).
-func stubClientProvenanceLookup(database *mocks_data.Database) {
+func stubClientProvenanceLookup(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
 			AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
@@ -1177,10 +1177,10 @@ func stubClientProvenanceLookup(database *mocks_data.Database) {
 //
 // It is deliberately the ONLY expectation on the mock. A case that reaches the emitter and does not
 // reach this read is a case where one of the two older gates refused first, and those are handed a
-// bare mocks_data.NewDatabase(t) instead, so a gate reordered above the read fails loudly rather
+// bare datamocks.NewDatabase(t) instead, so a gate reordered above the read fails loudly rather
 // than passing on a stub that answers everything.
-func testRegisteredDatabase(t *testing.T, registered ...string) *mocks_data.Database {
-	database := mocks_data.NewDatabase(t)
+func testRegisteredDatabase(t *testing.T, registered ...string) *datamocks.Database {
+	database := datamocks.NewDatabase(t)
 
 	uris := make([]record.RedirectURI, 0, len(registered))
 	for _, uri := range registered {
@@ -1727,7 +1727,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
@@ -1736,7 +1736,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 					return data["destination"] == tc.destination
 				})).Return(nil)
 
-			err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), pageRenderer, nil, testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
+			err := redirToClientWithError(w, r, datamocks.NewDatabase(t), pageRenderer, nil, testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
 
 			require.NoError(t, err)
 			assert.Empty(t, w.Header().Get("Location"), "a withheld redirect must never become a Location: %s", tc.why)
@@ -1759,7 +1759,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 // the gates removed (#108, #122, #213, #241).
 //
 // The database is the row's own, and its ABSENCE is an assertion. A row whose gate refuses before
-// the registration read is handed a mocks_data.NewDatabase(t) carrying no expectation at all, so a
+// the registration read is handed a datamocks.NewDatabase(t) carrying no expectation at all, so a
 // read that happens anyway fails the case instead of being absorbed by a permissive stub. That is
 // the ordering claim, and it is a claim about this function rather than about the database: the two
 // older gates cost nothing and the third costs a query, so the cheap refusals must stay above it.
@@ -1768,8 +1768,8 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 	// than reused from testRegisteredDatabase because these rows need the empty list too, and an
 	// empty variadic call reads as "no registrations" in one place and "no expectation" in the
 	// other; saying which is meant is the point of the whole table.
-	registeredDatabase := func(t *testing.T, registered ...string) *mocks_data.Database {
-		database := mocks_data.NewDatabase(t)
+	registeredDatabase := func(t *testing.T, registered ...string) *datamocks.Database {
+		database := datamocks.NewDatabase(t)
 
 		uris := make([]record.RedirectURI, 0, len(registered))
 		for _, uri := range registered {
@@ -1782,12 +1782,12 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 
 	// The rows whose gate refuses above the read use this: a mock with no expectation, so a call
 	// that reaches it fails the case.
-	noReadExpected := func(t *testing.T) *mocks_data.Database {
-		return mocks_data.NewDatabase(t)
+	noReadExpected := func(t *testing.T) *datamocks.Database {
+		return datamocks.NewDatabase(t)
 	}
 
-	failingDatabase := func(t *testing.T) *mocks_data.Database {
-		database := mocks_data.NewDatabase(t)
+	failingDatabase := func(t *testing.T) *datamocks.Database {
+		database := datamocks.NewDatabase(t)
 		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, errors.New("the database is unavailable"))
 		return database
@@ -1795,7 +1795,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 
 	for _, tc := range []struct {
 		name         string
-		database     func(t *testing.T) *mocks_data.Database
+		database     func(t *testing.T) *datamocks.Database
 		client       *record.Client
 		redirectURI  string
 		responseType string
@@ -1804,7 +1804,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 	}{
 		{
 			name: "administrator-registered client with an absolute, registered redirect URI",
-			database: func(t *testing.T) *mocks_data.Database {
+			database: func(t *testing.T) *datamocks.Database {
 				return registeredDatabase(t, "https://legit.example/cb")
 			},
 			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
@@ -1847,7 +1847,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 		{
 			name: "registered redirect URI deleted from the client",
-			database: func(t *testing.T) *mocks_data.Database {
+			database: func(t *testing.T) *datamocks.Database {
 				return registeredDatabase(t, "https://other.example/cb")
 			},
 			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
@@ -1860,7 +1860,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 		{
 			name: "client with no registrations at all",
-			database: func(t *testing.T) *mocks_data.Database {
+			database: func(t *testing.T) *datamocks.Database {
 				return registeredDatabase(t)
 			},
 			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
@@ -1884,7 +1884,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 		{
 			name: "loopback port flexibility IS granted on a code request",
-			database: func(t *testing.T) *mocks_data.Database {
+			database: func(t *testing.T) *datamocks.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
 			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
@@ -1898,7 +1898,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 		{
 			name: "loopback port flexibility is NOT granted on an implicit request",
-			database: func(t *testing.T) *mocks_data.Database {
+			database: func(t *testing.T) *datamocks.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
 			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
@@ -1912,7 +1912,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 		{
 			name: "a multi-token response type buys no loopback port",
-			database: func(t *testing.T) *mocks_data.Database {
+			database: func(t *testing.T) *datamocks.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
 			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
@@ -1925,7 +1925,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 		{
 			name: "an unrecognised token beside code buys no loopback port",
-			database: func(t *testing.T) *mocks_data.Database {
+			database: func(t *testing.T) *datamocks.Database {
 				return registeredDatabase(t, "http://127.0.0.1/cb")
 			},
 			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
@@ -1954,7 +1954,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 // where a later edit would drop it. The end-to-end shape is the sequential-read case in
 // TestHandleAuthorizeGet_RegistrationReadFailsThenSucceeds (#241).
 func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
@@ -1971,7 +1971,7 @@ func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	// No expectation on the database at all: the floor must short-circuit above the live gates, so
 	// a registration read reaching this mock fails the case. That is the ordering claim, and it is
 	// what stops a "helpful" edit from re-asking and taking the newer answer.
-	err := redirToClientWithError(w, r, mocks_data.NewDatabase(t), pageRenderer, nil, input)
+	err := redirToClientWithError(w, r, datamocks.NewDatabase(t), pageRenderer, nil, input)
 
 	require.NoError(t, err)
 	assert.Empty(t, w.Header().Get("Location"),
@@ -2023,11 +2023,11 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "http://127.0.0.1/cb")
 
 			if tc.wantLocation == "" {
@@ -2062,11 +2062,11 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 // cases in TestHandleAuthorizeGet_PromptNone (#241).
 func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.T) {
 	// newRequest is per-subtest because the mocks key their expectations on the exact w and r.
-	setup := func(t *testing.T) (*mocks_handlers.PageRenderer, *mocks_handlers.CeremonyStore,
+	setup := func(t *testing.T) (*handlersmocks.PageRenderer, *handlersmocks.CeremonyStore,
 		*httptest.ResponseRecorder, *http.Request) {
 
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
@@ -2091,7 +2091,7 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		// No expectation on the database at all, exactly as TestRedirToClientWithError_HonoursAnEarlierRefusal
 		// does: a registration read reaching this mock fails the case. That is stronger than stubbing a
 		// recovered read and asserting it was ignored, because it proves the second read never happens.
-		answerClientWithError(w, r, mocks_data.NewDatabase(t), pageRenderer, ceremonyStore, nil, input)
+		answerClientWithError(w, r, datamocks.NewDatabase(t), pageRenderer, ceremonyStore, nil, input)
 
 		assert.Empty(t, w.Header().Get("Location"),
 			"swapping the code for server_error must not launder away a refusal the request already earned: "+
@@ -2104,7 +2104,7 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 	t.Run("the response type survives, so a native client still gets server_error", func(t *testing.T) {
 		pageRenderer, ceremonyStore, w, r := setup(t)
 
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "http://127.0.0.1/cb")
 
 		input := testRedirectError("invalid_scope", "Invalid scope", "query",
@@ -2123,7 +2123,7 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 	t.Run("state survives", func(t *testing.T) {
 		pageRenderer, ceremonyStore, w, r := setup(t)
 
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
 		input := testRedirectError("invalid_scope", "Invalid scope", "query", "https://legit.example/cb",
@@ -2144,16 +2144,16 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 
 func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	t.Run("Valid implicit flow request with token response type", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
@@ -2211,16 +2211,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Valid implicit flow request with id_token token response type", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
@@ -2275,16 +2275,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow disabled - validation error redirects with fragment", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -2335,16 +2335,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Client explicitly enables implicit flow overriding global", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
@@ -2425,7 +2425,7 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 			if tc.typ != nil {
 				claims["typ"] = tc.typ
 			}
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).
 				Return(&oauth.JwtToken{TokenBase64: "the-hint", Claims: claims}, nil)
 
@@ -2448,15 +2448,15 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 
 func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	t.Run("Invalid id_token_hint bad signature - invalid_request", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
@@ -2507,15 +2507,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("id_token_hint with wrong issuer - invalid_request", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
@@ -2575,15 +2575,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	// An access token of this server, with the right issuer and a real sub, is not an ID Token:
 	// refused and answered as the unparseable hint above is (#401).
 	t.Run("id_token_hint that is an access token - invalid_request", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
@@ -2644,15 +2644,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("id_token_hint missing sub claim - invalid_request", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
@@ -2709,15 +2709,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("Expired id_token_hint matching user - succeeds", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
@@ -2793,15 +2793,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("SSO with id_token_hint matching session user - proceeds normally", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
@@ -2877,15 +2877,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("SSO with id_token_hint different user - forces re-auth", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
@@ -2963,14 +2963,14 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with valid id_token_hint matching session user - succeeds", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
@@ -3084,14 +3084,14 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	// Keep this case: once the predicate is right nothing else reaches this input, so it is the
 	// only thing that fails if the substring match comes back.
 	t.Run("prompt=none with a resource scope containing offline_access text - issues without consent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
@@ -3189,15 +3189,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with valid id_token_hint different user - login_required", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
@@ -3283,15 +3283,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with a failing clear - server_error to the client", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 
@@ -3376,15 +3376,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		// handlePromptNone's closure carries its own copy of the last-resort 500, so removing
 		// site 1's copy leaves this one and vice versa. Each is pinned at its own site.
@@ -3468,15 +3468,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("prompt=none with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
@@ -3561,15 +3561,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("Rejects request parameter with request_not_supported", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -3610,15 +3610,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("Rejects request_uri parameter with request_uri_not_supported", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -3658,15 +3658,15 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	})
 
 	t.Run("Rejects empty request parameter (key present, value empty)", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com")
-		authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
-		tokenParser := mocks_handlers.NewTokenParser(t)
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
 		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
 		stubAuthenticatedBrowser(database, userSessionManager)
 
@@ -3845,14 +3845,14 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 
 			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
@@ -3964,15 +3964,15 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "https://legit.example/cb")
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 
 			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
@@ -4050,15 +4050,15 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 // and immediate paths byte-identical. That end-to-end equality belongs to seam 3; what is pinned
 // here is only that the parked value went through the filter at all.
 func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	database := mocks_data.NewDatabase(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	database := datamocks.NewDatabase(t)
 	stubRegisteredRedirectURI(database, "https://legit.example/cb")
-	authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
-	tokenParser := mocks_handlers.NewTokenParser(t)
+	authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
+	tokenParser := handlersmocks.NewTokenParser(t)
 
 	handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 		authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
@@ -4121,19 +4121,19 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		hasSession bool
-		firstRead  func(*mocks_data.Database)
-		secondRead func(*mocks_data.Database)
+		firstRead  func(*datamocks.Database)
+		secondRead func(*datamocks.Database)
 		wantReads  int
 		why        string
 	}{
 		{
 			name:       "a refusal is never widened into a redirect",
 			hasSession: false,
-			firstRead: func(database *mocks_data.Database) {
+			firstRead: func(database *datamocks.Database) {
 				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return(nil, errors.New("the database is unavailable")).Once()
 			},
-			secondRead: func(database *mocks_data.Database) {
+			secondRead: func(database *datamocks.Database) {
 				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return([]record.RedirectURI{{URI: redirectURI}}, nil).Maybe()
 			},
@@ -4145,11 +4145,11 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 		{
 			name:       "a permission is still narrowed into a refusal",
 			hasSession: true,
-			firstRead: func(database *mocks_data.Database) {
+			firstRead: func(database *datamocks.Database) {
 				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return([]record.RedirectURI{{URI: redirectURI}}, nil).Once()
 			},
-			secondRead: func(database *mocks_data.Database) {
+			secondRead: func(database *datamocks.Database) {
 				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return([]record.RedirectURI{}, nil).Maybe()
 			},
@@ -4160,14 +4160,14 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			database := mocks_data.NewDatabase(t)
-			authorizeValidator := mocks_handlers.NewAuthorizeValidator(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
-			tokenParser := mocks_handlers.NewTokenParser(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+			tokenParser := handlersmocks.NewTokenParser(t)
 
 			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
 				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)

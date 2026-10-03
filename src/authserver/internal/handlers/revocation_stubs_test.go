@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +28,7 @@ var revokeTx = &sql.Tx{}
 // assertNotAttempted fails if any of the named methods appears in the mock's recorded calls. The
 // strict mock would already reject an unexpected call; this states which writes each failure path
 // must not have reached, so the intent survives a later edit to the expectations.
-func assertNotAttempted(t *testing.T, db *mocks_data.Database, methods ...string) {
+func assertNotAttempted(t *testing.T, db *datamocks.Database, methods ...string) {
 	t.Helper()
 	for _, call := range db.Calls {
 		for _, method := range methods {

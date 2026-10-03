@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -42,7 +42,7 @@ func (*deleteUserApiClient) DeleteUser(context.Context, string, int64) error {
 func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]interface{} {
 	t.Helper()
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_delete.html").Maybe()
 

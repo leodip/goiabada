@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -88,7 +88,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 	// generateAccessTokenCore consults the database for a profile picture when the
 	// profile scope is present, so a mock is needed even though nothing here is about
 	// pictures. Maybe(), because the rows using bare "openid" never reach it.
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 	now := time.Now().UTC()
@@ -179,7 +179,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 	// generateAccessTokenCore consults the database for a profile picture when the
 	// profile scope is present, so a mock is needed even though nothing here is about
 	// pictures. Maybe(), because the rows using bare "openid" never reach it.
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 	now := time.Now().UTC()
@@ -293,7 +293,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 	const sid = "test-session-123"
 
 	t.Run("codes inherit the AuthContext's generation, not the current user's", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		issuer := NewCodeIssuer(mockDB)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -320,7 +320,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 	})
 
 	t.Run("initial auth-code refresh token inherits its code's generation", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		// code 7 against a user already at 9.
@@ -338,7 +338,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 	})
 
 	t.Run("auth-code rotation inherits the parent token, not the code or the user", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		// Three-way conflict on purpose: parent 7, code 3, user 9. A read of either wrong
@@ -364,7 +364,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 	})
 
 	t.Run("initial ROPC refresh token inherits the validated user snapshot", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		input := &ROPCGrantInput{
@@ -385,7 +385,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 	})
 
 	t.Run("ROPC rotation inherits the parent token, not the reloaded user", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 		// The refresh path reloads the user, so this fixture puts the reloaded user at 9

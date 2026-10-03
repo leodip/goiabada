@@ -13,9 +13,9 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
 
@@ -31,7 +31,7 @@ import (
 
 func TestHandleForgotPasswordGet(t *testing.T) {
 	t.Run("Successful render", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
 
 		handler := HandleForgotPasswordGet(pageRenderer)
 
@@ -58,7 +58,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 	})
 
 	t.Run("RenderTemplate error", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
 
 		handler := HandleForgotPasswordGet(pageRenderer)
 
@@ -134,7 +134,7 @@ func forgotPasswordRequest(email string) *http.Request {
 
 // expectLinkSentPage expects the one page every well-formed request is answered with, and hands
 // back what it was bound with.
-func expectLinkSentPage(pageRenderer *mocks_handlers.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) *map[string]interface{} {
+func expectLinkSentPage(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) *map[string]interface{} {
 	bound := map[string]interface{}{}
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/forgot_password.html", mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -145,10 +145,10 @@ func expectLinkSentPage(pageRenderer *mocks_handlers.PageRenderer, rr *httptest.
 
 func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Email not given", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -189,10 +189,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -218,10 +218,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	})
 
 	t.Run("Success path, email is sent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -308,10 +308,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	// The lookup is the one database read every well-formed request makes before its response, so
 	// its failure is the server's and is answered as one, whatever address was asked about.
 	t.Run("The lookup fails", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -339,10 +339,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	// request owes beside the Error line that says why (#404 decision 6).
 	t.Run("Encrypting the code fails", func(t *testing.T) {
 		capture := logtest.CaptureSlog(t)
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		// A nil cipher refuses every encryption, which is the one way to make the real one fail.
@@ -373,10 +373,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 	t.Run("Storing the code fails", func(t *testing.T) {
 		capture := logtest.CaptureSlog(t)
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -471,10 +471,10 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			database := mocks_data.NewDatabase(t)
-			emailSender := mocks_accounthandlers.NewEmailSender(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 
 			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -528,10 +528,10 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 		{name: "a verified, enabled account", user: &record.User{Id: 7, Enabled: true, Email: email, EmailVerified: true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			database := mocks_data.NewDatabase(t)
-			emailSender := mocks_accounthandlers.NewEmailSender(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 
 			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -579,7 +579,7 @@ const (
 // back its payload once the handler has run, so a test compares the whole map: a key present
 // that should not be, an address in plain text or a userId naming no account, fails as surely as
 // a wrong value.
-func captureRequestedPasswordReset(auditLogger *mocks_handlers.AuditLogger) *map[string]interface{} {
+func captureRequestedPasswordReset(auditLogger *handlersmocks.AuditLogger) *map[string]interface{} {
 	details := map[string]interface{}{}
 	auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -595,10 +595,10 @@ func captureRequestedPasswordReset(auditLogger *mocks_handlers.AuditLogger) *map
 // two ends of the handler, the format check and the code issued.
 func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 	t.Run("a malformed address is recorded as invalid_address, digested as submitted", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -624,10 +624,10 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 	})
 
 	t.Run("a code issued is recorded once, digesting the address as looked up, before the mail is sent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
@@ -674,10 +674,10 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 	// answered, is told nothing different (#404 decisions 7 and 8).
 	t.Run("a mail that fails to send leaves the one code_issued record and an Error line", func(t *testing.T) {
 		capture := logtest.CaptureSlog(t)
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_accounthandlers.NewEmailSender(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		database := datamocks.NewDatabase(t)
+		emailSender := accounthandlersmocks.NewEmailSender(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
 		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)

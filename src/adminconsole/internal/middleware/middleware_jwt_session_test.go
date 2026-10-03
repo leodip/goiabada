@@ -26,7 +26,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 
-	mock_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
 )
 
 // Seam 5 of #427: SessionHandler, one row per step of its per-request order, over a real
@@ -161,7 +161,7 @@ type sessionHarness struct {
 	t         *testing.T
 	store     *sessionstore.ServerSideStore
 	backend   *contextHonouringBackend
-	parser    *mock_middleware.TokenParser
+	parser    *middlewaremocks.TokenParser
 	refresher *fakeRefresher
 	logs      *logtest.SlogCapture
 }
@@ -180,7 +180,7 @@ func newSessionHarness(t *testing.T) *sessionHarness {
 		t:         t,
 		store:     store,
 		backend:   backend,
-		parser:    mock_middleware.NewTokenParser(t),
+		parser:    middlewaremocks.NewTokenParser(t),
 		refresher: &fakeRefresher{},
 		logs:      logtest.CaptureSlog(t),
 	}
@@ -230,7 +230,7 @@ func (h *sessionHarness) serve(parser tokenParser, cookies []*http.Cookie) serve
 // serveOn is serve with the request on ctx, the browser's own context.
 func (h *sessionHarness) serveOn(ctx context.Context, parser tokenParser, cookies []*http.Cookie) served {
 	h.t.Helper()
-	m := NewJWT(h.store, sessionTestName, parser, h.refresher, new(mock_middleware.AuthHelper),
+	m := NewJWT(h.store, sessionTestName, parser, h.refresher, new(middlewaremocks.AuthHelper),
 		stubErrorRenderer{}, "http://console.example", "admin-console-client")
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil).WithContext(ctx)

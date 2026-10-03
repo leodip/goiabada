@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_accounthandlers
+package accounthandlersmocks
 
 import (
 	mock "github.com/stretchr/testify/mock"

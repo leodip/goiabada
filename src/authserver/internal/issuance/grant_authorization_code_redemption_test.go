@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -25,7 +25,7 @@ import (
 
 // armCodeMint arms every read and write minting a code's tokens makes, on a fixture whose scope is
 // openid alone, and notes "mint" at the first of them.
-func armCodeMint(t *testing.T, mockDB *mocks_data.Database, note func(string)) *record.Code {
+func armCodeMint(t *testing.T, mockDB *datamocks.Database, note func(string)) *record.Code {
 	t.Helper()
 	now := time.Now().UTC()
 	code := &record.Code{
@@ -67,7 +67,7 @@ func codeGrantSettings() *record.Settings {
 }
 
 func TestIssueAuthorizationCodeGrant_ClaimsBeforeMinting(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	var order []string
@@ -92,7 +92,7 @@ func TestIssueAuthorizationCodeGrant_ClaimsBeforeMinting(t *testing.T) {
 // answers. The strict double is the assertion that nothing else was read or written: no signing
 // key, no user, no refresh token row.
 func TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 	logs := logtest.CaptureSlog(t)
 
@@ -117,7 +117,7 @@ func TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing(t *testing.T) {
 // A claim the database could not make is a fault, not a lost race: it comes back as itself, never
 // as ErrCodeNotClaimed, and nothing is minted.
 func TestIssueAuthorizationCodeGrant_AClaimFailureIsAFault(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	failure := errs.New("connection refused")
@@ -135,7 +135,7 @@ func TestIssueAuthorizationCodeGrant_AClaimFailureIsAFault(t *testing.T) {
 // A mint that fails after a won claim leaves the code spent: the failure comes back and nothing
 // gives the code back, which is the price of never issuing two token sets from one code (#77).
 func TestIssueAuthorizationCodeGrant_AFailedMintAfterTheClaimIsAFault(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	failure := errs.New("connection refused")

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
@@ -22,7 +22,7 @@ import (
 )
 
 func TestGenerateAccessToken(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -110,7 +110,7 @@ func TestGenerateAccessToken(t *testing.T) {
 }
 
 func TestGenerateAccessToken_CustomScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -184,7 +184,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 }
 
 func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -295,7 +295,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 }
 
 func TestGenerateAccessToken_InvalidScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -342,7 +342,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 }
 
 func TestGenerateIdToken_FullScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -474,7 +474,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 }
 
 func TestGenerateIdToken_MinimalScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -546,7 +546,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 }
 
 func TestGenerateIdToken_ClientOverride(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -804,7 +804,7 @@ func TestAuthMethodsToArray_OIDCCompliance(t *testing.T) {
 // OIDC Core 1.0 Section 2 requires amr to be a JSON array of strings.
 // This test explicitly checks the type, not just the values.
 func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -1011,7 +1011,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 // comma-ok form: claims["amr"] returns nil for a missing key, and an empty array decodes to a
 // non-nil []interface{}{}, so assert.Nil would pass for either and pin nothing.
 func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -1227,7 +1227,7 @@ func TestAMR_EdgeCases(t *testing.T) {
 
 // TestCreateTokenInputFromCode verifies the factory function for auth code flow
 func TestCreateTokenInputFromCode(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
@@ -1264,7 +1264,7 @@ func TestCreateTokenInputFromCode(t *testing.T) {
 
 // TestCreateTokenInputFromImplicit verifies the factory function for implicit flow
 func TestCreateTokenInputFromImplicit(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
@@ -1300,7 +1300,7 @@ func TestCreateTokenInputFromImplicit(t *testing.T) {
 
 // TestCreateTokenInputFromROPC verifies the factory function for ROPC flow
 func TestCreateTokenInputFromROPC(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
@@ -1337,7 +1337,7 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 
 // TestGenerateAccessTokenCore_InvalidScope tests error handling for invalid scopes
 func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1398,7 +1398,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 
 // TestGenerateAccessTokenCore_MultipleAudiences tests handling of multiple resource audiences
 func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1440,7 +1440,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 
 // TestGenerateAccessTokenCore_OptionalClaims tests optional claims (nonce, sid)
 func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1508,7 +1508,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 
 // TestGenerateIdTokenCore_WithAtHash tests at_hash claim for implicit flow
 func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1578,7 +1578,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 
 // TestGenerateIdTokenCore_GroupsAndAttributes tests groups/attributes with IncludeInIdToken
 func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1642,7 +1642,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 
 // TestTokenGenerationInput_AllFieldsCopied ensures all fields are properly copied by factory functions
 func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
@@ -1683,7 +1683,7 @@ func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
 
 // TestGenerateAccessTokenCore_ClientOverrideExpiration tests client-specific token expiration
 func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1750,7 +1750,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 
 // TestGenerateAccessTokenCore_OIDCClaimsInAccessToken tests includeOpenIDConnectClaimsInAccessToken setting
 func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	privateKeyBytes := getTestPrivateKey(t)
@@ -1906,7 +1906,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
 
 	t.Run("the profile scope reads the picture flag under the caller's context", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("UserHasProfilePicture", callersContext, mock.Anything, int64(42)).Return(true, nil).Once()
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
@@ -1919,7 +1919,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 	})
 
 	t.Run("without the profile scope the port is not reached", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com", testDataCipher, nil)
 		claims := jwt.MapClaims{}
@@ -1951,7 +1951,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 	hasProfilePicture bool) (jwt.MapClaims, jwt.MapClaims) {
 	t.Helper()
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, baseURL, testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -2182,7 +2182,7 @@ type scopeIsTheGrantIssue struct {
 func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefreshScope string) scopeIsTheGrantIssue {
 	t.Helper()
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{

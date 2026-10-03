@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +15,7 @@ import (
 
 func TestSettings(t *testing.T) {
 	t.Run("Successful retrieval of settings", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		expectedSettings := &record.Settings{
 			Id:      1,
 			AppName: "TestApp",
@@ -37,7 +37,7 @@ func TestSettings(t *testing.T) {
 	})
 
 	t.Run("Database error", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 		middleware := Settings(mockDB, PageFaults())

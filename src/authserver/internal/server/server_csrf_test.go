@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/mock"
 )
@@ -151,7 +151,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 func newCsrfTestServer(t *testing.T) *Server {
 	t.Helper()
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	// middleware.CORS consults the registered web origins for /auth/token, /auth/logout and
 	// /userinfo when an Origin header is present, which every cross-site row here sends. Answering
 	// false is the production answer for an unregistered origin and keeps CORS out of the result:

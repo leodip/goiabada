@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
@@ -42,11 +42,11 @@ func assertServerErrorJSON(t *testing.T, rr *httptest.ResponseRecorder) {
 
 // The token endpoint: a reused code whose revocation transaction never opens.
 func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	tokenValidator := mocks_handlers.NewTokenValidator(t)
+	database := datamocks.NewDatabase(t)
+	tokenValidator := handlersmocks.NewTokenValidator(t)
 
 	handler := HandleTokenPost(render.New(nil),
-		database, mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t),
+		database, handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t),
 		noCredentialFailures{})
 
 	reuse := &protocolvalidation.AuthCodeReusedError{
@@ -56,7 +56,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 	}
 	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, reuse)
-	mocks_data.ExpectRunInTransactionRefused(database, errs.New("the engine refused to begin"))
+	datamocks.ExpectRunInTransactionRefused(database, errs.New("the engine refused to begin"))
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(
 		"grant_type=authorization_code&code=abc&redirect_uri=http://example.com&client_id=test_client"))
@@ -71,9 +71,9 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 
 // The userinfo endpoint: the user read fails.
 func TestHandleUserInfoGetPost_AServerFaultAnswersJSON(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := HandleUserInfoGetPost(render.New(nil), database,
-		mocks_handlers.NewAuditLogger(t), testBaseURL)
+		handlersmocks.NewAuditLogger(t), testBaseURL)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").
 		Return(nil, errs.New("the database went away")).Once()
@@ -91,7 +91,7 @@ func TestHandleUserInfoGetPost_AServerFaultAnswersJSON(t *testing.T) {
 
 // The JWKS endpoint: the key read fails.
 func TestHandleCertsGet_AServerFaultAnswersJSON(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	handler := HandleCertsGet(render.New(nil), database)
 
 	database.On("GetAllSigningKeys", mock.Anything, (*sql.Tx)(nil)).

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -801,7 +801,7 @@ func TestRequireValidSession(t *testing.T) {
 	}
 
 	t.Run("passes through when no bearer token in context", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		rr := httptest.NewRecorder()
@@ -817,7 +817,7 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("passes through when token has no sid claim (client_credentials/ROPC)", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
@@ -844,7 +844,7 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("passes through when token sid resolves to a valid session", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
@@ -883,7 +883,7 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("returns 401 invalid_token when session has been deleted", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
@@ -918,7 +918,7 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("returns 401 invalid_token when session has expired (idle timeout)", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
@@ -963,7 +963,7 @@ func TestRequireValidSession(t *testing.T) {
 		// Without settings we cannot enforce idle/max-lifetime limits.
 		// Silently skipping would let an expired session ride a still-valid
 		// JWT past us, so we fail closed with a 500.
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
@@ -1009,7 +1009,7 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("returns 500 when the settings on the context are a nil pointer", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
@@ -1048,7 +1048,7 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("returns 500 when database lookup fails", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
@@ -1082,7 +1082,7 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("body matches WWW-Authenticate description on rejection", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
@@ -1419,7 +1419,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.label, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			now := time.Now().UTC()
 
 			if !tc.noBearer && tc.claims["auth_time"] != nil &&
@@ -1666,7 +1666,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testing.T) {
 	const requestId = "req-bearer-1"
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
 		Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-boom").
@@ -1726,7 +1726,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 	}
 
 	t.Run("a user token reads the subject under the request's own context", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.MatchedBy(func(ctx context.Context) bool {
@@ -1757,7 +1757,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 	})
 
 	t.Run("a client_credentials token reaches no port", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		req := requestWithId()
 		req = req.WithContext(reqctx.WithBearerToken(req.Context(), oauth.JwtToken{

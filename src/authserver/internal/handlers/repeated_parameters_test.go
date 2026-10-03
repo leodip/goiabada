@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -34,26 +34,26 @@ import (
 // authorizeEndpoint is HandleAuthorizeGet over strict doubles: a call nothing registered fails the
 // test, which is what shows a refusal read nothing past the point it refused at.
 type authorizeEndpoint struct {
-	pageRenderer       *mocks_handlers.PageRenderer
-	ceremonyStore      *mocks_handlers.CeremonyStore
-	userSessionManager *mocks_handlers.UserSessionManager
-	database           *mocks_data.Database
-	validator          *mocks_handlers.AuthorizeValidator
+	pageRenderer       *handlersmocks.PageRenderer
+	ceremonyStore      *handlersmocks.CeremonyStore
+	userSessionManager *handlersmocks.UserSessionManager
+	database           *datamocks.Database
+	validator          *handlersmocks.AuthorizeValidator
 	handler            http.HandlerFunc
 }
 
 func newAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 	t.Helper()
 	e := &authorizeEndpoint{
-		pageRenderer:       mocks_handlers.NewPageRenderer(t),
-		ceremonyStore:      mocks_handlers.NewCeremonyStore(t),
-		userSessionManager: mocks_handlers.NewUserSessionManager(t),
-		database:           mocks_data.NewDatabase(t),
-		validator:          mocks_handlers.NewAuthorizeValidator(t),
+		pageRenderer:       handlersmocks.NewPageRenderer(t),
+		ceremonyStore:      handlersmocks.NewCeremonyStore(t),
+		userSessionManager: handlersmocks.NewUserSessionManager(t),
+		database:           datamocks.NewDatabase(t),
+		validator:          handlersmocks.NewAuthorizeValidator(t),
 	}
 	e.handler = HandleAuthorizeGet(e.pageRenderer, e.ceremonyStore, e.userSessionManager, e.database, nil,
-		e.validator, mocks_handlers.NewAuditLogger(t), mocks_handlers.NewPermissionChecker(t),
-		mocks_handlers.NewTokenParser(t), testBaseURL)
+		e.validator, handlersmocks.NewAuditLogger(t), handlersmocks.NewPermissionChecker(t),
+		handlersmocks.NewTokenParser(t), testBaseURL)
 	return e
 }
 

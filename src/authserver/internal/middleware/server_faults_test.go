@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -76,7 +76,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 		{
 			name: "the settings row cannot be read",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
-				db := mocks_data.NewDatabase(t)
+				db := datamocks.NewDatabase(t)
 				db.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 				return Settings(db, faults)
 			},
@@ -87,9 +87,9 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 		{
 			name: "the session store cannot be read",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
-				store := mocks_sessionstore.NewStore(t)
+				store := sessionstoremocks.NewStore(t)
 				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(nil, errors.New("the session backend is down"))
-				return SessionIdentifier(store, mocks_data.NewDatabase(t), faults)
+				return SessionIdentifier(store, datamocks.NewDatabase(t), faults)
 			},
 			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
 			pageMessage:  "unable to get the session store",
@@ -98,9 +98,9 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 		{
 			name: "the session row the cookie names cannot be read",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
-				store := mocks_sessionstore.NewStore(t)
+				store := sessionstoremocks.NewStore(t)
 				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(sessionWithIdentifier(store, "sid-1"), nil)
-				db := mocks_data.NewDatabase(t)
+				db := datamocks.NewDatabase(t)
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 				return SessionIdentifier(store, db, faults)
 			},
@@ -111,10 +111,10 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 		{
 			name: "the session cannot be saved after its row was found gone",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
-				store := mocks_sessionstore.NewStore(t)
+				store := sessionstoremocks.NewStore(t)
 				store.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(sessionWithIdentifier(store, "sid-1"), nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("the session backend is down"))
-				db := mocks_data.NewDatabase(t)
+				db := datamocks.NewDatabase(t)
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, nil)
 				return SessionIdentifier(store, db, faults)
 			},

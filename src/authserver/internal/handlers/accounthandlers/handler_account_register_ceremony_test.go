@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
@@ -48,7 +48,7 @@ var registrationEchoCases = []struct {
 func TestHandleRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
 	for _, tc := range registrationEchoCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
 			handler := HandleRegisterGet(pageRenderer)
 
 			req := httptest.NewRequest(http.MethodGet, "/account/register"+tc.query, nil)
@@ -73,11 +73,11 @@ func TestHandleRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
 func TestHandleRegisterPost_TheRedrawnFormKeepsOnlyAWellFormedCeremony(t *testing.T) {
 	for _, tc := range registrationEchoCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			handler := HandleRegisterPost(pageRenderer, mocks_data.NewDatabase(t),
-				mocks_accounthandlers.NewUserCreator(t), mocks_accounthandlers.NewEmailValidator(t),
-				mocks_accounthandlers.NewPasswordValidator(t), mocks_accounthandlers.NewEmailSender(t),
-				mocks_handlers.NewAuditLogger(t), testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			handler := HandleRegisterPost(pageRenderer, datamocks.NewDatabase(t),
+				accounthandlersmocks.NewUserCreator(t), accounthandlersmocks.NewEmailValidator(t),
+				accounthandlersmocks.NewPasswordValidator(t), accounthandlersmocks.NewEmailSender(t),
+				handlersmocks.NewAuditLogger(t), testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			req := httptest.NewRequest(http.MethodPost, "/account/register"+tc.query, strings.NewReader(""))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

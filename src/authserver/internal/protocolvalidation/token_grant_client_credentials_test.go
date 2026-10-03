@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -108,9 +108,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Valid client credentials request", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -153,9 +153,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Invalid client secret", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -191,9 +191,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Valid scope", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -238,9 +238,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Invalid scope format", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -279,9 +279,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Scope not granted to client", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -323,9 +323,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("ID token scope in client credentials", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -364,9 +364,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Non-existent resource in scope", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -406,9 +406,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Non-existent permission in scope", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -449,9 +449,9 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	})
 
 	t.Run("Multiple valid scopes", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -523,7 +523,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	// Registered with .Maybe() because each case reaches only the lookups its own
 	// scope string requires, and the assertion that matters is the outcome rather
 	// than the call set. The two error-propagation subtests below register their own.
-	registerCatalog := func(mockDB *mocks_data.Database) {
+	registerCatalog := func(mockDB *datamocks.Database) {
 		for _, r := range []struct {
 			identifier string
 			id         int64
@@ -549,8 +549,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	runCC := func(t *testing.T, clientPerms []record.Permission, scope, wantCode, wantDesc, wantScope string) {
 		t.Helper()
 
-		mockDB := mocks_data.NewDatabase(t)
-		validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+		mockDB := datamocks.NewDatabase(t)
+		validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 		client := &record.Client{
 			ClientIdentifier:         "cc_client",
@@ -795,18 +795,18 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	// status code, and a swallowed error would silently deny legitimate requests.
 	for _, tc := range []struct {
 		name  string
-		setup func(*mocks_data.Database)
+		setup func(*datamocks.Database)
 	}{
 		{
 			name: "GetResourceByResourceIdentifier error propagates",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
 					Return(nil, errors.New("database is down"))
 			},
 		},
 		{
 			name: "GetPermissionsByResourceId error propagates",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
 					Return(&record.Resource{Id: 1, ResourceIdentifier: "billing-api"}, nil)
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
@@ -815,8 +815,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+			mockDB := datamocks.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 			client := &record.Client{
 				ClientIdentifier:         "cc_client",
@@ -901,8 +901,8 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+			mockDB := datamocks.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 			settings := &record.Settings{}
 			ctx := context.Background()
 

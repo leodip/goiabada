@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +15,7 @@ import (
 )
 
 func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -95,7 +95,7 @@ func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 }
 
 func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -186,7 +186,7 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 }
 
 func TestIssueImplicitTx_BothTokens(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -278,7 +278,7 @@ func TestIssueImplicitTx_BothTokens(t *testing.T) {
 func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 	// This test verifies that implicit flow NEVER issues a refresh token
 	// per RFC 6749 Section 4.2.2
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -336,7 +336,7 @@ func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 }
 
 func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -399,7 +399,7 @@ func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 }
 
 func TestIssueImplicitTx_WithGroupsAndAttributes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{

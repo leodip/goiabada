@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 )
 
 // =============================================================================
@@ -27,7 +27,7 @@ import (
 // expectUserLoaded sets up the four calls UserHasScopePermission always makes
 // before it even looks at the scope string: fetch the user, then load its
 // permissions, groups, and the groups' permissions.
-func expectUserLoaded(mockDB *mocks_data.Database, user *record.User, times int) {
+func expectUserLoaded(mockDB *datamocks.Database, user *record.User, times int) {
 	mockDB.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil).Times(times)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Times(times)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Times(times)
@@ -35,7 +35,7 @@ func expectUserLoaded(mockDB *mocks_data.Database, user *record.User, times int)
 }
 
 func TestUserHasScopePermission_GrantedViaDirectUserPermission(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{
@@ -56,7 +56,7 @@ func TestUserHasScopePermission_GrantedViaDirectUserPermission(t *testing.T) {
 }
 
 func TestUserHasScopePermission_GrantedViaGroupPermission(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	// The user has no permission of its own; the grant comes from group membership.
@@ -85,7 +85,7 @@ func TestUserHasScopePermission_GrantedViaGroupPermission(t *testing.T) {
 }
 
 func TestUserHasScopePermission_GrantedViaSecondGroup(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	// Ensures the group loop does not stop at the first group.
@@ -111,7 +111,7 @@ func TestUserHasScopePermission_GrantedViaSecondGroup(t *testing.T) {
 }
 
 func TestUserHasScopePermission_DeniedWhenNeitherUserNorGroupHasIt(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{
@@ -138,7 +138,7 @@ func TestUserHasScopePermission_DeniedWhenNeitherUserNorGroupHasIt(t *testing.T)
 // Matching is done on permission Id precisely so that holding "read" on one
 // resource does not grant "read" on another. This test guards that.
 func TestUserHasScopePermission_DeniedWhenIdentifierMatchesButResourceDiffers(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	// The user holds "read" (Id 77) on some other resource.
@@ -161,7 +161,7 @@ func TestUserHasScopePermission_DeniedWhenIdentifierMatchesButResourceDiffers(t 
 }
 
 func TestUserHasScopePermission_UserNotFound(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(42)).Return(nil, nil).Once()
@@ -186,7 +186,7 @@ func TestUserHasScopePermission_MalformedScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			pc := NewChecker(mockDB)
 
 			user := &record.User{Id: 1}
@@ -205,7 +205,7 @@ func TestUserHasScopePermission_MalformedScope(t *testing.T) {
 // check and falls through to a lookup for the resource named "". That must be
 // denied rather than treated as a wildcard.
 func TestUserHasScopePermission_SeparatorOnlyScopeIsDenied(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{Id: 1}
@@ -223,7 +223,7 @@ func TestUserHasScopePermission_SeparatorOnlyScopeIsDenied(t *testing.T) {
 // now answers each as an outcome and the checker denies it by rule (#425). These
 // tests pin the deny outcome so that a refactor cannot silently turn it into a grant.
 func TestUserHasScopePermission_DeniedWhenResourceDoesNotExist(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{Id: 1}
@@ -237,7 +237,7 @@ func TestUserHasScopePermission_DeniedWhenResourceDoesNotExist(t *testing.T) {
 }
 
 func TestUserHasScopePermission_DeniedWhenPermissionIdentifierNotOnResource(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{Id: 1}
@@ -263,24 +263,24 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 
 	testCases := []struct {
 		name  string
-		setup func(mockDB *mocks_data.Database)
+		setup func(mockDB *datamocks.Database)
 	}{
 		{
 			name: "GetUserById fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, dbErr).Once()
 			},
 		},
 		{
 			name: "UserLoadPermissions fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(dbErr).Once()
 			},
 		},
 		{
 			name: "UserLoadGroups fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(dbErr).Once()
@@ -288,7 +288,7 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 		},
 		{
 			name: "GroupsLoadPermissions fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
@@ -297,14 +297,14 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 		},
 		{
 			name: "GetResourceByResourceIdentifier fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				expectUserLoaded(mockDB, user, 1)
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(nil, dbErr).Once()
 			},
 		},
 		{
 			name: "GetPermissionsByResourceId fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				expectUserLoaded(mockDB, user, 1)
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
@@ -314,7 +314,7 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			pc := NewChecker(mockDB)
 			tc.setup(mockDB)
 
@@ -335,7 +335,7 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 // =============================================================================
 
 func TestFilterOutScopes_NilUser(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "backend-svc:read", nil)
@@ -366,7 +366,7 @@ func TestFilterOutScopes_OidcAndOfflineAccessBypassPermissionCheck(t *testing.T)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			pc := NewChecker(mockDB)
 
 			result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), tc.scope, &record.User{Id: 1})
@@ -378,7 +378,7 @@ func TestFilterOutScopes_OidcAndOfflineAccessBypassPermissionCheck(t *testing.T)
 }
 
 func TestFilterOutScopes_EmptyScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "", &record.User{Id: 1})
@@ -388,7 +388,7 @@ func TestFilterOutScopes_EmptyScope(t *testing.T) {
 }
 
 func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	// The user holds "read" (Id 5) but not "write" (Id 6).
@@ -413,7 +413,7 @@ func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
 }
 
 func TestFilterOutScopes_PreservesOrderAndMixesOidcWithResourceScopes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{
@@ -439,7 +439,7 @@ func TestFilterOutScopes_PreservesOrderAndMixesOidcWithResourceScopes(t *testing
 // Extra whitespace produces empty elements, which are skipped. The result is
 // also trimmed, so no leading or trailing space survives.
 func TestFilterOutScopes_HandlesExtraWhitespace(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "  openid   profile  ", &record.User{Id: 1})
@@ -452,7 +452,7 @@ func TestFilterOutScopes_HandlesExtraWhitespace(t *testing.T) {
 // AuthContext.SetScope, so this pins current behavior rather than asserting
 // that duplicates are desirable.
 func TestFilterOutScopes_DoesNotDeduplicate(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid openid", &record.User{Id: 1})
@@ -462,7 +462,7 @@ func TestFilterOutScopes_DoesNotDeduplicate(t *testing.T) {
 }
 
 func TestFilterOutScopes_MalformedScopeElementReturnsError(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid not-a-valid-scope", &record.User{Id: 1})
@@ -478,7 +478,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 	dbErr := errors.New("database is down")
 	user := &record.User{Id: 1}
 	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
-	stubResolved := func(mockDB *mocks_data.Database) {
+	stubResolved := func(mockDB *datamocks.Database) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).
 			Return([]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
@@ -486,31 +486,31 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 
 	testCases := []struct {
 		name  string
-		setup func(mockDB *mocks_data.Database)
+		setup func(mockDB *datamocks.Database)
 	}{
 		{
 			name: "GetResourceByResourceIdentifier fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(nil, dbErr).Once()
 			},
 		},
 		{
 			name: "GetPermissionsByResourceId fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
 			},
 		},
 		{
 			name: "GetUserById fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, dbErr).Once()
 			},
 		},
 		{
 			name: "UserLoadPermissions fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(dbErr).Once()
@@ -518,7 +518,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 		},
 		{
 			name: "UserLoadGroups fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
@@ -527,7 +527,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 		},
 		{
 			name: "GroupsLoadPermissions fails",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
@@ -539,7 +539,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			pc := NewChecker(mockDB)
 			tc.setup(mockDB)
 
@@ -555,7 +555,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 // scopes, rather than passing them through unchecked or on the strength of the
 // caller's copy of the row. The row is read once however many scopes resolve.
 func TestFilterOutScopes_StripsEveryResourceScopeWhenUserNotInDatabase(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
@@ -580,7 +580,7 @@ func TestFilterOutScopes_StripsEveryResourceScopeWhenUserNotInDatabase(t *testin
 // their grants exactly once. Each loader is registered .Once(), so a per-scope
 // reload fails on the second call.
 func TestFilterOutScopes_LoadsTheUserAndGrantsOnce(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	dbRow := &record.User{Id: 1}
@@ -623,7 +623,7 @@ func TestFilterOutScopes_LoadsTheUserAndGrantsOnce(t *testing.T) {
 // A scope naming no resource, or no permission on one, is stripped on its own
 // lookup: nothing reads the user when no scope resolves.
 func TestFilterOutScopes_UnresolvedScopesNeverReadTheUser(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "ghost").Return(nil, nil).Once()
@@ -644,7 +644,7 @@ func TestFilterOutScopes_UnresolvedScopesNeverReadTheUser(t *testing.T) {
 // scope belongs, answered as any other malformed element, with no read at all. It
 // used to be case-folded through as offline access (#425).
 func TestFilterOutScopes_UppercaseOfflineAccessIsNotExempt(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid OFFLINE_ACCESS", &record.User{Id: 1})
@@ -671,7 +671,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 	testCases := []struct {
 		name          string
 		scope         string
-		setup         func(mockDB *mocks_data.Database)
+		setup         func(mockDB *datamocks.Database)
 		want          ScopeOutcome
 		wantResource  string
 		wantPerm      string
@@ -683,7 +683,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 		{
 			name:  "unknown resource",
 			scope: "ghost:read",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "ghost").Return(nil, nil).Once()
 			},
 			want: ScopeResourceUnknown, wantResource: "ghost", wantPerm: "read",
@@ -691,7 +691,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 		{
 			name:  "unknown permission on a known resource",
 			scope: "backend-svc:delete",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(onResource, nil).Once()
 			},
@@ -700,7 +700,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 		{
 			name:  "resolved carries the row",
 			scope: "backend-svc:write",
-			setup: func(mockDB *mocks_data.Database) {
+			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(onResource, nil).Once()
 			},
@@ -711,7 +711,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// A strict mock with no stubs is the proof that a malformed scope reads nothing.
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			if tc.setup != nil {
 				tc.setup(mockDB)
 			}
@@ -766,7 +766,7 @@ func TestIsResourceScope(t *testing.T) {
 			if tc.want {
 				return
 			}
-			resolution, err := ResolveScope(context.Background(), mocks_data.NewDatabase(t), tc.scope)
+			resolution, err := ResolveScope(context.Background(), datamocks.NewDatabase(t), tc.scope)
 			assert.NoError(t, err)
 			assert.Equal(t, ScopeMalformed, resolution.Outcome)
 		})
@@ -779,7 +779,7 @@ func TestResolveScope_DatabaseErrorsPropagate(t *testing.T) {
 	dbErr := errors.New("database is down")
 
 	t.Run("resource lookup", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(nil, dbErr).Once()
 
 		_, err := ResolveScope(context.Background(), mockDB, "backend-svc:read")
@@ -788,7 +788,7 @@ func TestResolveScope_DatabaseErrorsPropagate(t *testing.T) {
 	})
 
 	t.Run("permission lookup", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
 			Return(&record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
@@ -814,7 +814,7 @@ func TestUserHasScopePermission_CarriesTheCallersContextToEveryRead(t *testing.T
 		return got.Value(marker{}) == "the caller's own"
 	})
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{Id: 1, Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}}}
@@ -844,7 +844,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkip
 		return got.Value(marker{}) == "the caller's own"
 	})
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{Id: 1, Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}}}

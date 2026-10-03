@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -98,7 +98,7 @@ func TestHandleUIThemePost_OnlyASessionEndedListReadStopsTheRedraw(t *testing.T)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			var bind map[string]interface{}
 			if !tc.ended {

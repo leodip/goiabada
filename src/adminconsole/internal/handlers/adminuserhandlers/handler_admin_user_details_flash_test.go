@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -97,7 +97,7 @@ func renderDetails(t *testing.T, store *sessionstore.ServerSideStore,
 
 	t.Helper()
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_details.html").Once()
 
 	req := detailsRequest()

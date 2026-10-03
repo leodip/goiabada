@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -154,21 +154,21 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		handler  func(helper *mocks_handlers.HttpHelper) http.HandlerFunc
+		handler  func(helper *handlersmocks.HttpHelper) http.HandlerFunc
 		form     url.Values
 		options  []handlertest.Option
 		wantPath string
 	}{
 		{
 			name: "address",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleAddressPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/address",
 		},
 		{
 			name: "attributes add",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleAttributesAddPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
@@ -176,7 +176,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "attributes edit",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleAttributesEditPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
@@ -185,28 +185,28 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "authentication",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleAuthenticationPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/authentication",
 		},
 		{
 			name: "delete",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleDeletePost(helper, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/",
 		},
 		{
 			name: "details",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleDetailsPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/details",
 		},
 		{
 			name: "email",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleEmailPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}},
@@ -214,7 +214,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "new",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleNewPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}, "password": {"a password"}},
@@ -223,14 +223,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "phone",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandlePhonePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/phone",
 		},
 		{
 			name: "profile",
-			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleProfilePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/profile",
@@ -239,7 +239,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			options := append([]handlertest.Option{

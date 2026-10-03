@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -33,7 +33,7 @@ func ownerSession(id int64, userId int64) api.UserSessionDetailResponse {
 // ids. A helper collecting one id per session would ask for three and answer three records, so
 // the page would print one person twice.
 func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	var asked []int64
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
@@ -59,7 +59,7 @@ func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
 // helper walking it would produce a different array on every request and nothing could pin the
 // bytes.
 func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]record.User{
 			7:  {Id: 7, GivenName: "Jane"},
@@ -81,7 +81,7 @@ func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
 // keeps "users":[] out of being "users":null against a schema that declares a required,
 // non-nullable array.
 func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{})
 	require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 // email beside a live session and hide it, so the request fails instead -- the same choice
 // loadSessionClients makes for a client id with no row.
 func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]record.User{7: {Id: 7}}, nil).Once()
 
@@ -113,7 +113,7 @@ func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
 }
 
 func TestSessionOwners_ADatabaseFailureIsAnError(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]record.User(nil), errs.New("the database is down")).Once()
 
@@ -126,7 +126,7 @@ func TestSessionOwners_ADatabaseFailureIsAnError(t *testing.T) {
 // The page reads a session's owner out of users by userId, so the pairing is the contract and
 // not the arrays' lengths.
 func TestHandleClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	sessions := []record.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "sid-two", 5)}
 

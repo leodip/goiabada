@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,42 +19,42 @@ func TestCORS(t *testing.T) {
 		path          string
 		origin        string
 		expectedAllow bool
-		setupMock     func(*mocks_data.Database)
+		setupMock     func(*datamocks.Database)
 	}{
 		{
 			name:          "Allow CORS for openid-configuration",
 			path:          "/.well-known/openid-configuration",
 			origin:        "http://example.com",
 			expectedAllow: true,
-			setupMock:     func(db *mocks_data.Database) {},
+			setupMock:     func(db *datamocks.Database) {},
 		},
 		{
 			name:          "Allow CORS for openid-configuration with trailing slash",
 			path:          "/.well-known/openid-configuration/",
 			origin:        "http://example.com",
 			expectedAllow: true,
-			setupMock:     func(db *mocks_data.Database) {},
+			setupMock:     func(db *datamocks.Database) {},
 		},
 		{
 			name:          "Allow CORS for certs",
 			path:          "/certs",
 			origin:        "http://example.com",
 			expectedAllow: true,
-			setupMock:     func(db *mocks_data.Database) {},
+			setupMock:     func(db *datamocks.Database) {},
 		},
 		{
 			name:          "Allow CORS for certs with trailing slash",
 			path:          "/certs/",
 			origin:        "http://example.com",
 			expectedAllow: true,
-			setupMock:     func(db *mocks_data.Database) {},
+			setupMock:     func(db *datamocks.Database) {},
 		},
 		{
 			name:          "Allow CORS for auth/token with valid origin",
 			path:          "/auth/token",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
@@ -63,7 +63,7 @@ func TestCORS(t *testing.T) {
 			path:          "/auth/token/",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
@@ -72,7 +72,7 @@ func TestCORS(t *testing.T) {
 			path:          "/auth/logout",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
@@ -81,7 +81,7 @@ func TestCORS(t *testing.T) {
 			path:          "/auth/logout/",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
@@ -90,7 +90,7 @@ func TestCORS(t *testing.T) {
 			path:          "/userinfo",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
@@ -99,7 +99,7 @@ func TestCORS(t *testing.T) {
 			path:          "/userinfo/",
 			origin:        "http://allowed.com",
 			expectedAllow: true,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 			},
 		},
@@ -108,7 +108,7 @@ func TestCORS(t *testing.T) {
 			path:          "/auth/token",
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://disallowed.com").Return(false, nil)
 			},
 		},
@@ -117,7 +117,7 @@ func TestCORS(t *testing.T) {
 			path:          "/auth/logout",
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://disallowed.com").Return(false, nil)
 			},
 		},
@@ -126,7 +126,7 @@ func TestCORS(t *testing.T) {
 			path:          "/userinfo",
 			origin:        "http://disallowed.com",
 			expectedAllow: false,
-			setupMock: func(db *mocks_data.Database) {
+			setupMock: func(db *datamocks.Database) {
 				db.On("WebOriginExists", mock.Anything, mock.Anything, "http://disallowed.com").Return(false, nil)
 			},
 		},
@@ -135,27 +135,27 @@ func TestCORS(t *testing.T) {
 			path:          "/unknown",
 			origin:        "http://example.com",
 			expectedAllow: false,
-			setupMock:     func(db *mocks_data.Database) {},
+			setupMock:     func(db *datamocks.Database) {},
 		},
 		{
 			name:          "Disallow CORS for root path",
 			path:          "/",
 			origin:        "http://example.com",
 			expectedAllow: false,
-			setupMock:     func(db *mocks_data.Database) {},
+			setupMock:     func(db *datamocks.Database) {},
 		},
 		{
 			name:          "Disallow CORS for path below auth/token",
 			path:          "/auth/token/foo",
 			origin:        "http://example.com",
 			expectedAllow: false,
-			setupMock:     func(db *mocks_data.Database) {},
+			setupMock:     func(db *datamocks.Database) {},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := mocks_data.NewDatabase(t)
+			db := datamocks.NewDatabase(t)
 			tt.setupMock(db)
 
 			handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -180,10 +180,10 @@ func TestCORS(t *testing.T) {
 // The gated paths consult WebOriginExists and nothing else. GetAllWebOrigins read every row in the
 // table on every CORS-checked request, with no cache; the method here is an index lookup on the
 // UNIQUE (origin, client_id) migration 000034 adds. A strict mock is what pins which method runs:
-// the assertion below fails if the middleware goes back to scanning, and mocks_data.NewDatabase(t)
+// the assertion below fails if the middleware goes back to scanning, and datamocks.NewDatabase(t)
 // fails the test on any call that was not registered (#250).
 func TestCORS_ConsultsWebOriginExistsAndNotAScan(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil).Once()
 
 	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -204,7 +204,7 @@ func TestCORS_ConsultsWebOriginExistsAndNotAScan(t *testing.T) {
 // answering true here would let script on any origin read a token or userinfo response, so the
 // only safe answer is false. Nothing else in this file covers this path (#250).
 func TestCORS_ADatabaseErrorFailsClosed(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").
 		Return(false, errors.New("the database is unreachable")).Once()
 
@@ -231,7 +231,7 @@ func TestCORS_ADatabaseErrorFailsClosed(t *testing.T) {
 // that was set even if the response never carried it, which is how a test of a header can be
 // green about bytes that do not exist.
 func TestCORS_APreflightIsCacheable(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("WebOriginExists", mock.Anything, mock.Anything, "http://allowed.com").Return(true, nil)
 
 	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +276,7 @@ func theCorsRequestsContext() interface{} {
 // The accept arm: the origin lookup on a gated path is issued on behalf of the preflight that
 // asked for it.
 func TestCORS_ChecksTheOriginUnderTheRequestsContext(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.On("WebOriginExists", theCorsRequestsContext(), mock.Anything, "http://allowed.com").
 		Return(true, nil).Once()
 
@@ -295,7 +295,7 @@ func TestCORS_ChecksTheOriginUnderTheRequestsContext(t *testing.T) {
 // reached and there is no context to get wrong. It is the arm that stops the accept arm passing
 // on a middleware that consults the database unconditionally.
 func TestCORS_AnUngatedPathReachesNoOriginPort(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 
 	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

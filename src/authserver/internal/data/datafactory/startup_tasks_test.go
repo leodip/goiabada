@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -69,7 +69,7 @@ func TestRunStartupDataTasks_SkipsWithoutAUsablePreviousKey(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			db := mocks_data.NewDatabase(t)
+			db := datamocks.NewDatabase(t)
 
 			require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, tc.previous))
 			db.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything, mock.Anything)
@@ -105,7 +105,7 @@ func TestRunStartupDataTasks_NothingToRotate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			capture := logtest.CaptureSlog(t)
-			db := mocks_data.NewDatabase(t)
+			db := datamocks.NewDatabase(t)
 			db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(tc.keys(t), nil).Once()
 
 			require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, previousKey))
@@ -124,7 +124,7 @@ func TestRunStartupDataTasks_NothingToRotate(t *testing.T) {
 // (#262), and rotation never wanted it. This is what fails if someone re-adds the read.
 func TestRunStartupDataTasks_RotatesACanaryUnderThePreviousKey(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
-	db := mocks_data.NewDatabase(t)
+	db := datamocks.NewDatabase(t)
 	db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
 		Return([]record.KeyPair{{}, canaryUnder(t, previousKey)}, nil).Once()
 	db.EXPECT().ReencryptToKey(mock.Anything, previousKey, currentKey).Return(nil).Once()
@@ -148,7 +148,7 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 	boom := errors.New("storage is unavailable")
 
 	t.Run("a canary under neither key is refused and nothing is re-keyed", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
+		db := datamocks.NewDatabase(t)
 		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
 			Return([]record.KeyPair{canaryUnder(t, unknownKey)}, nil).Once()
 
@@ -163,7 +163,7 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 	})
 
 	t.Run("a failed read of the signing keys stops startup", func(t *testing.T) {
-		db := mocks_data.NewDatabase(t)
+		db := datamocks.NewDatabase(t)
 		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, boom).Once()
 
 		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
@@ -175,7 +175,7 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 
 	t.Run("a failed re-key stops startup", func(t *testing.T) {
 		capture := logtest.CaptureSlog(t)
-		db := mocks_data.NewDatabase(t)
+		db := datamocks.NewDatabase(t)
 		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
 			Return([]record.KeyPair{canaryUnder(t, previousKey)}, nil).Once()
 		db.EXPECT().ReencryptToKey(mock.Anything, previousKey, currentKey).Return(boom).Once()

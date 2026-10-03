@@ -1,6 +1,6 @@
 //go:build !production
 
-package mocks_data
+package datamocks
 
 import (
 	"context"

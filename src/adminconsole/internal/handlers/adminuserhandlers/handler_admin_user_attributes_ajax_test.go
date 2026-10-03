@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
@@ -145,7 +145,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -208,7 +208,7 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {

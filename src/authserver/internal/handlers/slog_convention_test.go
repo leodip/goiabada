@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
@@ -32,9 +32,9 @@ import (
 func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-	database := mocks_data.NewDatabase(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
 
 	// The missing auth context is the shortest path from a request to a record: no database,
 	// no template, one Warn and a redirect. No InternalServerError expectation is set, so the
@@ -47,7 +47,7 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	req.Header.Set("X-Request-Id", "req-level2-e2e")
 	rr := httptest.NewRecorder()
 
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	chimiddleware.RequestID(HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)

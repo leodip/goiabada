@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ func theCallersContext() interface{} {
 // The accept arm: both of permissions.ResolveScope's reads -- the resource and the permissions on
 // it -- are issued on behalf of the caller that asked for the validation.
 func TestValidateScopes_ResolvesUnderTheCallersContext(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	mockDB.On("GetResourceByResourceIdentifier", theCallersContext(), mock.Anything, "billing-api").
 		Return(&record.Resource{Id: 9, ResourceIdentifier: "billing-api"}, nil).Once()
@@ -56,7 +56,7 @@ func TestValidateScopes_ResolvesUnderTheCallersContext(t *testing.T) {
 // inside permissions.ResolveScope, before either read, so no database port is reached at all and
 // there is no context to get wrong.
 func TestValidateScopes_AMalformedScopeReachesNoDatabasePort(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	err := NewAuthorizeValidator(mockDB).ValidateScopes(aCallersContext(), "not-a-qualified-scope")
 
@@ -69,7 +69,7 @@ func TestValidateScopes_AMalformedScopeReachesNoDatabasePort(t *testing.T) {
 // one hop, but ClientLoadRedirectURIs reaches the database a second time inside commondb, which is
 // the shape that would keep compiling with a context.Background() under it.
 func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	client := &record.Client{Id: 5, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true}
 
@@ -93,7 +93,7 @@ func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *te
 // The reject arm for the client half: an empty client_id is refused before the lookup, so the
 // client port is never reached.
 func TestValidateClientAndRedirectURI_AnEmptyClientIdReachesNoClientPort(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(aCallersContext(),
 		&ValidateClientAndRedirectURIInput{

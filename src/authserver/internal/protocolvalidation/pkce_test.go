@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -198,9 +198,9 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 	run := func(t *testing.T, secret string, verifier string, enabled bool) (any, error) {
 		t.Helper()
 
-		mockDB := mocks_data.NewDatabase(t)
-		validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
-			mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+		mockDB := datamocks.NewDatabase(t)
+		validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
+			protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		require.NoError(t, err)
@@ -301,9 +301,9 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 // verifier for a used code is refused as an ordinary bad request and does not trigger #77's
 // revocation of everything the code descended into.
 func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
-		mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+	mockDB := datamocks.NewDatabase(t)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 	client := &record.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
 	// A code already redeemed, so the retry lookup with used=true finds it. It is older than the

@@ -4,7 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/mock"
@@ -18,7 +18,7 @@ import (
 // The two #425 cases that stood here pinned nil results from lookups the save no longer makes: it
 // reads the grants once, on its transaction, and deletes by the ids that read returned (#406, #428).
 func TestHandleGroupPermissionsGet_AFailedCountAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetGroupById", mock.Anything, mock.Anything, int64(5)).
 		Return(&record.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
 	database.On("GroupLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()

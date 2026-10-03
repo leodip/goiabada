@@ -379,7 +379,7 @@ integration server seeds it. The drop itself is each engine package's `DropDatab
 spelling `schemadump` and the data tier's fixtures use too (#433).
 
 **Transaction stub**: a unit test that needs the mock database to answer `RunInTransaction`
-uses `mocks_data.ExpectRunInTransaction`, hand-written beside the generated mock in
+uses `datamocks.ExpectRunInTransaction`, hand-written beside the generated mock in
 `authserver/internal/data/mocks` and reachable from every caller without a new import, with
 `ExpectRunInTransactionThenFail` for a commit the engine refuses and `ExpectRunInTransactionRefused`
 for a transaction that never opens. It hands the body the transaction the caller names and refuses a

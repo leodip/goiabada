@@ -7,7 +7,7 @@ import (
 
 	"errors"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/i18n"
@@ -29,7 +29,7 @@ var emailErrorMessages = map[string]string{
 }
 
 func TestValidateEmailAddress(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
 	tests := []struct {
@@ -102,7 +102,7 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 	subject := fake.UUID()
 
 	t.Run("address is free", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
@@ -115,7 +115,7 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 	})
 
 	t.Run("address already belongs to the same user", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
 		user := &record.User{Id: 1, Subject: subject}
@@ -128,7 +128,7 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 	})
 
 	t.Run("exactly 60 characters", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
 		email := strings.Repeat("a", 60-len("@example.com")) + "@example.com"
@@ -145,7 +145,7 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 }
 
 func TestValidateEmailChange_AddressTakenByAnotherUser(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
 	subject := fake.UUID()
@@ -184,7 +184,7 @@ func TestValidateEmailChange_RejectedBeforeAnyLookup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// NewDatabase(t) fails the test on any unexpected call, which is what
 			// proves the short circuit.
-			validator := NewEmailValidator(mocks_data.NewDatabase(t))
+			validator := NewEmailValidator(datamocks.NewDatabase(t))
 
 			err := validator.ValidateEmailChange(context.Background(), tc.email, fake.UUID())
 
@@ -194,7 +194,7 @@ func TestValidateEmailChange_RejectedBeforeAnyLookup(t *testing.T) {
 }
 
 func TestValidateEmailChange_TooLong(t *testing.T) {
-	validator := NewEmailValidator(mocks_data.NewDatabase(t))
+	validator := NewEmailValidator(datamocks.NewDatabase(t))
 
 	email := strings.Repeat("a", 50) + "@example.com"
 	assert.Greater(t, len(email), 60)
@@ -216,7 +216,7 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 	dbErr := errors.New("database is down")
 
 	t.Run("GetUserBySubject fails", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(nil, dbErr).Once()
@@ -229,7 +229,7 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 	})
 
 	t.Run("GetUserByEmail fails", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
@@ -251,7 +251,7 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 // NewDatabase(t) fails the test on any unexpected call, so the absence of a
 // GetUserByEmail expectation also proves the function short circuits.
 func TestValidateEmailChange_UnresolvableSubjectReturnsError(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
 	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
@@ -269,7 +269,7 @@ func TestValidateEmailChange_UnresolvableSubjectReturnsError(t *testing.T) {
 // reintroduced in only one of them.
 func TestSubjectResolutionIsConsistentAcrossValidators(t *testing.T) {
 	t.Run("ValidateEmailChange", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
 		err := NewEmailValidator(mockDB).ValidateEmailChange(context.Background(), "new@example.com", "unknown-subject")
@@ -278,7 +278,7 @@ func TestSubjectResolutionIsConsistentAcrossValidators(t *testing.T) {
 	})
 
 	t.Run("ValidateProfile", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
 		err := NewProfileValidator(mockDB).ValidateProfile(context.Background(), &ValidateProfileInput{
@@ -303,7 +303,7 @@ func TestValidateEmailChange_CarriesTheCallersContextToBothReads(t *testing.T) {
 		return got.Value(marker{}) == "the caller's own"
 	})
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("GetUserBySubject", callersContext, mock.Anything, "sub-1").
 		Return(&record.User{Id: 1, Subject: "sub-1", Email: "old@example.com"}, nil).Once()
 	mockDB.On("GetUserByEmail", callersContext, mock.Anything, "new@example.com").
@@ -319,7 +319,7 @@ func TestValidateEmailChange_CarriesTheCallersContextToBothReads(t *testing.T) {
 // no context to carry. Without it the accept arm would also pass on a validator that queried
 // unconditionally.
 func TestValidateEmailChange_AMalformedAddressReachesNoRead(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 
 	err := NewEmailValidator(mockDB).ValidateEmailChange(context.Background(), "not-an-address", "sub-1")
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,10 +33,10 @@ var apiTerminateTx = &sql.Tx{}
 // purpose, following stubSweep: revocation_test.go owns the exhaustive termination table over the
 // happy path, both entry guards and all six failure points, and restating it here would mean two
 // places to update.
-func stubTermination(database *mocks_data.Database, userSession *record.UserSession,
+func stubTermination(database *datamocks.Database, userSession *record.UserSession,
 	revokedCodeCount int64, tokens []*record.RefreshToken) {
 
-	mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
+	datamocks.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("RevokeCodesBySessionIdentifier", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
 		Return(revokedCodeCount, nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
@@ -70,8 +70,8 @@ func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
 // administrative half of decision 5, and it doubles as the field-by-field assertion on decision 9's
 // payload, because this is where the new event is emitted from.
 func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
@@ -136,8 +136,8 @@ func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 // matters as much as empty: AuditLogResponse.Details is the marshalled map returned verbatim by
 // GET /api/v1/admin/audit-logs, so an absent key is a change a consumer can see (#385).
 func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
@@ -170,14 +170,14 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 // exist. KEEP IT. The integration tier can read audit rows but cannot make the termination
 // transaction fail, so this is the only seam that can show neither event is emitted when it does.
 func TestHandleUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
-	stub := mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
+	stub := datamocks.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).
 		Return(errors.New("the session delete failed")).Once()
 
@@ -198,8 +198,8 @@ func TestHandleUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 // answers first. Without it, a handler that terminated before looking the session up would pass
 // every other case here.
 func TestHandleUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
 

@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -65,7 +65,7 @@ func requireRefused(t *testing.T, rr *httptest.ResponseRecorder, capture *logtes
 }
 
 // assertNothingAfterTheClient asserts the handler stopped before the session and the signing key.
-func assertNothingAfterTheClient(t *testing.T, database *mocks_data.Database) {
+func assertNothingAfterTheClient(t *testing.T, database *datamocks.Database) {
 	t.Helper()
 	database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "GetCurrentSigningKey", mock.Anything, mock.Anything)
@@ -74,7 +74,7 @@ func assertNothingAfterTheClient(t *testing.T, database *mocks_data.Database) {
 // logout/nil-err: resolving the client by its redirect URI, one client's URIs fail to load. The
 // record used to carry a nil error, so the 500 named no cause at all.
 func TestHandleAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetAllClients", mock.Anything, mock.Anything).
 		Return([]record.Client{{Id: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
@@ -91,7 +91,7 @@ func TestHandleAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(t *
 
 // logout/client-400, failure arm: a database error is not a bad client identifier.
 func TestHandleAccountLogoutRequestPost_AClientLookupFailureAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(nil, errLogoutLookupFailed).Once()
 
@@ -106,7 +106,7 @@ func TestHandleAccountLogoutRequestPost_AClientLookupFailureAnswers500(t *testin
 
 // logout/client-400, missing arm: an identifier naming no client stays the caller's 400.
 func TestHandleAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(nil, nil).Once()
 
@@ -120,7 +120,7 @@ func TestHandleAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.T) 
 
 // stubResolvedClient answers the client lookup and its redirect URIs, so the handler reaches the
 // session.
-func stubResolvedClient(database *mocks_data.Database) {
+func stubResolvedClient(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
@@ -132,7 +132,7 @@ func stubResolvedClient(database *mocks_data.Database) {
 // logout/session-401, failure arm: 401 would send the caller to re-authenticate over a fault of
 // the server's.
 func TestHandleAccountLogoutRequestPost_ASessionLookupFailureAnswers500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	stubResolvedClient(database)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
 		Return(nil, errLogoutLookupFailed).Once()
@@ -147,7 +147,7 @@ func TestHandleAccountLogoutRequestPost_ASessionLookupFailureAnswers500(t *testi
 
 // logout/session-401, missing arm: a sid naming no live session stays 401.
 func TestHandleAccountLogoutRequestPost_AMissingSessionIsStill401(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	stubResolvedClient(database)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
 		Return(nil, nil).Once()

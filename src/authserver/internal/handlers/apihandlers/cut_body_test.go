@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/inputvalidation"
@@ -46,8 +46,8 @@ func assertInvalidRequestBody(t *testing.T, rr *httptest.ResponseRecorder) {
 func TestCutBody_TheAccountPhonePut(t *testing.T) {
 	const body = `{"phoneCountryUniqueId":"US_0","phoneNumber":"5551234567"}`
 
-	serve := func(t *testing.T, limit int, database *mocks_data.Database) *httptest.ResponseRecorder {
-		handler := HandleAccountPhonePut(database, accountvalidation.NewPhoneValidator(), mocks_handlers.NewAuditLogger(t))
+	serve := func(t *testing.T, limit int, database *datamocks.Database) *httptest.ResponseRecorder {
+		handler := HandleAccountPhonePut(database, accountvalidation.NewPhoneValidator(), handlersmocks.NewAuditLogger(t))
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/account/phone", nil)
 		req.Body = cutBody(rr, body, limit)
@@ -56,7 +56,7 @@ func TestCutBody_TheAccountPhonePut(t *testing.T) {
 	}
 
 	t.Run("at exactly the limit the body is read and the user looked up", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, "a-subject").Return(nil, nil).Once()
 
 		rr := serve(t, len(body), database)
@@ -65,7 +65,7 @@ func TestCutBody_TheAccountPhonePut(t *testing.T) {
 	})
 
 	t.Run("one byte short it is refused before anything is looked up", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
+		database := datamocks.NewDatabase(t)
 
 		rr := serve(t, len(body)-1, database)
 
@@ -83,53 +83,53 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 	tests := []struct {
 		name    string
 		param   string
-		stub    func(database *mocks_data.Database)
-		handler func(database *mocks_data.Database, t *testing.T) http.HandlerFunc
+		stub    func(database *datamocks.Database)
+		handler func(database *datamocks.Database, t *testing.T) http.HandlerFunc
 	}{
 		{
 			name:  "client permissions",
 			param: "id",
-			stub: func(database *mocks_data.Database) {
+			stub: func(database *datamocks.Database) {
 				database.On("GetClientById", mock.Anything, mock.Anything, int64(1)).Return(&record.Client{Id: 1}, nil).Once()
 			},
-			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleClientPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
+			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
+				return HandleClientPermissionsPut(database, handlersmocks.NewAuditLogger(t))
 			},
 		},
 		{
 			name:  "group permissions",
 			param: "id",
-			stub: func(database *mocks_data.Database) {
+			stub: func(database *datamocks.Database) {
 				database.On("GetGroupById", mock.Anything, mock.Anything, int64(1)).Return(&record.Group{Id: 1}, nil).Once()
 			},
-			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleGroupPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
+			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
+				return HandleGroupPermissionsPut(database, handlersmocks.NewAuditLogger(t))
 			},
 		},
 		{
 			name:  "user permissions",
 			param: "id",
-			stub: func(database *mocks_data.Database) {
+			stub: func(database *datamocks.Database) {
 				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil).Once()
 			},
-			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleUserPermissionsPut(database, mocks_handlers.NewAuditLogger(t))
+			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
+				return HandleUserPermissionsPut(database, handlersmocks.NewAuditLogger(t))
 			},
 		},
 		{
 			name:  "resource permissions",
 			param: "resourceId",
-			stub: func(database *mocks_data.Database) {
+			stub: func(database *datamocks.Database) {
 				database.On("GetResourceById", mock.Anything, mock.Anything, int64(1)).Return(&record.Resource{Id: 1}, nil).Once()
 			},
-			handler: func(database *mocks_data.Database, t *testing.T) http.HandlerFunc {
-				return HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), mocks_handlers.NewAuditLogger(t))
+			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
+				return HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t))
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
+			database := datamocks.NewDatabase(t)
 			test.stub(database)
 
 			rr := httptest.NewRecorder()

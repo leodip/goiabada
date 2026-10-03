@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -120,19 +120,19 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 	// here always refuses, so nil is never dereferenced.
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient *groupCtxRecordingApiClient) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HttpHelper, apiClient *groupCtxRecordingApiClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleListGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleNewPost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleNewPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/new",
@@ -141,7 +141,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandlePermissionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
@@ -149,7 +149,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleSettingsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleSettingsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/settings",
@@ -157,7 +157,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleSettingsPost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleSettingsPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/settings",
@@ -166,7 +166,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleDeleteGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/delete",
@@ -174,7 +174,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleDeletePost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleDeletePost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/delete",
@@ -183,7 +183,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleMembersGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members",
@@ -191,7 +191,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersAddGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleMembersAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/add",
@@ -199,7 +199,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersSearchGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleMembersSearchGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/search?query=jane",
@@ -207,7 +207,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersAddPost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleMembersAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/add?userId=42",
@@ -215,7 +215,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersRemoveUserPost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleMembersRemoveUserPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/42/remove",
@@ -224,7 +224,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandlePermissionsGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
@@ -232,7 +232,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandlePermissionsPost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandlePermissionsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/permissions",
@@ -242,7 +242,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAttributesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes",
@@ -250,7 +250,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesRemovePost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAttributesRemovePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/remove",
@@ -259,7 +259,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesAddGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAttributesAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/add",
@@ -267,7 +267,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesAddPost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAttributesAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/add",
@@ -276,7 +276,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesEditGet",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAttributesEditGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/11/edit",
@@ -285,7 +285,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesEditPost",
-			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 				return HandleAttributesEditPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/edit",
@@ -297,7 +297,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			// Every writer is admitted: which one a handler picks is pattern 7's decision and is
 			// held by TestHandlers_AjaxHandlersDoNotUsePageWriters and the classifier guard, not
 			// here. What this case needs is only that the handler answered rather than carrying on.

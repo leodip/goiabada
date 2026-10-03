@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/web"
 )
 
@@ -50,8 +50,8 @@ import (
 // refused unauthorized_client, and one that is disabled is refused on the page (#197).
 var implicitAllowed = true
 
-func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager,
-	permissionChecker *mocks_handlers.PermissionChecker, redirectURI string) {
+func armIssueGate(database *datamocks.Database, userSessionManager *handlersmocks.UserSessionManager,
+	permissionChecker *handlersmocks.PermissionChecker, redirectURI string) {
 
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil).Maybe()
@@ -70,15 +70,15 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handl
 
 func TestHandleIssueGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -103,15 +103,15 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -139,15 +139,15 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Successfully issues a code", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -218,22 +218,22 @@ func TestHandleIssueGet(t *testing.T) {
 	// sweeps.
 	//
 	// "No code created" is enforced rather than asserted in the refusal rows below: the strict
-	// mocks_handlers.CodeIssuer carries no IssueAuthCodeTx expectation, so reaching it fails the
+	// handlersmocks.CodeIssuer carries no IssueAuthCodeTx expectation, so reaching it fails the
 	// case on its own, and the audit logger is not stubbed either.
 	//
 	// Two outcomes, one predicate. An interactive ceremony restarts level 1 (decision 6), and
 	// a prompt=none one is returned login_required (decision 16), because a request that
 	// forbids UI cannot be sent to a password form.
 	t.Run("No session identifier in the context, restarts level 1", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -285,15 +285,15 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Session identifier resolves to no session, restarts level 1", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -337,16 +337,16 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, returns login_required to the client", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -413,16 +413,16 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, failing clear - server_error to the client", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -476,15 +476,15 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
@@ -536,15 +536,15 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
@@ -595,15 +595,15 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Session lookup fails", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -643,15 +643,15 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("The commit fails, so no code reaches the client", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -730,11 +730,11 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 	}
 
 	type fixture struct {
-		pageRenderer  *mocks_handlers.PageRenderer
-		ceremonyStore *mocks_handlers.CeremonyStore
-		codeIssuer    *mocks_handlers.CodeIssuer
-		database      *mocks_data.Database
-		auditLogger   *mocks_handlers.AuditLogger
+		pageRenderer  *handlersmocks.PageRenderer
+		ceremonyStore *handlersmocks.CeremonyStore
+		codeIssuer    *handlersmocks.CodeIssuer
+		database      *datamocks.Database
+		auditLogger   *handlersmocks.AuditLogger
 		req           *http.Request
 		rr            *httptest.ResponseRecorder
 		authContext   *ceremony.AuthContext
@@ -742,23 +742,23 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 	}
 	newFixture := func(t *testing.T, prompt string) *fixture {
 		f := &fixture{
-			pageRenderer:  mocks_handlers.NewPageRenderer(t),
-			ceremonyStore: mocks_handlers.NewCeremonyStore(t),
-			codeIssuer:    mocks_handlers.NewCodeIssuer(t),
-			database:      mocks_data.NewDatabase(t),
-			auditLogger:   mocks_handlers.NewAuditLogger(t),
+			pageRenderer:  handlersmocks.NewPageRenderer(t),
+			ceremonyStore: handlersmocks.NewCeremonyStore(t),
+			codeIssuer:    handlersmocks.NewCodeIssuer(t),
+			database:      datamocks.NewDatabase(t),
+			auditLogger:   handlersmocks.NewAuditLogger(t),
 			req:           requestWithSessionIdentifier(t, liveSessionIdentifier),
 			rr:            httptest.NewRecorder(),
 			authContext:   issuanceAuthContext(prompt),
 		}
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		if prompt == "none" {
 			stubRegisteredRedirectURI(f.database, f.authContext.RedirectURI)
 			stubClientProvenanceLookup(f.database)
 		}
 		handler := HandleIssueGet(f.pageRenderer, f.ceremonyStore, fstest.MapFS{}, f.codeIssuer,
-			mocks_handlers.NewImplicitTokenIssuer(t), f.database, f.auditLogger, userSessionManager,
+			handlersmocks.NewImplicitTokenIssuer(t), f.database, f.auditLogger, userSessionManager,
 			permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 		f.ceremonyStore.On("GetAuthContext", f.req).Return(f.authContext, nil)
 		stubLiveSession(f.database, 123)
@@ -992,15 +992,15 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 	for _, family := range issuanceFamilies {
 		t.Run("Foreign ambient session restarts level 1: "+family.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
-			codeIssuer := mocks_handlers.NewCodeIssuer(t)
-			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			codeIssuer := handlersmocks.NewCodeIssuer(t)
+			implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1084,16 +1084,16 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 	for _, family := range promptNoneFamilies {
 		t.Run("Foreign ambient session and prompt=none returns login_required: "+family.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
-			codeIssuer := mocks_handlers.NewCodeIssuer(t)
-			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-			database := mocks_data.NewDatabase(t)
+			codeIssuer := handlersmocks.NewCodeIssuer(t)
+			implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+			database := datamocks.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "https://example.com/callback")
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1154,15 +1154,15 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	// outright. It also pins that the identifier still reaches the token when the session is the
 	// ceremony's own, which is what the whole change is careful not to break.
 	t.Run("Own ambient session still issues implicit tokens carrying its identifier", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1237,15 +1237,15 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 // =============================================================================
 func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	t.Run("Implicit request whose session row has vanished restarts level 1", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1299,16 +1299,16 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	})
 
 	t.Run("Implicit request whose session row has vanished and prompt=none returns login_required", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1378,7 +1378,7 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 // IssueAuthCodeTx or IssueImplicitTx at all. Liveness alone was enough after
 // #129 stage 6; #133 added the owner comparison, so the caller has to say which user the row
 // belongs to and a subtest that wants the gate to pass has to name its own ceremony's user.
-func stubLiveSession(database *mocks_data.Database, ownerUserId int64) {
+func stubLiveSession(database *datamocks.Database, ownerUserId int64) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
 }
@@ -1519,15 +1519,15 @@ func TestIsImplicitFlow(t *testing.T) {
 
 func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow with token response type", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1623,15 +1623,15 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow with id_token response type", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1714,15 +1714,15 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow with id_token token response type", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1810,15 +1810,15 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow uses consented scope when available", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1879,15 +1879,15 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	// have the stored redirect URI among them. It is a refusal rather than a fault, so it renders
 	// the withheld page and never names a client on it.
 	t.Run("Implicit flow, the client vanished - the redirect is withheld rather than emitted", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1937,15 +1937,15 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - user not found", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -1987,15 +1987,15 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - token generation fails", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -2284,15 +2284,15 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	t.Run("Implicit flow error - database error on client lookup", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -2330,15 +2330,15 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - database error on user lookup", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -2381,15 +2381,15 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - clear auth context fails", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3217,15 +3217,15 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	// Test cases for id_token_hint sub enforcement at issuance time (the critical safety net)
 
 	t.Run("IdTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3299,16 +3299,16 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user - returns login_required", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3384,16 +3384,16 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user, failing clear - server_error to the client", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3455,15 +3455,15 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
@@ -3529,15 +3529,15 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
@@ -3598,15 +3598,15 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3673,16 +3673,16 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("End-to-end: prompt=login with mismatched id_token_hint - blocks at issuance", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3825,15 +3825,15 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
-			codeIssuer := mocks_handlers.NewCodeIssuer(t)
-			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			codeIssuer := handlersmocks.NewCodeIssuer(t)
+			implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3924,15 +3924,15 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 //
 // It needs its ordering stated or it reads as a duplicate of the row above and gets tidied away.
 func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	templateFS := fstest.MapFS{}
-	codeIssuer := mocks_handlers.NewCodeIssuer(t)
-	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	codeIssuer := handlersmocks.NewCodeIssuer(t)
+	implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -3998,21 +3998,21 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 		{name: "prompt=none is answered login_required instead", prompt: "none", silent: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
-			codeIssuer := mocks_handlers.NewCodeIssuer(t)
-			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-			database := mocks_data.NewDatabase(t)
+			codeIssuer := handlersmocks.NewCodeIssuer(t)
+			implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+			database := datamocks.NewDatabase(t)
 			if tc.silent {
 				// Only the silent row answers the client, and only an answer to the client
 				// reaches the emitter's registration read (#241 decision 11). The other row
 				// restarts level 1, so an expectation here would go uncalled.
 				stubRegisteredRedirectURI(database, "https://example.com/callback")
 			}
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -4150,21 +4150,21 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
-			codeIssuer := mocks_handlers.NewCodeIssuer(t)
-			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-			database := mocks_data.NewDatabase(t)
+			codeIssuer := handlersmocks.NewCodeIssuer(t)
+			implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+			database := datamocks.NewDatabase(t)
 			if !tc.wantIssued {
 				// The rows that issue nothing refuse to the client, and only an answer to the
 				// client reaches the emitter's registration read (#241 decision 11). The rows
 				// that issue redirect to the callback themselves and never go through it.
 				stubRegisteredRedirectURI(database, "https://example.com/callback")
 			}
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
 
@@ -4269,13 +4269,13 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
-		arm     func(*mocks_data.Database, *mocks_handlers.PermissionChecker, *record.Client)
+		arm     func(*datamocks.Database, *handlersmocks.PermissionChecker, *record.Client)
 		wantErr string
 		why     string
 	}{
 		{
 			name: "the registration load fails",
-			arm: func(database *mocks_data.Database, _ *mocks_handlers.PermissionChecker, client *record.Client) {
+			arm: func(database *datamocks.Database, _ *handlersmocks.PermissionChecker, client *record.Client) {
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).
 					Return(errs.New("registration read sentinel"))
 			},
@@ -4286,7 +4286,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		},
 		{
 			name: "the permission filter fails",
-			arm: func(database *mocks_data.Database, permissionChecker *mocks_handlers.PermissionChecker, client *record.Client) {
+			arm: func(database *datamocks.Database, permissionChecker *handlersmocks.PermissionChecker, client *record.Client) {
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).
 					Run(func(args mock.Arguments) {
 						args.Get(2).(*record.Client).RedirectURIs =
@@ -4306,15 +4306,15 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pageRenderer := mocks_handlers.NewPageRenderer(t)
-			ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			templateFS := fstest.MapFS{}
-			codeIssuer := mocks_handlers.NewCodeIssuer(t)
-			implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
-			userSessionManager := mocks_handlers.NewUserSessionManager(t)
-			permissionChecker := mocks_handlers.NewPermissionChecker(t)
+			codeIssuer := handlersmocks.NewCodeIssuer(t)
+			implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 				database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
@@ -4382,15 +4382,15 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 // rather than two, and there is no response mode in which it can half-commit.
 func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("failing clear - the refusal is still rendered and nothing is emitted", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
@@ -4453,15 +4453,15 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	})
 
 	t.Run("an unrenderable page - 500 when the refusal itself cannot be shown", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
@@ -4527,10 +4527,10 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	// armEmptiedScope sets up a ceremony whose consented scope the live filter empties, which is
 	// the condition all three cases share. The response mode and the clear's answer are what each
 	// case varies.
-	armEmptiedScope := func(t *testing.T, responseMode string, database *mocks_data.Database,
-		ceremonyStore *mocks_handlers.CeremonyStore, auditLogger *mocks_handlers.AuditLogger,
-		userSessionManager *mocks_handlers.UserSessionManager,
-		permissionChecker *mocks_handlers.PermissionChecker,
+	armEmptiedScope := func(t *testing.T, responseMode string, database *datamocks.Database,
+		ceremonyStore *handlersmocks.CeremonyStore, auditLogger *handlersmocks.AuditLogger,
+		userSessionManager *handlersmocks.UserSessionManager,
+		permissionChecker *handlersmocks.PermissionChecker,
 		req *http.Request) *ceremony.AuthContext {
 
 		t.Helper()
@@ -4574,15 +4574,15 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	}
 
 	t.Run("failing clear - server_error to the client", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
 			database, auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
@@ -4619,14 +4619,14 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	})
 
 	t.Run("failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
@@ -4663,14 +4663,14 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	})
 
 	t.Run("unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		pageRenderer := mocks_handlers.NewPageRenderer(t)
-		ceremonyStore := mocks_handlers.NewCeremonyStore(t)
-		codeIssuer := mocks_handlers.NewCodeIssuer(t)
-		implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_handlers.NewAuditLogger(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		codeIssuer := handlersmocks.NewCodeIssuer(t)
+		implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},

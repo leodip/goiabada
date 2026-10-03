@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -44,7 +44,7 @@ func (c *emailRecordingApiClient) UpdateAccountEmail(_ context.Context, _ string
 }
 
 // requireNoPasswordInBind fails when any value the page was rendered with carries the password.
-func requireNoPasswordInBind(t *testing.T, httpHelper *mocks_handlers.HttpHelper) {
+func requireNoPasswordInBind(t *testing.T, httpHelper *handlersmocks.HttpHelper) {
 	t.Helper()
 	for key, value := range handlertest.Bind(t, httpHelper) {
 		assert.NotContains(t, fmt.Sprint(value), accountEmailFormPassword,
@@ -63,7 +63,7 @@ func TestHandleEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
+	HandleEmailPost(handlersmocks.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
@@ -86,7 +86,7 @@ func TestHandleEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
+	HandleEmailPost(handlersmocks.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
@@ -99,7 +99,7 @@ func TestHandleEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 func TestHandleEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) {
 	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusBadRequest, Code: "VALIDATION_ERROR", Message: "Current password is required."}}
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{"email": {"new@example.com"}, "emailConfirmation": {"new@example.com"}}
 	req := handlertest.Request(http.MethodPost, "/account/email?currentPassword="+accountEmailFormPassword,
@@ -116,7 +116,7 @@ func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusBadRequest, Code: "AUTHENTICATION_FAILED",
 		Message: "Authentication failed. Check your current password and try again."}}
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{
 		"email":             {"new@example.com"},
@@ -136,7 +136,7 @@ func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 
 func TestHandleEmailPost_AConfirmationMismatchReRendersWithoutThePassword(t *testing.T) {
 	apiClient := &emailRecordingApiClient{}
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{
 		"email":             {"new@example.com"},

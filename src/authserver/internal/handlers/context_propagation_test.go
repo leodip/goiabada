@@ -12,8 +12,8 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -58,8 +58,8 @@ func withURLParam(req *http.Request, key, value string) *http.Request {
 // reads the handler makes carry the request's own context, one of them on a value derived from
 // the other, which is the ordinary two-hop shape across this package.
 func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	database := mocks_data.NewDatabase(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
 
 	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
 	rr := httptest.NewRecorder()
@@ -80,8 +80,8 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 // turns away reaches no port at all, so there is no context to get wrong. Without it the accept
 // arm would also pass on a handler that queried unconditionally.
 func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	database := mocks_data.NewDatabase(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
 
 	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
 	rr := httptest.NewRecorder()
@@ -110,15 +110,15 @@ func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Reques
 // under. It is matched on the request's context, so a transaction opened on a context nobody can
 // cancel fails here rather than in production; the issuer's own test carries it to the statements.
 func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	templateFS := fstest.MapFS{}
-	codeIssuer := mocks_handlers.NewCodeIssuer(t)
-	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	codeIssuer := handlersmocks.NewCodeIssuer(t)
+	implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	req := issueRequestCarryingId(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
@@ -157,15 +157,15 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 // never reached. Without it the accept arm would also pass on a
 // handler that issued unconditionally.
 func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
-	pageRenderer := mocks_handlers.NewPageRenderer(t)
-	ceremonyStore := mocks_handlers.NewCeremonyStore(t)
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	templateFS := fstest.MapFS{}
-	codeIssuer := mocks_handlers.NewCodeIssuer(t)
-	implicitTokenIssuer := mocks_handlers.NewImplicitTokenIssuer(t)
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
-	userSessionManager := mocks_handlers.NewUserSessionManager(t)
-	permissionChecker := mocks_handlers.NewPermissionChecker(t)
+	codeIssuer := handlersmocks.NewCodeIssuer(t)
+	implicitTokenIssuer := handlersmocks.NewImplicitTokenIssuer(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	req := issueRequestCarryingId(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()

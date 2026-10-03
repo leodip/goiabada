@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	mocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -39,7 +39,7 @@ func lifecycleContext() context.Context {
 // unauthenticated caller's request rate (#266 decision 19) -- so it is the sweep most worth being
 // able to abandon when the process is shutting down.
 func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
@@ -58,7 +58,7 @@ func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
 // inside it is reached and there is no context to get wrong. Without it the accept arm would also
 // pass on a worker that swept unconditionally.
 func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
@@ -81,7 +81,7 @@ func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 // because these four are the sweeps that run inside the twelve-hour claim and a shutdown that
 // cannot interrupt them waits for the slowest DELETE in the schema.
 func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", theWorkersContext(), mock.Anything).Return(nil).Once()
@@ -102,7 +102,7 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 // likely to land in the middle of, and every iteration has to be issued under the context that
 // shutdown cancels rather than under one the loop invented.
 func TestWorker_DeleteOldAuditLogs_SweepsUnderTheWorkersContext(t *testing.T) {
-	mockDB := mocks.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB)
 
 	// One short batch, which is what ends the loop after a single statement.

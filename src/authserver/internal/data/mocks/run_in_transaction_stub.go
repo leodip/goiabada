@@ -1,6 +1,6 @@
 //go:build !production
 
-package mocks_data
+package datamocks
 
 import (
 	"context"
@@ -26,7 +26,7 @@ import (
 
 // nilTxPanic is what a nil transaction is refused with, named so the test that pins the refusal
 // asserts the message rather than merely that something panicked.
-const nilTxPanic = "mocks_data: ExpectRunInTransaction needs a non-nil *sql.Tx. A nil one is what " +
+const nilTxPanic = "datamocks: ExpectRunInTransaction needs a non-nil *sql.Tx. A nil one is what " +
 	"a call made outside any transaction passes, so an expectation written against it cannot " +
 	"tell a write inside the transaction from one moved back outside it. Declare a sentinel -- " +
 	"var someTx = &sql.Tx{} -- and expect that instead."

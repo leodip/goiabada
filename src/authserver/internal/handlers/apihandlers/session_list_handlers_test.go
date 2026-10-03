@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -51,7 +51,7 @@ func decodeSessionList(t *testing.T, rr *httptest.ResponseRecorder) []api.UserSe
 // expectSessionOwnerRead registers the one extra read the client endpoint makes: the owners of
 // the sessions it kept, in a single GetUsersByIds. Only that endpoint has it, because only that
 // one lists sessions across users.
-func expectSessionOwnerRead(database *mocks_data.Database, users ...record.User) {
+func expectSessionOwnerRead(database *datamocks.Database, users ...record.User) {
 	byId := make(map[int64]record.User, len(users))
 	for _, user := range users {
 		byId[user.Id] = user
@@ -62,14 +62,14 @@ func expectSessionOwnerRead(database *mocks_data.Database, users ...record.User)
 // expectSessionListReads registers the reads every list handler makes once it has its sessions:
 // the per-session client rows are already on the fixtures, so UserSessionsLoadClients is a no-op
 // here and GetClientsByIds is the one query buildSessionDetails runs.
-func expectSessionListReads(database *mocks_data.Database, sessions []record.UserSession) {
+func expectSessionListReads(database *datamocks.Database, sessions []record.UserSession) {
 	database.On("UserSessionsLoadClients", mock.Anything, (*sql.Tx)(nil), sessions).Return(nil).Once()
 	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
 }
 
 func TestHandleUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	now := liveSession(1, "sid-other", 5)
 	mine := liveSession(2, "sid-mine", 5)
@@ -99,7 +99,7 @@ func TestHandleUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 // An admin token minted through client_credentials carries no sid, and the handler must read that
 // as "none of these is mine" rather than matching the empty string against an empty identifier.
 func TestHandleUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	sessions := []record.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "", 5)}
 
@@ -120,7 +120,7 @@ func TestHandleUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.T) 
 }
 
 func TestHandleClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	mine := liveSession(2, "sid-mine", 5)
 	stale := liveSession(3, "sid-stale", 5)
@@ -148,7 +148,7 @@ func TestHandleClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 }
 
 func TestHandleAccountSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	mine := liveSession(2, "sid-mine", 5)
 	stale := liveSession(3, "sid-stale", 5)

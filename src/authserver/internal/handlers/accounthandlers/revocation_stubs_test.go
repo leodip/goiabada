@@ -3,7 +3,7 @@ package accounthandlers
 import (
 	"database/sql"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 )
@@ -26,8 +26,8 @@ var revokeTx = &sql.Tx{}
 // It also proves the transaction is real: the helper hands the body a non-nil tx, so every
 // nested call is asserted to receive that exact pointer. A nil one would be rejected by
 // revocation.RevokeUserAuthState's precondition.
-func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGeneration int64) {
-	mocks_data.ExpectRunInTransaction(database, revokeTx)
+func stubRevocationSweepTx(database *datamocks.Database, userId int64, newGeneration int64) {
+	datamocks.ExpectRunInTransaction(database, revokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, userId).

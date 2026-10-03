@@ -14,9 +14,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
@@ -73,7 +73,7 @@ func setTokenContext(req *http.Request, sub string) *http.Request {
 }
 
 func TestHandleAccountProfilePictureGet_NoToken(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleAccountProfilePictureGet(database, testBaseURL)
 
@@ -91,7 +91,7 @@ func TestHandleAccountProfilePictureGet_NoToken(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureGet_EmptySub(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleAccountProfilePictureGet(database, testBaseURL)
 
@@ -110,7 +110,7 @@ func TestHandleAccountProfilePictureGet_EmptySub(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureGet_UserNotFound(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleAccountProfilePictureGet(database, testBaseURL)
 
@@ -128,7 +128,7 @@ func TestHandleAccountProfilePictureGet_UserNotFound(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureGet_HasPicture(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleAccountProfilePictureGet(database, testBaseURL)
 
@@ -151,7 +151,7 @@ func TestHandleAccountProfilePictureGet_HasPicture(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureGet_NoPicture(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	handler := HandleAccountProfilePictureGet(database, testBaseURL)
 
@@ -174,8 +174,8 @@ func TestHandleAccountProfilePictureGet_NoPicture(t *testing.T) {
 }
 
 func TestHandleAccountProfilePicturePost_NoToken(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -188,8 +188,8 @@ func TestHandleAccountProfilePicturePost_NoToken(t *testing.T) {
 }
 
 func TestHandleAccountProfilePicturePost_UserNotFound(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -209,8 +209,8 @@ func TestHandleAccountProfilePicturePost_UserNotFound(t *testing.T) {
 }
 
 func TestHandleAccountProfilePicturePost_NoFile(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -236,8 +236,8 @@ func TestHandleAccountProfilePicturePost_NoFile(t *testing.T) {
 // A body past the handed cap and its multipart overhead is refused before any image is read, with
 // the code it has always carried.
 func TestHandleAccountProfilePicturePost_BodyOverTheBound(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
 
@@ -260,8 +260,8 @@ func TestHandleAccountProfilePicturePost_BodyOverTheBound(t *testing.T) {
 }
 
 func TestHandleAccountProfilePicturePost_InvalidImage(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -293,8 +293,8 @@ func TestHandleAccountProfilePicturePost_InvalidImage(t *testing.T) {
 // The size cap is the one the handler was handed, not the configured default: an image the
 // default accepts is refused under a smaller injected cap, and the refusal names that cap (#434).
 func TestHandleAccountProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
 
@@ -321,8 +321,8 @@ func TestHandleAccountProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(t *
 }
 
 func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -356,8 +356,8 @@ func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
 }
 
 func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
@@ -397,8 +397,8 @@ func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureDelete_NoToken(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
@@ -411,8 +411,8 @@ func TestHandleAccountProfilePictureDelete_NoToken(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureDelete_UserNotFound(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
@@ -430,8 +430,8 @@ func TestHandleAccountProfilePictureDelete_UserNotFound(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureDelete_Success(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
@@ -460,8 +460,8 @@ func TestHandleAccountProfilePictureDelete_Success(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureDelete_GetUserFails_JSON500(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
@@ -480,8 +480,8 @@ func TestHandleAccountProfilePictureDelete_GetUserFails_JSON500(t *testing.T) {
 }
 
 func TestHandleAccountProfilePictureDelete_DatabaseError(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 

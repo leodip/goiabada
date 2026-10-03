@@ -14,8 +14,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
@@ -51,7 +51,7 @@ func authenticationPutRequest(t *testing.T, id string, req api.UpdateClientAuthe
 
 // stubClientResponseLoads registers the two related-field loads every client handler performs
 // before it encodes its response. They carry nothing this file asserts on.
-func stubClientResponseLoads(database *mocks_data.Database) {
+func stubClientResponseLoads(database *datamocks.Database) {
 	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 }
@@ -70,10 +70,10 @@ func stubClientResponseLoads(database *mocks_data.Database) {
 // administrator had just set, and no revocation runs on this path, so the client's outstanding
 // grants would stay redeemable with nothing presented.
 func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCaller(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	secret := []byte("the-secret-another-request-just-set")
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
@@ -115,9 +115,9 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 // PKCE off underneath it. The caller below is exactly that stale snapshot, and it goes through
 // the same helper the other two use, with nothing endpoint-specific handed in.
 func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAgainstTheRefreshedMode(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
@@ -153,9 +153,9 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 // credentials and to PKCE optional, and a helper that forced them on every write would silently
 // take a working configuration away from the larger population.
 func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlowsAlone(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&record.Client{Id: 7, IsPublic: false}, nil).Once()
@@ -183,9 +183,9 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 // row being deleted between the handler's load and this write. UpdateClient keys on the id and
 // would quietly affect no rows, so the failure has to be raised here.
 func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotAnInsert(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
@@ -201,9 +201,9 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 // Falling through would put the endpoint back where it was with every other test here still
 // green.
 func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
 
@@ -227,8 +227,8 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 // comes from SetClientPublic, the write itself, and this asserts that the handler acts on that
 // answer rather than on the copy in its hand.
 func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	// The snapshot the handler works from: already public.
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
@@ -236,7 +236,7 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 	// What the write reports when it runs: it really did make the client public, because another
 	// request got there first with confidential mode and the grants it issued are the ones at
 	// stake. The handler must believe this over its own snapshot.
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
@@ -275,12 +275,12 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 // client nobody flipped, and saving anyway would produce the very state the classification
 // exists to catch, so the whole transaction is abandoned and the caller is told it failed.
 func TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).
 		Return(false, errors.New("no client with that id")).Once()
 
@@ -304,12 +304,12 @@ func TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSav
 // leave the client's grants alone: revoking here would sign every user of the application out
 // because an administrator re-saved a form.
 func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
@@ -333,15 +333,15 @@ func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothin
 // already carry client credentials off and PKCE an explicit true, since the endpoint answers with
 // that row and the console renders it (#245, #428).
 func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	pkceOptional := false
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.Client{
 		Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"),
 		ClientCredentialsEnabled: true, PKCERequired: &pkceOptional,
 	}, nil).Once()
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
 	var written record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
@@ -374,7 +374,7 @@ func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicIn
 // could never be equal and passed at every call site whatever the handler did. Matching on the
 // name alone is what this helper meant in the first place, and it is the one thing an argument
 // list cannot express (#421).
-func assertNotAttemptedOnClientDatabase(t *testing.T, database *mocks_data.Database, methods ...string) {
+func assertNotAttemptedOnClientDatabase(t *testing.T, database *datamocks.Database, methods ...string) {
 	t.Helper()
 	for _, method := range methods {
 		for _, call := range database.Calls {
@@ -387,7 +387,7 @@ func assertNotAttemptedOnClientDatabase(t *testing.T, database *mocks_data.Datab
 
 // callIndex reports the position of the first call to method in the mock's recorded order, so a
 // test can assert that one call happened before another.
-func callIndex(t *testing.T, database *mocks_data.Database, method string) int {
+func callIndex(t *testing.T, database *datamocks.Database, method string) int {
 	t.Helper()
 	for i, call := range database.Calls {
 		if call.Method == method {
@@ -421,14 +421,14 @@ func webOriginsPutRequest(t *testing.T, id string, body string) *http.Request {
 // expectWebOriginsClient registers the client read the save makes before it validates. The
 // client's authorization code flow is off: the save has no flow gate, since a browser client of any
 // flow needs a web origin, and a client with no redirect-based flow must still be saved (#250).
-func expectWebOriginsClient(database *mocks_data.Database) {
+func expectWebOriginsClient(database *datamocks.Database) {
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&record.Client{Id: 7, AuthorizationCodeEnabled: false}, nil).Once()
 }
 
 // expectStoredWebOrigins registers the read of the stored list on the save's transaction,
 // answering the rows given.
-func expectStoredWebOrigins(database *mocks_data.Database, rows ...record.WebOrigin) {
+func expectStoredWebOrigins(database *datamocks.Database, rows ...record.WebOrigin) {
 	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			args.Get(2).(*record.Client).WebOrigins = append([]record.WebOrigin(nil), rows...)
@@ -441,13 +441,13 @@ func expectStoredWebOrigins(database *mocks_data.Database, rows ...record.WebOri
 // its canonical form, the exact string a browser sends in an Origin header (#250). The audit event
 // follows the commit.
 func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 	var order []string
 	note := func(edge string) { order = append(order, edge) }
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx, note)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectStoredWebOrigins(database,
 		record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
 		record.WebOrigin{Id: 12, ClientId: 7, Origin: "https://keep.example.com"},
@@ -494,11 +494,11 @@ func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.
 // in the chain, so a real deadlock would be recognised and rerun rather than answered. The wrap
 // names the origin being written, for the operator reading the one log record (#428).
 func TestHandleClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredWebOrigins(database, record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"})
 	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
@@ -532,11 +532,11 @@ func TestHandleClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testin
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectWebOriginsClient(database)
-			stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			loadErr := errors.New("the read failed")
 			database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(loadErr).Once()
 
@@ -566,8 +566,8 @@ func TestHandleClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testin
 // reachable through what the body returned, which is what the real classifier needs, and runs it
 // again. The real loop, with a real deadlock, is the data tier's.
 func TestHandleClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 
@@ -611,12 +611,12 @@ func TestHandleClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 // The helper giving up, a deadlock on every attempt, is one 500 under the update message and no
 // audit event: the exhausted error carries no step of its own and is reported as the helper's.
 func TestHandleClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 	exhausted := errors.New("transaction aborted as a deadlock victim on all 3 attempts")
-	mocks_data.ExpectRunInTransactionRefused(database, exhausted)
+	datamocks.ExpectRunInTransactionRefused(database, exhausted)
 
 	rr := httptest.NewRecorder()
 	handler := HandleClientWebOriginsPut(database, auditLogger)
@@ -660,8 +660,8 @@ func canonicalOriginOfLength(t *testing.T, n int) string {
 // The strict mock carries GetClientById and nothing else: reaching RunInTransaction fails the test,
 // so the refusal is proved to happen before any write is attempted.
 func TestHandleClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 
@@ -683,13 +683,13 @@ func TestHandleClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing
 // the longest standards-valid origin, is written. It reaches CreateWebOrigin on the save's
 // transaction, which is what separates an admitted value from one refused before the write (#428).
 func TestHandleClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	origin := canonicalOriginOfLength(t, 267)
 
 	expectWebOriginsClient(database)
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredWebOrigins(database)
 	var created string
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
@@ -712,11 +712,11 @@ func TestHandleClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 // conflict an administrator resolves by reloading, rather than a 500 that says nothing; nothing is
 // audited (#428).
 func TestHandleClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredWebOrigins(database)
 	refused := errs.Errorf("%w: %w", data.ErrUniqueViolation, errs.New("duplicate key value violates unique constraint \"idx_web_origins_origin_client\""))
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(refused).Once()
@@ -737,11 +737,11 @@ func TestHandleClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
 // outdated page: 409 CONCURRENT_UPDATE, nothing written and nothing audited, where applying the
 // whole list would silently undo the change the caller never saw (#428).
 func TestHandleClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredWebOrigins(database,
 		record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
 		record.WebOrigin{Id: 12, ClientId: 7, Origin: "https://added-meanwhile.example.com"},
@@ -783,11 +783,11 @@ func TestHandleClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.T) 
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectWebOriginsClient(database)
-			mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			expectStoredWebOrigins(database, test.stored...)
 			for _, row := range test.stored {
 				database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, row.Id).Return(nil).Once()
@@ -850,8 +850,8 @@ func TestHandleClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *testi
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			expectWebOriginsClient(database)
 
 			rr := httptest.NewRecorder()
@@ -891,14 +891,14 @@ func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request 
 
 // expectRedirectURIsClient registers the client read the save makes before it validates, for a
 // client whose authorization code flow is on, so the flow gate lets the request through.
-func expectRedirectURIsClient(database *mocks_data.Database) {
+func expectRedirectURIsClient(database *datamocks.Database) {
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&record.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 }
 
 // expectStoredRedirectURIs registers the read of the stored list on the save's transaction,
 // answering the rows given.
-func expectStoredRedirectURIs(database *mocks_data.Database, rows ...record.RedirectURI) {
+func expectStoredRedirectURIs(database *datamocks.Database, rows ...record.RedirectURI) {
 	database.On("ClientLoadRedirectURIs", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			args.Get(2).(*record.Client).RedirectURIs = append([]record.RedirectURI(nil), rows...)
@@ -924,13 +924,13 @@ func uriOfBytes(t *testing.T, n int, unit string) string {
 // later removal of the URI deleted one copy and left the other live at sign-in (#428). The audit
 // event follows the commit.
 func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
 	var order []string
 	note := func(edge string) { order = append(order, edge) }
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx, note)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectStoredRedirectURIs(database,
 		record.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"},
 		record.RedirectURI{Id: 12, ClientId: 7, URI: "https://keep.example.com/cb"},
@@ -973,11 +973,11 @@ func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testin
 // the save wrote before it commits; the answer is one 500 and nothing is audited, since an audit row
 // for a save that did not happen is a false record of an administrator's action (#264, #428).
 func TestHandleClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredRedirectURIs(database, record.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"})
 	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
@@ -1010,11 +1010,11 @@ func TestHandleClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *testin
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectRedirectURIsClient(database)
-			stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			readErr := errors.New("the read failed")
 			database.On("ClientLoadRedirectURIs", mock.Anything, clientUpdateTx, mock.Anything).Return(readErr).Once()
 
@@ -1036,8 +1036,8 @@ func TestHandleClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *testin
 // attempt reads the stored list afresh and plans from it, and nothing is written to the response
 // from inside an attempt that might be thrown away (#301, #428).
 func TestHandleClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
 	deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
@@ -1075,11 +1075,11 @@ func TestHandleClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 // outdated page: 409 CONCURRENT_UPDATE, nothing written and nothing audited, where applying the
 // whole list would silently undo the change the caller never saw (#428).
 func TestHandleClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredRedirectURIs(database,
 		record.RedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
 		record.RedirectURI{Id: 12, ClientId: 7, URI: "https://added-meanwhile.example.com/cb"},
@@ -1120,11 +1120,11 @@ func TestHandleClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectRedirectURIsClient(database)
-			mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			expectStoredRedirectURIs(database, test.stored...)
 			for _, row := range test.stored {
 				database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, row.Id).Return(nil).Once()
@@ -1212,8 +1212,8 @@ func TestHandleClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *tes
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_handlers.NewAuditLogger(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
 			expectRedirectURIsClient(database)
 
 			rr := httptest.NewRecorder()
@@ -1243,10 +1243,10 @@ func TestHandleClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
 	sixty[1] = uriOfBytes(t, 2048, "😀")
 	sixty[2] = uriOfBytes(t, 2048, "a")
 
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectRedirectURIsClient(database)
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredRedirectURIs(database)
 	var created []string
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).

@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_handlers
+package handlersmocks
 
 import (
 	mock "github.com/stretchr/testify/mock"

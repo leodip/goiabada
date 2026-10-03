@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -28,7 +28,7 @@ func idTokenMapper(db Database) Mapper {
 // issuance's "anything beyond a lone openid" rule, and it put a profile claim in a response that
 // had not been granted the profile scope.
 func TestAddOpenIDConnectClaims(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mapper := idTokenMapper(mockDB)
 	now := time.Now().UTC()
 
@@ -228,7 +228,7 @@ func TestAddOpenIDConnectClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) 
 		t.Run(test.name, func(t *testing.T) {
 			user := &record.User{Id: 7, Email: "a@example.com",
 				UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
-			mockDB := mocks_data.NewDatabase(t)
+			mockDB := datamocks.NewDatabase(t)
 			if slices.Contains(test.scopes, "profile") {
 				mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, int64(7)).
 					Return(false, nil).Once()
@@ -255,7 +255,7 @@ func TestAddOpenIDConnectClaims_UpdatedAtDoesNotDependOnTheTokenType(t *testing.
 	user := &record.User{Id: 7, Email: "a@example.com", UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
 
 	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
-		mapper := Mapper{Database: mocks_data.NewDatabase(t), BaseURL: "http://localhost:8081",
+		mapper := Mapper{Database: datamocks.NewDatabase(t), BaseURL: "http://localhost:8081",
 			Inclusion: inclusion}
 
 		claims := jwt.MapClaims{}
@@ -278,7 +278,7 @@ func TestAddOpenIDConnectClaims_CarriesTheCallersContext(t *testing.T) {
 	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
 
 	t.Run("the profile scope reads the picture flag under the caller's context", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("UserHasProfilePicture", callersContext, mock.Anything, int64(42)).Return(true, nil).Once()
 
 		claims := jwt.MapClaims{}
@@ -290,7 +290,7 @@ func TestAddOpenIDConnectClaims_CarriesTheCallersContext(t *testing.T) {
 	})
 
 	t.Run("without the profile scope the port is not reached", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 
 		claims := jwt.MapClaims{}
 		idTokenMapper(mockDB).
@@ -313,7 +313,7 @@ func TestAddOpenIDConnectClaims_ReadsThePictureOnTheTransactionItIsHanded(t *tes
 
 	t.Run("the transaction it is handed", func(t *testing.T) {
 		tx := &sql.Tx{}
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("UserHasProfilePicture", mock.Anything, tx, int64(42)).Return(true, nil).Once()
 
 		claims := jwt.MapClaims{}
@@ -324,7 +324,7 @@ func TestAddOpenIDConnectClaims_ReadsThePictureOnTheTransactionItIsHanded(t *tes
 	})
 
 	t.Run("no transaction, when it is handed none", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(true, nil).Once()
 
 		claims := jwt.MapClaims{}
@@ -338,7 +338,7 @@ func TestAddOpenIDConnectClaims_ReadsThePictureOnTheTransactionItIsHanded(t *tes
 // TestAddOpenIDConnectClaims_PictureFailureLeavesTheRestStanding pins the arm both callers wrote
 // before this package and neither logged: a failed lookup omits the claim and nothing else.
 func TestAddOpenIDConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, int64(9)).
 		Return(false, assert.AnError).Once()
 
@@ -639,7 +639,7 @@ func TestAddressClaim(t *testing.T) {
 // rather than an empty object.
 func TestAddOpenIDConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 	claims := jwt.MapClaims{}
-	idTokenMapper(mocks_data.NewDatabase(t)).
+	idTokenMapper(datamocks.NewDatabase(t)).
 		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 4}, []string{"openid", "address"})
 
 	assert.NotContains(t, claims, "address")

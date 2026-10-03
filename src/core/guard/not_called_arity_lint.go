@@ -429,7 +429,7 @@ func typeOfReceiver(info *types.Info, expr ast.Expr) types.Type {
 }
 
 // typeName renders a type the way the file that named it reads, qualified by package name rather
-// than by import path, so a finding points at mocks_data.Database and not at the whole path.
+// than by import path, so a finding points at datamocks.Database and not at the whole path.
 func typeName(typ types.Type, pkg *types.Package) string {
 	qualifier := func(p *types.Package) string {
 		if pkg != nil && p == pkg {

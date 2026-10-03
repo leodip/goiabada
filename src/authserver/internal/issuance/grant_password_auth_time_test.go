@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +33,7 @@ type ropcGrantFixture struct {
 func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 	t.Helper()
 
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	user := &record.User{Id: 1, Subject: fake.UUID(), Email: "user@example.com", Enabled: true}
 	client := &record.Client{Id: 1, ClientIdentifier: "ropc-client"}
 
@@ -124,7 +124,7 @@ func TestIssuePasswordGrant_TheIssuerStampsTheInstantNotTheCaller(t *testing.T) 
 // the validator from signing auth_time as the zero time. The strict mock fails the test on any
 // database call.
 func TestMintROPCRefreshTokens_ATokenWithNoInstantIsRefused(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &record.Settings{},

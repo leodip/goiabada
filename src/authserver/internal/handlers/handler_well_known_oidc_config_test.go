@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -52,7 +52,7 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 
 func serveDiscovery(t *testing.T, settings *record.Settings) oidc.WellKnownConfig {
 	t.Helper()
-	jsonWriter := mocks_handlers.NewJSONWriter(t)
+	jsonWriter := handlersmocks.NewJSONWriter(t)
 	handler := HandleWellKnownOIDCConfigGet(jsonWriter, testBaseURL)
 
 	req, err := http.NewRequest("GET", "/.well-known/openid-configuration", nil)

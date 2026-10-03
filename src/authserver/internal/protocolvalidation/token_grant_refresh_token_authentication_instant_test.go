@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -46,9 +46,9 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 				"invalid_request", "The refresh token is invalid because it does not belong to the client."},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+				mockDB := datamocks.NewDatabase(t)
+				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+				validator := NewTokenValidator(mockDB, mockTokenParser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 				client := &record.Client{
 					Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
@@ -104,9 +104,9 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 	})
 
 	t.Run("an authorization-code token needs none, its instant being on its code", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		validator := NewTokenValidator(mockDB, mockTokenParser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)

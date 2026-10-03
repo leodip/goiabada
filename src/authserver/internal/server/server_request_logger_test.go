@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -41,11 +41,11 @@ const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 // The database is a mock with GetSettingsById stubbed, which middleware.Settings calls on every
 // request. middleware.CORS also holds the database but needs no stub: go-chi/cors only calls
 // AllowOriginFunc for a request carrying an Origin header, and these send none. That is enforced
-// rather than assumed, since mocks_data.NewDatabase(t) fails the test on any call nobody expected.
+// rather than assumed, since datamocks.NewDatabase(t) fails the test on any call nobody expected.
 func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {
 	t.Helper()
 
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil)
 
 	// The flag initMiddleware reads when it mounts the request logger.

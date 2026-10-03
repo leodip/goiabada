@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
@@ -17,7 +17,7 @@ import (
 )
 
 func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -267,7 +267,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 }
 
 func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -401,7 +401,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 }
 
 func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -579,7 +579,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 }
 
 func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{
@@ -697,7 +697,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 }
 
 func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	settings := &record.Settings{

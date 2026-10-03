@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,7 +36,7 @@ func apiIdRequest(target, id string) *http.Request {
 // per group inside a loop and is the shape that would keep compiling with a context.Background()
 // under it.
 func TestHandleGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetAllGroups", theApiRequestsContext(), mock.Anything).
 		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}}, nil).Once()
@@ -53,7 +53,7 @@ func TestHandleGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
 // The reject arm: an id that is not a number is refused before the first query, so neither the
 // group read nor the member count is reached and there is no context to get wrong.
 func TestHandleGroupGet_MalformedIdReachesNoGroupPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandleGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number", "not-a-number"))
@@ -68,7 +68,7 @@ func TestHandleGroupGet_MalformedIdReachesNoGroupPort(t *testing.T) {
 // carry whatever context the handler hands in. It is one of stage 1's five nil-transaction sites,
 // so it is also the method most worth showing carries the request's own.
 func TestHandleGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetGroupById", theApiRequestsContext(), mock.Anything, int64(5)).
 		Return(&record.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
@@ -87,7 +87,7 @@ func TestHandleGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t *te
 // The reject arm: a group id that is not a number is refused before the read, so the loader is
 // never reached.
 func TestHandleGroupPermissionsGet_MalformedIdReachesNoPermissionPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandleGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number/permissions", "not-a-number"))
@@ -100,7 +100,7 @@ func TestHandleGroupPermissionsGet_MalformedIdReachesNoPermissionPort(t *testing
 // The accept arm for the key half: the signing keys page reads every key pair on the install, and
 // reads it on behalf of the request that asked.
 func TestHandleSettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theApiRequestsContext(), mock.Anything).
 		Return([]record.KeyPair{{Id: 9, KeyIdentifier: "kid-9", State: record.KeyStateCurrent.String()}}, nil).Once()
@@ -116,8 +116,8 @@ func TestHandleSettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 // read nor the delete is reached. The delete is the assertion worth having, because it is the one
 // that would destroy a signing key: a revocation retires every token that key signed.
 func TestHandleSettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_handlers.NewAuditLogger(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	req := apiIdRequest("/api/v1/admin/settings/keys/not-a-number", "not-a-number")
 
@@ -133,7 +133,7 @@ func TestHandleSettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
 // the same reason the user search was in stage 7: an operator chooses the page size from the query
 // string, and the count statement runs over the whole table whatever that size is.
 func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
 		Return([]record.AuditLog{{Id: 1, AuditEvent: "login"}}, 1, nil).Once()
@@ -150,7 +150,7 @@ func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 // case pins is that the clamp happens BEFORE the read and that the read still carries the
 // request's context -- a size of 500 reaches the database as 20, not as 500.
 func TestHandleAuditLogsGet_AnOutOfRangeSizeReachesTheDatabaseClamped(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 
 	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
 		Return([]record.AuditLog{}, 0, nil).Once()

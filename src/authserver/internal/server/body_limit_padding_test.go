@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -62,7 +62,7 @@ type readCount struct {
 // root chain, a wrapper counts what is read from the request body before the handler returns, and
 // places the decoded bearer token where JwtAuthorizationHeaderToContext would: signature
 // validation is not what these cases claim.
-func newPaddingTestServer(t *testing.T, database *mocks_data.Database) (*httptest.Server, <-chan readCount) {
+func newPaddingTestServer(t *testing.T, database *datamocks.Database) (*httptest.Server, <-chan readCount) {
 	t.Helper()
 
 	s := newStaticBranchTestServer(database)
@@ -174,11 +174,11 @@ func paddingTestSettings() *record.Settings {
 var paddingDCRTx = &sql.Tx{}
 
 func TestBodyLimitPadding_DynamicClientRegistration(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	// One registration per request, and the helper sends two: with a Content-Length and chunked.
 	for range 2 {
-		mocks_data.ExpectRunInTransaction(database, paddingDCRTx)
+		datamocks.ExpectRunInTransaction(database, paddingDCRTx)
 	}
 	database.On("CreateClient", mock.Anything, paddingDCRTx, mock.Anything).Return(nil)
 	database.On("CreateRedirectURI", mock.Anything, paddingDCRTx, mock.Anything).Return(nil)
@@ -197,7 +197,7 @@ func TestBodyLimitPadding_DynamicClientRegistration(t *testing.T) {
 
 // The account phone PUT, one bearer JSON handler for the 45 that decode a body the same way.
 func TestBodyLimitPadding_ABearerJSONHandler(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
 		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
@@ -219,7 +219,7 @@ func TestBodyLimitPadding_ABearerJSONHandler(t *testing.T) {
 // The account picture upload: a multipart parse stops at the closing boundary, and what follows it
 // is the epilogue, which RFC 2046 section 5.1.1 says to ignore.
 func TestBodyLimitPadding_AnUpload(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
 		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)

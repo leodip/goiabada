@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_protocolvalidation
+package protocolvalidationmocks
 
 import (
 	"context"

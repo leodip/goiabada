@@ -22,8 +22,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/authorizerequest"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -40,18 +40,18 @@ import (
 // authorizePostEndpoint is HandleAuthorizePost over strict doubles: a call nothing registered
 // fails the test, which is how a refusal that wrote no row, or read nothing past its gate, is shown.
 type authorizePostEndpoint struct {
-	pageRenderer *mocks_handlers.PageRenderer
-	validator    *mocks_handlers.AuthorizeValidator
-	database     *mocks_data.Database
+	pageRenderer *handlersmocks.PageRenderer
+	validator    *handlersmocks.AuthorizeValidator
+	database     *datamocks.Database
 	handler      http.HandlerFunc
 }
 
 func newAuthorizePostEndpoint(t *testing.T) *authorizePostEndpoint {
 	t.Helper()
 	e := &authorizePostEndpoint{
-		pageRenderer: mocks_handlers.NewPageRenderer(t),
-		validator:    mocks_handlers.NewAuthorizeValidator(t),
-		database:     mocks_data.NewDatabase(t),
+		pageRenderer: handlersmocks.NewPageRenderer(t),
+		validator:    handlersmocks.NewAuthorizeValidator(t),
+		database:     datamocks.NewDatabase(t),
 	}
 	e.handler = HandleAuthorizePost(e.pageRenderer, e.validator, e.database, testBaseURL)
 	return e
@@ -311,7 +311,7 @@ func TestAuthorizeParkedParameters_CoverEveryRead(t *testing.T) {
 // consumes registers the transaction, the read and the claim of the handle every case below holds.
 func (e *authorizeEndpoint) consumes(handle string, form url.Values, claimed bool) {
 	tx := &sql.Tx{}
-	mocks_data.ExpectRunInTransaction(e.database, tx)
+	datamocks.ExpectRunInTransaction(e.database, tx)
 	e.database.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, hashutil.HashString(handle), mock.Anything).
 		Return(&record.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: form.Encode(),
 			ExpiresAt: time.Now().UTC().Add(time.Minute)}, nil).Once()
@@ -428,7 +428,7 @@ func TestHandleAuthorizeGet_ARequestHandleBesideAnotherParameterIsRefused(t *tes
 func TestHandleAuthorizeGet_AnUnusableRequestHandleIsOneAnswer(t *testing.T) {
 	t.Run("a read that finds nothing", func(t *testing.T) {
 		e := newAuthorizeEndpoint(t)
-		mocks_data.ExpectRunInTransaction(e.database, &sql.Tx{})
+		datamocks.ExpectRunInTransaction(e.database, &sql.Tx{})
 		e.database.On("GetAuthorizeRequestByHandleHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil).Once()
 		e.expectsPage(unusableHandlePage())
@@ -489,7 +489,7 @@ func TestHandleAuthorizeGet_AnUnusableRequestHandleIsOneAnswer(t *testing.T) {
 
 func TestHandleAuthorizeGet_AFaultConsumingTheRequestHandleIsA500NotARefusal(t *testing.T) {
 	e := newAuthorizeEndpoint(t)
-	mocks_data.ExpectRunInTransaction(e.database, &sql.Tx{})
+	datamocks.ExpectRunInTransaction(e.database, &sql.Tx{})
 	fault := errors.New("connection reset")
 	e.database.On("GetAuthorizeRequestByHandleHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, fault).Once()

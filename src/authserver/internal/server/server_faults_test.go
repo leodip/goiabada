@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/web"
@@ -62,7 +62,7 @@ func registeredRoutes(t *testing.T, s *Server) []string {
 }
 
 // newFaultsTestServer runs the real initMiddleware and initRoutes over database.
-func newFaultsTestServer(database *mocks_data.Database) *Server {
+func newFaultsTestServer(database *datamocks.Database) *Server {
 	s := newStaticBranchTestServer(database)
 	s.templateFS = web.TemplateFS()
 	s.initRoutes(s.initMiddleware())
@@ -118,7 +118,7 @@ func requireEveryFormatReached(t *testing.T, routes []string) {
 // one of them answered text/plain, so a client parsing the token endpoint, userinfo, JWKS, discovery,
 // registration or the APIs as JSON could not parse the one fault that reaches them all at once.
 func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
 
@@ -140,7 +140,7 @@ func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 // The cookie is what reaches the session middleware's database read, so the fault needs a browser
 // that has signed in, which a client calling the token endpoint from the same origin can be.
 func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
@@ -177,7 +177,7 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 // carries the method it found refused there, so the group answers the 405 it answered when the
 // route was its own rather than its 404 page.
 func TestInitRoutes_TheTokenEndpointStillRefusesGETWith405(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
+	database := datamocks.NewDatabase(t)
 	// The group's chain runs ahead of its 405, as it did when the route was the group's.
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	s := newFaultsTestServer(database)

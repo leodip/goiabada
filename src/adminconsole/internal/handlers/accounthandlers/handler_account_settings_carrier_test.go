@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -65,7 +65,7 @@ func publicSettings(smtpEnabled bool) *api.PublicSettingsResponse {
 func TestHandleEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 	for _, smtpEnabled := range []bool{true, false} {
 		t.Run(map[bool]string{true: "smtp enabled", false: "smtp disabled"}[smtpEnabled], func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 
@@ -83,7 +83,7 @@ func TestHandleEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 }
 
 func TestHandleEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/account_email_verification.html").Once()
@@ -102,7 +102,7 @@ func TestHandleEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *te
 // because there is nothing to send a verification with. Without this row the case above is
 // satisfied by a handler that read the carrier once and ignored what it said.
 func TestHandleEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	var refusedWith error
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { refusedWith, _ = args.Get(2).(error) }).Once()
@@ -143,26 +143,26 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 	verificationForm := handlertest.WithForm(url.Values{"verificationCode": {"123456"}})
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlers.HttpHelper) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HttpHelper) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleEmailGet",
-			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleEmailGet(h, newFlashTestStore(), settingsCarrierApiClient{})
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailVerificationGet",
-			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleEmailVerificationGet(h, newFlashTestStore(), settingsCarrierApiClient{})
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email-verification", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailVerificationPost, a code the API calls expired",
-			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
 					err: &apiclient.APIError{Code: "INVALID_OR_EXPIRED_VERIFICATION_CODE", Message: "Expired.", StatusCode: http.StatusBadRequest},
 				}, consoleBaseURL)
@@ -172,7 +172,7 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 		},
 		{
 			name: "HandleEmailVerificationPost, any other refusal",
-			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
 					err: &apiclient.APIError{Code: "SOMETHING_ELSE", Message: "No.", StatusCode: http.StatusBadRequest},
 				}, consoleBaseURL)
@@ -184,7 +184,7 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			var refusedWith error
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { refusedWith, _ = args.Get(2).(error) }).Once()

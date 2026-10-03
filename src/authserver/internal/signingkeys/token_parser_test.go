@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -259,7 +259,7 @@ func TestDecodeAndValidateTokenString_RejectsNonRS256Token(t *testing.T) {
 // An empty token parses to an empty result and reads no key: the strict mock has nothing stubbed.
 func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 	for _, withExpirationCheck := range []bool{true, false} {
-		mockDB := mocks_data.NewDatabase(t)
+		mockDB := datamocks.NewDatabase(t)
 		tp := NewTokenParser(mockDB)
 
 		result, err := tp.DecodeAndValidateTokenString(context.Background(), "", withExpirationCheck)
@@ -272,9 +272,9 @@ func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 }
 
 // currentKeyDatabase is a strict database mock whose current signing key is privateKey's.
-func currentKeyDatabase(t *testing.T, privateKey *rsa.PrivateKey) *mocks_data.Database {
+func currentKeyDatabase(t *testing.T, privateKey *rsa.PrivateKey) *datamocks.Database {
 	t.Helper()
-	mockDB := mocks_data.NewDatabase(t)
+	mockDB := datamocks.NewDatabase(t)
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey)),
 	}, nil)

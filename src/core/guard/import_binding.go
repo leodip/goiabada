@@ -13,7 +13,7 @@ import (
 // differ often: every versioned module binds a name the path does not spell
 // (github.com/go-chi/chi/v5 binds chi, golang-jwt/jwt/v5 binds jwt, jackc/pgx/v5 binds pgx,
 // jackc/puddle/v2 binds puddle, go.yaml.in/yaml/v3 binds yaml), and every generated mocks
-// directory declares a name of its own (authserver/internal/data/mocks declares mocks_data).
+// directory declares a name of its own (authserver/internal/data/mocks declares datamocks).
 //
 // dir is where the package is declared, relative to the source root, forward slashes, and empty
 // for a path outside src/ -- stdlib and the module dependencies. It carries no weight when a call

@@ -15,17 +15,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Authorization code flow not enabled", func(t *testing.T) {
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -58,9 +58,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Missing code parameter", func(t *testing.T) {
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -94,9 +94,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Missing redirect_uri parameter", func(t *testing.T) {
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -131,9 +131,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Missing code_verifier parameter when PKCE was used", func(t *testing.T) {
 		// Now that PKCE is optional, code_verifier is only required if code_challenge was stored
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -189,9 +189,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Invalid code", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -230,9 +230,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Mismatched redirect URI", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -274,9 +274,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Mismatched client_id", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -323,9 +323,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Disabled user", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -381,9 +381,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Expired code", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -440,9 +440,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Invalid PKCE code verifier", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -497,9 +497,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Missing client secret for non-public client", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -557,9 +557,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Client authentication failed for non-public client", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -623,9 +623,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Public client with unnecessary client secret", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -683,9 +683,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Valid non-expired code", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -737,9 +737,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	})
 
 	t.Run("Public client with valid code verifier", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -838,9 +838,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	}
 
 	t.Run("Reuse with correct credentials returns AuthCodeReusedError sentinel (public client + PKCE)", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -887,9 +887,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Reuse with correct credentials returns sentinel (confidential client + correct secret)", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -935,9 +935,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Reuse with a disabled, superseded user still returns sentinel (account state read below the reuse return)", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -981,9 +981,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Reuse with wrong client_id does NOT produce sentinel", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1034,9 +1034,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Reuse with wrong redirect_uri does NOT produce sentinel", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1076,9 +1076,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Reuse with confidential client and missing client_secret does NOT produce sentinel", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1124,9 +1124,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Reuse with confidential client and wrong client_secret does NOT produce sentinel", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1172,9 +1172,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Reuse with wrong PKCE code_verifier does NOT produce sentinel", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1216,9 +1216,9 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	})
 
 	t.Run("Code-not-found (truly unknown) returns plain invalid_grant, not sentinel", func(t *testing.T) {
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1268,9 +1268,9 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	// case remains valid, but only for a client that authenticates: a public client is
 	// now refused a challenge-less code, which is what the _PublicClient_Fails
 	// counterpart below asserts.
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1335,9 +1335,9 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	// The fixture is CONFIDENTIAL, and it used to be public (#245). It has to be: a public
 	// client presenting a challenge-less code is now refused above this guard, so a public
 	// fixture would pass on the wrong refusal and stop covering the downgrade guard at all.
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1400,9 +1400,9 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) {
 	// When PKCE was used during authorization and a valid code_verifier is provided,
 	// the token request should succeed
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1460,9 +1460,9 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	// When PKCE was used during authorization but no code_verifier is provided,
 	// this should fail
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1520,9 +1520,9 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	// When PKCE was used during authorization but wrong code_verifier is provided,
 	// this should fail
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1586,9 +1586,9 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	//
 	// Confidential for the same reason as the test above (#245): treating empty as no PKCE
 	// still means success for a client that authenticates, and refusal for one that does not.
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
@@ -1658,9 +1658,9 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 	t.Helper()
 
-	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{}
@@ -1762,9 +1762,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 	setup := func(t *testing.T, sessionOwner *int64, lookupErr error) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
@@ -1904,9 +1904,9 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 	setup := func(t *testing.T, codeRedirectURI string, registered []string, loadErr error, codeChallenge string) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
-		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
-		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+		mockDB := datamocks.NewDatabase(t)
+		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}

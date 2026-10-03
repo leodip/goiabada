@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -78,7 +78,7 @@ var submittedAccountProfile = url.Values{
 // A refusal from the API redraws the account profile page with what the user typed rather than what
 // is stored, and the API's sentence, so nothing the user entered is lost (#440 decision 7).
 func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_profile.html").Once()
 
@@ -133,7 +133,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 func TestHandleProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.T) {
 	for _, zoneInfo := range []string{"America/Sao_Paulo", "Brazil___America___Sao_Paulo"} {
 		t.Run(zoneInfo, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			apiClient := &accountProfileRecorder{}

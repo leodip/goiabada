@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -104,10 +104,10 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 		}
 		for _, a := range attempts {
 			t.Run(shape+", "+a.name, func(t *testing.T) {
-				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
+				mockDB := datamocks.NewDatabase(t)
+				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser,
-					mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
+					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 				clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 				require.NoError(t, err)

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -71,7 +71,7 @@ func TestHandleEmailPost_AnswersAFailedWrite(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlers.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHttpHelper(t)
 			switch {
 			case testCase.wantNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
