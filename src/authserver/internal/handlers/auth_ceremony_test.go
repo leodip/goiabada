@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
@@ -373,7 +373,7 @@ func stepRequestFor(method string, target string, idInQuery string, idInForm str
 	} else {
 		req = httptest.NewRequest(method, target, nil)
 	}
-	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
 
 // The comparison every gated route now makes in the loader, once, for a page load and for a
@@ -542,7 +542,7 @@ func TestCeremonyStepURL(t *testing.T) {
 // renderer rather than of anything under test here.
 func renderableRequest(target string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
 
 // TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext is the third of #328's four call

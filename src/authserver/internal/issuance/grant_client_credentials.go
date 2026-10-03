@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *models.Settings,
-	client *models.Client, scope string) (*oauth.TokenResponse, error) {
+func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings,
+	client *record.Client, scope string) (*oauth.TokenResponse, error) {
 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, client)
 

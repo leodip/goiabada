@@ -8,7 +8,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -125,7 +125,7 @@ func TestLogger_DBPersistence_Enabled(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Expect CreateAuditLog to be called
-	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.MatchedBy(func(log *models.AuditLog) bool {
+	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.MatchedBy(func(log *record.AuditLog) bool {
 		return log.AuditEvent == "test_event" &&
 			log.Details != "" &&
 			log.CreatedAt.IsZero() // CreatedAt should be zero before DB call
@@ -475,10 +475,10 @@ func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 
-			var row *models.AuditLog
+			var row *record.AuditLog
 			mockDB := mocks.NewDatabase(t)
 			mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).
-				Run(func(args mock.Arguments) { row = args.Get(2).(*models.AuditLog) }).
+				Run(func(args mock.Arguments) { row = args.Get(2).(*record.AuditLog) }).
 				Return(nil).Once()
 
 			NewLogger(mockDB, bothTargets()).Log(tc.ctx, "auth_failed_pwd",

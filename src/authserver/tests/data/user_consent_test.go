@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateUserConsent(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	userConsent := &models.UserConsent{
+	userConsent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile",
@@ -141,7 +141,7 @@ func TestUserConsentsLoadClients(t *testing.T) {
 	userConsent1 := createTestUserConsent(t)
 	userConsent2 := createTestUserConsent(t)
 
-	userConsents := []models.UserConsent{*userConsent1, *userConsent2}
+	userConsents := []record.UserConsent{*userConsent1, *userConsent2}
 
 	err := database.UserConsentsLoadClients(context.Background(), nil, userConsents)
 	if err != nil {
@@ -204,11 +204,11 @@ func TestDeleteUserConsent(t *testing.T) {
 	}
 }
 
-func createTestUserConsent(t *testing.T) *models.UserConsent {
+func createTestUserConsent(t *testing.T) *record.UserConsent {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	userConsent := &models.UserConsent{
+	userConsent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile",
@@ -223,10 +223,10 @@ func createTestUserConsent(t *testing.T) *models.UserConsent {
 	return userConsent
 }
 
-func createTestUserConsentForUser(t *testing.T, userId int64) *models.UserConsent {
+func createTestUserConsentForUser(t *testing.T, userId int64) *record.UserConsent {
 	client := createTestClient(t)
 
-	userConsent := &models.UserConsent{
+	userConsent := &record.UserConsent{
 		UserId:   userId,
 		ClientId: client.Id,
 		Scope:    "openid profile",

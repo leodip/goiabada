@@ -11,7 +11,7 @@ import (
 )
 
 // Seam 2 for the group attribute family (#350). The same reasoning as groups_test.go: the
-// rebuild into models.GroupAttribute is gone, so the decode is where a renamed tag now hides, and
+// rebuild into record.GroupAttribute is gone, so the decode is where a renamed tag now hides, and
 // the bodies are literal JSON text for that reason.
 //
 // groupId is the field with the least visible failure: the edit handler refuses an attribute whose

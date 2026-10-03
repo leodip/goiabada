@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
@@ -211,7 +211,7 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 
 // newAuthTimeFixture creates a confidential client with one registered redirect URI, and a user
 // able to complete a level 1 ceremony for it, returning the secrets a ceremony needs.
-func newAuthTimeFixture(t *testing.T) (*models.Client, string, *models.RedirectURI, *models.User, string) {
+func newAuthTimeFixture(t *testing.T) (*record.Client, string, *record.RedirectURI, *record.User, string) {
 	t.Helper()
 
 	clientSecret := fake.Password(32)
@@ -220,13 +220,13 @@ func newAuthTimeFixture(t *testing.T) (*models.Client, string, *models.RedirectU
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -235,7 +235,7 @@ func newAuthTimeFixture(t *testing.T) (*models.Client, string, *models.RedirectU
 		t.Fatal(createClientErr)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -249,7 +249,7 @@ func newAuthTimeFixture(t *testing.T) (*models.Client, string, *models.RedirectU
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -270,7 +270,7 @@ func newAuthTimeFixture(t *testing.T) (*models.Client, string, *models.RedirectU
 // well over the hour max_age allows, and signed in to again five minutes ago, inside the idle
 // timeout. The test sets the two lifetimes it depends on, the seeded ones.
 func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
-	settings := changeSettings(t, func(settings *models.Settings) {
+	settings := changeSettings(t, func(settings *record.Settings) {
 		settings.UserSessionIdleTimeoutInSeconds = 7200
 		settings.UserSessionMaxLifetimeInSeconds = 86400
 	})

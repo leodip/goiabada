@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -189,11 +189,11 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			}
 
 			req := httptest.NewRequest("GET", target, nil)
-			ctx := reqctx.WithSettings(req.Context(), &models.Settings{Issuer: "https://issuer.example"})
+			ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://issuer.example"})
 			req = req.WithContext(reqctx.WithSessionIdentifier(ctx, "session-123"))
 			rr := httptest.NewRecorder()
 
-			client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
+			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
@@ -209,10 +209,10 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			// Maybe, because which exits look the session up is not what this table is about: the
 			// prompt=login exit never does, and TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed
 			// owns that.
-			var userSession *models.UserSession
+			var userSession *record.UserSession
 			if tc.hasSession {
-				userSession = &models.UserSession{Id: 1, UserId: 123, AcrLevel: models.AcrLevel1, AuthMethods: "pwd",
-					User: models.User{Id: 123, Enabled: true, Subject: sessionSubject}}
+				userSession = &record.UserSession{Id: 1, UserId: 123, AcrLevel: record.AcrLevel1, AuthMethods: "pwd",
+					User: record.User{Id: 123, Enabled: true, Subject: sessionSubject}}
 			}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-123").
 				Return(userSession, nil).Maybe()
@@ -246,7 +246,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			assert.Equal(t, "the-nonce", saved.Nonce)
 			assert.Equal(t, tc.hint, saved.IdTokenHintSub)
 			if !tc.scopeInvalid {
-				assert.Equal(t, models.AcrLevel1.String(), saved.TargetAcrLevel,
+				assert.Equal(t, record.AcrLevel1.String(), saved.TargetAcrLevel,
 					"the target is fixed before the exit saves")
 			}
 

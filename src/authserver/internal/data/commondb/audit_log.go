@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error {
+func (d *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *record.AuditLog) error {
 
 	if auditLog.AuditEvent == "" {
 		return errs.New("can't create audit log with empty audit_event")
@@ -19,7 +19,7 @@ func (d *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *mod
 	// Always set CreatedAt to current time (ignore any incoming value)
 	auditLog.CreatedAt = time.Now().UTC()
 
-	auditLogStruct := sqlbuilder.NewStruct(new(models.AuditLog)).
+	auditLogStruct := sqlbuilder.NewStruct(new(record.AuditLog)).
 		For(d.Flavor)
 
 	insertBuilder := auditLogStruct.WithoutTag("pk").InsertInto("audit_logs", auditLog)
@@ -34,7 +34,7 @@ func (d *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *mod
 }
 
 func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
-	requestId string) ([]models.AuditLog, int, error) {
+	requestId string) ([]record.AuditLog, int, error) {
 
 	if page < 1 {
 		page = 1
@@ -48,7 +48,7 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 
 	offset := PageOffset(page, pageSize)
 
-	auditLogStruct := sqlbuilder.NewStruct(new(models.AuditLog)).
+	auditLogStruct := sqlbuilder.NewStruct(new(record.AuditLog)).
 		For(d.Flavor)
 
 	selectBuilder := auditLogStruct.SelectFrom("audit_logs")
@@ -70,9 +70,9 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 	}
 	defer func() { _ = rows.Close() }()
 
-	var auditLogs []models.AuditLog
+	var auditLogs []record.AuditLog
 	for rows.Next() {
-		var auditLog models.AuditLog
+		var auditLog record.AuditLog
 		addr := auditLogStruct.Addr(&auditLog)
 		err = rows.Scan(addr...)
 		if err != nil {

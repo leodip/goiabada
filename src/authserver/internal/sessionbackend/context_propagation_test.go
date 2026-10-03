@@ -7,7 +7,7 @@ import (
 	"time"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -49,17 +49,17 @@ func TestDatabaseBackend_LoadReadsUnderTheCallersContext(t *testing.T) {
 
 	database.On("GetBrowserSessionByOwnerAndSessionIdHash", theCallersContext(), (*sql.Tx)(nil),
 		owner, hashutil.HashString(id), fixedNow).
-		Return(&models.BrowserSession{
+		Return(&record.BrowserSession{
 			Data:          "ciphertext",
 			LastAccessed:  fixedNow,
 			ExpiresAt:     fixedNow.Add(time.Hour),
 			SessionIdHash: hashutil.HashString(id),
 		}, nil).Once()
 
-	record, err := testBackend(database, owner).Load(markedSettingsContext(), id)
+	stored, err := testBackend(database, owner).Load(markedSettingsContext(), id)
 
 	require.NoError(t, err)
-	assert.Equal(t, []byte("ciphertext"), record.Data)
+	assert.Equal(t, []byte("ciphertext"), stored.Data)
 	database.AssertExpectations(t)
 }
 

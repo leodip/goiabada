@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateResource(t *testing.T) {
-	resource := &models.Resource{
+	resource := &record.Resource{
 		ResourceIdentifier: "test_resource_" + fake.LetterN(6),
 		Description:        "Test Resource",
 	}
@@ -228,8 +228,8 @@ func TestDeleteResource(t *testing.T) {
 	}
 }
 
-func createTestResource(t *testing.T) *models.Resource {
-	resource := &models.Resource{
+func createTestResource(t *testing.T) *record.Resource {
+	resource := &record.Resource{
 		ResourceIdentifier: "test_resource" + fake.LetterN(4),
 		Description:        "Test Resource",
 	}
@@ -254,14 +254,14 @@ func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
 	lower := "case_resource_" + strings.ToLower(fake.LetterN(6))
 	upper := strings.ToUpper(lower)
 
-	lowerResource := &models.Resource{ResourceIdentifier: lower, Description: "lowercase"}
+	lowerResource := &record.Resource{ResourceIdentifier: lower, Description: "lowercase"}
 	if err := database.CreateResource(context.Background(), nil, lowerResource); err != nil {
 		t.Fatalf("Failed to create the lowercase resource: %v", err)
 	}
 
 	// A second resource differing from the first only by case, which MySQL and SQL Server
 	// refused before 000040.
-	upperResource := &models.Resource{ResourceIdentifier: upper, Description: "uppercase"}
+	upperResource := &record.Resource{ResourceIdentifier: upper, Description: "uppercase"}
 	if err := database.CreateResource(context.Background(), nil, upperResource); err != nil {
 		t.Fatalf("Failed to create a resource differing only by case, which every engine must now accept: %v", err)
 	}

@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -36,7 +36,7 @@ func HandleSettingsTokensGet() http.HandlerFunc {
 
 // settingsTokensDatabase is what the token settings endpoint needs: the settings write.
 type settingsTokensDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // HandleSettingsTokensPut - PUT /api/v1/admin/settings/tokens

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +38,7 @@ func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
 	var asked []int64
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) { asked = args.Get(2).([]int64) }).
-		Return(map[int64]models.User{
+		Return(map[int64]record.User{
 			7: {Id: 7, Email: "jane@example.com", GivenName: "Jane"},
 			9: {Id: 9, Email: "sam@example.com", GivenName: "Sam"},
 		}, nil).
@@ -61,7 +61,7 @@ func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
 func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Return(map[int64]models.User{
+		Return(map[int64]record.User{
 			7:  {Id: 7, GivenName: "Jane"},
 			9:  {Id: 9, GivenName: "Sam"},
 			11: {Id: 11, GivenName: "Alex"},
@@ -102,7 +102,7 @@ func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Return(map[int64]models.User{7: {Id: 7}}, nil).Once()
+		Return(map[int64]record.User{7: {Id: 7}}, nil).Once()
 
 	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{
 		ownerSession(1, 7), ownerSession(2, 9),
@@ -115,7 +115,7 @@ func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
 func TestSessionOwners_ADatabaseFailureIsAnError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Return(map[int64]models.User(nil), errs.New("the database is down")).Once()
+		Return(map[int64]record.User(nil), errs.New("the database is down")).Once()
 
 	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{ownerSession(1, 7)})
 	require.Error(t, err)
@@ -128,13 +128,13 @@ func TestSessionOwners_ADatabaseFailureIsAnError(t *testing.T) {
 func TestHandleClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	sessions := []models.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "sid-two", 5)}
+	sessions := []record.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "sid-two", 5)}
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.Client{Id: 7}, nil).Once()
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.Client{Id: 7}, nil).Once()
 	database.On("GetUserSessionsByClientIdPaginated", mock.Anything, (*sql.Tx)(nil), int64(7), 1, 50).
 		Return(sessions, len(sessions), nil).Once()
 	expectSessionListReads(database, sessions)
-	expectSessionOwnerRead(database, models.User{
+	expectSessionOwnerRead(database, record.User{
 		Id: 42, Email: "jane@example.com", GivenName: "Jane", FamilyName: "Doe",
 	})
 

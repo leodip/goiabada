@@ -12,7 +12,7 @@ package mocks_accounthandlers
 import (
 	"context"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -54,23 +54,23 @@ func (_m *UserCreator) EXPECT() *UserCreator_Expecter {
 }
 
 // CreateUser provides a mock function for the type UserCreator
-func (_mock *UserCreator) CreateUser(ctx context.Context, input *usercreation.Input) (*models.User, error) {
+func (_mock *UserCreator) CreateUser(ctx context.Context, input *usercreation.Input) (*record.User, error) {
 	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateUser")
 	}
 
-	var r0 *models.User
+	var r0 *record.User
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.Input) (*models.User, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.Input) (*record.User, error)); ok {
 		return returnFunc(ctx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.Input) *models.User); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *usercreation.Input) *record.User); ok {
 		r0 = returnFunc(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*models.User)
+			r0 = ret.Get(0).(*record.User)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *usercreation.Input) error); ok {
@@ -111,12 +111,12 @@ func (_c *UserCreator_CreateUser_Call) Run(run func(ctx context.Context, input *
 	return _c
 }
 
-func (_c *UserCreator_CreateUser_Call) Return(user *models.User, err error) *UserCreator_CreateUser_Call {
+func (_c *UserCreator_CreateUser_Call) Return(user *record.User, err error) *UserCreator_CreateUser_Call {
 	_c.Call.Return(user, err)
 	return _c
 }
 
-func (_c *UserCreator_CreateUser_Call) RunAndReturn(run func(ctx context.Context, input *usercreation.Input) (*models.User, error)) *UserCreator_CreateUser_Call {
+func (_c *UserCreator_CreateUser_Call) RunAndReturn(run func(ctx context.Context, input *usercreation.Input) (*record.User, error)) *UserCreator_CreateUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -41,12 +41,12 @@ func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-user"
-	user := &models.User{Id: 42, Enabled: true}
-	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}
+	user := &record.User{Id: 42, Enabled: true}
+	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
-	stubTermination(database, userSession, 1, []*models.RefreshToken{
+	stubTermination(database, userSession, 1, []*record.RefreshToken{
 		{Id: 1, RefreshTokenJti: "rt-live"},
 	})
 
@@ -96,9 +96,9 @@ func TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	const subject = "the-user"
 	// The session belongs to user 7; the caller is user 42.
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
-		Return(&models.UserSession{Id: 100, SessionIdentifier: "sid-someone-else", UserId: 7}, nil).Once()
+		Return(&record.UserSession{Id: 100, SessionIdentifier: "sid-someone-else", UserId: 7}, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
+		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAccountSessionDelete(database, auditLogger)
@@ -121,9 +121,9 @@ func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	const subject = "the-user"
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
-		Return(&models.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}, nil).Once()
+		Return(&record.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
+		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
 	stub := mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, int64(100)).

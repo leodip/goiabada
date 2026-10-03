@@ -13,7 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -24,13 +24,13 @@ import (
 // accountLogoutDatabase is what the account logout endpoint needs: the session being ended, the
 // clients it authorized, and the key that signs the logout token.
 type accountLogoutDatabase interface {
-	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Client, error)
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error
-	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
+	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 // HandleAccountLogoutRequestPost - POST /api/v1/account/logout-request
@@ -69,7 +69,7 @@ func HandleAccountLogoutRequestPost(
 		}
 
 		// Resolve client
-		var client *models.Client
+		var client *record.Client
 		var err error
 		if req.ClientIdentifier != "" {
 			// A failed lookup is the server's fault and a missing row the caller's, so the two
@@ -92,7 +92,7 @@ func HandleAccountLogoutRequestPost(
 				writeInternalServerError(w, r, clientsErr)
 				return
 			}
-			var matches []*models.Client
+			var matches []*record.Client
 			for i := range clients {
 				c := &clients[i]
 				// derr, not err: err is the function's, and nil here. Passing it logged a 500

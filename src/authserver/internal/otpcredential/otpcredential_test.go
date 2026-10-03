@@ -10,8 +10,8 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,15 +32,15 @@ const (
 )
 
 // enrollableUser is a user part way through enrolling: no authenticator yet.
-func enrollableUser() *models.User {
-	return &models.User{Id: otpUserId, Enabled: true}
+func enrollableUser() *record.User {
+	return &record.User{Id: otpUserId, Enabled: true}
 }
 
 // enrolledUser is a user with otpSeed already established, which is the state VerifyStored reads.
-func enrolledUser(t *testing.T) *models.User {
+func enrolledUser(t *testing.T) *record.User {
 	t.Helper()
 
-	u := &models.User{Id: otpUserId, Enabled: true, OTPEnabled: true}
+	u := &record.User{Id: otpUserId, Enabled: true, OTPEnabled: true}
 	require.NoError(t, setSecret(testDataCipher, u, otpSeed))
 	return u
 }
@@ -65,7 +65,7 @@ func TestEstablish_WritesTheUserTheGenerationAndTheClearInOneTransaction(t *test
 	var calls []string
 	mocks_data.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 
-	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *models.User) bool {
+	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *record.User) bool {
 		// otp_enabled is on and the seed is stored encrypted, both of which were the caller's
 		// two lines before #387 folded them in here. There is no plaintext column any more:
 		// migration 000048 dropped users.otp_secret (#98).
@@ -77,7 +77,7 @@ func TestEstablish_WritesTheUserTheGenerationAndTheClearInOneTransaction(t *test
 		}
 		stored, err := storedSecret(testDataCipher, u)
 		return err == nil && stored == otpSeed
-	})).RunAndReturn(func(context.Context, *sql.Tx, *models.User) error {
+	})).RunAndReturn(func(context.Context, *sql.Tx, *record.User) error {
 		calls = append(calls, "update")
 		return nil
 	}).Once()
@@ -168,9 +168,9 @@ func TestRemove_ClearsDisablesResetsAndAdvancesInOneTransaction(t *testing.T) {
 	var calls []string
 	mocks_data.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 
-	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *models.User) bool {
+	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *record.User) bool {
 		return !u.OTPEnabled && len(u.OTPSecretEncrypted) == 0
-	})).RunAndReturn(func(context.Context, *sql.Tx, *models.User) error {
+	})).RunAndReturn(func(context.Context, *sql.Tx, *record.User) error {
 		calls = append(calls, "update")
 		return nil
 	}).Once()
@@ -339,12 +339,12 @@ func TestVerifySupplied(t *testing.T) {
 	})
 }
 
-// The seed's encryption at rest, which was models.User's TestUser_OTPSecret until #387 took the
+// The seed's encryption at rest, which was record.User's TestUser_OTPSecret until #387 took the
 // three methods off the persistence record. Same four claims (#82).
 func TestSeedAtRest(t *testing.T) {
 	const secret = "JBSWY3DPEHPK3PXP"
 
-	u := &models.User{}
+	u := &record.User{}
 	require.NoError(t, setSecret(testDataCipher, u, secret))
 
 	// The encrypted value must be populated without containing the seed verbatim. There is no
@@ -365,7 +365,7 @@ func TestSeedAtRest(t *testing.T) {
 	assert.Error(t, err, "storedSecret with a different cipher key: expected an error")
 
 	// A user with no encrypted secret returns an empty string, no error.
-	got, err = storedSecret(testDataCipher, &models.User{})
+	got, err = storedSecret(testDataCipher, &record.User{})
 	require.NoError(t, err)
 	assert.Empty(t, got)
 

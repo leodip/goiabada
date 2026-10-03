@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,7 +79,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 
 	// Setup: Create test users with more unique identifiers to avoid conflicts
 	uniqueSuffix := fake.LetterN(8)
-	user1 := &models.User{
+	user1 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "uniquejohn" + uniqueSuffix + "@searchtest.com",
@@ -352,10 +352,10 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 	// with a sibling, but goiabada_integration is never dropped on mysql,
 	// postgres or mssql, and a fixed address there collides with itself.
 	uniqueSuffix := fake.LetterN(10)
-	var testUsers []*models.User
+	var testUsers []*record.User
 	for i := 1; i <= 8; i++ {
 		n := strconv.Itoa(i)
-		user := &models.User{
+		user := &record.User{
 			Subject:       fake.UUID(),
 			Enabled:       true,
 			Email:         "testuser" + n + "." + uniqueSuffix + "@pagination.test",
@@ -433,11 +433,11 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 //
 // The inserts are require.NoError for the same reason: a fixture that was not
 // built must stop its test rather than hand it phantom users.
-func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
-	users := make([]*models.User, 0)
+func createTestUsersWithSuffix(t *testing.T, suffix string) []*record.User {
+	users := make([]*record.User, 0)
 
 	// Create user 1 - enabled user
-	user1 := &models.User{
+	user1 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "john.doe." + suffix + "@test.com",
@@ -450,7 +450,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 	users = append(users, user1)
 
 	// Create user 2 - enabled user
-	user2 := &models.User{
+	user2 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         "jane.smith." + suffix + "@test.com",
@@ -463,7 +463,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 	users = append(users, user2)
 
 	// Create user 3 - disabled user
-	user3 := &models.User{
+	user3 := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       false,
 		Email:         "disabled." + suffix + "@test.com",
@@ -497,7 +497,7 @@ func TestAPIUsersSearch_FixtureIsIndependentAcrossCalls(t *testing.T) {
 
 	ids := make(map[int64]bool)
 	emails := make(map[string]bool)
-	for _, user := range append(append([]*models.User{}, first...), second...) {
+	for _, user := range append(append([]*record.User{}, first...), second...) {
 		require.NotZero(t, user.Id, "every fixture user must have been inserted")
 		assert.False(t, ids[user.Id], "user id %d was handed out twice", user.Id)
 		assert.False(t, emails[user.Email], "address %q was handed out twice", user.Email)

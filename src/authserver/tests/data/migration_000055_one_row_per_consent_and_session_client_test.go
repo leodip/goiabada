@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -201,7 +201,7 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 func seedConsent000055(t *testing.T, h *isolatedDB, userId, clientId int64, scope, updatedAt string) int64 {
 	t.Helper()
 
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId: userId, ClientId: clientId, Scope: scope,
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
@@ -216,7 +216,7 @@ func seedSessionClient000055(t *testing.T, h *isolatedDB, sessionId, clientId in
 	t.Helper()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	association := &models.UserSessionClient{UserSessionId: sessionId, ClientId: clientId, Started: now, LastAccessed: now}
+	association := &record.UserSessionClient{UserSessionId: sessionId, ClientId: clientId, Started: now, LastAccessed: now}
 	require.NoError(t, h.DB.CreateUserSessionClient(context.Background(), nil, association),
 		"seed an association while no key refuses a second")
 	return association.Id
@@ -317,22 +317,22 @@ func (s *seeded000055) assertTheKeysRefuseADuplicate(t *testing.T, h *isolatedDB
 	t.Helper()
 	ctx := context.Background()
 
-	err := h.DB.CreateUserConsent(ctx, nil, &models.UserConsent{UserId: s.userA, ClientId: s.client1, Scope: "openid"})
+	err := h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: s.client1, Scope: "openid"})
 	assert.ErrorIsf(t, err, data.ErrUniqueViolation, "a second consent for a pair is refused by the key %s", when)
 	assert.Lenf(t, consentRows000055(t, h, s.userA, s.client1), 1, "and writes nothing %s", when)
 
 	other := createTestClientOn(t, h.DB)
-	assert.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &models.UserConsent{UserId: s.userA, ClientId: other.Id, Scope: "openid"}),
+	assert.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: other.Id, Scope: "openid"}),
 		"a consent for another pair is accepted %s", when)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	err = h.DB.CreateUserSessionClient(ctx, nil, &models.UserSessionClient{UserSessionId: s.session1, ClientId: s.client1, Started: now, LastAccessed: now})
+	err = h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session1, ClientId: s.client1, Started: now, LastAccessed: now})
 	assert.ErrorIsf(t, err, data.ErrUniqueViolation, "a second association for a pair is refused by the key %s", when)
 	assert.Lenf(t, sessionClientIds000055(t, h, s.session1, s.client1), 1, "and writes nothing %s", when)
 
-	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &models.UserSessionClient{UserSessionId: s.session1, ClientId: s.client3, Started: now, LastAccessed: now}),
+	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session1, ClientId: s.client3, Started: now, LastAccessed: now}),
 		"an association for another client is accepted %s", when)
-	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &models.UserSessionClient{UserSessionId: s.session2, ClientId: s.client2, Started: now, LastAccessed: now}),
+	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session2, ClientId: s.client2, Started: now, LastAccessed: now}),
 		"and so is the same client in another session %s", when)
 	// Clear what the two controls added, so the down and up that follow start from the seed.
 	_, err = h.SQL.ExecContext(ctx, fmt.Sprintf(

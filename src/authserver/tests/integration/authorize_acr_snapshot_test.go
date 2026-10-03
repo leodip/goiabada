@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,16 +40,16 @@ import (
 // stepped through here rather than run by one of the suite's sign-in helpers: the whole subject of
 // the case is what happens in the gap between them.
 func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -61,7 +61,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 
 	// No OTP: this user has no second factor to present, so an acr naming one can only have come
 	// from the client row rather than from anything the ceremony did.
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -106,7 +106,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// The administrator tightens the client's policy, mid-ceremony.
-	client.DefaultAcrLevel = models.AcrLevel2Mandatory
+	client.DefaultAcrLevel = record.AcrLevel2Mandatory
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	resp = loadPage(t, httpClient, loc)
@@ -120,7 +120,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	require.NotEmpty(t, codeVal, "the ceremony should still complete; the raise applies to later requests")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, models.AcrLevel1, code.AcrLevel,
+	assert.Equal(t, record.AcrLevel1, code.AcrLevel,
 		"the acr must describe the authentication this ceremony performed, not the policy that "+
 			"replaced the one it was accepted under")
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods,
@@ -132,6 +132,6 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, models.AcrLevel1, sessions[0].AcrLevel,
+	assert.Equal(t, record.AcrLevel1, sessions[0].AcrLevel,
 		"the session records the level reached, so a later step-up is decided from the truth")
 }

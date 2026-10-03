@@ -11,7 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -24,7 +24,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true, // Global setting enabled
@@ -41,7 +41,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:             sub,
 			Email:               "test@example.com",
 			EmailVerified:       true,
@@ -65,10 +65,10 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 			AddressCountry:      "Test Country",
 			UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "test-client",
 			// IncludeOpenIDConnectClaimsInIdToken is "default", so uses global setting
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
@@ -130,7 +130,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: false, // Global setting disabled
@@ -147,7 +147,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:             sub,
 			Email:               "test@example.com",
 			EmailVerified:       true,
@@ -159,10 +159,10 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 			AddressLine1:        "123 Test St",
 			UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "test-client",
 			// IncludeOpenIDConnectClaimsInIdToken is "default", so uses global setting
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
@@ -215,7 +215,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: false, // Global setting disabled
@@ -232,7 +232,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:       sub,
 			Email:         "test@example.com",
 			EmailVerified: true,
@@ -240,10 +240,10 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 			FamilyName:    "User",
 			UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "test-client",
 			// Client override: ON (should include claims despite global disabled)
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingOn.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingOn.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -280,7 +280,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true, // Global setting enabled
@@ -297,7 +297,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:       sub,
 			Email:         "test@example.com",
 			EmailVerified: true,
@@ -305,10 +305,10 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 			FamilyName:    "User",
 			UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "test-client",
 			// Client override: OFF (should NOT include claims despite global enabled)
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingOff.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingOff.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -343,7 +343,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: false, // Disabled - but groups/attributes should still work
@@ -360,23 +360,23 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:   sub,
 			UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
-			Groups: []models.Group{
+			Groups: []record.Group{
 				{GroupIdentifier: "group1", IncludeInIdToken: true},
 				{GroupIdentifier: "group2", IncludeInIdToken: true},
 				{GroupIdentifier: "group3", IncludeInIdToken: false},
 			},
-			Attributes: []models.UserAttribute{
+			Attributes: []record.UserAttribute{
 				{Key: "attr1", Value: "value1", IncludeInIdToken: true},
 				{Key: "attr2", Value: "value2", IncludeInIdToken: true},
 				{Key: "attr3", Value: "value3", IncludeInIdToken: false},
 			},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier:                    "test-client",
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email groups attributes",
 		Nonce:             "test-nonce",
@@ -415,7 +415,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -435,7 +435,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                1,
 		ClientId:          1,
 		UserId:            1,
@@ -446,16 +446,16 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
 		TokenExpirationInSeconds:                900,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 		// Client uses default (which is global disabled)
-		IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		Subject:       sub,
@@ -474,14 +474,14 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 		Id:           1,
 		UserId:       1,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -524,7 +524,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -544,7 +544,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                2,
 		ClientId:          2,
 		UserId:            2,
@@ -555,14 +555,14 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       2,
 		ClientIdentifier:         "test-client-override",
 		TokenExpirationInSeconds: 900,
 		// Client override: ON
-		IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingOn.String(),
+		IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingOn.String(),
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            2,
 		UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		Subject:       sub,
@@ -581,14 +581,14 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 		Id:           1,
 		UserId:       2,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -621,7 +621,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: false, // Disabled
@@ -637,15 +637,15 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:   sub,
 			Email:     "test@example.com",
 			GivenName: "Test",
 			UpdatedAt: sql.NullTime{Time: now, Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier:                    "minimal-client",
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
@@ -681,7 +681,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
@@ -697,15 +697,15 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:   sub,
 			Email:     "test@example.com",
 			GivenName: "Test",
 			UpdatedAt: sql.NullTime{Time: now, Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier:                    "minimal-enabled-client",
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
@@ -739,7 +739,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
@@ -755,7 +755,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:             sub,
 			Email:               "test@example.com",
 			EmailVerified:       true,
@@ -766,9 +766,9 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 			AddressLine1:        "123 Test St",
 			UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier:                    "email-only-client",
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid email", // Only email scope, NOT profile/address/phone
 		Nonce:             "test-nonce",
@@ -815,7 +815,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
@@ -832,7 +832,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Id:            userId,
 			Subject:       sub,
 			Email:         "picture@example.com",
@@ -841,9 +841,9 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 			FamilyName:    "User",
 			UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier:                    "picture-client",
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -883,7 +883,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
@@ -899,7 +899,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	assert.NoError(t, err)
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject:       sub,
 			Email:         "minimal@example.com",
 			EmailVerified: true,
@@ -916,9 +916,9 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 			// AddressLine1: empty
 			UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier:                    "minimal-fields-client",
-			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",

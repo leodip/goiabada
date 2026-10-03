@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -121,7 +121,7 @@ func assertUserAgentRoundTrip000046(t *testing.T, h *isolatedDB, userId int64, n
 		identifier := fake.UUID()
 		now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		session := &models.UserSession{
+		session := &record.UserSession{
 			SessionIdentifier: identifier,
 			Started:           now,
 			LastAccessed:      now,

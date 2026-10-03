@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,7 @@ import (
 // challengelessCode mints a code carrying no PKCE challenge, from a confidential client with
 // PKCE turned off. Both are needed: the seeded Settings.PKCERequired is true, so the ceremony
 // itself would be refused at /auth/authorize without the explicit false.
-func challengelessCode(t *testing.T, clientSecret string) (*models.Code, string) {
+func challengelessCode(t *testing.T, clientSecret string) (*record.Code, string) {
 	t.Helper()
 
 	pkceRequired := false

@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -184,7 +184,7 @@ func requireOutcome(t *testing.T, f *family, result rotationResult, before int64
 
 	// The property the decision is for, whichever shape and whichever order: nothing the rotation
 	// left live is behind the user, so the next refresh does not refuse it.
-	var members []*models.RefreshToken
+	var members []*record.RefreshToken
 	var err error
 	if f.ropc {
 		members, err = database.GetRefreshTokensByUserId(context.Background(), nil, f.user.Id)
@@ -230,8 +230,8 @@ func requireOutcome(t *testing.T, f *family, result rotationResult, before int64
 func requireNoDeadlockRerun(t *testing.T, logs *logtest.SlogCapture) {
 	t.Helper()
 
-	for _, record := range logs.Records() {
-		assert.NotEqual(t, "rerunning a transaction the engine aborted as a deadlock victim", record.Message,
+	for _, logRecord := range logs.Records() {
+		assert.NotEqual(t, "rerunning a transaction the engine aborted as a deadlock victim", logRecord.Message,
 			"the rotation and the credential change serialize on the user's row, so neither is a deadlock victim")
 	}
 }

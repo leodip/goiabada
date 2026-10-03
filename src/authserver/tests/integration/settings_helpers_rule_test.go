@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,16 +18,16 @@ import (
 
 // populatedSettings answers a row with every field set, so a test that changes one field changes
 // it away from something rather than from a zero value.
-func populatedSettings() models.Settings {
+func populatedSettings() record.Settings {
 	stamp := sql.NullTime{Time: time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC), Valid: true}
-	return models.Settings{
+	return record.Settings{
 		Id:                                      1,
 		CreatedAt:                               stamp,
 		UpdatedAt:                               stamp,
 		AppName:                                 "Goiabada",
 		Issuer:                                  "https://auth.example.org",
 		UITheme:                                 "dark",
-		PasswordPolicy:                          models.PasswordPolicyMedium,
+		PasswordPolicy:                          record.PasswordPolicyMedium,
 		SelfRegistrationEnabled:                 true,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 2592000,
@@ -86,7 +86,7 @@ func TestSettingsChanges_IdenticalRowsHaveNone(t *testing.T) {
 // once, under its own name. The loop is over the struct, so a column added later is covered here
 // without being listed.
 func TestSettingsChanges_NamesEveryOtherField(t *testing.T) {
-	fields := reflect.TypeOf(models.Settings{})
+	fields := reflect.TypeOf(record.Settings{})
 	compared := 0
 	for i := range fields.NumField() {
 		name := fields.Field(i).Name
@@ -114,7 +114,7 @@ func TestSettingsChanges_SkipsTheColumnsNoTestOwns(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			before, after := populatedSettings(), populatedSettings()
 			field := reflect.ValueOf(&after).Elem().FieldByName(name)
-			require.True(t, field.IsValid(), "%s is not a field of models.Settings", name)
+			require.True(t, field.IsValid(), "%s is not a field of record.Settings", name)
 			changeField(t, name, field)
 
 			assert.Empty(t, settingsChanges(&before, &after))
@@ -147,7 +147,7 @@ func TestSettingsChanges_PrintsBothValuesOfAnyOtherField(t *testing.T) {
 }
 
 // readSettingsRow reads the row as the server now sees it.
-func readSettingsRow(t *testing.T) *models.Settings {
+func readSettingsRow(t *testing.T) *record.Settings {
 	t.Helper()
 
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
@@ -191,7 +191,7 @@ func TestChangeSettings_WritesTheEditAndRestoresIt(t *testing.T) {
 	before := readSettingsRow(t)
 
 	t.Run("changes the row", func(t *testing.T) {
-		written := changeSettings(t, func(settings *models.Settings) {
+		written := changeSettings(t, func(settings *record.Settings) {
 			settings.DynamicClientRegistrationEnabled = !before.DynamicClientRegistrationEnabled
 		})
 
@@ -209,8 +209,8 @@ func TestChangeSettings_TwoCallsEndWithTheRowTheFirstFound(t *testing.T) {
 	before := readSettingsRow(t)
 
 	t.Run("changes the row twice", func(t *testing.T) {
-		changeSettings(t, func(settings *models.Settings) { settings.TokenExpirationInSeconds = 61 })
-		changeSettings(t, func(settings *models.Settings) { settings.TokenExpirationInSeconds = 62 })
+		changeSettings(t, func(settings *record.Settings) { settings.TokenExpirationInSeconds = 61 })
+		changeSettings(t, func(settings *record.Settings) { settings.TokenExpirationInSeconds = 62 })
 		assert.Equal(t, 62, readSettingsRow(t).TokenExpirationInSeconds)
 	})
 

@@ -13,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -30,15 +30,15 @@ type dcrWriteRecorder struct {
 	data.Database
 	failAt  int
 	uris    int
-	created *models.Client
+	created *record.Client
 }
 
-func (d *dcrWriteRecorder) CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (d *dcrWriteRecorder) CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 	d.created = client
 	return d.Database.CreateClient(ctx, tx, client)
 }
 
-func (d *dcrWriteRecorder) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error {
+func (d *dcrWriteRecorder) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error {
 	d.uris++
 	if d.uris == d.failAt {
 		return errs.New("the second redirect URI write was refused")
@@ -59,7 +59,7 @@ func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder,
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
 	handlers.HandleDynamicClientRegistrationPost(db, auditLogger, dataCipher).ServeHTTP(rr, req)

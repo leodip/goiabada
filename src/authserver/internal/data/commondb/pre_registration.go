@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error {
+func (d *Database) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *Database) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	preRegistration.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	preRegistration.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
 		For(d.Flavor)
 
 	insertBuilder := preRegistrationStruct.WithoutTag("pk").InsertInto("pre_registrations", preRegistration)
@@ -35,7 +35,7 @@ func (d *Database) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	return nil
 }
 
-func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error {
+func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error {
 
 	if preRegistration.Id == 0 {
 		return errs.New("can't update preRegistration with id 0")
@@ -44,7 +44,7 @@ func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	originalUpdatedAt := preRegistration.UpdatedAt
 	preRegistration.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
 		For(d.Flavor)
 
 	updateBuilder := preRegistrationStruct.WithoutTag("pk").WithoutTag("dont-update").Update("pre_registrations", preRegistration)
@@ -61,7 +61,7 @@ func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 }
 
 func (d *Database) getPreRegistrationCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
+	preRegistrationStruct *sqlbuilder.Struct) (*record.PreRegistration, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -70,7 +70,7 @@ func (d *Database) getPreRegistrationCommon(ctx context.Context, tx *sql.Tx, sel
 	}
 	defer func() { _ = rows.Close() }()
 
-	var preRegistration models.PreRegistration
+	var preRegistration record.PreRegistration
 	if rows.Next() {
 		addr := preRegistrationStruct.Addr(&preRegistration)
 		err = rows.Scan(addr...)
@@ -86,9 +86,9 @@ func (d *Database) getPreRegistrationCommon(ctx context.Context, tx *sql.Tx, sel
 	return nil, nil
 }
 
-func (d *Database) GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error) {
+func (d *Database) GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRegistrationId int64) (*record.PreRegistration, error) {
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
 		For(d.Flavor)
 
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
@@ -104,7 +104,7 @@ func (d *Database) GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRe
 
 func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
+	clientStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("pre_registrations")
@@ -126,7 +126,7 @@ func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 //
 // Locating the row is not authenticating it. The caller still compares the submitted code
 // against the encrypted column and checks the code's expiry.
-func (d *Database) GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
+func (d *Database) GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.PreRegistration, error) {
 
 	// As on the user lookup: '' is the dormant value, so an empty codeHash reaching the
 	// query could match a row nobody supplied a code for.
@@ -134,7 +134,7 @@ func (d *Database) GetPreRegistrationByVerificationCodeHash(ctx context.Context,
 		return nil, nil
 	}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
 		For(d.Flavor)
 
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
@@ -148,9 +148,9 @@ func (d *Database) GetPreRegistrationByVerificationCodeHash(ctx context.Context,
 	return preRegistration, nil
 }
 
-func (d *Database) GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.PreRegistration, error) {
+func (d *Database) GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.PreRegistration, error) {
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
+	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
 		For(d.Flavor)
 
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")

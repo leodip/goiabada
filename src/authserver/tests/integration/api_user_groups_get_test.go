@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +19,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@user-groups.test"),
@@ -34,7 +34,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test groups
-	testGroup1 := &models.Group{
+	testGroup1 := &record.Group{
 		GroupIdentifier:  "user-group-1",
 		Description:      "User Group 1",
 		IncludeInIdToken: true,
@@ -45,7 +45,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
 	}()
 
-	testGroup2 := &models.Group{
+	testGroup2 := &record.Group{
 		GroupIdentifier:  "user-group-2",
 		Description:      "User Group 2",
 		IncludeInIdToken: false,
@@ -57,7 +57,7 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 	}()
 
 	// Setup: Assign user to group1 only
-	userGroup := &models.UserGroup{
+	userGroup := &record.UserGroup{
 		UserId:  testUser.Id,
 		GroupId: testGroup1.Id,
 	}
@@ -99,7 +99,7 @@ func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user without groups
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@no-groups.test"),
@@ -170,7 +170,7 @@ func TestAPIUserGroupsGet_InvalidId(t *testing.T) {
 
 func TestAPIUserGroupsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-groups.test"),

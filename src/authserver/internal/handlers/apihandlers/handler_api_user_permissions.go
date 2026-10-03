@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -18,14 +18,14 @@ import (
 // userPermissionsDatabase is what the user permission endpoints need: the user's grants and the
 // catalogue they are granted from.
 type userPermissionsDatabase interface {
-	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
+	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserPermission, error)
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 func HandleUserPermissionsGet(
@@ -139,8 +139,8 @@ func HandleUserPermissionsPut(
 			}
 		}
 
-		grantKey := func(up models.UserPermission) int64 { return up.PermissionId }
-		grantId := func(up models.UserPermission) int64 { return up.Id }
+		grantKey := func(up record.UserPermission) int64 { return up.PermissionId }
+		grantId := func(up record.UserPermission) int64 { return up.Id }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator revoking one permission and granting another ends with both changes or
@@ -173,7 +173,7 @@ func HandleUserPermissionsPut(
 				}
 			}
 			for _, permissionId := range insert {
-				if createErr := database.CreateUserPermission(r.Context(), tx, &models.UserPermission{
+				if createErr := database.CreateUserPermission(r.Context(), tx, &record.UserPermission{
 					UserId:       user.Id,
 					PermissionId: permissionId,
 				}); createErr != nil {

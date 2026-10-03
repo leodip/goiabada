@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,19 +20,19 @@ import (
 // enableImplicitFlowGlobally enables implicit flow at the settings level until the test ends.
 func enableImplicitFlowGlobally(t *testing.T) {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 }
 
 // createImplicitClientForPromptTests creates a client that supports both auth code
 // (for establishing sessions) and implicit flow (for prompt=none implicit tests).
-func createImplicitClientForPromptTests(t *testing.T) (*models.Client, *models.RedirectURI) {
-	client := &models.Client{
+func createImplicitClientForPromptTests(t *testing.T) (*record.Client, *record.RedirectURI) {
+	client := &record.Client{
 		ClientIdentifier:         "implicit-prompt-test-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true, // Needed for establishing session
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -40,7 +40,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*models.Client, *models.R
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}

@@ -11,8 +11,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +63,7 @@ func flipToConfidential(t *testing.T, adminToken string, clientId int64) string 
 
 // redeemCode exchanges a code this package's helpers issued. clientSecret is omitted when empty,
 // which is what a public client must do: decision 11 refuses a superfluous secret on every arm.
-func redeemCode(t *testing.T, httpClient *http.Client, code *models.Code, clientSecret string) map[string]interface{} {
+func redeemCode(t *testing.T, httpClient *http.Client, code *record.Code, clientSecret string) map[string]interface{} {
 	t.Helper()
 
 	form := url.Values{
@@ -102,7 +102,7 @@ func presentRefreshToken(t *testing.T, clientIdentifier, refreshToken, clientSec
 // than leaning on the seed.
 func requireDatabaseAuditLogs(t *testing.T) {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) { settings.AuditLogsInDatabaseEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 }
 
 // D1. The flip revokes, and the event says so.
@@ -175,7 +175,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -228,7 +228,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)
@@ -335,7 +335,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_SetsPKCERequired(t *testing.T) 
 	// Explicitly optional beforehand, so the assertion below cannot pass by the column having
 	// been left alone.
 	pkceOptional := false
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "flip-pkce-" + strings.ToLower(fake.LetterN(10)),
 		Enabled:                  true,
 		IsPublic:                 false,

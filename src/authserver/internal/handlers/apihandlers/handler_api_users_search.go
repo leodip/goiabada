@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging"
@@ -16,11 +16,11 @@ import (
 // usersSearchDatabase is what the user search endpoint needs: one page of users and the groups
 // and permissions each carries.
 type usersSearchDatabase interface {
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
-	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
-	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []models.User) error
-	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]record.User, int, error)
+	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []record.User) error
+	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []record.User) error
 }
 
 func HandleUsersSearchGet(

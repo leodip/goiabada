@@ -9,7 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,15 +17,15 @@ import (
 // row is one users row as the pre-flight reads it, with the engine's LOWER() agreeing with Go's.
 // Every hazard case below varies exactly one thing from this, which is what makes the passing
 // cases load-bearing: a check that refused everything would satisfy the refusals on its own.
-func row(id int64, email string) models.EmailCaseRow {
-	return models.EmailCaseRow{Id: id, Email: email, EngineLowered: strings.ToLower(email)}
+func row(id int64, email string) record.EmailCaseRow {
+	return record.EmailCaseRow{Id: id, Email: email, EngineLowered: strings.ToLower(email)}
 }
 
 // divergentRow is a row this engine's LOWER() does not reduce the way Go does: it is what SQLite
 // answers for any non-ASCII uppercase letter and what SQL Server answers for U+1E9E and U+212A,
 // and the reason the check compares rather than carrying a character list.
-func divergentRow(id int64, email string, engineLowered string) models.EmailCaseRow {
-	return models.EmailCaseRow{Id: id, Email: email, EngineLowered: engineLowered}
+func divergentRow(id int64, email string, engineLowered string) record.EmailCaseRow {
+	return record.EmailCaseRow{Id: id, Email: email, EngineLowered: engineLowered}
 }
 
 // TestCheckEmailCaseBeforeMigrating_Skips pins the three states in which the check reads nothing
@@ -93,7 +93,7 @@ func TestCheckEmailCaseBeforeMigrating_Skips(t *testing.T) {
 // them, so a message naming one row of a pair turns one outage into two.
 func TestCheckEmailCaseBeforeMigrating_RefusesACollision(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase(mock.Anything).Return([]models.EmailCaseRow{
+	db.EXPECT().ScanEmailCase(mock.Anything).Return([]record.EmailCaseRow{
 		row(1, "Alice@example.com"),
 		row(2, "alice@example.com"),
 		row(3, "bob@example.com"),
@@ -125,7 +125,7 @@ func TestCheckEmailCaseBeforeMigrating_RefusesACollision(t *testing.T) {
 // outcome this refusal exists to prevent.
 func TestCheckEmailCaseBeforeMigrating_RefusesAnAddressTheEngineWillNotReduce(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase(mock.Anything).Return([]models.EmailCaseRow{
+	db.EXPECT().ScanEmailCase(mock.Anything).Return([]record.EmailCaseRow{
 		row(1, "alice@example.com"),
 		// SQL Server and SQLite both leave U+1E9E alone; Go maps it to U+00DF.
 		divergentRow(2, "ẞ@example.com", "ẞ@example.com"),
@@ -153,7 +153,7 @@ func TestCheckEmailCaseBeforeMigrating_RefusesAnAddressTheEngineWillNotReduce(t 
 // that differ by more than case.
 func TestCheckEmailCaseBeforeMigrating_PassesACleanTable(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase(mock.Anything).Return([]models.EmailCaseRow{
+	db.EXPECT().ScanEmailCase(mock.Anything).Return([]record.EmailCaseRow{
 		row(1, "alice@example.com"),
 		row(2, "Bob@example.com"),
 		row(3, "bobby@example.com"),

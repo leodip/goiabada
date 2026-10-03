@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/api"
@@ -76,12 +76,12 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
-	var written *models.Client
+		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
+	var written *record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { written = args.Get(2).(*models.Client) }).Return(nil).Once()
+		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
 
-	stale := &models.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
+	stale := &record.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
 	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
 
 	require.NotNil(t, written)
@@ -121,15 +121,15 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
-	var written *models.Client
+		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
+	var written *record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { written = args.Get(2).(*models.Client) }).Return(nil).Once()
+		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
 
 	// A confidential client's legitimate settings, carried by a request that loaded it before it
 	// became public.
 	pkceOff := false
-	stale := &models.Client{
+	stale := &record.Client{
 		Id:                       7,
 		IsPublic:                 false,
 		PKCERequired:             &pkceOff,
@@ -158,13 +158,13 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: false}, nil).Once()
-	var written *models.Client
+		Return(&record.Client{Id: 7, IsPublic: false}, nil).Once()
+	var written *record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { written = args.Get(2).(*models.Client) }).Return(nil).Once()
+		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
 
 	pkceOff := false
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       7,
 		IsPublic:                 false,
 		PKCERequired:             &pkceOff,
@@ -189,7 +189,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
-	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7})
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7})
 	require.Error(t, err)
 	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper, which rolls back")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient")
@@ -207,7 +207,7 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
 
-	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7, IsPublic: true})
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7, IsPublic: true})
 	require.Error(t, err)
 	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper unchanged, which is what lets a real deadlock be rerun")
 	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient")
@@ -232,7 +232,7 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 
 	// The snapshot the handler works from: already public.
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
+		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
 	// What the write reports when it runs: it really did make the client public, because another
 	// request got there first with confidential mode and the grants it issued are the ones at
 	// stake. The handler must believe this over its own snapshot.
@@ -241,7 +241,7 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
 	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 
 	var revokedPayload map[string]interface{}
@@ -279,7 +279,7 @@ func TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSav
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
+		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).
 		Return(false, errors.New("no client with that id")).Once()
@@ -308,7 +308,7 @@ func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothin
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
+		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
 	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
@@ -337,18 +337,18 @@ func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicIn
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	pkceOptional := false
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.Client{
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.Client{
 		Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"),
 		ClientCredentialsEnabled: true, PKCERequired: &pkceOptional,
 	}, nil).Once()
 	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
-	var written models.Client
+	var written record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { written = *args.Get(2).(*models.Client) }).Return(nil).Once()
+		Run(func(args mock.Arguments) { written = *args.Get(2).(*record.Client) }).Return(nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
 	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
@@ -423,15 +423,15 @@ func webOriginsPutRequest(t *testing.T, id string, body string) *http.Request {
 // flow needs a web origin, and a client with no redirect-based flow must still be saved (#250).
 func expectWebOriginsClient(database *mocks_data.Database) {
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: false}, nil).Once()
+		Return(&record.Client{Id: 7, AuthorizationCodeEnabled: false}, nil).Once()
 }
 
 // expectStoredWebOrigins registers the read of the stored list on the save's transaction,
 // answering the rows given.
-func expectStoredWebOrigins(database *mocks_data.Database, rows ...models.WebOrigin) {
+func expectStoredWebOrigins(database *mocks_data.Database, rows ...record.WebOrigin) {
 	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).WebOrigins = append([]models.WebOrigin(nil), rows...)
+			args.Get(2).(*record.Client).WebOrigins = append([]record.WebOrigin(nil), rows...)
 		}).Return(nil).Once()
 }
 
@@ -449,8 +449,8 @@ func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.
 	note := func(edge string) { order = append(order, edge) }
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectStoredWebOrigins(database,
-		models.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
-		models.WebOrigin{Id: 12, ClientId: 7, Origin: "https://keep.example.com"},
+		record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
+		record.WebOrigin{Id: 12, ClientId: 7, Origin: "https://keep.example.com"},
 	)
 	var deleted []int64
 	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
@@ -461,7 +461,7 @@ func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.
 	var created []string
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			wo := args.Get(2).(*models.WebOrigin)
+			wo := args.Get(2).(*record.WebOrigin)
 			assert.Equal(t, int64(7), wo.ClientId)
 			created = append(created, wo.Origin)
 			order = append(order, "insert")
@@ -499,7 +499,7 @@ func TestHandleClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 
 	expectWebOriginsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredWebOrigins(database, models.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"})
+	expectStoredWebOrigins(database, record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"})
 	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
@@ -631,7 +631,7 @@ func TestHandleClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T
 // canonicalOriginOfLength is a canonical origin of exactly n bytes: "https://" plus a host of
 // 63-character labels and one shorter label, plus ":65535". urlmatch.CanonicalOrigin bounds no
 // host's length, so every n from 30 up canonicalizes, which is what lets the two boundary cases
-// below sit either side of models.WebOriginMaxBytes on length alone.
+// below sit either side of record.WebOriginMaxBytes on length alone.
 func canonicalOriginOfLength(t *testing.T, n int) string {
 	t.Helper()
 	const prefix, port = "https://", ":65535"
@@ -651,7 +651,7 @@ func canonicalOriginOfLength(t *testing.T, n int) string {
 }
 
 // A canonical origin one byte longer than the column is refused rather than stored.
-// web_origins.origin is 267 wide (models.WebOriginMaxBytes) on MySQL, PostgreSQL and SQL Server,
+// web_origins.origin is 267 wide (record.WebOriginMaxBytes) on MySQL, PostgreSQL and SQL Server,
 // so an unbounded save would be a 500 on three engines out of four and a silent success on sqlite,
 // which is the only engine the local integration tier runs (#250, #428). The value canonicalizes
 // cleanly and is refused purely on length, which is what separates this from the invalid-origin
@@ -665,7 +665,7 @@ func TestHandleClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing
 
 	expectWebOriginsClient(database)
 
-	// A literal rather than models.WebOriginMaxBytes+1, so the case pins the number itself: a bound
+	// A literal rather than record.WebOriginMaxBytes+1, so the case pins the number itself: a bound
 	// raised past the column moves with a derived value and is caught only by a literal one.
 	origin := canonicalOriginOfLength(t, 268)
 
@@ -679,7 +679,7 @@ func TestHandleClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
-// The other side of the bound: a canonical origin of exactly 267 bytes, models.WebOriginMaxBytes and
+// The other side of the bound: a canonical origin of exactly 267 bytes, record.WebOriginMaxBytes and
 // the longest standards-valid origin, is written. It reaches CreateWebOrigin on the save's
 // transaction, which is what separates an admitted value from one refused before the write (#428).
 func TestHandleClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
@@ -693,7 +693,7 @@ func TestHandleClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 	expectStoredWebOrigins(database)
 	var created string
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { created = args.Get(2).(*models.WebOrigin).Origin }).Return(nil).Once()
+		Run(func(args mock.Arguments) { created = args.Get(2).(*record.WebOrigin).Origin }).Return(nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedWebOrigins, mock.Anything).Return().Once()
 
@@ -743,8 +743,8 @@ func TestHandleClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	expectWebOriginsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredWebOrigins(database,
-		models.WebOrigin{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
-		models.WebOrigin{Id: 12, ClientId: 7, Origin: "https://added-meanwhile.example.com"},
+		record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
+		record.WebOrigin{Id: 12, ClientId: 7, Origin: "https://added-meanwhile.example.com"},
 	)
 
 	rr := httptest.NewRecorder()
@@ -767,12 +767,12 @@ func TestHandleClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 func TestHandleClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	tests := []struct {
 		name     string
-		stored   []models.WebOrigin
+		stored   []record.WebOrigin
 		expected []string
 	}{
 		{
 			name: "another order, a repeat and a non-canonical spelling",
-			stored: []models.WebOrigin{
+			stored: []record.WebOrigin{
 				{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
 				{Id: 12, ClientId: 7, Origin: "https://b.example.com"},
 			},
@@ -885,7 +885,7 @@ func redirectURIsBody(t *testing.T, wanted, expected []string) string {
 func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/redirect-uris", strings.NewReader(body))
-	r = r.WithContext(reqctx.WithSettings(r.Context(), &models.Settings{}))
+	r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
 	return setChiURLParam(r, "id", id)
 }
 
@@ -893,15 +893,15 @@ func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request 
 // client whose authorization code flow is on, so the flow gate lets the request through.
 func expectRedirectURIsClient(database *mocks_data.Database) {
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+		Return(&record.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 }
 
 // expectStoredRedirectURIs registers the read of the stored list on the save's transaction,
 // answering the rows given.
-func expectStoredRedirectURIs(database *mocks_data.Database, rows ...models.RedirectURI) {
+func expectStoredRedirectURIs(database *mocks_data.Database, rows ...record.RedirectURI) {
 	database.On("ClientLoadRedirectURIs", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).RedirectURIs = append([]models.RedirectURI(nil), rows...)
+			args.Get(2).(*record.Client).RedirectURIs = append([]record.RedirectURI(nil), rows...)
 		}).Return(nil).Once()
 }
 
@@ -932,9 +932,9 @@ func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testin
 	note := func(edge string) { order = append(order, edge) }
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectStoredRedirectURIs(database,
-		models.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"},
-		models.RedirectURI{Id: 12, ClientId: 7, URI: "https://keep.example.com/cb"},
-		models.RedirectURI{Id: 13, ClientId: 7, URI: "https://keep.example.com/cb"},
+		record.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"},
+		record.RedirectURI{Id: 12, ClientId: 7, URI: "https://keep.example.com/cb"},
+		record.RedirectURI{Id: 13, ClientId: 7, URI: "https://keep.example.com/cb"},
 	)
 	var deleted []int64
 	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
@@ -945,7 +945,7 @@ func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testin
 	var created []string
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			ru := args.Get(2).(*models.RedirectURI)
+			ru := args.Get(2).(*record.RedirectURI)
 			assert.Equal(t, int64(7), ru.ClientId)
 			created = append(created, ru.URI)
 			order = append(order, "insert")
@@ -978,7 +978,7 @@ func TestHandleClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
 
 	expectRedirectURIsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredRedirectURIs(database, models.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"})
+	expectStoredRedirectURIs(database, record.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"})
 	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
@@ -1081,8 +1081,8 @@ func TestHandleClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T)
 	expectRedirectURIsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredRedirectURIs(database,
-		models.RedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
-		models.RedirectURI{Id: 12, ClientId: 7, URI: "https://added-meanwhile.example.com/cb"},
+		record.RedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
+		record.RedirectURI{Id: 12, ClientId: 7, URI: "https://added-meanwhile.example.com/cb"},
 	)
 
 	rr := httptest.NewRecorder()
@@ -1104,12 +1104,12 @@ func TestHandleClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T)
 func TestHandleClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	tests := []struct {
 		name     string
-		stored   []models.RedirectURI
+		stored   []record.RedirectURI
 		expected []string
 	}{
 		{
 			name: "another order, a repeat and surrounding spaces",
-			stored: []models.RedirectURI{
+			stored: []record.RedirectURI{
 				{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
 				{Id: 12, ClientId: 7, URI: "https://b.example.com/cb"},
 			},
@@ -1250,7 +1250,7 @@ func TestHandleClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
 	expectStoredRedirectURIs(database)
 	var created []string
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { created = append(created, args.Get(2).(*models.RedirectURI).URI) }).
+		Run(func(args mock.Arguments) { created = append(created, args.Get(2).(*record.RedirectURI).URI) }).
 		Return(nil).Times(60)
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()

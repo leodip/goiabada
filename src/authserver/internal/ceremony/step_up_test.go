@@ -3,7 +3,7 @@ package ceremony
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,12 +13,12 @@ import (
 
 func TestTargetRequiresSecondFactor(t *testing.T) {
 	testCases := []struct {
-		target models.AcrLevel
+		target record.AcrLevel
 		want   bool
 	}{
-		{models.AcrLevel1, false},
-		{models.AcrLevel2Optional, true},
-		{models.AcrLevel2Mandatory, true},
+		{record.AcrLevel1, false},
+		{record.AcrLevel2Optional, true},
+		{record.AcrLevel2Mandatory, true},
 		// A level outside the three ranks below level 1, so it asks nothing.
 		{"", false},
 		{"urn:goiabada:level3", false},
@@ -33,12 +33,12 @@ func TestTargetRequiresSecondFactor(t *testing.T) {
 
 func TestStepUpOwed_NoSession(t *testing.T) {
 	testCases := []struct {
-		target models.AcrLevel
+		target record.AcrLevel
 		want   StepUp
 	}{
-		{models.AcrLevel1, StepUpNone},
-		{models.AcrLevel2Optional, StepUpLevel},
-		{models.AcrLevel2Mandatory, StepUpLevel},
+		{record.AcrLevel1, StepUpNone},
+		{record.AcrLevel2Optional, StepUpLevel},
+		{record.AcrLevel2Mandatory, StepUpLevel},
 		{"", StepUpNone},
 	}
 
@@ -54,15 +54,15 @@ func TestStepUpOwed_NoSession(t *testing.T) {
 
 func TestStepUpOwed_Session(t *testing.T) {
 	const (
-		level1    = models.AcrLevel1
-		optional  = models.AcrLevel2Optional
-		mandatory = models.AcrLevel2Mandatory
+		level1    = record.AcrLevel1
+		optional  = record.AcrLevel2Optional
+		mandatory = record.AcrLevel2Mandatory
 	)
 
 	testCases := []struct {
 		name          string
-		target        models.AcrLevel
-		sessionAcr    models.AcrLevel
+		target        record.AcrLevel
+		sessionAcr    record.AcrLevel
 		sessionOtpGen int64
 		userOtpGen    int64
 		want          StepUp
@@ -98,10 +98,10 @@ func TestStepUpOwed_Session(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			session := &models.UserSession{
+			session := &record.UserSession{
 				AcrLevel:            tc.sessionAcr,
 				OtpConfigGeneration: tc.sessionOtpGen,
-				User:                models.User{OtpConfigGeneration: tc.userOtpGen},
+				User:                record.User{OtpConfigGeneration: tc.userOtpGen},
 			}
 
 			got, err := StepUpOwed(tc.target, session)
@@ -113,9 +113,9 @@ func TestStepUpOwed_Session(t *testing.T) {
 }
 
 func TestStepUpOwed_UnparsableSessionAcr(t *testing.T) {
-	for _, target := range []models.AcrLevel{models.AcrLevel1, models.AcrLevel2Mandatory} {
+	for _, target := range []record.AcrLevel{record.AcrLevel1, record.AcrLevel2Mandatory} {
 		t.Run(string(target), func(t *testing.T) {
-			session := &models.UserSession{AcrLevel: "urn:goiabada:unknown"}
+			session := &record.UserSession{AcrLevel: "urn:goiabada:unknown"}
 
 			_, err := StepUpOwed(target, session)
 

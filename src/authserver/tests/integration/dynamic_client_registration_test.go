@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ import (
 // TestDCR_Disabled_Returns403 verifies that DCR returns 403 when feature is disabled (RFC 7591 §3)
 func TestDCR_Disabled_Returns403(t *testing.T) {
 	// Ensure DCR is disabled
-	changeSettings(t, func(settings *models.Settings) { settings.DynamicClientRegistrationEnabled = false })
+	changeSettings(t, func(settings *record.Settings) { settings.DynamicClientRegistrationEnabled = false })
 
 	// Attempt to register a client
 	reqBody := oidc.DynamicClientRegistrationRequest{
@@ -538,7 +538,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 	})
 
 	t.Run("DCR disabled - registration_endpoint absent", func(t *testing.T) {
-		changeSettings(t, func(settings *models.Settings) { settings.DynamicClientRegistrationEnabled = false })
+		changeSettings(t, func(settings *record.Settings) { settings.DynamicClientRegistrationEnabled = false })
 
 		httpClient := createHttpClient(t)
 		wellKnownURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
@@ -623,7 +623,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	assert.NoError(t, err)
 
-	assert.Equal(t, models.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
+	assert.Equal(t, record.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
 
 	// Verify token expiration uses global settings
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
@@ -661,7 +661,7 @@ func makeDCRRequest(t *testing.T, body oidc.DynamicClientRegistrationRequest) *h
 // handler, or it is asserting against defaults the test itself chose (#108).
 //
 // The caller owns the setting: call enableDCR before.
-func registerDCRClient(t *testing.T, clientName string, redirectURI string) *models.Client {
+func registerDCRClient(t *testing.T, clientName string, redirectURI string) *record.Client {
 	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{redirectURI},
 		ClientName:   clientName,
@@ -683,7 +683,7 @@ func registerDCRClient(t *testing.T, clientName string, redirectURI string) *mod
 // enableDCR enables Dynamic Client Registration until the test ends.
 func enableDCR(t *testing.T) {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) { settings.DynamicClientRegistrationEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.DynamicClientRegistrationEnabled = true })
 }
 
 // TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly covers the one creation path that makes a
@@ -785,7 +785,7 @@ func TestDCR_RefusalsForBoundsAndInconsistentGrantsCreateNothing(t *testing.T) {
 
 	adminToken, _ := createAdminClientWithToken(t)
 
-	tooMany := make([]string, models.RedirectURIsMaxPerClient+1)
+	tooMany := make([]string, record.RedirectURIsMaxPerClient+1)
 	for i := range tooMany {
 		tooMany[i] = fmt.Sprintf("https://dcr-bounds.example.com/callback/%d", i)
 	}
@@ -804,7 +804,7 @@ func TestDCR_RefusalsForBoundsAndInconsistentGrantsCreateNothing(t *testing.T) {
 			RedirectURIs: tooMany,
 		}, oidc.DCRErrorInvalidRedirectURI},
 		{"a redirect URI of 2049 bytes", oidc.DynamicClientRegistrationRequest{
-			RedirectURIs: []string{httpsRedirectURIOfBytes(t, "dcr-bounds.example.com", models.RedirectURIMaxBytes+1)},
+			RedirectURIs: []string{httpsRedirectURIOfBytes(t, "dcr-bounds.example.com", record.RedirectURIMaxBytes+1)},
 		}, oidc.DCRErrorInvalidRedirectURI},
 		{"a redirect URI listed twice", oidc.DynamicClientRegistrationRequest{
 			RedirectURIs: []string{"https://dcr-bounds.example.com/cb", "https://dcr-bounds.example.com/cb"},
@@ -836,8 +836,8 @@ func TestDCR_ARegistrationAtTheBoundsIsStoredWhole(t *testing.T) {
 
 	adminToken, _ := createAdminClientWithToken(t)
 
-	uris := make([]string, models.RedirectURIsMaxPerClient)
-	uris[0] = httpsRedirectURIOfBytes(t, "dcr-bounds.example.com", models.RedirectURIMaxBytes)
+	uris := make([]string, record.RedirectURIsMaxPerClient)
+	uris[0] = httpsRedirectURIOfBytes(t, "dcr-bounds.example.com", record.RedirectURIMaxBytes)
 	for i := 1; i < len(uris); i++ {
 		uris[i] = fmt.Sprintf("https://dcr-bounds.example.com/callback/%d", i)
 	}
@@ -878,7 +878,7 @@ func TestDCR_ARegistrationAtTheBoundsIsStoredWhole(t *testing.T) {
 func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *testing.T) {
 	enableDCR(t)
 
-	redirectURI := httpsRedirectURIOfBytes(t, "dcr-long.example.com", models.RedirectURIMaxBytes)
+	redirectURI := httpsRedirectURIOfBytes(t, "dcr-long.example.com", record.RedirectURIMaxBytes)
 
 	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
 		ClientName:              "Long Callback",

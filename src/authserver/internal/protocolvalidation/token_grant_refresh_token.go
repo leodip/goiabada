@@ -11,9 +11,9 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -40,8 +40,8 @@ const invalidRefreshTokenMessage = "The refresh token is invalid."
 // code, so its user and client are on the token row; an authorization code's are on
 // RefreshToken.Code, loaded by the validator.
 type RefreshTokenGrant struct {
-	Client         *models.Client
-	RefreshToken   *models.RefreshToken
+	Client         *record.Client
+	RefreshToken   *record.RefreshToken
 	ScopeRequested string
 	IsROPC         bool
 }
@@ -52,8 +52,8 @@ func (*RefreshTokenGrant) GrantType() oidc.GrantType { return oidc.GrantTypeRefr
 // ValidateTokenRequest has already found and found enabled. It serves both shapes of refresh
 // token: one descended from an authorization code, and one the password grant issued, which has
 // no code.
-func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settings *models.Settings,
-	client *models.Client, input *ValidateTokenRequestInput) (*RefreshTokenGrant, error) {
+func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settings *record.Settings,
+	client *record.Client, input *ValidateTokenRequestInput) (*RefreshTokenGrant, error) {
 	// No flow rule lives on this arm, deliberately. A refresh is governed by the switch
 	// of the flow that ISSUED the token, and which flow that was is not known here: the
 	// method reads the presented token's linkage further below, and the client's flags
@@ -113,7 +113,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	var tokenUserId int64
 	var tokenScope string
 	// tokenUser is the grant's user as loaded: the token row's for ROPC, the code's otherwise.
-	var tokenUser *models.User
+	var tokenUser *record.User
 
 	if isROPCToken {
 		// ROPC refresh token - load User and Client directly from RefreshToken

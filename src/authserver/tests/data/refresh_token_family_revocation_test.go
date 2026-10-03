@@ -11,7 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -364,12 +364,12 @@ func TestRefreshTokenFamilyRevocation_MethodsEnlistInTheCallersTransaction(t *te
 
 // seedFamilyMembers writes one refresh token per entry of revoked, all in the family, in the ROPC
 // shape (user and client on the row, no code). Each reports whether it is revoked.
-func seedFamilyMembers(t *testing.T, family string, revoked ...bool) []*models.RefreshToken {
+func seedFamilyMembers(t *testing.T, family string, revoked ...bool) []*record.RefreshToken {
 	t.Helper()
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	members := make([]*models.RefreshToken, 0, len(revoked))
+	members := make([]*record.RefreshToken, 0, len(revoked))
 	for _, isRevoked := range revoked {
 		members = append(members, seedFamilyToken(t, familyTokenSpec{
 			FamilyJti: family, UserId: user.Id, ClientId: client.Id, Revoked: isRevoked,

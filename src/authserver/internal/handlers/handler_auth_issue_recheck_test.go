@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -43,9 +43,9 @@ type recheckFixture struct {
 	implicitIssuer *mocks_handlers.ImplicitTokenIssuer
 	database       *mocks_data.Database
 	auditLogger    *mocks_handlers.AuditLogger
-	settings       *models.Settings
-	client         *models.Client
-	user           *models.User
+	settings       *record.Settings
+	client         *record.Client
+	user           *record.User
 	authContext    *ceremony.AuthContext
 	req            *http.Request
 	rr             *httptest.ResponseRecorder
@@ -76,13 +76,13 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 		implicitIssuer: mocks_handlers.NewImplicitTokenIssuer(t),
 		database:       mocks_data.NewDatabase(t),
 		auditLogger:    mocks_handlers.NewAuditLogger(t),
-		settings: &models.Settings{
+		settings: &record.Settings{
 			UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds,
 		},
-		client: &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
+		client: &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
 			AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed},
-		user: &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true,
+		user: &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true,
 			AuthStateGeneration: recheckGeneration},
 		authContext: &ceremony.AuthContext{
 			CeremonyId:          testCeremonyId,
@@ -95,7 +95,7 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 			RequestedScope:      "openid",
 			State:               "test-state",
 			Nonce:               "test-nonce",
-			AcrLevel:            models.AcrLevel1,
+			AcrLevel:            record.AcrLevel1,
 			AuthMethods:         "pwd",
 			Prompt:              prompt,
 			AuthStateGeneration: recheckGeneration,
@@ -116,21 +116,21 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 		Return(f.client, nil).Maybe()
 	f.database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: callback}}
+			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: callback}}
 		}).Return(nil).Maybe()
 	f.database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
-		Return([]models.RedirectURI{{URI: callback}}, nil).Maybe()
+		Return([]record.RedirectURI{{URI: callback}}, nil).Maybe()
 	f.database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(f.user, nil).Maybe()
 	f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
+		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
 
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	// As the real manager answers: a row that does not resolve is not valid.
 	userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).
-		Return(func(session *models.UserSession, _ int, _ int, _ *int64) bool { return session != nil }).Maybe()
+		Return(func(session *record.UserSession, _ int, _ int, _ *int64) bool { return session != nil }).Maybe()
 	permissionChecker := mocks_handlers.NewPermissionChecker(t)
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
-		Return(func(_ context.Context, scope string, _ *models.User) string { return scope }, nil).Maybe()
+		Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
 
 	handler := HandleIssueGet(f.pageRenderer, f.ceremonyStore, fstest.MapFS{}, f.codeIssuer, f.implicitIssuer,
 		f.database, f.auditLogger, userSessionManager, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
@@ -209,9 +209,9 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 
 		assert.Empty(t, f.rr.Header().Get("Location"))
 		var logged bool
-		for _, record := range logs.Records() {
-			logged = logged || (record.Level.String() == "ERROR" &&
-				record.Message == "unable to clear the auth context while refusing a disabled client, rendering the refusal anyway")
+		for _, logRecord := range logs.Records() {
+			logged = logged || (logRecord.Level.String() == "ERROR" &&
+				logRecord.Message == "unable to clear the auth context while refusing a disabled client, rendering the refusal anyway")
 		}
 		assert.True(t, logged, "the failed clear is an Error record")
 		f.pageRenderer.AssertExpectations(t)
@@ -305,7 +305,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 		f.client.ImplicitGrantEnabled = &off
 
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&models.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
@@ -403,9 +403,9 @@ func TestHandleIssueGet_AStaleGenerationRestartsTheCeremony(t *testing.T) {
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 
-			record, ok := warningSaying(t, logs, "authentication generation has moved on")
+			warning, ok := warningSaying(t, logs, "authentication generation has moved on")
 			if ok {
-				assert.EqualValues(t, 123, record.Attrs["ceremony_user_id"])
+				assert.EqualValues(t, 123, warning.Attrs["ceremony_user_id"])
 			}
 		})
 

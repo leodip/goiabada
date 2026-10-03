@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pquerna/otp/totp"
@@ -186,7 +186,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	level1Id := decodeSessionIdentifier(t, level1Cookie)
 
 	// A second client, wanting level 2 from the same browser.
-	level2Client, level2RedirectUri := newClientAndRedirectUri(t, models.AcrLevel2Mandatory)
+	level2Client, level2RedirectUri := newClientAndRedirectUri(t, record.AcrLevel2Mandatory)
 
 	resp = beginAuthorize(t, httpClient, level2Client, level2RedirectUri)
 	defer func() { _ = resp.Body.Close() }()
@@ -351,7 +351,7 @@ func decodeSessionIdentifier(t *testing.T, cookie *http.Cookie) string {
 // and checks the server does not treat it as a session. This is the assertion that says a
 // rotation invalidated the old handle rather than issuing a new one beside it.
 func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
-	client *models.Client, redirectUri *models.RedirectURI) {
+	client *record.Client, redirectUri *record.RedirectURI) {
 	t.Helper()
 
 	replay := createHttpClient(t)
@@ -371,16 +371,16 @@ func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
 
 // newLevel1Actors is the cast of a plain password ceremony: a client that wants level 1, a
 // redirect URI, and a user with a known password.
-func newLevel1Actors(t *testing.T) (*models.Client, *models.RedirectURI, *models.User, string) {
+func newLevel1Actors(t *testing.T) (*record.Client, *record.RedirectURI, *record.User, string) {
 	t.Helper()
 
-	client, redirectUri := newClientAndRedirectUri(t, models.AcrLevel1)
+	client, redirectUri := newClientAndRedirectUri(t, record.AcrLevel1)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -391,10 +391,10 @@ func newLevel1Actors(t *testing.T) (*models.Client, *models.RedirectURI, *models
 	return client, redirectUri, user, password
 }
 
-func newClientAndRedirectUri(t *testing.T, acrLevel models.AcrLevel) (*models.Client, *models.RedirectURI) {
+func newClientAndRedirectUri(t *testing.T, acrLevel record.AcrLevel) (*record.Client, *record.RedirectURI) {
 	t.Helper()
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -403,14 +403,14 @@ func newClientAndRedirectUri(t *testing.T, acrLevel models.AcrLevel) (*models.Cl
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 
 	return client, redirectUri
 }
 
 func beginAuthorize(t *testing.T, httpClient *http.Client,
-	client *models.Client, redirectUri *models.RedirectURI) *http.Response {
+	client *record.Client, redirectUri *record.RedirectURI) *http.Response {
 	t.Helper()
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +

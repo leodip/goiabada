@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,7 +19,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -35,7 +35,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                1,
 		ClientId:          1,
 		UserId:            1,
@@ -44,13 +44,13 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 172800,
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      1,
 		Subject: sub,
 	}
@@ -58,7 +58,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 
@@ -89,7 +89,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                          "https://test-issuer.com",
 		UserSessionIdleTimeoutInSeconds: 1800,
 		UserSessionMaxLifetimeInSeconds: 43200,
@@ -105,7 +105,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                2,
 		ClientId:          2,
 		UserId:            2,
@@ -114,11 +114,11 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 		AuthenticatedAt:   now.Add(-10 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:               2,
 		ClientIdentifier: "refresh-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      2,
 		Subject: sub,
 	}
@@ -126,8 +126,8 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 		Id:           1,
 		UserId:       2,
 		Started:      now.Add(-30 * time.Minute),
@@ -163,7 +163,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -179,7 +179,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                3,
 		ClientId:          3,
 		UserId:            3,
@@ -188,11 +188,11 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 		AuthenticatedAt:   now.Add(-15 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:               3,
 		ClientIdentifier: "existing-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      3,
 		Subject: sub,
 	}
@@ -200,14 +200,14 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	existingRefreshToken := &models.RefreshToken{
+	existingRefreshToken := &record.RefreshToken{
 		Id:                   1,
 		RefreshTokenJti:      "existing-jti",
 		FirstRefreshTokenJti: "first-jti",
 		MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 	}
 
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken)
 
@@ -233,7 +233,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 	mockDB.AssertExpectations(t)
 
-	mockDB.AssertCalled(t, "CreateRefreshToken", mock.Anything, mock.Anything, mock.MatchedBy(func(rt *models.RefreshToken) bool {
+	mockDB.AssertCalled(t, "CreateRefreshToken", mock.Anything, mock.Anything, mock.MatchedBy(func(rt *record.RefreshToken) bool {
 		return rt.PreviousRefreshTokenJti == "existing-jti" &&
 			rt.FirstRefreshTokenJti == "first-jti"
 	}))
@@ -243,7 +243,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,  // 1 hour
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400, // 24 hours
@@ -259,7 +259,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                4,
 		ClientId:          4,
 		UserId:            4,
@@ -268,13 +268,13 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 		AuthenticatedAt:   initialTime.Add(-22 * time.Hour), // 22 hours ago
 		SessionIdentifier: sessionIdentifier,
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      4,
 		ClientIdentifier:                        "max-lifetime-client",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,   // 2 hours
 		RefreshTokenOfflineMaxLifetimeInSeconds: 172800, // 48 hours (client setting)
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      4,
 		Subject: sub,
 	}
@@ -282,12 +282,12 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	// Simulate two previous refresh token generations
 	secondRefreshTime := initialTime.Add(-1 * time.Hour)
 
-	secondRefreshToken := &models.RefreshToken{
+	secondRefreshToken := &record.RefreshToken{
 		Id:                      2,
 		RefreshTokenJti:         "second-jti",
 		FirstRefreshTokenJti:    "first-jti",
@@ -331,7 +331,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	assert.LessOrEqual(t, expUnix, maxLifetimeUnix, "Refresh token expiration should not exceed the max lifetime")
 
 	// Verify that the correct previous and first refresh token JTIs are used
-	mockDB.AssertCalled(t, "CreateRefreshToken", mock.Anything, mock.Anything, mock.MatchedBy(func(rt *models.RefreshToken) bool {
+	mockDB.AssertCalled(t, "CreateRefreshToken", mock.Anything, mock.Anything, mock.MatchedBy(func(rt *record.RefreshToken) bool {
 		return rt.PreviousRefreshTokenJti == "second-jti" &&
 			rt.FirstRefreshTokenJti == "first-jti"
 	}))
@@ -342,11 +342,11 @@ func TestGetRefreshTokenExpiration(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
-	settings := &models.Settings{
+	settings := &record.Settings{
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		UserSessionIdleTimeoutInSeconds:         1800,
 	}
-	client := &models.Client{
+	client := &record.Client{
 		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,
 	}
 
@@ -405,11 +405,11 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	now := time.Now().UTC()
-	settings := &models.Settings{
+	settings := &record.Settings{
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 		UserSessionMaxLifetimeInSeconds:         43200,
 	}
-	client := &models.Client{
+	client := &record.Client{
 		RefreshTokenOfflineMaxLifetimeInSeconds: 172800,
 	}
 	sessionIdentifier := "test-session-123"
@@ -419,7 +419,7 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 		refreshTokenType TokenType
 		expectedLifetime int64
 		expectedError    bool
-		mockUserSession  *models.UserSession
+		mockUserSession  *record.UserSession
 	}{
 		{
 			name:             "Offline token with client override",
@@ -438,7 +438,7 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 			refreshTokenType: TokenTypeRefresh,
 			expectedLifetime: now.Add(43200 * time.Second).Unix(),
 			expectedError:    false,
-			mockUserSession: &models.UserSession{
+			mockUserSession: &record.UserSession{
 				Started: now,
 			},
 		},

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,19 +24,19 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 	httpClient, _, _, _, _ := createSessionWithAcrLevel1AndPassword(t)
 
 	// Create a different client with DefaultAcrLevel=level2_optional
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -124,19 +124,19 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 	httpClient, _, _, _, _ := createSessionWithAcrLevel1AndPassword(t)
 
 	// Create client with DefaultAcrLevel=level2_optional
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -160,7 +160,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none" +
-		"&acr_values=" + models.AcrLevel1.String()
+		"&acr_values=" + record.AcrLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -278,13 +278,13 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -294,7 +294,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -309,7 +309,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -431,13 +431,13 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -447,7 +447,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -462,7 +462,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -589,13 +589,13 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -605,7 +605,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -620,7 +620,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -748,13 +748,13 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -764,7 +764,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -779,7 +779,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -898,13 +898,13 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         true,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -914,7 +914,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -929,7 +929,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -941,7 +941,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	}
 
 	// Create consent including offline_access
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile offline_access",
@@ -1088,13 +1088,13 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -1104,7 +1104,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -1119,7 +1119,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -1235,13 +1235,13 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -1251,7 +1251,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -1266,7 +1266,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

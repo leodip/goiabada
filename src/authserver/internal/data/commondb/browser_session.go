@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -19,7 +19,7 @@ import (
 // empty value can only be a caller bug, and matching on one would either return
 // somebody else's row or sweep rows the caller never named.
 
-func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error {
+func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error {
 
 	if browserSession.Owner == "" {
 		return errs.New("can't create a browser session with an empty owner")
@@ -36,7 +36,7 @@ func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browser
 	browserSession.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	browserSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(models.BrowserSession)).
+	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
 		For(d.Flavor)
 
 	insertBuilder := browserSessionStruct.WithoutTag("pk").InsertInto("browser_sessions", browserSession)
@@ -66,7 +66,7 @@ func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browser
 // session, including rows.Err(), which is where a driver reports a fault it deferred to
 // the result set rather than returning from the query.
 func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string,
-	now time.Time) (*models.BrowserSession, error) {
+	now time.Time) (*record.BrowserSession, error) {
 
 	if owner == "" {
 		return nil, errs.New("can't get a browser session with an empty owner")
@@ -76,7 +76,7 @@ func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context,
 		return nil, errs.New("can't get a browser session with an empty session id hash")
 	}
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(models.BrowserSession)).
+	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
 		For(d.Flavor)
 
 	selectBuilder := browserSessionStruct.SelectFrom("browser_sessions")
@@ -93,7 +93,7 @@ func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context,
 	}
 	defer func() { _ = rows.Close() }()
 
-	var browserSession models.BrowserSession
+	var browserSession record.BrowserSession
 	if rows.Next() {
 		addr := browserSessionStruct.Addr(&browserSession)
 		err = rows.Scan(addr...)
@@ -255,7 +255,7 @@ func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, 
 		return errs.New("can't delete a browser session with an empty session id hash")
 	}
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(models.BrowserSession)).
+	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
 		For(d.Flavor)
 
 	deleteBuilder := browserSessionStruct.DeleteFrom("browser_sessions")
@@ -279,7 +279,7 @@ func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, 
 // a session end.
 func (d *Database) DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error {
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(models.BrowserSession)).
+	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
 		For(d.Flavor)
 
 	deleteBuilder := browserSessionStruct.DeleteFrom("browser_sessions")

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,12 +43,12 @@ func TestToken_ClientDoesNotExist(t *testing.T) {
 func TestToken_InvalidGrantType(t *testing.T) {
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,13 +43,13 @@ func TestCreateAuthCode(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
-	testClient := &models.Client{
+	testClient := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	input := &CreateCodeInput{
 		ClientId:            "test-client",
@@ -64,7 +64,7 @@ func TestCreateAuthCode(t *testing.T) {
 		UserAgent:           "Mozilla/5.0",
 		ResponseMode:        "query",
 		IpAddress:           "127.0.0.1",
-		AcrLevel:            models.AcrLevel1,
+		AcrLevel:            record.AcrLevel1,
 		AuthMethods:         "pwd",
 		SessionIdentifier:   "session123",
 	}
@@ -139,12 +139,12 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 			codeIssuer := NewCodeIssuer(mockDB)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+				&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 
 			var persisted string
-			mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Run(
+			mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Run(
 				func(args mock.Arguments) {
-					persisted = args.Get(2).(*models.Code).UserAgent
+					persisted = args.Get(2).(*record.Code).UserAgent
 				}).Return(nil)
 
 			_, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
@@ -156,7 +156,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 				UserAgent:         tc.userAgent,
 				ResponseMode:      "query",
 				IpAddress:         "127.0.0.1",
-				AcrLevel:          models.AcrLevel1,
+				AcrLevel:          record.AcrLevel1,
 				AuthMethods:       "pwd",
 				SessionIdentifier: "session123",
 			})
@@ -174,13 +174,13 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
-	testClient := &models.Client{
+	testClient := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	input := &CreateCodeInput{
 		ClientId: "test-client",
@@ -202,13 +202,13 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
-	testClient := &models.Client{
+	testClient := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	testCases := []struct {
 		name           string
@@ -261,13 +261,13 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	codeIssuer := NewCodeIssuer(mockDB)
 
-	testClient := &models.Client{
+	testClient := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(errors.New("database error"))
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(errors.New("database error"))
 
 	input := &CreateCodeInput{
 		ClientId:          "test-client",
@@ -303,7 +303,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 	// nil, nil is the shape GetClientByClientIdentifier reports for a client that is not there:
 	// an absence rather than a failure.
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "deleted-client").
-		Return((*models.Client)(nil), nil)
+		Return((*record.Client)(nil), nil)
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
 		ClientId: "deleted-client", UserId: 123,
@@ -332,7 +332,7 @@ func issueCodeInput() *CreateCodeInput {
 		UserId:            123,
 		Scope:             "openid profile",
 		RedirectURI:       "https://example.com/callback",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       "pwd",
 		SessionIdentifier: issueSid,
 	}
@@ -355,8 +355,8 @@ func TestIssueAuthCodeTx_TakesTheSessionRowBeforeTheInsert(t *testing.T) {
 	mocks_data.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Run(note("session row")).Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Run(note("client")).
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
-	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*models.Code")).Run(note("insert")).
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).Run(note("insert")).
 		Return(nil).Once()
 
 	code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
@@ -467,8 +467,8 @@ func TestIssueAuthCodeTx_FailuresAreNotRefusals(t *testing.T) {
 		mocks_data.ExpectRunInTransactionThenFail(mockDB, issueTx, boom)
 		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Once()
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
-			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
-		mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*models.Code")).Return(nil).Once()
+			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).Return(nil).Once()
 
 		code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
 
@@ -486,10 +486,10 @@ func TestIssueAuthCodeTx_ARerunReturnsTheCommittingAttemptsCode(t *testing.T) {
 	mocks_data.ExpectRunInTransactionRerun(mockDB, issueTx)
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Twice()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Twice()
-	var inserted []*models.Code
-	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*models.Code")).
-		Run(func(args mock.Arguments) { inserted = append(inserted, args.Get(2).(*models.Code)) }).
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Twice()
+	var inserted []*record.Code
+	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).
+		Run(func(args mock.Arguments) { inserted = append(inserted, args.Get(2).(*record.Code)) }).
 		Return(nil).Twice()
 
 	code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())

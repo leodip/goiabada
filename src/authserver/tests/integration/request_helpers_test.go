@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ import (
 
 // createUserAccessTokenWithScope issues an access token for a user making sure requested
 // custom scopes are granted to that user before the flow. Returns (accessToken, *user).
-func createUserAccessTokenWithScope(t *testing.T, scope string) (string, *models.User) {
+func createUserAccessTokenWithScope(t *testing.T, scope string) (string, *record.User) {
 	data, code, _, _ := userTokenResponseWithScope(t, scope, nil)
 	accessToken, ok := data["access_token"].(string)
 	assert.True(t, ok)
@@ -31,8 +31,8 @@ func createUserAccessTokenWithScope(t *testing.T, scope string) (string, *models
 // token response, the code it redeemed, and the client to refresh with. beforeExchange, when set,
 // runs on the user after the code is issued and before it is redeemed, which is where a fixture
 // changes what the token will carry: issuance reads the user's groups at the exchange.
-func userTokenResponseWithScope(t *testing.T, scope string, beforeExchange func(user *models.User)) (
-	map[string]interface{}, *models.Code, *http.Client, string) {
+func userTokenResponseWithScope(t *testing.T, scope string, beforeExchange func(user *record.User)) (
+	map[string]interface{}, *record.Code, *http.Client, string) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 	if beforeExchange != nil {
@@ -133,14 +133,14 @@ func dumpResponseBody(t *testing.T, response *http.Response) {
 }
 
 // createAdminClientWithToken creates a client with admin permissions and returns an access token
-func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
+func createAdminClientWithToken(t *testing.T) (string, *record.Client) {
 	// Generate client secret
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
 	// Create client with admin permissions
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "admin-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
@@ -157,7 +157,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
 	assert.NoError(t, err)
 
-	var adminPermission *models.Permission
+	var adminPermission *record.Permission
 	for idx, permission := range permissions {
 		if permission.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			adminPermission = &permissions[idx]
@@ -167,7 +167,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	assert.NotNil(t, adminPermission, "Should find manage permission")
 
 	// Assign admin permission to client
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: adminPermission.Id,
 	})

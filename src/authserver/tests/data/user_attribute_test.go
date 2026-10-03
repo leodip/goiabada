@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateUserAttribute(t *testing.T) {
@@ -161,8 +161,8 @@ func TestDeleteUserAttribute(t *testing.T) {
 	}
 }
 
-func createTestUserAttribute(t *testing.T, userId int64) *models.UserAttribute {
-	attr := &models.UserAttribute{
+func createTestUserAttribute(t *testing.T, userId int64) *record.UserAttribute {
+	attr := &record.UserAttribute{
 		Key:                  "TestKey_" + fake.LetterN(6),
 		Value:                "TestValue_" + fake.LetterN(6),
 		IncludeInIdToken:     fake.Bool(),

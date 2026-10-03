@@ -28,7 +28,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `builtin/` - The identifiers both processes must agree on: the `authserver` resource, the seven permissions on it, listed by `AuthServerPermissionIdentifiers()`, which returns a fresh copy on every call, the admin console's client identifier, and its session name in `session_name.go`. No context key and no other session key: each process declares its own, the auth server and the admin console alike their context keys in `internal/reqctx` and their session keys in `internal/sessionkeys`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more. It was `core/constants` until #442 moved the build stamp to `buildinfo/` (#351, #385, #433, #440, #442)
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It reads nothing but the source tree, so unlike `schemadump` it needs no container, and it refuses to invent a justification rather than fill the one cell a human owes (#385)
 - `countries/` - Self-maintained ISO 3166-1 reference data: names, alpha-2 and alpha-3 codes, flag emoji and ITU-T E.164 calling codes, generated into `data_generated.go` from the datahub dataset. It replaced `github.com/biter777/countries` and deliberately depends on nothing (#272)
-- There is no `enums/` here: the six auth-server-only enumerations it held went to the domains that own them — `AcrLevel`, `PasswordPolicy`, `ThreeStateSetting` and `KeyState` to `authserver/internal/models`, forced there because `internal/data` names them and imports nothing above it, `AuthMethod` to `ceremony` and since to `oidc` (#437), `TokenType` to `issuance` and `SMTPEncryption` to `emaildelivery` — leaving `Gender` as `core/gender`. A package named for a Go construct is what invites the next unrelated one in beside it (#385)
+- There is no `enums/` here: the six auth-server-only enumerations it held went to the domains that own them — `AcrLevel`, `PasswordPolicy`, `ThreeStateSetting` and `KeyState` to `authserver/internal/record`, forced there because `internal/data` names them and imports nothing above it, `AuthMethod` to `ceremony` and since to `oidc` (#437), `TokenType` to `issuance` and `SMTPEncryption` to `emaildelivery` — leaving `Gender` as `core/gender`. A package named for a Go construct is what invites the next unrelated one in beside it (#385)
 - `errs/` - The one way this tree constructs an error, and what pattern 7 below is about: one stack per error tree, the leftmost origin's, printed under `%+v`
 - `gender/` - The three gender values the OIDC `gender` claim is written from, and the bound that says which integers name one. A fourth shared reference vocabulary beside `countries/`, `locales/` and `timezones/`: the auth server validates and stores a gender, the admin console renders and re-renders one, and both name the same three strings (#385)
 - `guard/` - The tree-wide guards every module's unit tier runs, and the `Reporter` / `Run` pair they are written against. See **Guard shape** under Testing for what that shape is and what each guard owes. Test support compiled into no binary, holding guards and nothing else: it was `core/testutil` until #442, when `SkipWithoutIPv6Loopback`, the one helper in it that was no guard, left for `hostport/hostporttest`
@@ -63,7 +63,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/afterresponse/` - The work a handler hands off so its response does not wait for it: `Go` runs a job under the request's context detached from its cancellation, so its records keep the request id, and `Wait`, called by the server once the listeners have drained, waits for the jobs in flight. Forgot-password's code store, audit record and mail run here, so every well-formed request answers alike, and so does the self-service email change's notice to the previous address, which never fails the change (#404)
 - `internal/emaillinks/` - The emailed-link round trip for password reset and activation: build the link, mark it followed, redeem it once. Beside `emaildelivery`, which sends it (#387)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and origin predicates, UUIDs (#360); `oidc` also holds the grant type list every grant-type reader consults and the `amr` values (#437); the encrypted id_token_hint's JWE, keyed from a client secret and sharing nothing with the data cipher, left `encryption` for `internal/idtokenhint` (#434)
-- `internal/models/` - All domain models (Client, User, Permission, Group, etc.). Persistence records only: no cryptography, no claim construction, and nothing imported but the standard library, `core/builtin` and `core/errs` (#359, #387, #442)
+- `internal/record/` - The persistence records (Client, User, Permission, Group, etc.), one struct per table: no cryptography, no claim construction, and nothing imported but the standard library, `core/builtin` and `core/errs` (#359, #387, #442)
 - `internal/data/` - The composition-only `Database` interface, `commondb/`, the four engine adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359, #386)
 - `internal/data/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353, #438)
 - `internal/bootstrap/` - The first run: which of the three bootstrap modes applies, and the seed, whose 18 writes commit in one transaction with the bootstrap file published only after it (#424)
@@ -143,7 +143,7 @@ Programmatic client registration for MCP servers, native apps, etc.
 The auth code flow uses a state machine tracked in `AuthContext` (stored in the server-side session store, keyed by a cookie (#266)).
 
 ### ACR Levels (Authentication Context Class Reference)
-Defined in `src/authserver/internal/models/acr_level.go`:
+Defined in `src/authserver/internal/record/acr_level.go`:
 - **`urn:goiabada:level1`** - Password only (single factor)
 - **`urn:goiabada:level2_optional`** - Password + OTP if user has OTP enabled (skip if not)
 - **`urn:goiabada:level2_mandatory`** - Password + OTP required (user must enroll if not already)
@@ -279,14 +279,14 @@ UserSession (DB)
 └── UserId
 ```
 
-### Session Validity (`models/user_session.go`, `IsValid`)
+### Session Validity (`record/user_session.go`, `IsValid`)
 Valid if ALL true:
 1. `now <= LastAccessed + IdleTimeoutSeconds`
 2. `now <= Started + MaxLifetimeSeconds`
 3. If `max_age` param: `now <= AuthTime + max_age` (`Started` when `AuthTime` is zero)
 
 ### ACR Step-Up Logic (`ceremony/step_up.go`)
-One rule, `StepUpOwed`, read by `HandleAuthLevel1CompletedGet` and `handlePromptNone`. Uses `models.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
+One rule, `StepUpOwed`, read by `HandleAuthLevel1CompletedGet` and `handlePromptNone`. Uses `record.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)
@@ -422,7 +422,7 @@ in `internal/server`, which refuses `_` in the error position of a hash, encrypt
 key-generation call (#409) and resolves the data cipher's methods by receiver type with `go/types` (#434),
 its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
 outside `HandleAuthorizeGet`, resolved with `go/types` (#436), and the import rule #387 added
-beside the child-package one: `models/import_lint_test.go`, which holds that package to the
+beside the child-package one: `record/import_lint_test.go`, which holds that package to the
 standard library, `core/builtin` and `core/errs` -- both parse imports with `go/parser` rather
 than matching text, because an alias binds a different name to the same path and one of the 39
 production files did exactly that.

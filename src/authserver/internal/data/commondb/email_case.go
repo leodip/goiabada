@@ -3,7 +3,7 @@ package commondb
 import (
 	"context"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -22,7 +22,7 @@ import (
 // the collision check unable to see the lowercase twin of a mixed-case address, which is the row
 // that makes it a collision. It runs once per upgrade, before the migration chain, and never
 // again afterwards.
-func (d *Database) ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error) {
+func (d *Database) ScanEmailCase(ctx context.Context) ([]record.EmailCaseRow, error) {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", "email", "LOWER(email)").From("users")
 	query, args := sb.BuildWithFlavor(d.Flavor)
@@ -33,9 +33,9 @@ func (d *Database) ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, er
 	}
 	defer func() { _ = rows.Close() }()
 
-	var result []models.EmailCaseRow
+	var result []record.EmailCaseRow
 	for rows.Next() {
-		var row models.EmailCaseRow
+		var row record.EmailCaseRow
 		if err := rows.Scan(&row.Id, &row.Email, &row.EngineLowered); err != nil {
 			return nil, errs.Wrap(err, "unable to scan a user email for the email case pre-flight")
 		}

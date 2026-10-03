@@ -7,7 +7,7 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 const (
@@ -62,7 +62,7 @@ type backgroundWorkerDatabase interface {
 	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 }
 

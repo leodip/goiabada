@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,9 +30,9 @@ func rekeyEncrypt(t *testing.T, plaintext string, key []byte) []byte {
 
 // rekeyKeyPair is a key pair holding pem as its private key, the row shape ReencryptToKey re-keys
 // apart from the string columns.
-func rekeyKeyPair(pem []byte) *models.KeyPair {
-	return &models.KeyPair{
-		State: models.KeyStateCurrent.String(), KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
+func rekeyKeyPair(pem []byte) *record.KeyPair {
+	return &record.KeyPair{
+		State: record.KeyStateCurrent.String(), KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
 		PrivateKeyPEM: pem,
 	}
 }
@@ -77,12 +77,12 @@ func TestReencryptToKey(t *testing.T) {
 	settings.AESEncryptionKeyLegacy = legacyKey
 	settings.SMTPPasswordEncrypted = rekeyEncrypt(t, smtpPass, rekeyKeyA)
 	require.NoError(t, db.CreateSettings(ctx, nil, settings))
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:      "c-" + fake.UUID(),
 		ClientSecretEncrypted: rekeyEncrypt(t, clientSec, rekeyKeyA),
 	}
 	require.NoError(t, db.CreateClient(ctx, nil, client))
-	user := &models.User{
+	user := &record.User{
 		Subject:                              fake.UUID(),
 		Username:                             fake.Username(),
 		Email:                                fake.Email(),
@@ -94,7 +94,7 @@ func TestReencryptToKey(t *testing.T) {
 		OtpEnrollmentSecretEncrypted:         rekeyEncrypt(t, otpEnrolment, rekeyKeyA),
 	}
 	require.NoError(t, db.CreateUser(ctx, nil, user))
-	preReg := &models.PreRegistration{
+	preReg := &record.PreRegistration{
 		Email:                     fake.Email(),
 		PasswordHash:              "x",
 		VerificationCodeEncrypted: rekeyEncrypt(t, preRegCode, rekeyKeyA),
@@ -158,7 +158,7 @@ func TestReencryptToKey_RefusesShortKeys(t *testing.T) {
 	ctx := context.Background()
 
 	const clientSec = "client-secret"
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:      "c-" + fake.UUID(),
 		ClientSecretEncrypted: rekeyEncrypt(t, clientSec, rekeyKeyA),
 	}
@@ -200,7 +200,7 @@ func TestReencryptToKey_AFailureLeavesEverythingUnderTheOldKey(t *testing.T) {
 		clientSec = "client-secret"
 		pem       = "-----BEGIN RSA PRIVATE KEY-----\nfakepem\n-----END RSA PRIVATE KEY-----\n"
 	)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:      "c-" + fake.UUID(),
 		ClientSecretEncrypted: rekeyEncrypt(t, clientSec, rekeyKeyA),
 	}

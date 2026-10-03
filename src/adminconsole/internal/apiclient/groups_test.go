@@ -12,7 +12,7 @@ import (
 
 // Seam 2 for the group family (#350).
 //
-// The console used to decode api.GroupResponse and rebuild a models.Group from it, field by field,
+// The console used to decode api.GroupResponse and rebuild a record.Group from it, field by field,
 // in six methods. It hands the decoded response to the handlers now, so the decode is the only
 // place a renamed json tag is still invisible. The bodies below are therefore written as literal
 // JSON text rather than marshalled from the struct they check: a body produced by the same tags it
@@ -29,7 +29,7 @@ const groupBodyFields = `
 	"includeInAccessToken": false,
 	"memberCount": 17`
 
-// The member count used to arrive as a second return value beside a models.Group that did not
+// The member count used to arrive as a second return value beside a record.Group that did not
 // carry one. It is a field on the response now, filled by the same handler from the same query, so
 // a method that answered the group but dropped the count would leave the delete confirmation
 // offering to delete a group it says has no members.

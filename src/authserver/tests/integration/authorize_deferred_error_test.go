@@ -9,8 +9,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -339,7 +339,7 @@ func deferralAuthorizeURL(clientIdentifier string, responseMode string) string {
 // Every hop is asserted rather than followed blindly, so a ceremony that goes somewhere unexpected
 // fails at the hop that went wrong instead of at an assertion about a response it never reached.
 func driveDeferral(t *testing.T, httpClient *http.Client, destUrl string,
-	user *models.User, password string) *http.Response {
+	user *record.User, password string) *http.Response {
 
 	t.Helper()
 
@@ -385,20 +385,20 @@ func errorDescriptionFromLocation(t *testing.T, resp *http.Response) string {
 // through dynamic registration is refused a redirect outright by #108's provenance gate, so it never
 // reaches the question of who is at the browser. It lives here rather than in fixture_helpers_test.go because
 // this file is its only reader, as newRegisteredQueryClient does for its own.
-func newDeferralClient(t *testing.T) (*models.Client, *models.User, string) {
+func newDeferralClient(t *testing.T) (*record.Client, *record.User, string) {
 	t.Helper()
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "deferral-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      deferralRedirectURI,
 	})
@@ -408,7 +408,7 @@ func newDeferralClient(t *testing.T) (*models.Client, *models.User, string) {
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

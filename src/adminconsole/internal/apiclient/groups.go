@@ -36,7 +36,7 @@ func (c *AuthServerClient) CreateGroup(ctx context.Context, accessToken string, 
 	return &response.Group, nil
 }
 
-// The member count used to be a second return value, because the models.Group this rebuilt did
+// The member count used to be a second return value, because the record.Group this rebuilt did
 // not carry one. api.GroupResponse does, filled by the same handler from the same query, so the
 // delete page reads it off the response like every other field (#350).
 func (c *AuthServerClient) GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {

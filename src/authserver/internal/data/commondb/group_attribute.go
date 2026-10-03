@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
+func (d *Database) CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error {
 
 	if groupAttribute.GroupId == 0 {
 		return errs.New("can't create groupAttribute with group_id 0")
@@ -23,7 +23,7 @@ func (d *Database) CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAt
 	groupAttribute.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	groupAttribute.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(record.GroupAttribute)).
 		For(d.Flavor)
 
 	insertBuilder := groupAttributeStruct.WithoutTag("pk").InsertInto("group_attributes", groupAttribute)
@@ -39,7 +39,7 @@ func (d *Database) CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAt
 	return nil
 }
 
-func (d *Database) UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
+func (d *Database) UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error {
 
 	if groupAttribute.Id == 0 {
 		return errs.New("can't update groupAttribute with id 0")
@@ -48,7 +48,7 @@ func (d *Database) UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAt
 	originalUpdatedAt := groupAttribute.UpdatedAt
 	groupAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(record.GroupAttribute)).
 		For(d.Flavor)
 
 	updateBuilder := groupAttributeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("group_attributes", groupAttribute)
@@ -65,7 +65,7 @@ func (d *Database) UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAt
 }
 
 func (d *Database) getGroupAttributeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	groupAttributeStruct *sqlbuilder.Struct) (*models.GroupAttribute, error) {
+	groupAttributeStruct *sqlbuilder.Struct) (*record.GroupAttribute, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -74,7 +74,7 @@ func (d *Database) getGroupAttributeCommon(ctx context.Context, tx *sql.Tx, sele
 	}
 	defer func() { _ = rows.Close() }()
 
-	var groupAttribute models.GroupAttribute
+	var groupAttribute record.GroupAttribute
 	if rows.Next() {
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
@@ -90,9 +90,9 @@ func (d *Database) getGroupAttributeCommon(ctx context.Context, tx *sql.Tx, sele
 	return nil, nil
 }
 
-func (d *Database) GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error) {
+func (d *Database) GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error) {
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(record.GroupAttribute)).
 		For(d.Flavor)
 
 	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
@@ -106,16 +106,16 @@ func (d *Database) GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupA
 	return groupAttribute, nil
 }
 
-func (d *Database) GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error) {
+func (d *Database) GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupAttribute, error) {
 
 	if len(groupIds) == 0 {
 		return nil, nil
 	}
 
-	var groupAttributes []models.GroupAttribute
+	var groupAttributes []record.GroupAttribute
 
 	err := forEachIdBatch(groupIds, func(batch []int64) error {
-		groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
+		groupAttributeStruct := sqlbuilder.NewStruct(new(record.GroupAttribute)).
 			For(d.Flavor)
 
 		selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
@@ -129,7 +129,7 @@ func (d *Database) GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx,
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var groupAttribute models.GroupAttribute
+			var groupAttribute record.GroupAttribute
 			addr := groupAttributeStruct.Addr(&groupAttribute)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -151,9 +151,9 @@ func (d *Database) GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx,
 	return groupAttributes, nil
 }
 
-func (d *Database) GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error) {
+func (d *Database) GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error) {
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
+	groupAttributeStruct := sqlbuilder.NewStruct(new(record.GroupAttribute)).
 		For(d.Flavor)
 
 	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
@@ -166,9 +166,9 @@ func (d *Database) GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, 
 	}
 	defer func() { _ = rows.Close() }()
 
-	var groupAttributes []models.GroupAttribute
+	var groupAttributes []record.GroupAttribute
 	for rows.Next() {
-		var groupAttribute models.GroupAttribute
+		var groupAttribute record.GroupAttribute
 		addr := groupAttributeStruct.Addr(&groupAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -186,7 +186,7 @@ func (d *Database) GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, 
 
 func (d *Database) DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
+	clientStruct := sqlbuilder.NewStruct(new(record.GroupAttribute)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("group_attributes")

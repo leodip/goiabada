@@ -8,7 +8,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -37,9 +37,9 @@ const implicitBaseURL = "http://localhost:8081"
 type implicitFixture struct {
 	mockDB   *mocks_data.Database
 	issuer   *TokenIssuer
-	settings *models.Settings
+	settings *record.Settings
 	input    *ImplicitGrantInput
-	keyPair  *models.KeyPair
+	keyPair  *record.KeyPair
 }
 
 func newImplicitFixture(t *testing.T) *implicitFixture {
@@ -49,24 +49,24 @@ func newImplicitFixture(t *testing.T) *implicitFixture {
 	return &implicitFixture{
 		mockDB: mockDB,
 		issuer: NewTokenIssuer(mockDB, implicitBaseURL, testDataCipher, nil),
-		settings: &models.Settings{
+		settings: &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			IncludeOpenIDConnectClaimsInAccessToken: true,
 			IncludeOpenIDConnectClaimsInIdToken:     true,
 		},
 		input: &ImplicitGrantInput{
-			Client:              &models.Client{Id: 1, ClientIdentifier: "implicit-client"},
-			User:                &models.User{Id: 7, Subject: fake.UUID(), Username: "implicituser", Groups: []models.Group{}},
+			Client:              &record.Client{Id: 1, ClientIdentifier: "implicit-client"},
+			User:                &record.User{Id: 7, Subject: fake.UUID(), Username: "implicituser", Groups: []record.Group{}},
 			Scope:               "openid profile",
-			AcrLevel:            models.AcrLevel1,
+			AcrLevel:            record.AcrLevel1,
 			AuthMethods:         "pwd",
 			SessionIdentifier:   "sid-implicit",
 			Nonce:               "implicit-nonce",
 			AuthenticatedAt:     time.Now().UTC().Add(-time.Minute),
 			AuthStateGeneration: 3,
 		},
-		keyPair: &models.KeyPair{KeyIdentifier: "test-key-id", PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t))},
+		keyPair: &record.KeyPair{KeyIdentifier: "test-key-id", PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t))},
 	}
 }
 

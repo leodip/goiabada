@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error {
+func (d *Database) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error {
 
 	if userAttribute.UserId == 0 {
 		return errs.New("can't create userAttribute with user_id 0")
@@ -23,7 +23,7 @@ func (d *Database) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttr
 	userAttribute.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userAttribute.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
+	userAttributeStruct := sqlbuilder.NewStruct(new(record.UserAttribute)).
 		For(d.Flavor)
 
 	insertBuilder := userAttributeStruct.WithoutTag("pk").InsertInto("user_attributes", userAttribute)
@@ -39,7 +39,7 @@ func (d *Database) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttr
 	return nil
 }
 
-func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error {
+func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error {
 
 	if userAttribute.Id == 0 {
 		return errs.New("can't update userAttribute with id 0")
@@ -48,7 +48,7 @@ func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttr
 	originalUpdatedAt := userAttribute.UpdatedAt
 	userAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
+	userAttributeStruct := sqlbuilder.NewStruct(new(record.UserAttribute)).
 		For(d.Flavor)
 
 	updateBuilder := userAttributeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_attributes", userAttribute)
@@ -65,7 +65,7 @@ func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttr
 }
 
 func (d *Database) getUserAttributeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userAttributeStruct *sqlbuilder.Struct) (*models.UserAttribute, error) {
+	userAttributeStruct *sqlbuilder.Struct) (*record.UserAttribute, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -74,7 +74,7 @@ func (d *Database) getUserAttributeCommon(ctx context.Context, tx *sql.Tx, selec
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userAttribute models.UserAttribute
+	var userAttribute record.UserAttribute
 	if rows.Next() {
 		addr := userAttributeStruct.Addr(&userAttribute)
 		err = rows.Scan(addr...)
@@ -90,9 +90,9 @@ func (d *Database) getUserAttributeCommon(ctx context.Context, tx *sql.Tx, selec
 	return nil, nil
 }
 
-func (d *Database) GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error) {
+func (d *Database) GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*record.UserAttribute, error) {
 
-	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
+	userAttributeStruct := sqlbuilder.NewStruct(new(record.UserAttribute)).
 		For(d.Flavor)
 
 	selectBuilder := userAttributeStruct.SelectFrom("user_attributes")
@@ -106,9 +106,9 @@ func (d *Database) GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAtt
 	return userAttribute, nil
 }
 
-func (d *Database) GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserAttribute, error) {
+func (d *Database) GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error) {
 
-	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
+	userAttributeStruct := sqlbuilder.NewStruct(new(record.UserAttribute)).
 		For(d.Flavor)
 
 	selectBuilder := userAttributeStruct.SelectFrom("user_attributes")
@@ -121,9 +121,9 @@ func (d *Database) GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, us
 	}
 	defer func() { _ = rows.Close() }()
 
-	var userAttributes []models.UserAttribute
+	var userAttributes []record.UserAttribute
 	for rows.Next() {
-		var userAttribute models.UserAttribute
+		var userAttribute record.UserAttribute
 		addr := userAttributeStruct.Addr(&userAttribute)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -141,7 +141,7 @@ func (d *Database) GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, us
 
 func (d *Database) DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).
+	clientStruct := sqlbuilder.NewStruct(new(record.UserAttribute)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("user_attributes")

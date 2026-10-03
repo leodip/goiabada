@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // RFC 6749 sections 3.1 and 3.2: "Request and response parameters MUST NOT be included more than
@@ -22,7 +22,7 @@ import (
 
 // repeatedParametersQuery is a code-flow request for client, as a url.Values so a case can add a
 // second copy of any parameter.
-func repeatedParametersQuery(client *models.Client, redirectUri *models.RedirectURI) url.Values {
+func repeatedParametersQuery(client *record.Client, redirectUri *record.RedirectURI) url.Values {
 	return url.Values{
 		"client_id":             {client.ClientIdentifier},
 		"redirect_uri":          {redirectUri.URI},
@@ -180,17 +180,17 @@ func TestToken_RepeatedParameters(t *testing.T) {
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 	resource := createResourceWithId(t, "repeated-svc-"+fake.LetterN(8))
 	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
-	require.NoError(t, database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
+	require.NoError(t, database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permission.Id,
 	}))

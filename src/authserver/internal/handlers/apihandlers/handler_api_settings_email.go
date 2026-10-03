@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/hostport"
@@ -47,7 +47,7 @@ func HandleSettingsEmailGet() http.HandlerFunc {
 
 // settingsEmailDatabase is what the email settings endpoint needs: the settings write.
 type settingsEmailDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // HandleSettingsEmailPut - PUT /api/v1/admin/settings/email

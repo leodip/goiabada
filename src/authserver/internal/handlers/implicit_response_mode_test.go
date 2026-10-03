@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -317,9 +317,9 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-		Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
+		Return(&record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
 	implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, true).
 		Return(implicitTokenResponse(), nil)

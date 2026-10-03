@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error {
+func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *models.Gr
 	group.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	group.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
+	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
 		For(d.Flavor)
 
 	insertBuilder := groupStruct.WithoutTag("pk").InsertInto(d.Flavor.Quote("groups"), group)
@@ -35,7 +35,7 @@ func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *models.Gr
 	return nil
 }
 
-func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error {
+func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error {
 
 	if group.Id == 0 {
 		return errs.New("can't update group with id 0")
@@ -44,7 +44,7 @@ func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Gr
 	originalUpdatedAt := group.UpdatedAt
 	group.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
+	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
 		For(d.Flavor)
 
 	updateBuilder := groupStruct.WithoutTag("pk").WithoutTag("dont-update").Update(d.Flavor.Quote("groups"), group)
@@ -61,7 +61,7 @@ func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Gr
 }
 
 func (d *Database) getGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	groupStruct *sqlbuilder.Struct) (*models.Group, error) {
+	groupStruct *sqlbuilder.Struct) (*record.Group, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -70,7 +70,7 @@ func (d *Database) getGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder
 	}
 	defer func() { _ = rows.Close() }()
 
-	var group models.Group
+	var group record.Group
 	if rows.Next() {
 		addr := groupStruct.Addr(&group)
 		err = rows.Scan(addr...)
@@ -86,9 +86,9 @@ func (d *Database) getGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder
 	return nil, nil
 }
 
-func (d *Database) GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error) {
+func (d *Database) GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error) {
 
-	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
+	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
 		For(d.Flavor)
 
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
@@ -102,16 +102,16 @@ func (d *Database) GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) 
 	return group, nil
 }
 
-func (d *Database) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.Group, error) {
+func (d *Database) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error) {
 
 	if len(groupIds) == 0 {
 		return nil, nil
 	}
 
-	var groups []models.Group
+	var groups []record.Group
 
 	err := forEachIdBatch(groupIds, func(batch []int64) error {
-		groupStruct := sqlbuilder.NewStruct(new(models.Group)).
+		groupStruct := sqlbuilder.NewStruct(new(record.Group)).
 			For(d.Flavor)
 
 		selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
@@ -125,7 +125,7 @@ func (d *Database) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []in
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var group models.Group
+			var group record.Group
 			addr := groupStruct.Addr(&group)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -147,7 +147,7 @@ func (d *Database) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []in
 	return groups, nil
 }
 
-func (d *Database) GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *models.Group) error {
+func (d *Database) GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *record.Group) error {
 
 	if group == nil {
 		return nil
@@ -168,13 +168,13 @@ func (d *Database) GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *
 		return errs.Wrap(err, "unable to get permissions")
 	}
 
-	group.Permissions = make([]models.Permission, len(permissions))
+	group.Permissions = make([]record.Permission, len(permissions))
 	copy(group.Permissions, permissions)
 
 	return nil
 }
 
-func (d *Database) GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []models.Group) error {
+func (d *Database) GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []record.Group) error {
 
 	if groups == nil {
 		return nil
@@ -200,18 +200,18 @@ func (d *Database) GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups
 		return errs.Wrap(err, "unable to get permissions")
 	}
 
-	permissionsMap := make(map[int64]models.Permission)
+	permissionsMap := make(map[int64]record.Permission)
 	for _, permission := range permissions {
 		permissionsMap[permission.Id] = permission
 	}
 
-	groupPermissionsMap := make(map[int64][]models.GroupPermission)
+	groupPermissionsMap := make(map[int64][]record.GroupPermission)
 	for _, groupPermission := range groupPermissions {
 		groupPermissionsMap[groupPermission.GroupId] = append(groupPermissionsMap[groupPermission.GroupId], groupPermission)
 	}
 
 	for i, group := range groups {
-		group.Permissions = make([]models.Permission, len(groupPermissionsMap[group.Id]))
+		group.Permissions = make([]record.Permission, len(groupPermissionsMap[group.Id]))
 		for j, groupPermission := range groupPermissionsMap[group.Id] {
 			group.Permissions[j] = permissionsMap[groupPermission.PermissionId]
 		}
@@ -221,7 +221,7 @@ func (d *Database) GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups
 	return nil
 }
 
-func (d *Database) GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []models.Group) error {
+func (d *Database) GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []record.Group) error {
 
 	if groups == nil {
 		return nil
@@ -237,7 +237,7 @@ func (d *Database) GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups 
 		return errs.Wrap(err, "unable to get group attributes")
 	}
 
-	groupAttributesMap := make(map[int64][]models.GroupAttribute)
+	groupAttributesMap := make(map[int64][]record.GroupAttribute)
 	for _, groupAttribute := range groupAttributes {
 		groupAttributesMap[groupAttribute.GroupId] = append(groupAttributesMap[groupAttribute.GroupId], groupAttribute)
 	}
@@ -250,9 +250,9 @@ func (d *Database) GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups 
 	return nil
 }
 
-func (d *Database) GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*models.Group, error) {
+func (d *Database) GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*record.Group, error) {
 
-	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
+	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
 		For(d.Flavor)
 
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
@@ -271,9 +271,9 @@ func (d *Database) GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, gr
 	return group, nil
 }
 
-func (d *Database) GetAllGroups(ctx context.Context, tx *sql.Tx) ([]models.Group, error) {
+func (d *Database) GetAllGroups(ctx context.Context, tx *sql.Tx) ([]record.Group, error) {
 
-	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
+	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
 		For(d.Flavor)
 
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
@@ -285,9 +285,9 @@ func (d *Database) GetAllGroups(ctx context.Context, tx *sql.Tx) ([]models.Group
 	}
 	defer func() { _ = rows.Close() }()
 
-	var groups []models.Group
+	var groups []record.Group
 	for rows.Next() {
-		var group models.Group
+		var group record.Group
 		addr := groupStruct.Addr(&group)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -303,7 +303,7 @@ func (d *Database) GetAllGroups(ctx context.Context, tx *sql.Tx) ([]models.Group
 	return groups, nil
 }
 
-func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error) {
+func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]record.Group, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -312,7 +312,7 @@ func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page i
 		pageSize = 10
 	}
 
-	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
+	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
 		For(d.Flavor)
 
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
@@ -327,9 +327,9 @@ func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page i
 	}
 	defer func() { _ = rows.Close() }()
 
-	var groups []models.Group
+	var groups []record.Group
 	for rows.Next() {
-		var group models.Group
+		var group record.Group
 		addr := groupStruct.Addr(&group)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -366,7 +366,7 @@ func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page i
 	return groups, total, nil
 }
 
-func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error) {
+func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]record.User, int, error) {
 	if groupId <= 0 {
 		return nil, 0, errs.New("group id must be greater than 0")
 	}
@@ -379,7 +379,7 @@ func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, gro
 		pageSize = 10
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
 		For(d.Flavor)
 
 	selectBuilder := userStruct.SelectFrom("users")
@@ -398,9 +398,9 @@ func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, gro
 	}
 	defer func() { _ = rows.Close() }()
 
-	var users []models.User
+	var users []record.User
 	for rows.Next() {
-		var user models.User
+		var user record.User
 		addr := userStruct.Addr(&user)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -472,7 +472,7 @@ func (d *Database) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId in
 
 func (d *Database) DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Group)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Group)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom(d.Flavor.Quote("groups"))

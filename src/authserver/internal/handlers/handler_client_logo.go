@@ -10,13 +10,13 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // clientLogoDatabase is what the client logo page needs: the client and its logo.
 type clientLogoDatabase interface {
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
 }
 
 func HandleClientLogoGet(

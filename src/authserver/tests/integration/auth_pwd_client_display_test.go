@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,11 +19,11 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
 	// Create redirect URI
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -58,10 +58,10 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -92,10 +92,10 @@ func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -125,10 +125,10 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -158,10 +158,10 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -191,10 +191,10 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -224,10 +224,10 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -257,10 +257,10 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -290,10 +290,10 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -323,10 +323,10 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -356,10 +356,10 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -389,10 +389,10 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -425,10 +425,10 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true, // Upload logo
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -462,10 +462,10 @@ func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true, // Logo exists but hidden
 		ConsentRequired:  false,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}

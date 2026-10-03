@@ -17,7 +17,7 @@ import (
 
 // Decision 10 at the console's seam. These five pages disable rename and delete on a system-level
 // resource, and the auth server refuses both for the same reason, at handler_api_resources.go. The
-// console used to decide it for itself, by calling models.Resource.IsSystemLevelResource(), which
+// console used to decide it for itself, by calling record.Resource.IsSystemLevelResource(), which
 // compares the identifier against constants.AuthServerResourceIdentifier; it reads a bool off the
 // response now, which the server sets by asking that same method.
 //

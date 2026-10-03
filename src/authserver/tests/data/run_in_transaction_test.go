@@ -11,7 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,8 +29,8 @@ import (
 const deadlockCeiling = 60 * time.Second
 
 // newClientModel is a client that has not been inserted, for bodies that insert it themselves.
-func newClientModel() *models.Client {
-	return &models.Client{
+func newClientModel() *record.Client {
+	return &record.Client{
 		ClientIdentifier: "rit_client_" + fake.LetterN(8),
 		Description:      "RunInTransaction test client",
 	}
@@ -117,7 +117,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 	var closeA, closeB sync.Once
 	var attempts atomic.Int32
 
-	party := func(db data.Database, first, second *models.Client, held *sync.Once, mine, theirs chan struct{}) error {
+	party := func(db data.Database, first, second *record.Client, held *sync.Once, mine, theirs chan struct{}) error {
 		return db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 			attempts.Add(1)
 			if err := db.AcquireClientRow(context.Background(), tx, first.Id); err != nil {
@@ -149,7 +149,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 	assert.Equal(t, int32(3), attempts.Load(),
 		"exactly one party was chosen as the victim and ran its body a second time; %d attempts in total", attempts.Load())
 
-	for _, row := range []*models.Client{rowA, rowB} {
+	for _, row := range []*record.Client{rowA, rowB} {
 		got, err := database.GetClientById(context.Background(), nil, row.Id)
 		require.NoError(t, err)
 		assert.NotNil(t, got, "both rows are still there after both parties committed")

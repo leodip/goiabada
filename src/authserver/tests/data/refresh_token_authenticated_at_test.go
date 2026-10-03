@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,13 +19,13 @@ import (
 
 // seedROPCRefreshToken writes an ROPC-shaped token, user and client set and no code, recording
 // instant.
-func seedROPCRefreshToken(t *testing.T, instant sql.NullTime) *models.RefreshToken {
+func seedROPCRefreshToken(t *testing.T, instant sql.NullTime) *record.RefreshToken {
 	t.Helper()
 	client := createTestClient(t)
 	user := createTestUser(t)
 	jti := fake.UUID()
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	token := &models.RefreshToken{
+	token := &record.RefreshToken{
 		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
 		RefreshTokenJti:      jti,
@@ -61,7 +61,7 @@ func TestRefreshToken_AuthenticatedAtRoundTrips(t *testing.T) {
 			byJti, err := database.GetRefreshTokenByJti(context.Background(), nil, created.RefreshTokenJti)
 			require.NoError(t, err)
 
-			for _, read := range []*models.RefreshToken{byId, byJti} {
+			for _, read := range []*record.RefreshToken{byId, byJti} {
 				require.NotNil(t, read)
 				assert.Equal(t, tc.instant.Valid, read.AuthenticatedAt.Valid)
 				if tc.instant.Valid {
@@ -112,7 +112,7 @@ func TestGetRefreshTokensBySessionIdentifier_ReadsTheTokensInstantNotTheCodes(t 
 	codeInstant := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Microsecond)
 	tokenInstant := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Microsecond)
 
-	code := &models.Code{
+	code := &record.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		Code:                "code_" + fake.LetterN(6),
@@ -136,7 +136,7 @@ func TestGetRefreshTokensBySessionIdentifier_ReadsTheTokensInstantNotTheCodes(t 
 	wanted := map[string]sql.NullTime{}
 	for _, instant := range []sql.NullTime{{}, {Time: tokenInstant, Valid: true}} {
 		jti := fake.UUID()
-		require.NoError(t, database.CreateRefreshToken(context.Background(), nil, &models.RefreshToken{
+		require.NoError(t, database.CreateRefreshToken(context.Background(), nil, &record.RefreshToken{
 			CodeId:               sql.NullInt64{Int64: code.Id, Valid: true},
 			RefreshTokenJti:      jti,
 			FirstRefreshTokenJti: jti,

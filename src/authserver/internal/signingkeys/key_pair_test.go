@@ -12,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -29,7 +29,7 @@ const testKeySizeBits = 1024
 // ParsePrivateKey to the half of the pair the public columns describe. A row whose private and
 // public halves came from different keys would sign tokens nobody could verify.
 func TestNewKeyPair_BuildsTheRowTheKeySetStores(t *testing.T) {
-	for _, state := range []models.KeyState{models.KeyStateCurrent, models.KeyStateNext} {
+	for _, state := range []record.KeyState{record.KeyStateCurrent, record.KeyStateNext} {
 		t.Run(state.String(), func(t *testing.T) {
 			row, err := NewKeyPair(testDataCipher, state, testKeySizeBits)
 			require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestNewKeyPair_BuildsTheRowTheKeySetStores(t *testing.T) {
 // hands them, where both used to read one process-wide key: a key pair sealed under one cipher
 // parses under that cipher and is refused under a cipher built from another key (#434).
 func TestNewKeyPair_OpensOnlyUnderTheCipherItWasGiven(t *testing.T) {
-	row, err := NewKeyPair(testDataCipher, models.KeyStateNext, testKeySizeBits)
+	row, err := NewKeyPair(testDataCipher, record.KeyStateNext, testKeySizeBits)
 	require.NoError(t, err)
 
 	privateKey, err := ParsePrivateKey(testDataCipher, row)
@@ -85,16 +85,16 @@ func TestNewKeyPair_OpensOnlyUnderTheCipherItWasGiven(t *testing.T) {
 	assert.Nil(t, privateKey)
 
 	// And the other way round: a row sealed under the second cipher does not open under the first.
-	row, err = NewKeyPair(otherCipher, models.KeyStateNext, testKeySizeBits)
+	row, err = NewKeyPair(otherCipher, record.KeyStateNext, testKeySizeBits)
 	require.NoError(t, err)
 	_, err = ParsePrivateKey(testDataCipher, row)
 	require.Error(t, err)
 }
 
 func TestNewKeyPair_MintsAKidPerKey(t *testing.T) {
-	first, err := NewKeyPair(testDataCipher, models.KeyStateNext, testKeySizeBits)
+	first, err := NewKeyPair(testDataCipher, record.KeyStateNext, testKeySizeBits)
 	require.NoError(t, err)
-	second, err := NewKeyPair(testDataCipher, models.KeyStateNext, testKeySizeBits)
+	second, err := NewKeyPair(testDataCipher, record.KeyStateNext, testKeySizeBits)
 	require.NoError(t, err)
 
 	assert.NotEqual(t, first.KeyIdentifier, second.KeyIdentifier)
@@ -102,7 +102,7 @@ func TestNewKeyPair_MintsAKidPerKey(t *testing.T) {
 }
 
 func TestNewKeyPair_RefusesABitSizeRSARefuses(t *testing.T) {
-	row, err := NewKeyPair(testDataCipher, models.KeyStateNext, 512)
+	row, err := NewKeyPair(testDataCipher, record.KeyStateNext, 512)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to generate a private key")
@@ -125,7 +125,7 @@ func relabel(t *testing.T, data []byte, label string) []byte {
 func TestNewKeyPair_TheTokenParserReadsBothLabels(t *testing.T) {
 	for _, label := range []string{"PUBLIC KEY", "RSA PUBLIC KEY"} {
 		t.Run(label, func(t *testing.T) {
-			row, err := NewKeyPair(testDataCipher, models.KeyStateCurrent, testKeySizeBits)
+			row, err := NewKeyPair(testDataCipher, record.KeyStateCurrent, testKeySizeBits)
 			require.NoError(t, err)
 			row.PublicKeyPEM = relabel(t, row.PublicKeyPEM, label)
 

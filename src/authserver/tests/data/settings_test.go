@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateSettings(t *testing.T) {
-	settings := &models.Settings{
+	settings := &record.Settings{
 		AppName:                 "TestApp",
 		Issuer:                  "https://test.com",
 		UITheme:                 "default",
-		PasswordPolicy:          models.PasswordPolicyMedium,
+		PasswordPolicy:          record.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
 		TokenExpirationInSeconds:                  3600,
@@ -67,7 +67,7 @@ func TestUpdateSettings(t *testing.T) {
 	settings.AppName = "UpdatedApp"
 	settings.Issuer = "https://updated.com"
 	settings.UITheme = "dark"
-	settings.PasswordPolicy = models.PasswordPolicyHigh
+	settings.PasswordPolicy = record.PasswordPolicyHigh
 	settings.SelfRegistrationEnabled = false
 	settings.SelfRegistrationRequiresEmailVerification = false
 	settings.TokenExpirationInSeconds = 7200
@@ -131,12 +131,12 @@ func TestGetSettingsById(t *testing.T) {
 	}
 }
 
-func createTestSettings(t *testing.T) *models.Settings {
-	settings := &models.Settings{
+func createTestSettings(t *testing.T) *record.Settings {
+	settings := &record.Settings{
 		AppName:                 "TestApp",
 		Issuer:                  "https://test.com",
 		UITheme:                 "default",
-		PasswordPolicy:          models.PasswordPolicyMedium,
+		PasswordPolicy:          record.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
 		TokenExpirationInSeconds:                  3600,
@@ -167,7 +167,7 @@ func createTestSettings(t *testing.T) *models.Settings {
 	return settings
 }
 
-func compareSettings(t *testing.T, expected, actual *models.Settings) {
+func compareSettings(t *testing.T, expected, actual *record.Settings) {
 	if actual.AppName != expected.AppName {
 		t.Errorf("Expected AppName %s, got %s", expected.AppName, actual.AppName)
 	}

@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -33,9 +33,9 @@ var ErrKeySetIncomplete = errors.New("expected current and next signing keys to 
 // Exported, unlike most ports here, because the settings endpoint that builds a rotator lives in
 // apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
 type RotationDatabase interface {
-	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error
+	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error
 	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
-	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
 }
@@ -86,7 +86,7 @@ func NewRotator(database RotationDatabase, dataCipher *encryption.DataCipher) *R
 // across it is what made the window wide enough to hit.
 func (r *Rotator) Rotate(ctx context.Context) error {
 
-	newNextKey, err := NewKeyPair(r.dataCipher, models.KeyStateNext, r.keySizeBits)
+	newNextKey, err := NewKeyPair(r.dataCipher, record.KeyStateNext, r.keySizeBits)
 	if err != nil {
 		return err
 	}
@@ -103,21 +103,21 @@ func (r *Rotator) Rotate(ctx context.Context) error {
 			return err
 		}
 
-		var currentKey *models.KeyPair
-		var nextKey *models.KeyPair
-		var previousKey *models.KeyPair
+		var currentKey *record.KeyPair
+		var nextKey *record.KeyPair
+		var previousKey *record.KeyPair
 		for i := range allSigningKeys {
 			kp := &allSigningKeys[i]
-			keyState, keyStateErr := models.KeyStateFromString(kp.State)
+			keyState, keyStateErr := record.KeyStateFromString(kp.State)
 			if keyStateErr != nil {
 				return keyStateErr
 			}
 			switch keyState {
-			case models.KeyStateCurrent:
+			case record.KeyStateCurrent:
 				currentKey = kp
-			case models.KeyStateNext:
+			case record.KeyStateNext:
 				nextKey = kp
-			case models.KeyStatePrevious:
+			case record.KeyStatePrevious:
 				previousKey = kp
 			}
 		}
@@ -138,7 +138,7 @@ func (r *Rotator) Rotate(ctx context.Context) error {
 		}
 
 		moved, err := r.database.UpdateKeyPairState(ctx, tx, currentKey.Id,
-			models.KeyStateCurrent.String(), models.KeyStatePrevious.String())
+			record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
 		if err != nil {
 			return err
 		}
@@ -147,7 +147,7 @@ func (r *Rotator) Rotate(ctx context.Context) error {
 		}
 
 		moved, err = r.database.UpdateKeyPairState(ctx, tx, nextKey.Id,
-			models.KeyStateNext.String(), models.KeyStateCurrent.String())
+			record.KeyStateNext.String(), record.KeyStateCurrent.String())
 		if err != nil {
 			return err
 		}

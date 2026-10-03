@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,12 +33,12 @@ const userinfoDescription000050 = "Access to the OpenID Connect user info endpoi
 // and one client.
 type userinfoFixture000050 struct {
 	h        *isolatedDB
-	resource *models.Resource
-	userinfo *models.Permission
-	control  *models.Permission
-	user     *models.User
-	group    *models.Group
-	client   *models.Client
+	resource *record.Resource
+	userinfo *record.Permission
+	control  *record.Permission
+	user     *record.User
+	group    *record.Group
+	client   *record.Client
 }
 
 // seedUserinfoFixture000050 migrates a fresh database to the version below 000050 and writes the
@@ -51,14 +51,14 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, before), "migrate an empty database up to %d on %s", before, dbType())
 
 	f := &userinfoFixture000050{h: h}
-	f.resource = &models.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
+	f.resource = &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
 	require.NoError(t, h.DB.CreateResource(ctx, nil, f.resource))
-	f.userinfo = &models.Permission{PermissionIdentifier: "userinfo", Description: userinfoDescription000050, ResourceId: f.resource.Id}
+	f.userinfo = &record.Permission{PermissionIdentifier: "userinfo", Description: userinfoDescription000050, ResourceId: f.resource.Id}
 	require.NoError(t, h.DB.CreatePermission(ctx, nil, f.userinfo))
-	f.control = &models.Permission{PermissionIdentifier: "mig50-control", Description: "Control", ResourceId: f.resource.Id}
+	f.control = &record.Permission{PermissionIdentifier: "mig50-control", Description: "Control", ResourceId: f.resource.Id}
 	require.NoError(t, h.DB.CreatePermission(ctx, nil, f.control))
 
-	f.user = &models.User{
+	f.user = &record.User{
 		Enabled:      true,
 		Subject:      "00000000-0000-0000-0000-000000050001",
 		Username:     "mig50user",
@@ -66,15 +66,15 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 		PasswordHash: "not-a-real-hash",
 	}
 	require.NoError(t, h.DB.CreateUser(ctx, nil, f.user))
-	f.group = &models.Group{GroupIdentifier: "mig50-group", Description: "Migration 000050 test group"}
+	f.group = &record.Group{GroupIdentifier: "mig50-group", Description: "Migration 000050 test group"}
 	require.NoError(t, h.DB.CreateGroup(ctx, nil, f.group))
-	f.client = &models.Client{ClientIdentifier: "mig50-client", Description: "Migration 000050 test client"}
+	f.client = &record.Client{ClientIdentifier: "mig50-client", Description: "Migration 000050 test client"}
 	require.NoError(t, h.DB.CreateClient(ctx, nil, f.client))
 
-	for _, permission := range []*models.Permission{f.userinfo, f.control} {
-		require.NoError(t, h.DB.CreateUserPermission(ctx, nil, &models.UserPermission{UserId: f.user.Id, PermissionId: permission.Id}))
-		require.NoError(t, h.DB.CreateGroupPermission(ctx, nil, &models.GroupPermission{GroupId: f.group.Id, PermissionId: permission.Id}))
-		require.NoError(t, h.DB.CreateClientPermission(ctx, nil, &models.ClientPermission{ClientId: f.client.Id, PermissionId: permission.Id}))
+	for _, permission := range []*record.Permission{f.userinfo, f.control} {
+		require.NoError(t, h.DB.CreateUserPermission(ctx, nil, &record.UserPermission{UserId: f.user.Id, PermissionId: permission.Id}))
+		require.NoError(t, h.DB.CreateGroupPermission(ctx, nil, &record.GroupPermission{GroupId: f.group.Id, PermissionId: permission.Id}))
+		require.NoError(t, h.DB.CreateClientPermission(ctx, nil, &record.ClientPermission{ClientId: f.client.Id, PermissionId: permission.Id}))
 	}
 
 	userHolds, groupHolds, clientHolds := f.held(t)

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/builtin"
@@ -23,14 +23,14 @@ import (
 // regardless of the OAuth flow being used (auth code, implicit, ROPC).
 type tokenGenerationInput struct {
 	// User and Client (always required)
-	User   *models.User
-	Client *models.Client
+	User   *record.User
+	Client *record.Client
 
 	// Scope
 	Scope string
 
 	// Authentication context
-	AcrLevel        models.AcrLevel // e.g., models.AcrLevel1, models.AcrLevel2Optional
+	AcrLevel        record.AcrLevel // e.g., record.AcrLevel1, record.AcrLevel2Optional
 	AuthMethods     []string        // e.g., ["pwd"], ["pwd", "otp"]
 	AuthenticatedAt time.Time
 
@@ -63,9 +63,9 @@ type tokenGenerationInput struct {
 //
 // tx is the transaction the grant runs in, nil for one that runs in none, as generateAccessTokenCore
 // states. A refresh hands over the one its rotation runs in (#132, #437).
-func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, code *models.Code, scope string,
+func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *models.RefreshToken) (string, error) {
+	parentRefreshToken *record.RefreshToken) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
@@ -81,7 +81,7 @@ func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, setti
 	return t.generateAccessTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
-func (t *TokenIssuer) generateIdToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, code *models.Code, scope string,
+func (t *TokenIssuer) generateIdToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
@@ -108,7 +108,7 @@ func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Map
 // sets one, else the server's. A client's 0 means it inherits the setting. Every grant reads it
 // here; client credentials once kept its own copy of the lifetime and read the setting alone,
 // ignoring an override every other grant honoured (#437).
-func tokenLifetimeSeconds(settings *models.Settings, client *models.Client) int {
+func tokenLifetimeSeconds(settings *record.Settings, client *record.Client) int {
 	if client.TokenExpirationInSeconds > 0 {
 		return client.TokenExpirationInSeconds
 	}
@@ -123,7 +123,7 @@ func tokenLifetimeSeconds(settings *models.Settings, client *models.Client) int 
 // over, because on sqlitedb's single connection a read on nil waits for the connection that
 // transaction holds until the context expires, and the picture claim is dropped without an error
 // (#437).
-func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *tokenGenerationInput,
+func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *tokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -197,9 +197,9 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 
 	// OpenID Connect claims in access token (if enabled)
 	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
-	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == models.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInAccessToken == models.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == models.ThreeStateSettingOn.String()
+	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == record.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInAccessToken == record.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == record.ThreeStateSettingOn.String()
 	}
 
 	mapper := t.claimMapper(userclaims.InclusionAccessToken)
@@ -225,7 +225,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 // generateIdTokenCore creates an id_token using the unified tokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC). tx is
 // generateAccessTokenCore's.
-func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *tokenGenerationInput,
+func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *tokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -272,9 +272,9 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 	// Per OIDC Core 5.4, scope claims (email, profile, etc.) MAY be in ID tokens
 	// but SHOULD be available from /userinfo endpoint for strict conformance.
 	includeOpenIDConnectClaimsInIdToken := settings.IncludeOpenIDConnectClaimsInIdToken
-	if input.Client.IncludeOpenIDConnectClaimsInIdToken == models.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInIdToken == models.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == models.ThreeStateSettingOn.String()
+	if input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOn.String()
 	}
 
 	mapper := t.claimMapper(userclaims.InclusionIdToken)
@@ -299,7 +299,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 
 // createTokenInputFromCode creates a tokenGenerationInput from an authorization code.
 // Used by the authorization code flow.
-func (t *TokenIssuer) createTokenInputFromCode(code *models.Code) *tokenGenerationInput {
+func (t *TokenIssuer) createTokenInputFromCode(code *record.Code) *tokenGenerationInput {
 	return &tokenGenerationInput{
 		User:              &code.User,
 		Client:            &code.Client,
@@ -345,7 +345,7 @@ func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput) *tokenGene
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       []string{oidc.AuthMethodPassword.String()},
 		AuthenticatedAt:   input.AuthenticatedAt,
 		SessionIdentifier: "", // ROPC is sessionless: see ROPCGrantInput
@@ -371,9 +371,9 @@ func (t *TokenIssuer) calculateAtHash(accessToken string) string {
 // generation with the current one, laundering it forward (#106 decision 13).
 //
 // ROPC grants are always offline, so no access token here ever carries sid.
-func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *models.RefreshToken) (string, error) {
+	parentRefreshToken *record.RefreshToken) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
@@ -389,7 +389,7 @@ func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, tx *sql.Tx, s
 }
 
 // generateROPCIdToken creates an id_token for ROPC flow.
-func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input)

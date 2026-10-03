@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,11 +17,11 @@ import (
 // and PostgreSQL's sequence is moved by setval (#424 decision 14). On isolated databases, because
 // the shared one's settings table already holds rows at 1 and above.
 
-func initialSettings(appName string) *models.Settings {
-	return &models.Settings{
+func initialSettings(appName string) *record.Settings {
+	return &record.Settings{
 		AppName:                appName,
 		Issuer:                 "https://localhost:8080",
-		PasswordPolicy:         models.PasswordPolicyLow,
+		PasswordPolicy:         record.PasswordPolicyLow,
 		AESEncryptionKeyLegacy: []byte{},
 	}
 }

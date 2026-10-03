@@ -11,8 +11,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -56,14 +56,14 @@ func getErrorFromFragment(t *testing.T, resp *http.Response) (errorCode string, 
 }
 
 // createImplicitFlowClient creates a client configured for implicit flow
-func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Client, *models.RedirectURI) {
-	client := &models.Client{
+func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*record.Client, *record.RedirectURI) {
+	client := &record.Client{
 		ClientIdentifier:         "implicit-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: false, // Disable auth code to test implicit-only
 		ImplicitGrantEnabled:     implicitEnabled,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -71,7 +71,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Clie
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -85,14 +85,14 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Clie
 }
 
 // createTestUser creates a user for testing
-func createTestUserForImplicit(t *testing.T) (*models.User, string) {
+func createTestUserForImplicit(t *testing.T) (*record.User, string) {
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -110,7 +110,7 @@ func createTestUserForImplicit(t *testing.T) (*models.User, string) {
 // TestImplicitFlow_TokenResponseType tests the basic implicit flow with response_type=token
 func TestImplicitFlow_TokenResponseType(t *testing.T) {
 	// Enable implicit flow globally for this test
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -178,7 +178,7 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 
 // TestImplicitFlow_IdTokenResponseType tests implicit flow with response_type=id_token
 func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -253,7 +253,7 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 
 // TestImplicitFlow_IdTokenTokenResponseType tests implicit flow with response_type=id_token token
 func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -327,7 +327,7 @@ func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
 
 // TestImplicitFlow_Disabled_GlobalSetting tests that implicit flow is rejected when disabled globally
 func TestImplicitFlow_Disabled_GlobalSetting(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = false })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = false })
 
 	client, redirectUri := createImplicitFlowClient(t, nil) // nil means inherit from global
 
@@ -359,7 +359,7 @@ func TestImplicitFlow_Disabled_GlobalSetting(t *testing.T) {
 // TestImplicitFlow_ClientOverride_Enabled tests client-level implicit flow enable
 func TestImplicitFlow_ClientOverride_Enabled(t *testing.T) {
 	// Disable globally
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = false })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = false })
 
 	// Create client with explicit enable
 	implicitEnabled := true
@@ -414,7 +414,7 @@ func TestImplicitFlow_ClientOverride_Enabled(t *testing.T) {
 // TestImplicitFlow_ClientOverride_Disabled tests client-level implicit flow disable
 func TestImplicitFlow_ClientOverride_Disabled(t *testing.T) {
 	// Enable globally
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	// Create client with explicit disable
 	implicitDisabled := false
@@ -445,7 +445,7 @@ func TestImplicitFlow_ClientOverride_Disabled(t *testing.T) {
 
 // TestImplicitFlow_MissingNonce_IdToken tests that nonce is required for id_token
 func TestImplicitFlow_MissingNonce_IdToken(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 
@@ -475,7 +475,7 @@ func TestImplicitFlow_MissingNonce_IdToken(t *testing.T) {
 
 // TestImplicitFlow_MissingOpenIdScope_IdToken tests that openid scope is required for id_token
 func TestImplicitFlow_MissingOpenIdScope_IdToken(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 
@@ -507,21 +507,21 @@ func TestImplicitFlow_MissingOpenIdScope_IdToken(t *testing.T) {
 
 // TestImplicitFlow_UnsupportedResponseType_HybridFlow tests that hybrid flows are rejected
 func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	// Create a client with both auth code and implicit enabled
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "hybrid-test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -558,7 +558,7 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 
 // TestImplicitFlow_ValidateAccessToken tests that the access token can be used
 func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -637,7 +637,7 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 
 // TestImplicitFlow_ErrorInFragment tests that errors use fragment for implicit flow
 func TestImplicitFlow_ErrorInFragment(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 
@@ -678,21 +678,21 @@ func TestImplicitFlow_ErrorInFragment(t *testing.T) {
 
 // TestImplicitFlow_WithResourcePermissions tests implicit flow with resource permissions requiring consent
 func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	// Create client with consent required
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "implicit-consent-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: false,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -766,7 +766,7 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 
 // TestImplicitFlow_AtHashValidation tests that at_hash is correctly calculated per OIDC Core 3.2.2.10
 func TestImplicitFlow_AtHashValidation(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -851,7 +851,7 @@ func TestImplicitFlow_AtHashValidation(t *testing.T) {
 // TestImplicitFlow_NoRefreshTokenInResponse tests that refresh tokens are NEVER issued in implicit flow
 // Per RFC 6749 Section 4.2.2: The authorization server MUST NOT issue a refresh token for implicit grant
 func TestImplicitFlow_NoRefreshTokenInResponse(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -912,7 +912,7 @@ func TestImplicitFlow_NoRefreshTokenInResponse(t *testing.T) {
 
 // TestImplicitFlow_StatePreservation tests that state is correctly preserved through the flow
 func TestImplicitFlow_StatePreservation(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	testCases := []struct {
 		name  string
@@ -975,7 +975,7 @@ func TestImplicitFlow_StatePreservation(t *testing.T) {
 
 // TestImplicitFlow_EmptyState tests behavior when no state is provided
 func TestImplicitFlow_EmptyState(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -1027,7 +1027,7 @@ func TestImplicitFlow_EmptyState(t *testing.T) {
 
 // TestImplicitFlow_NonceInIdToken tests that nonce is correctly included in id_token
 func TestImplicitFlow_NonceInIdToken(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -1089,7 +1089,7 @@ func TestImplicitFlow_NonceInIdToken(t *testing.T) {
 
 // TestImplicitFlow_AudienceInTokens tests that audience claims are correct in tokens
 func TestImplicitFlow_AudienceInTokens(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
@@ -1159,21 +1159,21 @@ func TestImplicitFlow_AudienceInTokens(t *testing.T) {
 
 // TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit tests that a client with auth code enabled can also use implicit if enabled
 func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	// Create client with BOTH auth code AND implicit enabled
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "both-flows-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true, // Auth code enabled
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}

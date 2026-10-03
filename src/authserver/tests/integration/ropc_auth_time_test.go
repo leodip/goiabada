@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,9 +25,9 @@ import (
 
 // ropcAuthTimeFixture is an ROPC-enabled confidential client and a user of it.
 type ropcAuthTimeFixture struct {
-	client       *models.Client
+	client       *record.Client
 	clientSecret string
-	user         *models.User
+	user         *record.User
 	password     string
 	httpClient   *http.Client
 	tokenURL     string
@@ -35,7 +35,7 @@ type ropcAuthTimeFixture struct {
 
 func newROPCAuthTimeFixture(t *testing.T) ropcAuthTimeFixture {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)
@@ -63,7 +63,7 @@ func (f ropcAuthTimeFixture) refresh(t *testing.T, refreshToken string) (int, ma
 }
 
 // tokenRow reads back the refresh_tokens row a refresh token names.
-func tokenRow(t *testing.T, refreshToken string) *models.RefreshToken {
+func tokenRow(t *testing.T, refreshToken string) *record.RefreshToken {
 	t.Helper()
 	jti, ok := decodeJWTPayload(t, refreshToken)["jti"].(string)
 	require.True(t, ok, "the refresh token carries no jti")
@@ -156,7 +156,7 @@ func issueROPCRefreshToken(t *testing.T, f ropcAuthTimeFixture, instant sql.Null
 	maxLifetime := now.Add(24 * time.Hour)
 	jti := fake.UUID()
 
-	require.NoError(t, database.CreateRefreshToken(context.Background(), nil, &models.RefreshToken{
+	require.NoError(t, database.CreateRefreshToken(context.Background(), nil, &record.RefreshToken{
 		UserId:               sql.NullInt64{Int64: f.user.Id, Valid: true},
 		ClientId:             sql.NullInt64{Int64: f.client.Id, Valid: true},
 		RefreshTokenJti:      jti,

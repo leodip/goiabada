@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -59,7 +59,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, "https://example.com", refreshed.WebsiteURL)
 	assert.Equal(t, updateReq.Enabled, refreshed.Enabled)
 	assert.Equal(t, updateReq.ConsentRequired, refreshed.ConsentRequired)
-	assert.Equal(t, models.AcrLevel1, refreshed.DefaultAcrLevel)
+	assert.Equal(t, record.AcrLevel1, refreshed.DefaultAcrLevel)
 }
 
 func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
@@ -521,10 +521,10 @@ func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 }
 
 // helper to create a client directly in DB
-func createTestClientUnique(t *testing.T, authCodeEnabled bool) *models.Client {
+func createTestClientUnique(t *testing.T, authCodeEnabled bool) *record.Client {
 	t.Helper()
 	ident := "test-client-" + strings.ToLower(fake.LetterN(10))
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         ident,
 		Description:              "Test client",
 		Enabled:                  true,
@@ -532,7 +532,7 @@ func createTestClientUnique(t *testing.T, authCodeEnabled bool) *models.Client {
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: authCodeEnabled,
 		ClientCredentialsEnabled: false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)

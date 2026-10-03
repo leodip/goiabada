@@ -45,7 +45,7 @@ import (
 //     behavioural test in the suite, because the ORM always writes both columns explicitly and so
 //     never exercises the default.
 //  4. A users row that predates the column reads 0, which is property 3 proved on the engine.
-//  5. level2_auth_config_has_changed is gone. Its drop and models.UserSession losing the field are
+//  5. level2_auth_config_has_changed is gone. Its drop and record.UserSession losing the field are
 //     one commit: with the field kept and the column gone every session query names a column that
 //     is not there, and with the field gone and the column kept every insert omits a NOT NULL
 //     column with no default on three engines.

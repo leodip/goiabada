@@ -1,7 +1,7 @@
 package protocolvalidation
 
 import (
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -15,7 +15,7 @@ import (
 //
 // It lives beside the validator that constructs it rather than in core/oauth beside ErrorDetail,
 // because Code is a persistence model and core/oauth is compiled by the admin console, which has
-// no use for a row: carrying the field there republished authserver/internal/models across a
+// no use for a row: carrying the field there republished authserver/internal/record across a
 // module boundary for one authserver-only type (#350). ErrorDetail and the sentinels stay where
 // they were.
 //
@@ -26,7 +26,7 @@ import (
 // passing the wrapper is no longer a silent 500 (#279).
 type AuthCodeReusedError struct {
 	Detail *oauth.ErrorDetail
-	Code   *models.Code
+	Code   *record.Code
 }
 
 func (e *AuthCodeReusedError) Error() string {

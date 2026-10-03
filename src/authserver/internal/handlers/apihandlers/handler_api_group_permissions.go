@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -19,13 +19,13 @@ import (
 // the catalogue they are granted from.
 type groupPermissionsDatabase interface {
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
-	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *models.GroupPermission) error
+	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *record.GroupPermission) error
 	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
-	GetGroupPermissionsByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]models.GroupPermission, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
-	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *models.Group) error
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetGroupPermissionsByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupPermission, error)
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -73,7 +73,7 @@ func HandleGroupPermissionsGet(
 			}
 		}
 
-		memberCounts, err := countGroupMembers(r.Context(), database, []models.Group{*group})
+		memberCounts, err := countGroupMembers(r.Context(), database, []record.Group{*group})
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -144,8 +144,8 @@ func HandleGroupPermissionsPut(
 			}
 		}
 
-		grantKey := func(gp models.GroupPermission) int64 { return gp.PermissionId }
-		grantId := func(gp models.GroupPermission) int64 { return gp.Id }
+		grantKey := func(gp record.GroupPermission) int64 { return gp.PermissionId }
+		grantId := func(gp record.GroupPermission) int64 { return gp.Id }
 
 		// One transaction, as the user permission save: a failure part way through commits
 		// nothing, overlapping saves merge item by item with no row lock (group_permissions has no
@@ -175,7 +175,7 @@ func HandleGroupPermissionsPut(
 				}
 			}
 			for _, permissionId := range insert {
-				if createErr := database.CreateGroupPermission(r.Context(), tx, &models.GroupPermission{
+				if createErr := database.CreateGroupPermission(r.Context(), tx, &record.GroupPermission{
 					GroupId:      group.Id,
 					PermissionId: permissionId,
 				}); createErr != nil {

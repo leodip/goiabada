@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +33,7 @@ import (
 // noBumps is the session port a rotation bumps through, which these cases do not exercise.
 type noBumps struct{}
 
-func (noBumps) BumpUserSession(context.Context, string, int64, string, models.AcrLevel, string) (*models.UserSession, error) {
+func (noBumps) BumpUserSession(context.Context, string, int64, string, record.AcrLevel, string) (*record.UserSession, error) {
 	return nil, nil
 }
 
@@ -51,7 +51,7 @@ func newPausingInserts(db data.Database) *pausingInserts {
 	return &pausingInserts{Database: db, paused: make(chan *sql.Tx, 1), release: make(chan struct{})}
 }
 
-func (p *pausingInserts) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (p *pausingInserts) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 	p.once.Do(func() {
 		p.paused <- tx
 		<-p.release
@@ -59,7 +59,7 @@ func (p *pausingInserts) CreateRefreshToken(ctx context.Context, tx *sql.Tx, ref
 	return p.Database.CreateRefreshToken(ctx, tx, refreshToken)
 }
 
-func rotationSettings() *models.Settings {
+func rotationSettings() *record.Settings {
 	settings := implicitSettings()
 	settings.UserSessionIdleTimeoutInSeconds = 1200
 	settings.UserSessionMaxLifetimeInSeconds = 2400
@@ -90,13 +90,13 @@ func (s familyShape) String() string {
 type family struct {
 	ropc    bool
 	offline bool
-	client  *models.Client
-	user    *models.User
-	code    *models.Code
+	client  *record.Client
+	user    *record.User
+	code    *record.Code
 	// replayed is the earlier, revoked member: presenting it is a replay.
-	replayed *models.RefreshToken
+	replayed *record.RefreshToken
 	// live is the member a refresh presents.
-	live *models.RefreshToken
+	live *record.RefreshToken
 }
 
 func (f *family) firstJti() string { return f.replayed.RefreshTokenJti }
@@ -120,8 +120,8 @@ func newFamilyOfShape(t *testing.T, db data.Database, shape familyShape) *family
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	firstJti := fake.UUID()
-	row := func(jti string, revoked bool) *models.RefreshToken {
-		token := &models.RefreshToken{
+	row := func(jti string, revoked bool) *record.RefreshToken {
+		token := &record.RefreshToken{
 			RefreshTokenJti:      jti,
 			FirstRefreshTokenJti: firstJti,
 			Revoked:              revoked,
@@ -193,7 +193,7 @@ func (f *family) presenting(t *testing.T, db data.Database, jti string) *issuanc
 func (f *family) members(t *testing.T, db data.Database) int {
 	t.Helper()
 
-	var tokens []*models.RefreshToken
+	var tokens []*record.RefreshToken
 	var err error
 	if f.ropc {
 		tokens, err = db.GetRefreshTokensByUserId(context.Background(), nil, f.user.Id)
@@ -204,7 +204,7 @@ func (f *family) members(t *testing.T, db data.Database) int {
 	return len(tokens)
 }
 
-func childOf(t *testing.T, db data.Database, response string) *models.RefreshToken {
+func childOf(t *testing.T, db data.Database, response string) *record.RefreshToken {
 	t.Helper()
 
 	child, err := db.GetRefreshTokenByJti(context.Background(), nil, claimsOf(t, response)["jti"].(string))
@@ -217,7 +217,7 @@ func childOf(t *testing.T, db data.Database, response string) *models.RefreshTok
 // replay when it was revoked, and by the rotation's own family check when it is live in a recorded
 // family. Which of the two an engine leaves behind is the engine's; that it is one of them is the
 // decision.
-func (f *family) requireUnredeemable(t *testing.T, db data.Database, child *models.RefreshToken) {
+func (f *family) requireUnredeemable(t *testing.T, db data.Database, child *record.RefreshToken) {
 	t.Helper()
 
 	presented := f.presenting(t, db, child.RefreshTokenJti)

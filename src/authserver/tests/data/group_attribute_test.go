@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateGroupAttribute(t *testing.T) {
@@ -14,7 +14,7 @@ func TestCreateGroupAttribute(t *testing.T) {
 	group := createTestGroup(t)
 
 	random := fake.LetterN(6)
-	groupAttribute := &models.GroupAttribute{
+	groupAttribute := &record.GroupAttribute{
 		GroupId:              group.Id,
 		Key:                  "testkey_" + random,
 		Value:                "testvalue_" + random,
@@ -57,7 +57,7 @@ func TestCreateGroupAttribute(t *testing.T) {
 	}
 
 	// Test creating a group attribute with invalid group ID
-	invalidGroupAttribute := &models.GroupAttribute{
+	invalidGroupAttribute := &record.GroupAttribute{
 		GroupId: 0,
 		Key:     "invalidkey",
 		Value:   "invalidvalue",
@@ -275,9 +275,9 @@ func TestDeleteGroupAttribute(t *testing.T) {
 	}
 }
 
-func createTestGroupAttribute(t *testing.T, groupId int64) *models.GroupAttribute {
+func createTestGroupAttribute(t *testing.T, groupId int64) *record.GroupAttribute {
 	random := fake.LetterN(6)
-	groupAttribute := &models.GroupAttribute{
+	groupAttribute := &record.GroupAttribute{
 		GroupId:              groupId,
 		Key:                  "TestKey_" + random,
 		Value:                "TestValue_" + random,

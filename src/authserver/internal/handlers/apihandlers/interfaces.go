@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 )
 
@@ -64,12 +64,12 @@ type EmailValidator interface {
 // settings. Three handlers call it: user creation, an administrator setting a user's password, and
 // the account's own password change.
 type PasswordValidator interface {
-	ValidatePassword(policy models.PasswordPolicy, password string) error
+	ValidatePassword(policy record.PasswordPolicy, password string) error
 }
 
 // UserCreator creates the user row and its default permissions in one transaction.
 type UserCreator interface {
-	CreateUser(ctx context.Context, input *usercreation.Input) (*models.User, error)
+	CreateUser(ctx context.Context, input *usercreation.Input) (*record.User, error)
 }
 
 // CredentialFailureRecorder marks the credential check this request performed as failed, so

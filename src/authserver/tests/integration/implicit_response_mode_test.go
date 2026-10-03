@@ -9,7 +9,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ import (
 // explicit query was refused with the refusal itself written into the query.
 
 // implicitModeAuthorizeURL is an implicit request whose response mode is the one thing a test varies.
-func implicitModeAuthorizeURL(client *models.Client, redirectURI string, responseType string,
+func implicitModeAuthorizeURL(client *record.Client, redirectURI string, responseType string,
 	responseMode string, state string, nonce string) string {
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -44,7 +44,7 @@ func implicitModeAuthorizeURL(client *models.Client, redirectURI string, respons
 // signInToIssue walks a whole sign-in, asserting every hop, and returns the response /auth/issue
 // produced, which the caller closes. It is the ceremony the longhand tests in implicit_flow_test.go
 // walk, written once for the cases here.
-func signInToIssue(t *testing.T, httpClient *http.Client, destUrl string, user *models.User, password string) *http.Response {
+func signInToIssue(t *testing.T, httpClient *http.Client, destUrl string, user *record.User, password string) *http.Response {
 	t.Helper()
 
 	resp, err := httpClient.Get(destUrl)

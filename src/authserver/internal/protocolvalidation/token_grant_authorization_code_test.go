@@ -9,7 +9,7 @@ import (
 
 	"errors"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -29,7 +29,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -37,7 +37,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientId:  "client1",
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: false,
@@ -64,7 +64,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -73,7 +73,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			// Code is intentionally left empty
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -100,7 +100,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -110,7 +110,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			// RedirectURI is intentionally left empty
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -137,7 +137,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -148,7 +148,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			// CodeVerifier is intentionally left empty
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -156,14 +156,14 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		// Code has a code_challenge stored, so code_verifier is required
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:      "hash_of_some_code",
 			RedirectURI:   "https://example.com/callback",
 			CodeChallenge: sql.NullString{String: "stored_code_challenge", Valid: true},
-			Client: models.Client{
+			Client: record.Client{
 				ClientIdentifier: "client1",
 			},
-			User: models.User{
+			User: record.User{
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -195,7 +195,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -206,7 +206,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -236,7 +236,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -247,14 +247,14 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 true,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
 		}
@@ -280,7 +280,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -291,17 +291,17 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 true,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
-			Client: models.Client{
+			Client: record.Client{
 				ClientIdentifier: "client2",
 			},
 		}
@@ -329,7 +329,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -340,7 +340,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -349,14 +349,14 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		// The right verifier, so the request proves it may redeem the code and reaches the
 		// user's state, which is read only below PKCE (#137).
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:      "hash_of_valid_code",
 			RedirectURI:   "https://example.com/callback",
 			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
-			Client: models.Client{
+			Client: record.Client{
 				ClientIdentifier: "client1",
 			},
-			User: models.User{
+			User: record.User{
 				Enabled: false,
 			},
 		}
@@ -387,7 +387,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -398,7 +398,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -407,14 +407,14 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		// The right verifier, as in the disabled-user case above: the age is read only below
 		// PKCE (#137).
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:      "hash_of_valid_code",
 			RedirectURI:   "https://example.com/callback",
 			CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
-			Client: models.Client{
+			Client: record.Client{
 				ClientIdentifier: "client1",
 			},
-			User: models.User{
+			User: record.User{
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -446,7 +446,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -457,20 +457,20 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: wrongCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 true,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
-			Client: models.Client{
+			Client: record.Client{
 				ClientIdentifier: "client1",
 			},
-			User: models.User{
+			User: record.User{
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -503,7 +503,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -515,7 +515,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			// ClientSecret is intentionally left empty
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "non_public_client",
 			Enabled:                  true,
@@ -523,13 +523,13 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			IsPublic:                 false,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
 			ClientId:    1,
 			Client:      *client,
 			UserId:      1,
-			User: models.User{
+			User: record.User{
 				Id:      1,
 				Enabled: true,
 			},
@@ -563,7 +563,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -579,7 +579,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
@@ -588,13 +588,13 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientSecretEncrypted:    []byte(clientSecretEncrypted),
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
 			ClientId:    1,
 			Client:      *client,
 			UserId:      1,
-			User: models.User{
+			User: record.User{
 				Id:      1,
 				Enabled: true,
 			},
@@ -629,7 +629,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -641,7 +641,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			ClientSecret: "unnecessary_secret", // Public client shouldn't provide this
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "public_client",
 			Enabled:                  true,
@@ -649,13 +649,13 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			IsPublic:                 true,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
 			ClientId:    1,
 			Client:      *client,
 			UserId:      1,
-			User: models.User{
+			User: record.User{
 				Id:      1,
 				Enabled: true,
 			},
@@ -689,7 +689,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -700,20 +700,20 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "valid_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 true,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
-			Client: models.Client{
+			Client: record.Client{
 				ClientIdentifier: "valid_client",
 			},
-			User: models.User{
+			User: record.User{
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -743,7 +743,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		codeVerifier := testCodeVerifier
@@ -755,20 +755,20 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 			CodeVerifier: codeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "public_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 true,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code_for_public_client",
 			RedirectURI: "https://example.com/public-client/callback",
-			Client: models.Client{
+			Client: record.Client{
 				ClientIdentifier: "public_client",
 			},
-			User: models.User{
+			User: record.User{
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -807,15 +807,15 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	// code: the validator's first GetCodeByCodeHash(used=false) call returns
 	// nil, the retry GetCodeByCodeHash(used=true) returns this entity, and
 	// the auth gate runs against it.
-	reusedCodeFixture := func(client *models.Client, withPKCE bool) *models.Code {
-		c := &models.Code{
+	reusedCodeFixture := func(client *record.Client, withPKCE bool) *record.Code {
+		c := &record.Code{
 			Id:          42,
 			CodeHash:    "hash_of_reused_code",
 			RedirectURI: "https://example.com/callback",
 			ClientId:    client.Id,
 			Client:      *client,
 			UserId:      1,
-			User: models.User{
+			User: record.User{
 				Id:      1,
 				Enabled: true,
 			},
@@ -844,7 +844,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -855,7 +855,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -893,14 +893,14 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
@@ -941,7 +941,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -952,7 +952,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 			CodeVerifier: testCodeVerifier,
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -987,19 +987,19 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		// Attacker's client_id matches what they're submitting, but the code
 		// was issued to a different client.
-		attackerClient := &models.Client{
+		attackerClient := &record.Client{
 			Id:                       2,
 			ClientIdentifier:         "attacker_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 true,
 		}
-		victimClient := &models.Client{
+		victimClient := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "victim_client",
 			Enabled:                  true,
@@ -1040,10 +1040,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1082,14 +1082,14 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
@@ -1130,14 +1130,14 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		assert.Nil(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
@@ -1178,10 +1178,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1222,10 +1222,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1274,7 +1274,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
@@ -1289,7 +1289,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 	require.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -1298,14 +1298,14 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	}
 
 	// Code entity has NO code_challenge stored (PKCE was not used)
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
 		CodeChallenge: sql.NullString{Valid: false}, // PKCE was not used
-		Client: models.Client{
+		Client: record.Client{
 			ClientIdentifier: "client1",
 		},
-		User: models.User{
+		User: record.User{
 			Enabled: true,
 		},
 		CreatedAt: sql.NullTime{
@@ -1341,7 +1341,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
@@ -1356,7 +1356,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 	require.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -1365,14 +1365,14 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	}
 
 	// Code entity has NO code_challenge stored (PKCE was not used)
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
 		CodeChallenge: sql.NullString{Valid: false}, // PKCE was not used
-		Client: models.Client{
+		Client: record.Client{
 			ClientIdentifier: "client1",
 		},
-		User: models.User{
+		User: record.User{
 			Enabled: true,
 		},
 		CreatedAt: sql.NullTime{
@@ -1406,7 +1406,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	codeVerifier := "valid_code_verifier_string_that_is_long_enough"
@@ -1420,7 +1420,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 		CodeVerifier: codeVerifier,
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -1428,14 +1428,14 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	}
 
 	// Code entity has the code_challenge stored (PKCE was used)
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
 		CodeChallenge: sql.NullString{String: expectedCodeChallenge, Valid: true},
-		Client: models.Client{
+		Client: record.Client{
 			ClientIdentifier: "client1",
 		},
-		User: models.User{
+		User: record.User{
 			Enabled: true,
 		},
 		CreatedAt: sql.NullTime{
@@ -1466,7 +1466,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
@@ -1477,7 +1477,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 		CodeVerifier: "", // No code_verifier provided but PKCE was used
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -1485,14 +1485,14 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	}
 
 	// Code entity has the code_challenge stored (PKCE was used)
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
 		CodeChallenge: sql.NullString{String: "stored_code_challenge", Valid: true},
-		Client: models.Client{
+		Client: record.Client{
 			ClientIdentifier: "client1",
 		},
-		User: models.User{
+		User: record.User{
 			Enabled: true,
 		},
 		CreatedAt: sql.NullTime{
@@ -1526,7 +1526,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	// The stored code_challenge was generated from "correct_verifier"
@@ -1541,7 +1541,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 		CodeVerifier: "wrong_code_verifier_string_that_is_long_enough", // Wrong verifier
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -1549,14 +1549,14 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	}
 
 	// Code entity has the code_challenge stored (PKCE was used)
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
 		CodeChallenge: sql.NullString{String: storedCodeChallenge, Valid: true},
-		Client: models.Client{
+		Client: record.Client{
 			ClientIdentifier: "client1",
 		},
-		User: models.User{
+		User: record.User{
 			Enabled: true,
 		},
 		CreatedAt: sql.NullTime{
@@ -1592,7 +1592,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
@@ -1607,7 +1607,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 	require.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -1616,14 +1616,14 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	}
 
 	// Code entity has empty string code_challenge (edge case)
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
 		CodeChallenge: sql.NullString{String: "", Valid: true}, // Empty string, Valid=true
-		Client: models.Client{
+		Client: record.Client{
 			ClientIdentifier: "client1",
 		},
-		User: models.User{
+		User: record.User{
 			Enabled: true,
 		},
 		CreatedAt: sql.NullTime{
@@ -1655,7 +1655,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 // else is an ordinary, valid authorization code redemption, so the only thing any row
 // here can be refused for is the rule under test.
 func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString, isPublic bool) (
-	*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
+	*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
@@ -1663,9 +1663,9 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
@@ -1673,13 +1673,13 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 		IsPublic:                 isPublic,
 	}
 
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
 		ClientId:      1,
 		CodeChallenge: storedChallenge,
-		Client:        models.Client{ClientIdentifier: "client1"},
-		User:          models.User{Id: 7, Enabled: true},
+		Client:        record.Client{ClientIdentifier: "client1"},
+		User:          record.User{Id: 7, Enabled: true},
 		CreatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 
@@ -1759,7 +1759,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 	// gone, which is the swept case; otherwise it is the user the row belongs to. A non-nil
 	// lookupErr makes the lookup itself fail, which is a third outcome and not a fourth
 	// flavour of absence.
-	setup := func(t *testing.T, sessionOwner *int64, lookupErr error) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
+	setup := func(t *testing.T, sessionOwner *int64, lookupErr error) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -1767,7 +1767,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 
 		// Confidential, and it used to be public (#245). The subject is the code's session
 		// ownership, and the code carries no challenge, so a public client would now be
@@ -1775,7 +1775,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1784,15 +1784,15 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:          "hash_of_valid_code",
 			RedirectURI:       "https://example.com/callback",
 			SessionIdentifier: sid,
 			// Both sides of the comparison are non-zero, so the accept row is a real match
 			// rather than the zero-to-zero one an incomplete fixture would give.
 			UserId: grantUserId,
-			Client: models.Client{ClientIdentifier: "client1"},
-			User:   models.User{Id: grantUserId, Enabled: true},
+			Client: record.Client{ClientIdentifier: "client1"},
+			User:   record.User{Id: grantUserId, Enabled: true},
 			CreatedAt: sql.NullTime{
 				Time:  time.Now().UTC(),
 				Valid: true,
@@ -1813,7 +1813,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, nil).Once()
 		default:
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
-				Return(&models.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
+				Return(&record.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
 		}
 
 		input := &ValidateTokenRequestInput{
@@ -1901,7 +1901,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 	// codeChallenge empty means the code was minted without PKCE, which is every case but the
 	// last; the last needs a stored challenge so that a wrong verifier is a genuine PKCE
 	// failure rather than the strict-mode rejection of an unexpected one.
-	setup := func(t *testing.T, codeRedirectURI string, registered []string, loadErr error, codeChallenge string) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
+	setup := func(t *testing.T, codeRedirectURI string, registered []string, loadErr error, codeChallenge string) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -1909,7 +1909,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 
 		// Confidential, and the code carries no challenge, so the PKCE boundary (#245) does not
 		// pre-empt the subject. The secret also gives the ordering cases below something real to
@@ -1917,7 +1917,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1926,13 +1926,13 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:          "hash_of_valid_code",
 			RedirectURI:       codeRedirectURI,
 			SessionIdentifier: "",
 			UserId:            grantUserId,
-			Client:            models.Client{ClientIdentifier: "client1"},
-			User:              models.User{Id: grantUserId, Enabled: true},
+			Client:            record.Client{ClientIdentifier: "client1"},
+			User:              record.User{Id: grantUserId, Enabled: true},
 			CodeChallenge:     sql.NullString{String: codeChallenge, Valid: codeChallenge != ""},
 			CreatedAt: sql.NullTime{
 				Time:  time.Now().UTC(),
@@ -1954,10 +1954,10 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 			mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(loadErr).Once()
 		case registered != nil:
 			mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Run(func(args mock.Arguments) {
-				c := args.Get(2).(*models.Client)
+				c := args.Get(2).(*record.Client)
 				c.RedirectURIs = nil
 				for _, uri := range registered {
-					c.RedirectURIs = append(c.RedirectURIs, models.RedirectURI{URI: uri})
+					c.RedirectURIs = append(c.RedirectURIs, record.RedirectURI{URI: uri})
 				}
 			}).Return(nil).Once()
 		}

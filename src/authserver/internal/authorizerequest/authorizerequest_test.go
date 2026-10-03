@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 )
 
@@ -22,8 +22,8 @@ var tx = &sql.Tx{}
 
 // parkedRow is what the database hands back for a handle: a row whose hash is the handle's digest,
 // holding form.
-func parkedRow(id int64, handle string, form url.Values) *models.AuthorizeRequest {
-	return &models.AuthorizeRequest{
+func parkedRow(id int64, handle string, form url.Values) *record.AuthorizeRequest {
+	return &record.AuthorizeRequest{
 		Id:          id,
 		HandleHash:  hashutil.HashString(handle),
 		RequestForm: form.Encode(),
@@ -54,9 +54,9 @@ func TestPark_IssuesAHandleThatIsFortyThreeUnpaddedURLSafeCharacters(t *testing.
 // export) holds nothing a browser could present.
 func TestPark_StoresTheDigestAndNeverTheHandle(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	var stored *models.AuthorizeRequest
+	var stored *record.AuthorizeRequest
 	db.On("CreateAuthorizeRequest", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { stored = args.Get(2).(*models.AuthorizeRequest) }).Return(nil).Once()
+		Run(func(args mock.Arguments) { stored = args.Get(2).(*record.AuthorizeRequest) }).Return(nil).Once()
 
 	before := time.Now().UTC()
 	handle, err := Park(context.Background(), db, url.Values{"client_id": {"c"}})
@@ -79,9 +79,9 @@ func TestPark_StoresTheDigestAndNeverTheHandle(t *testing.T) {
 // GET reads what the POST received.
 func TestPark_TheFormIsStoredEncodedAndKeepsEveryCopy(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	var stored *models.AuthorizeRequest
+	var stored *record.AuthorizeRequest
 	db.On("CreateAuthorizeRequest", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { stored = args.Get(2).(*models.AuthorizeRequest) }).Return(nil).Once()
+		Run(func(args mock.Arguments) { stored = args.Get(2).(*record.AuthorizeRequest) }).Return(nil).Once()
 
 	form := url.Values{
 		"client_id": {"c"},
@@ -282,7 +282,7 @@ func TestConsume_ARerunAfterADeadlockStartsFromWhatTheDatabaseHoldsNow(t *testin
 // repeating a 500.
 func TestConsume_ARowThatDoesNotParseIsClaimedAndRefused(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	corrupt := &models.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: "client_id=%zz"}
+	corrupt := &record.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: "client_id=%zz"}
 
 	db := mocks_data.NewDatabase(t)
 	mocks_data.ExpectRunInTransaction(db, tx)

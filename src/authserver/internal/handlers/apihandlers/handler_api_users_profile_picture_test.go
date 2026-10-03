@@ -13,7 +13,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -103,7 +103,7 @@ func TestHandleUserProfilePictureGet_HasPicture(t *testing.T) {
 	handler := HandleUserProfilePictureGet(database, testBaseURL)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/123/profile-picture", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -127,7 +127,7 @@ func TestHandleUserProfilePictureGet_NoPicture(t *testing.T) {
 	handler := HandleUserProfilePictureGet(database, testBaseURL)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/123/profile-picture", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -217,7 +217,7 @@ func TestHandleUserProfilePicturePost_InvalidImage(t *testing.T) {
 	handler := HandleUserProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", invalidImageData)
@@ -249,7 +249,7 @@ func TestHandleUserProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(t *tes
 	handler := HandleUserProfilePicturePost(database, auditLogger, testBaseURL, 64)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	pictureData := createTestPNG(100, 100)
 	require.Greater(t, len(pictureData), 64)
@@ -277,7 +277,7 @@ func TestHandleUserProfilePicturePost_CreateNew(t *testing.T) {
 	handler := HandleUserProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 	adminSub := fake.UUID()
 
 	pictureData := createTestPNG(100, 100)
@@ -289,7 +289,7 @@ func TestHandleUserProfilePicturePost_CreateNew(t *testing.T) {
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
-	database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *record.UserProfilePicture) bool {
 		return pp.UserId == int64(123) && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -314,8 +314,8 @@ func TestHandleUserProfilePicturePost_UpdateExisting(t *testing.T) {
 	handler := HandleUserProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
-	existingPicture := &models.UserProfilePicture{
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
+	existingPicture := &record.UserProfilePicture{
 		Id:          1,
 		UserId:      123,
 		Picture:     []byte("old picture data"),
@@ -332,7 +332,7 @@ func TestHandleUserProfilePicturePost_UpdateExisting(t *testing.T) {
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(existingPicture, nil)
-	database.On("UpdateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("UpdateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *record.UserProfilePicture) bool {
 		return pp.Id == existingPicture.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -420,7 +420,7 @@ func TestHandleUserProfilePictureDelete_Success(t *testing.T) {
 	handler := HandleUserProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 	adminSub := fake.UUID()
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)
@@ -452,7 +452,7 @@ func TestHandleUserProfilePictureDelete_DatabaseError(t *testing.T) {
 	handler := HandleUserProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
-	user := &models.User{Id: 123, Subject: sub, Enabled: true}
+	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)
 	req = setChiURLParam(req, "id", "123")

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +35,7 @@ import (
 func TestUnique_ClientIdentifier(t *testing.T) {
 	existing := createTestClient(t)
 
-	duplicate := &models.Client{
+	duplicate := &record.Client{
 		ClientIdentifier: existing.ClientIdentifier,
 		Description:      "Duplicate client identifier",
 	}
@@ -46,7 +46,7 @@ func TestUnique_ClientIdentifier(t *testing.T) {
 func TestUnique_ResourceIdentifier(t *testing.T) {
 	existing := createTestResource(t)
 
-	duplicate := &models.Resource{
+	duplicate := &record.Resource{
 		ResourceIdentifier: existing.ResourceIdentifier,
 		Description:        "Duplicate resource identifier",
 	}
@@ -57,7 +57,7 @@ func TestUnique_ResourceIdentifier(t *testing.T) {
 func TestUnique_GroupIdentifier(t *testing.T) {
 	existing := createTestGroup(t)
 
-	duplicate := &models.Group{
+	duplicate := &record.Group{
 		GroupIdentifier: existing.GroupIdentifier,
 		Description:     "Duplicate group identifier",
 	}
@@ -68,7 +68,7 @@ func TestUnique_GroupIdentifier(t *testing.T) {
 func TestUnique_UserSubject(t *testing.T) {
 	existing := createTestUser(t)
 
-	duplicate := &models.User{
+	duplicate := &record.User{
 		Enabled:  true,
 		Subject:  existing.Subject,
 		Username: fake.Username(),
@@ -81,7 +81,7 @@ func TestUnique_UserSubject(t *testing.T) {
 func TestUnique_UserEmail(t *testing.T) {
 	existing := createTestUser(t)
 
-	duplicate := &models.User{
+	duplicate := &record.User{
 		Enabled:  true,
 		Subject:  fake.UUID(),
 		Username: fake.Username(),
@@ -107,10 +107,10 @@ func TestUnique_KeyPairState(t *testing.T) {
 	// 'next' rather than 'current', because 'next' is the only duplicate the rotation
 	// defect could actually produce: two concurrent rotations both inserting a new next
 	// key. The constraint covers all three states identically (#251).
-	next := models.KeyStateNext.String()
+	next := record.KeyStateNext.String()
 	existing := createKeyPairInState(t, next)
 
-	duplicate := &models.KeyPair{
+	duplicate := &record.KeyPair{
 		State:         existing.State,
 		KeyIdentifier: fake.UUID(),
 		Type:          "RSA",
@@ -126,7 +126,7 @@ func TestUnique_RefreshTokenJti(t *testing.T) {
 	existing := createROPCRefreshToken(t, user.Id, client.Id)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	duplicate := &models.RefreshToken{
+	duplicate := &record.RefreshToken{
 		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
 		RefreshTokenJti:  existing.RefreshTokenJti,
@@ -145,7 +145,7 @@ func TestUnique_UserSessionSessionIdentifier(t *testing.T) {
 	existing := createTestUserSession(t, user.Id)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	duplicate := &models.UserSession{
+	duplicate := &record.UserSession{
 		SessionIdentifier: existing.SessionIdentifier,
 		Started:           now,
 		LastAccessed:      now,
@@ -164,7 +164,7 @@ func TestUnique_UserProfilePicturePerUser(t *testing.T) {
 	user := createTestUser(t)
 	createTestUserProfilePicture(t, user.Id)
 
-	duplicate := &models.UserProfilePicture{
+	duplicate := &record.UserProfilePicture{
 		UserId:      user.Id,
 		Picture:     createTestPNG(10, 10),
 		ContentType: "image/png",
@@ -178,7 +178,7 @@ func TestUnique_ClientLogoPerClient(t *testing.T) {
 	client := createTestClient(t)
 	createTestClientLogo(t, client.Id)
 
-	duplicate := &models.ClientLogo{
+	duplicate := &record.ClientLogo{
 		ClientId:    client.Id,
 		Logo:        createTestPNG(10, 10),
 		ContentType: "image/png",
@@ -196,7 +196,7 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 	resource := createTestResource(t)
 	existing := createTestPermission(t, resource)
 
-	duplicate := &models.Permission{
+	duplicate := &record.Permission{
 		PermissionIdentifier: existing.PermissionIdentifier,
 		Description:          "Duplicate permission on the same resource",
 		ResourceId:           resource.Id,
@@ -207,7 +207,7 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 	// The same identifier on a different resource is legitimate, and is what
 	// makes permissions resource-scoped rather than global.
 	otherResource := createTestResource(t)
-	onOtherResource := &models.Permission{
+	onOtherResource := &record.Permission{
 		PermissionIdentifier: existing.PermissionIdentifier,
 		Description:          "Same identifier, different resource",
 		ResourceId:           otherResource.Id,
@@ -225,7 +225,7 @@ func TestUnique_RejectedDuplicateInsertsNothing(t *testing.T) {
 	before, err := database.GetAllGroups(context.Background(), nil)
 	require.NoError(t, err, "GetAllGroups")
 
-	duplicate := &models.Group{
+	duplicate := &record.Group{
 		GroupIdentifier: existing.GroupIdentifier,
 		Description:     "Duplicate group identifier",
 	}

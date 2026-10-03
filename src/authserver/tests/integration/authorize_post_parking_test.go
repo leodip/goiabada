@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +24,7 @@ import (
 // that holds the browser's jar.
 
 // authorizePostForm is a code-flow request for the client, with prompt appended when set.
-func authorizePostForm(client *models.Client, redirectURI, prompt string) url.Values {
+func authorizePostForm(client *record.Client, redirectURI, prompt string) url.Values {
 	form := url.Values{}
 	form.Set("client_id", client.ClientIdentifier)
 	form.Set("redirect_uri", redirectURI)
@@ -229,7 +229,7 @@ func TestAuthorizeGet_AnUnusableRequestHandleIsRefusedOnThePage(t *testing.T) {
 
 	// An expired request: a row whose deadline has passed and which the sweep has not reached.
 	expiredHandle := fake.LetterN(42) + "A"
-	require.NoError(t, database.CreateAuthorizeRequest(context.Background(), nil, &models.AuthorizeRequest{
+	require.NoError(t, database.CreateAuthorizeRequest(context.Background(), nil, &record.AuthorizeRequest{
 		HandleHash:  hashutil.HashString(expiredHandle),
 		RequestForm: "client_id=whatever",
 		ExpiresAt:   time.Now().UTC().Add(-time.Second),

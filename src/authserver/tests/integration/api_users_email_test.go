@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@email.test"),
@@ -108,7 +108,7 @@ func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@normalize.test"),
@@ -162,7 +162,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 	// unchanged assertion -- so each is drawn once.
 	takenEmail := uniqueEmail("existing@duplicate.test")
 	keptEmail := uniqueEmail("testuser@duplicate.test")
-	existingUser := &models.User{
+	existingUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      takenEmail,
@@ -176,7 +176,7 @@ func TestAPIUserEmailPut_DuplicateEmail(t *testing.T) {
 	}()
 
 	// Setup: Create second user to test duplicate email
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      keptEmail,
@@ -213,7 +213,7 @@ func TestAPIUserEmailPut_InvalidEmail(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@invalid.test"),
@@ -263,7 +263,7 @@ func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 	// Setup: Create test user with unverified email and verification code. The
 	// request below re-sends the same address, so it is drawn once.
 	verifiedEmail := uniqueEmail("testuser@verified.test")
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:                        fake.UUID(),
 		Enabled:                        true,
 		Email:                          verifiedEmail,
@@ -315,7 +315,7 @@ func TestAPIUserEmailPut_UnsetEmailVerified(t *testing.T) {
 	// Setup: Create test user with verified email. The request below re-sends
 	// the same address, so it is drawn once.
 	unverifiedEmail := uniqueEmail("testuser@unverified.test")
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         unverifiedEmail,
@@ -409,7 +409,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@invalid-body.test"),
@@ -440,7 +440,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 
 func TestAPIUserEmailPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-email.test"),
@@ -472,7 +472,7 @@ func TestAPIUserEmailPut_PartialUpdate(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user with existing data
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("original@partial.test"),

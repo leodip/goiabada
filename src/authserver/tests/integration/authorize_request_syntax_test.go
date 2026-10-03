@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // #244's remaining parts over HTTP: what the authorization and token endpoints now refuse or ignore,
@@ -19,7 +19,7 @@ import (
 // reached on the wire, and that the refusal is the one the client reads.
 
 // authorizeRequest is a code-flow authorization request for client, its parameters overridable.
-func authorizeRequest(client *models.Client, redirectUri *models.RedirectURI, overrides map[string]string) string {
+func authorizeRequest(client *record.Client, redirectUri *record.RedirectURI, overrides map[string]string) string {
 	query := url.Values{
 		"client_id":             {client.ClientIdentifier},
 		"redirect_uri":          {redirectUri.URI},

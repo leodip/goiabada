@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/stretchr/testify/assert"
@@ -141,7 +141,7 @@ func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 // that has signed in, which a client calling the token endpoint from the same origin can be.
 func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{Id: 1}, nil)
+	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
 
@@ -179,7 +179,7 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 func TestInitRoutes_TheTokenEndpointStillRefusesGETWith405(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	// The group's chain runs ahead of its 405, as it did when the route was the group's.
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{Id: 1}, nil)
+	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	s := newFaultsTestServer(database)
 
 	rr := httptest.NewRecorder()

@@ -7,7 +7,7 @@
 // It exists because two of those operations used to live in a handler package for no reason but
 // reachability: EnableUserOTPTx sat in authserver/internal/handlers with a doc comment saying it
 // was there because "the browser handler cannot reach an unexported function in apihandlers",
-// where disableUserOTP was, and the seed's cipher sat on models.User, which is a persistence
+// where disableUserOTP was, and the seed's cipher sat on record.User, which is a persistence
 // record. Nothing here takes an http.ResponseWriter, a *http.Request, template data or a status
 // code, and nothing here imports a handler package.
 //
@@ -35,8 +35,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // Database is what the OTP credential lifecycle needs: the user row, the generation counter every
@@ -56,7 +56,7 @@ type Database interface {
 	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // VerifyOutcome is what a passcode check concluded. The three values are the three arms every
@@ -113,7 +113,7 @@ type VerifyResult struct {
 // The browser caller needs the returned value: it captured the pre-enrollment generation at
 // /auth/level2, and promoting that at /auth/completed would leave a session that just enrolled
 // and verified owing another second-factor prompt at once.
-func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *models.User, seed string) (int64, error) {
+func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User, seed string) (int64, error) {
 	if err := setSecret(dataCipher, user, seed); err != nil {
 		return 0, err
 	}
@@ -181,7 +181,7 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 //
 // Shared by the two sites decision 4 names, HandleAccountOTPPut's disable branch and
 // HandleUserOTPPut. There is no third: the browser flow enrolls but never disables.
-func Remove(ctx context.Context, db Database, user *models.User) error {
+func Remove(ctx context.Context, db Database, user *record.User) error {
 	clearSecret(user)
 	user.OTPEnabled = false
 
@@ -219,11 +219,11 @@ func Remove(ctx context.Context, db Database, user *models.User) error {
 // decision 10).
 //
 // The stored seed is decrypted here and goes no further: it is the read that used to travel out to
-// the browser handler as models.User.GetOTPSecret, which is what #387's rule about a plaintext seed
+// the browser handler as record.User.GetOTPSecret, which is what #387's rule about a plaintext seed
 // not leaving the minimum is about.
 //
 // One caller today, HandleAuthOtpPost's already-enrolled arm.
-func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *models.User, code string, now time.Time) (VerifyResult, error) {
+func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User, code string, now time.Time) (VerifyResult, error) {
 	secret, err := storedSecret(dataCipher, user)
 	if err != nil {
 		return VerifyResult{}, err
@@ -243,7 +243,7 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 // Two callers, and the seed reaches this function from a different place at each: the browser's
 // comes off AuthContext.OTPKeyURL, the account API's off the pending enrolment the server issued
 // and recorded. Neither seed is ever one the requester named.
-func VerifySupplied(ctx context.Context, db Database, user *models.User, seed string, code string,
+func VerifySupplied(ctx context.Context, db Database, user *record.User, seed string, code string,
 	now time.Time) (VerifyResult, error) {
 	return verify(ctx, db, user, seed, code, now, false)
 }
@@ -253,7 +253,7 @@ func VerifySupplied(ctx context.Context, db Database, user *models.User, seed st
 //
 // It reports rather than decides. The caller keeps the audit records, the rate-limit accounting and
 // the response, because those three genuinely differ between the sites and must keep differing.
-func verify(ctx context.Context, db Database, user *models.User, secret string, code string,
+func verify(ctx context.Context, db Database, user *record.User, secret string, code string,
 	now time.Time, requireOTPEnabled bool) (VerifyResult, error) {
 	step, matched := otp.MatchStep(code, secret, now)
 	if !matched {
@@ -273,10 +273,10 @@ func verify(ctx context.Context, db Database, user *models.User, secret string, 
 // setSecret encrypts the TOTP seed at rest (AES-256-GCM, under the data cipher it is given) into
 // OTPSecretEncrypted. See issue #82: TOTP secrets must not be stored in plaintext.
 //
-// Unexported, where this was models.User.SetOTPSecret: the only way to store a seed is to establish
+// Unexported, where this was record.User.SetOTPSecret: the only way to store a seed is to establish
 // an authenticator with it, which is what keeps the cipher and the generation advance from coming
 // apart (#387).
-func setSecret(dataCipher *encryption.DataCipher, u *models.User, secret string) error {
+func setSecret(dataCipher *encryption.DataCipher, u *record.User, secret string) error {
 	encrypted, err := dataCipher.Encrypt(secret)
 	if err != nil {
 		return err
@@ -289,9 +289,9 @@ func setSecret(dataCipher *encryption.DataCipher, u *models.User, secret string)
 // secret. It is the only way a seed is read: the legacy plaintext users.otp_secret column was
 // dropped by migration 000048 along with the startup pass that converted it (#98, #262).
 //
-// Unexported, where this was models.User.GetOTPSecret, and that is decision 4's point: a plaintext
+// Unexported, where this was record.User.GetOTPSecret, and that is decision 4's point: a plaintext
 // seed now leaves this package only on the enrolment render path, where the QR code needs it.
-func storedSecret(dataCipher *encryption.DataCipher, u *models.User) (string, error) {
+func storedSecret(dataCipher *encryption.DataCipher, u *record.User) (string, error) {
 	if len(u.OTPSecretEncrypted) == 0 {
 		return "", nil
 	}
@@ -299,6 +299,6 @@ func storedSecret(dataCipher *encryption.DataCipher, u *models.User) (string, er
 }
 
 // clearSecret removes any stored TOTP seed.
-func clearSecret(u *models.User) {
+func clearSecret(u *record.User) {
 	u.OTPSecretEncrypted = nil
 }

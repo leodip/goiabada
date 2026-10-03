@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
+func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 
 	now := time.Now().UTC()
 
@@ -19,7 +19,7 @@ func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *mod
 	settings.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	settings.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
+	settingsStruct := sqlbuilder.NewStruct(new(record.Settings)).
 		For(d.Flavor)
 
 	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settings", settings)
@@ -49,7 +49,7 @@ const initialSettingsId = 1
 // It refuses a nil transaction because SQL Server's IDENTITY_INSERT, which ExplicitIdInsertSQL
 // brackets the insert with there, is a setting of the connection, and only a transaction pins the
 // three statements to one.
-func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
+func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 	if tx == nil {
 		return errs.New("the initial settings are written inside a transaction, and none was given")
 	}
@@ -80,7 +80,7 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 		}
 	}
 
-	insertBuilder := sqlbuilder.NewStruct(new(models.Settings)).
+	insertBuilder := sqlbuilder.NewStruct(new(record.Settings)).
 		For(d.Flavor).
 		InsertInto("settings", settings)
 	statement, args := insertBuilder.Build()
@@ -99,7 +99,7 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 	return nil
 }
 
-func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
+func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 
 	if settings.Id == 0 {
 		return errs.New("can't update settings with id 0")
@@ -108,7 +108,7 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *mod
 	originalUpdatedAt := settings.UpdatedAt
 	settings.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
+	settingsStruct := sqlbuilder.NewStruct(new(record.Settings)).
 		For(d.Flavor)
 
 	updateBuilder := settingsStruct.WithoutTag("pk").WithoutTag("dont-update").Update("settings", settings)
@@ -125,7 +125,7 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *mod
 }
 
 func (d *Database) getSettingsCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	settingsStruct *sqlbuilder.Struct) (*models.Settings, error) {
+	settingsStruct *sqlbuilder.Struct) (*record.Settings, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -134,7 +134,7 @@ func (d *Database) getSettingsCommon(ctx context.Context, tx *sql.Tx, selectBuil
 	}
 	defer func() { _ = rows.Close() }()
 
-	var settings models.Settings
+	var settings record.Settings
 	if rows.Next() {
 		addr := settingsStruct.Addr(&settings)
 		err = rows.Scan(addr...)
@@ -150,9 +150,9 @@ func (d *Database) getSettingsCommon(ctx context.Context, tx *sql.Tx, selectBuil
 	return nil, nil
 }
 
-func (d *Database) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error) {
+func (d *Database) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error) {
 
-	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
+	settingsStruct := sqlbuilder.NewStruct(new(record.Settings)).
 		For(d.Flavor)
 
 	selectBuilder := settingsStruct.SelectFrom("settings")

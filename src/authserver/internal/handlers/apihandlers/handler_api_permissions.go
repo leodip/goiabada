@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -24,13 +24,13 @@ import (
 // permissionsDatabase is what the permission endpoints need: the resource that owns a permission
 // and the permission rows under it.
 type permissionsDatabase interface {
-	CreatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
+	CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
 	DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
-	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
+	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
 }
 
 func HandlePermissionsByResourceGet(
@@ -57,7 +57,7 @@ func HandlePermissionsByResourceGet(
 
 		// Ensure permissions is never nil
 		if permissions == nil {
-			permissions = []models.Permission{}
+			permissions = []record.Permission{}
 		}
 
 		// Load resource information for each permission if we have any
@@ -184,8 +184,8 @@ func HandleResourcePermissionsPut(
 		}
 
 		// Build a map for uniqueness checks
-		existingById := map[int64]models.Permission{}
-		existingByIdentifier := map[string]models.Permission{}
+		existingById := map[int64]record.Permission{}
+		existingByIdentifier := map[string]record.Permission{}
 		for _, p := range existing {
 			existingById[p.Id] = p
 			existingByIdentifier[p.PermissionIdentifier] = p
@@ -264,7 +264,7 @@ func HandleResourcePermissionsPut(
 				return errListChanged
 			}
 
-			storedById := make(map[int64]models.Permission, len(stored))
+			storedById := make(map[int64]record.Permission, len(stored))
 			for _, p := range stored {
 				storedById[p.Id] = p
 			}
@@ -310,7 +310,7 @@ func HandleResourcePermissionsPut(
 				if p.Id > 0 {
 					continue
 				}
-				if createErr := database.CreatePermission(r.Context(), tx, &models.Permission{
+				if createErr := database.CreatePermission(r.Context(), tx, &record.Permission{
 					ResourceId:           resource.Id,
 					PermissionIdentifier: p.PermissionIdentifier,
 					Description:          p.Description,
@@ -342,7 +342,7 @@ func HandleResourcePermissionsPut(
 // description by another save makes the caller's list outdated as surely as an added or dropped
 // permission does. The caller's entries are compared as sent: it echoes what it read, and stored
 // values were trimmed when they were written (#428).
-func permissionEntryOf(p models.Permission) api.ResourcePermissionUpsert {
+func permissionEntryOf(p record.Permission) api.ResourcePermissionUpsert {
 	return api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description}
 }
 

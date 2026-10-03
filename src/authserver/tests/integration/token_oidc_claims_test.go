@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ import (
 
 func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 	// Disable the global setting
-	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -101,7 +101,7 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 
 func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 	// Ensure the global setting is enabled
-	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -145,7 +145,7 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 
 func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 	// Disable the global setting
-	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -190,7 +190,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 
 func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 	// Enable the global setting
-	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -234,17 +234,17 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 }
 
 // createAuthCodeWithUserProfile creates a user with full profile data and completes auth code flow
-func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
+func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope string) (*http.Client, *record.Code) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
@@ -253,7 +253,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -285,7 +285,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	// API is a weaker thing for the claim assertions to run against. Nothing
 	// below asserts on either value, only that the claim carries what was
 	// stored (#272).
-	user := &models.User{
+	user := &record.User{
 		Subject:             fake.UUID(),
 		Enabled:             true,
 		Email:               fake.Email(),

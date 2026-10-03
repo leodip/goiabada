@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -141,8 +141,8 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	family, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
 	require.NoError(t, err)
 
-	children := make([]*models.RefreshToken, 0, len(family))
-	live := make([]*models.RefreshToken, 0, len(family))
+	children := make([]*record.RefreshToken, 0, len(family))
+	live := make([]*record.RefreshToken, 0, len(family))
 	for _, rt := range family {
 		if rt.PreviousRefreshTokenJti == parentJti {
 			children = append(children, rt)

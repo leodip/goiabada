@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCreateWebOrigin(t *testing.T) {
 	client := createTestClient(t)
-	webOrigin := &models.WebOrigin{
+	webOrigin := &record.WebOrigin{
 		Origin:   "https://example.com",
 		ClientId: client.Id,
 	}
@@ -46,20 +46,20 @@ func TestCreateWebOrigin(t *testing.T) {
 
 // TestCreateWebOrigin_TheLongestStandardOriginRoundTrips stores the longest standards-valid origin:
 // "https://" plus a 253-character host of three 63-character labels and one of 61, plus ":65535",
-// which is models.WebOriginMaxBytes. The admin API admits it, so every engine has to store it, under
+// which is record.WebOriginMaxBytes. The admin API admits it, so every engine has to store it, under
 // the unique index on (origin, client_id) that covers the widened column (#428).
 func TestCreateWebOrigin_TheLongestStandardOriginRoundTrips(t *testing.T) {
 	label := func(n int) string { return strings.Repeat("a", n) }
 	host := strings.Join([]string{label(63), label(63), label(63), label(61)}, ".")
 	require.Len(t, host, 253, "the host is off the longest DNS name, so the case no longer observes the column's edge")
 	origin := "https://" + host + ":65535"
-	require.Len(t, origin, models.WebOriginMaxBytes)
+	require.Len(t, origin, record.WebOriginMaxBytes)
 
 	client := createTestClient(t)
-	webOrigin := &models.WebOrigin{Origin: origin, ClientId: client.Id}
+	webOrigin := &record.WebOrigin{Origin: origin, ClientId: client.Id}
 
 	err := database.CreateWebOrigin(context.Background(), nil, webOrigin)
-	require.NoError(t, err, "a web origin of %d bytes was refused by the column", models.WebOriginMaxBytes)
+	require.NoError(t, err, "a web origin of %d bytes was refused by the column", record.WebOriginMaxBytes)
 
 	stored, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
 	require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestWebOriginExists_Transaction(t *testing.T) {
 	origin := "https://" + random + ".tx.example.com"
 
 	tx := beginTx(t)
-	webOrigin := &models.WebOrigin{Origin: origin, ClientId: client.Id}
+	webOrigin := &record.WebOrigin{Origin: origin, ClientId: client.Id}
 	if err := database.CreateWebOrigin(context.Background(), tx, webOrigin); err != nil {
 		t.Fatalf("CreateWebOrigin in a transaction: %v", err)
 	}
@@ -310,9 +310,9 @@ func webOriginExistsWithin(t *testing.T, tx *sql.Tx, origin string, within time.
 	}
 }
 
-func createTestWebOrigin(t *testing.T, clientId int64) *models.WebOrigin {
+func createTestWebOrigin(t *testing.T, clientId int64) *record.WebOrigin {
 	random := fake.LetterN(6)
-	webOrigin := &models.WebOrigin{
+	webOrigin := &record.WebOrigin{
 		Origin:   "https://" + random + ".example.com",
 		ClientId: clientId,
 	}

@@ -8,8 +8,8 @@ import (
 	"errors"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -31,13 +31,13 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -46,7 +46,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
@@ -83,12 +83,12 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
 	}
 	ctx := context.Background()
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Inherit from global
@@ -121,13 +121,13 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -136,7 +136,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -171,13 +171,13 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true, // Globally enabled
 	}
 	ctx := context.Background()
 
 	ropcDisabled := false
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled, // Client overrides to disable
@@ -208,13 +208,13 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -248,13 +248,13 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -290,13 +290,13 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -334,13 +334,13 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -384,13 +384,13 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -429,13 +429,13 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -468,13 +468,13 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -482,7 +482,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -517,13 +517,13 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -531,7 +531,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -569,13 +569,13 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -584,7 +584,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -619,13 +619,13 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                false, // Confidential client
@@ -663,13 +663,13 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 
 	encryptedSecret, _ := testDataCipher.Encrypt("correct-secret")
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                false, // Confidential client
@@ -716,7 +716,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCi
 	require.NoError(t, err)
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                false,
@@ -726,7 +726,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCi
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(context.Background(),
-		&models.Settings{ResourceOwnerPasswordCredentialsEnabled: true},
+		&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true},
 		&ValidateTokenRequestInput{
 			GrantType:    "password",
 			ClientId:     "ropc-client",
@@ -750,13 +750,13 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 	encryptedSecret, _ := testDataCipher.Encrypt("correct-secret")
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("userpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -765,7 +765,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
@@ -804,13 +804,13 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -819,7 +819,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -853,13 +853,13 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -868,7 +868,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -909,14 +909,14 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 
 			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-			settings := &models.Settings{
+			settings := &record.Settings{
 				ResourceOwnerPasswordCredentialsEnabled: true,
 			}
 			ctx := context.Background()
 
 			passwordHash, err := passwordhash.Hash("correctpassword")
 			require.NoError(t, err)
-			user := &models.User{
+			user := &record.User{
 				Id:           1,
 				Email:        "user@example.com",
 				PasswordHash: passwordHash,
@@ -924,7 +924,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 			}
 
 			ropcEnabled := true
-			client := &models.Client{
+			client := &record.Client{
 				ClientIdentifier:                        "ropc-client",
 				Enabled:                                 true,
 				IsPublic:                                true,
@@ -961,13 +961,13 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -976,7 +976,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -1014,13 +1014,13 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -1029,19 +1029,19 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 	}
 
-	resource := &models.Resource{
+	resource := &record.Resource{
 		Id:                 1,
 		ResourceIdentifier: "api",
 	}
 
-	permissions := []models.Permission{
+	permissions := []record.Permission{
 		{Id: 1, PermissionIdentifier: "read", ResourceId: 1},
 	}
 
@@ -1075,13 +1075,13 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &models.User{
+	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
@@ -1090,19 +1090,19 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	}
 
 	ropcEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 	}
 
-	resource := &models.Resource{
+	resource := &record.Resource{
 		Id:                 1,
 		ResourceIdentifier: "api",
 	}
 
-	permissions := []models.Permission{
+	permissions := []record.Permission{
 		{Id: 1, PermissionIdentifier: "read", ResourceId: 1},
 	}
 
@@ -1159,9 +1159,9 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			scope: "openid api:delete",
 			setup: func(mockDB *mocks_data.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "api").
-					Return(&models.Resource{Id: 1, ResourceIdentifier: "api"}, nil).Once()
+					Return(&record.Resource{Id: 1, ResourceIdentifier: "api"}, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
-					Return([]models.Permission{{Id: 1, PermissionIdentifier: "read", ResourceId: 1}}, nil).Once()
+					Return([]record.Permission{{Id: 1, PermissionIdentifier: "read", ResourceId: 1}}, nil).Once()
 			},
 			wantDesc: "Scope 'api:delete' is not recognized. The resource identified by 'api' doesn't grant the 'delete' permission.",
 		},
@@ -1171,12 +1171,12 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			name:  "authserver:userinfo, a permission the authserver resource no longer has",
 			scope: "openid authserver:userinfo",
 			setup: func(mockDB *mocks_data.Database) {
-				builtIns := make([]models.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
+				builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 				for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-					builtIns = append(builtIns, models.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
+					builtIns = append(builtIns, record.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
 				}
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
-					Return(&models.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
+					Return(&record.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
 			},
 			wantDesc: "Scope 'authserver:userinfo' is not recognized. The resource identified by 'authserver' doesn't grant the 'userinfo' permission.",
@@ -1186,11 +1186,11 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			mockDB := mocks_data.NewDatabase(t)
 			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
-			settings := &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
+			settings := &record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 			ctx := context.Background()
 
 			passwordHash, _ := passwordhash.Hash("correctpassword")
-			user := &models.User{
+			user := &record.User{
 				Id:           1,
 				Email:        "user@example.com",
 				PasswordHash: passwordHash,
@@ -1198,7 +1198,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			}
 
 			ropcEnabled := true
-			client := &models.Client{
+			client := &record.Client{
 				ClientIdentifier:                        "ropc-client",
 				Enabled:                                 true,
 				IsPublic:                                true,

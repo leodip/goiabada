@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -26,14 +26,14 @@ import (
 // logoutDatabase is what the logout ceremony needs: the session it ends, the clients it
 // must notify, and the deletes that end it.
 type logoutDatabase interface {
-	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error
-	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
+	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 // HandleLogoutGet and HandleLogoutPost serve /auth/logout, the OpenID Connect RP-Initiated
@@ -221,7 +221,7 @@ func (h hintState) String() string {
 // scope a teardown or authorize a redirect from a hint that failed to validate.
 type hintClassification struct {
 	state             hintState
-	client            *models.Client
+	client            *record.Client
 	sessionIdentifier string
 }
 
@@ -247,12 +247,12 @@ var nonIdTokenTypValues = map[string]bool{
 // A package function rather than a closure in classifyIdTokenHint, which it was until the review
 // of #320: sloglint reads the attribute keys at a call site only for a function it can name, and a
 // closure has no name to give it. It is registered under custom-funcs in .golangci.yml and in
-// slogSpreadSites in core/guard, which together are what let it spread record below.
+// slogSpreadSites in core/guard, which together are what let it spread attrs below.
 func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClassification, error) {
-	record := make([]any, 0, len(args)+2)
-	record = append(record, "gate", gate)
-	record = append(record, args...)
-	slog.WarnContext(ctx, "id_token_hint rejected", record...)
+	attrs := make([]any, 0, len(args)+2)
+	attrs = append(attrs, "gate", gate)
+	attrs = append(attrs, args...)
+	slog.WarnContext(ctx, "id_token_hint rejected", attrs...)
 	return hintClassification{state: hintRejected}, nil
 }
 
@@ -528,7 +528,7 @@ func classifyIdTokenHint(
 func handleExistingSessionOnLogout(
 	r *http.Request,
 	sessionIdentifier string,
-	client *models.Client,
+	client *record.Client,
 	database logoutDatabase,
 	auditLogger AuditLogger,
 ) error {
@@ -847,7 +847,7 @@ func deleteWholeUserSession(
 // the teardown, so turning it into a 500 would put the End-User back on a terminal page while still
 // signed in, which is the defect #109 exists to remove. Losing a redirect is the safe direction; the
 // reason is logged.
-func clientForPostLogoutRedirect(ctx context.Context, clientId string, database logoutDatabase) *models.Client {
+func clientForPostLogoutRedirect(ctx context.Context, clientId string, database logoutDatabase) *record.Client {
 	if len(clientId) == 0 {
 		// RP-Initiated Logout 1.0 section 3: "if it is not supplied with post_logout_redirect_uri,
 		// the OP MUST NOT perform post-logout redirection unless the OP has other means of
@@ -895,7 +895,7 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 func postLogoutRedirectLocation(
 	r *http.Request,
 	database logoutDatabase,
-	client *models.Client,
+	client *record.Client,
 	postLogoutRedirectURI string,
 ) string {
 	if client == nil {

@@ -8,13 +8,13 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging"
 )
 
 // auditDatabase is what the audit logger writes: the record.
 type auditDatabase interface {
-	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error
+	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *record.AuditLog) error
 }
 
 // Switches are the two settings that say where Log records an event.
@@ -104,7 +104,7 @@ func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string
 			return
 		}
 
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: auditEvent,
 			Details:    string(detailsJSON),
 			// Through FieldForLog, and not chi's raw string, so the row carries exactly what

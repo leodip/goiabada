@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -36,7 +36,7 @@ import (
 // withSelfRegistration attaches the settings middleware.Settings would have, with self-registration
 // on or off. The handler refuses both hops while it is off (#425 decision 6).
 func withSelfRegistration(req *http.Request, enabled bool) *http.Request {
-	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{SelfRegistrationEnabled: enabled}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: enabled}))
 }
 
 // activationLinkFollowedRequest is the emailed link being followed: the code, and nothing else.
@@ -55,14 +55,14 @@ func activationCleanGetRequest() *http.Request {
 
 // preRegistrationWithCode builds a pending registration holding an outstanding activation
 // code, along with the hash the link's code resolves to.
-func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedAt time.Time) (*models.PreRegistration, string) {
+func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedAt time.Time) (*record.PreRegistration, string) {
 	t.Helper()
 
 	encrypted, err := testDataCipher.Encrypt(code)
 	require.NoError(t, err)
 	codeHash := hashutil.HashString(code)
 
-	return &models.PreRegistration{
+	return &record.PreRegistration{
 		Id:                        id,
 		Email:                     email,
 		PasswordHash:              "password_hash",
@@ -437,7 +437,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
-		createdUser := &models.User{Id: 3, Email: activateTestEmail}
+		createdUser := &record.User{Id: 3, Email: activateTestEmail}
 		userCreator.On("CreateUser", mock.Anything, &usercreation.Input{
 			Email:         activateTestEmail,
 			EmailVerified: true,

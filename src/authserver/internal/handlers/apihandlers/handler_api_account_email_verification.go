@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -24,7 +24,7 @@ import (
 // accountEmailVerificationDatabase is what the account email verification endpoints need: the
 // caller's own user row.
 type accountEmailVerificationDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
 		issuedAt time.Time, issuedNotAfter time.Time) (bool, error)
 	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error)
@@ -167,7 +167,7 @@ func HandleAccountEmailVerificationSendPost(
 // whether or not that code is still pending. An email change and a verification clear the code
 // and keep this, so changing away from an address and back to it does not reopen a send to it
 // (#404).
-func writeSendNotNeeded(w http.ResponseWriter, r *http.Request, user *models.User) bool {
+func writeSendNotNeeded(w http.ResponseWriter, r *http.Request, user *record.User) bool {
 	if user.EmailVerified {
 		writeJSON(w, r, http.StatusOK, api.AccountEmailVerificationSendResponse{EmailVerified: true})
 		return true

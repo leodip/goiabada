@@ -10,7 +10,7 @@ import (
 //
 // It lives here rather than on api.UserResponse because the API enforces nothing about a full
 // name: it is three fields of the same response joined for display, and putting it on the wire
-// type would make it another implementation beside the auth server's models.User.FullName (#350).
+// type would make it another implementation beside the auth server's record.User.FullName (#350).
 // The renderer's menu label joins the ID token's name claims through the same fullName, so this
 // application writes the rule once (#440).
 func UserFullName(user *api.UserResponse) string {

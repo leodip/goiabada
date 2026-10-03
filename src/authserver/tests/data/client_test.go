@@ -8,12 +8,12 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateClient(t *testing.T) {
 	random := fake.LetterN(6)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client Description",
@@ -25,9 +25,9 @@ func TestCreateClient(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -94,7 +94,7 @@ func TestCreateClient(t *testing.T) {
 
 func TestUpdateClient(t *testing.T) {
 	random := fake.LetterN(6)
-	originalClient := &models.Client{
+	originalClient := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("original_secret"),
 		Description:                             "Original Description",
@@ -106,9 +106,9 @@ func TestUpdateClient(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, originalClient)
@@ -116,7 +116,7 @@ func TestUpdateClient(t *testing.T) {
 		t.Fatalf("Failed to create initial client: %v", err)
 	}
 
-	updatedClient := &models.Client{
+	updatedClient := &record.Client{
 		Id:                                      originalClient.Id,
 		ClientIdentifier:                        "updated_client_" + random,
 		ClientSecretEncrypted:                   []byte("updated_secret"),
@@ -129,9 +129,9 @@ func TestUpdateClient(t *testing.T) {
 		TokenExpirationInSeconds:                7200,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 5184000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingOn.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingOff.String(),
-		DefaultAcrLevel:                         models.AcrLevel2Optional,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingOn.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingOff.String(),
+		DefaultAcrLevel:                         record.AcrLevel2Optional,
 	}
 
 	err = database.UpdateClient(context.Background(), nil, updatedClient)
@@ -225,7 +225,7 @@ func TestUpdateClient(t *testing.T) {
 
 func TestGetClientById(t *testing.T) {
 	random := fake.LetterN(6)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client Description",
@@ -237,8 +237,8 @@ func TestGetClientById(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -325,7 +325,7 @@ func TestGetClientById(t *testing.T) {
 func TestGetClientByClientIdentifier(t *testing.T) {
 	random := fake.LetterN(6)
 	clientIdentifier := "test_client_" + random
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        clientIdentifier,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client Description",
@@ -337,8 +337,8 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -424,7 +424,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 
 func TestClientLoadRedirectURIs(t *testing.T) {
 	random := fake.LetterN(6)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client Description",
@@ -436,8 +436,8 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -446,7 +446,7 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 	}
 
 	// Create multiple redirect URIs for the client
-	redirectURIs := []models.RedirectURI{
+	redirectURIs := []record.RedirectURI{
 		{URI: "https://example.com/callback1", ClientId: client.Id},
 		{URI: "https://example.com/callback2", ClientId: client.Id},
 		{URI: "http://localhost:8080/callback", ClientId: client.Id},
@@ -483,7 +483,7 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 	}
 
 	// Test loading redirect URIs for a client with no URIs
-	clientWithNoURIs := &models.Client{
+	clientWithNoURIs := &record.Client{
 		ClientIdentifier: "client_with_no_uris_" + fake.LetterN(6),
 	}
 	err = database.CreateClient(context.Background(), nil, clientWithNoURIs)
@@ -509,7 +509,7 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 
 func TestClientLoadWebOrigins(t *testing.T) {
 	random := fake.LetterN(6)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client Description",
@@ -521,8 +521,8 @@ func TestClientLoadWebOrigins(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -531,7 +531,7 @@ func TestClientLoadWebOrigins(t *testing.T) {
 	}
 
 	// Create multiple web origins for the client
-	webOrigins := []models.WebOrigin{
+	webOrigins := []record.WebOrigin{
 		{Origin: "https://example.com", ClientId: client.Id},
 		{Origin: "https://app.example.com", ClientId: client.Id},
 		{Origin: "http://localhost:3000", ClientId: client.Id},
@@ -568,7 +568,7 @@ func TestClientLoadWebOrigins(t *testing.T) {
 	}
 
 	// Test loading web origins for a client with no origins
-	clientWithNoOrigins := &models.Client{
+	clientWithNoOrigins := &record.Client{
 		ClientIdentifier: "client_with_no_origins_" + fake.LetterN(6),
 	}
 	err = database.CreateClient(context.Background(), nil, clientWithNoOrigins)
@@ -594,12 +594,12 @@ func TestClientLoadWebOrigins(t *testing.T) {
 
 func TestGetClientsByIds(t *testing.T) {
 	// Create multiple test clients
-	clients := make([]models.Client, 3)
+	clients := make([]record.Client, 3)
 	clientIds := make([]int64, 3)
 
 	for i := 0; i < 3; i++ {
 		random := fake.LetterN(6)
-		client := models.Client{
+		client := record.Client{
 			ClientIdentifier:                        "test_client_" + random,
 			ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
 			Description:                             "Test Client Description " + random,
@@ -611,8 +611,8 @@ func TestGetClientsByIds(t *testing.T) {
 			TokenExpirationInSeconds:                3600 + i*1800,
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400 + i*43200,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000 + i*1296000,
-			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         models.AcrLevel1,
+			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         record.AcrLevel1,
 		}
 
 		err := database.CreateClient(context.Background(), nil, &client)
@@ -718,7 +718,7 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 	realIds := make([]int64, 3)
 	for i := 0; i < 3; i++ {
 		random := fake.LetterN(6)
-		client := models.Client{
+		client := record.Client{
 			ClientIdentifier:                        "test_client_" + random,
 			ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
 			Description:                             "Test Client Description " + random,
@@ -726,8 +726,8 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 			TokenExpirationInSeconds:                3600,
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         models.AcrLevel1,
+			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         record.AcrLevel1,
 		}
 		if err := database.CreateClient(context.Background(), nil, &client); err != nil {
 			t.Fatalf("Failed to create test client %d: %v", i, err)
@@ -798,7 +798,7 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 // deduplicating neighbours passes for deduplicating the list (#373).
 func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 	random := fake.LetterN(6)
-	client := models.Client{
+	client := record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
 		Description:                             "Test Client Description " + random,
@@ -806,8 +806,8 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	if err := database.CreateClient(context.Background(), nil, &client); err != nil {
 		t.Fatalf("Failed to create test client: %v", err)
@@ -854,7 +854,7 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 
 func TestClientLoadPermissions(t *testing.T) {
 	random := fake.LetterN(6)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client Description",
@@ -866,8 +866,8 @@ func TestClientLoadPermissions(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -876,7 +876,7 @@ func TestClientLoadPermissions(t *testing.T) {
 	}
 
 	// Create a test resource
-	resource := &models.Resource{
+	resource := &record.Resource{
 		ResourceIdentifier: "test_resource_" + random,
 		Description:        "Test Resource",
 	}
@@ -886,7 +886,7 @@ func TestClientLoadPermissions(t *testing.T) {
 	}
 
 	// Create multiple permissions for the resource
-	permissions := []models.Permission{
+	permissions := []record.Permission{
 		{PermissionIdentifier: "read_" + random, Description: "Read Permission", ResourceId: resource.Id},
 		{PermissionIdentifier: "write_" + random, Description: "Write Permission", ResourceId: resource.Id},
 		{PermissionIdentifier: "delete_" + random, Description: "Delete Permission", ResourceId: resource.Id},
@@ -901,7 +901,7 @@ func TestClientLoadPermissions(t *testing.T) {
 
 	// Associate permissions with the client
 	for _, perm := range permissions {
-		clientPermission := &models.ClientPermission{
+		clientPermission := &record.ClientPermission{
 			ClientId:     client.Id,
 			PermissionId: perm.Id,
 		}
@@ -938,7 +938,7 @@ func TestClientLoadPermissions(t *testing.T) {
 	}
 
 	// Test loading permissions for a client with no permissions
-	clientWithNoPermissions := &models.Client{
+	clientWithNoPermissions := &record.Client{
 		ClientIdentifier: "client_with_no_permissions_" + fake.LetterN(6),
 	}
 	err = database.CreateClient(context.Background(), nil, clientWithNoPermissions)
@@ -977,11 +977,11 @@ func TestGetAllClients(t *testing.T) {
 
 	// Create multiple test clients
 	numClients := 5
-	createdClients := make([]*models.Client, numClients)
+	createdClients := make([]*record.Client, numClients)
 
 	for i := 0; i < numClients; i++ {
 		random := fake.LetterN(6)
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:                        "test_client_" + random,
 			ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
 			Description:                             "Test Client Description " + random,
@@ -993,8 +993,8 @@ func TestGetAllClients(t *testing.T) {
 			TokenExpirationInSeconds:                3600 + i*1800,
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400 + i*43200,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000 + i*1296000,
-			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         models.AcrLevel1,
+			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         record.AcrLevel1,
 		}
 
 		createClientErr := database.CreateClient(context.Background(), nil, client)
@@ -1017,7 +1017,7 @@ func TestGetAllClients(t *testing.T) {
 	}
 
 	// Create a map of created clients for easy lookup
-	createdClientMap := make(map[string]*models.Client)
+	createdClientMap := make(map[string]*record.Client)
 	for _, client := range createdClients {
 		createdClientMap[client.ClientIdentifier] = client
 	}
@@ -1103,7 +1103,7 @@ func TestGetAllClients(t *testing.T) {
 
 func TestDeleteClient(t *testing.T) {
 	random := fake.LetterN(6)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client Description",
@@ -1115,8 +1115,8 @@ func TestDeleteClient(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1126,7 +1126,7 @@ func TestDeleteClient(t *testing.T) {
 
 	// Create associated data
 	// 1. Redirect URIs
-	redirectURI := &models.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		URI:      "https://example.com/callback",
 		ClientId: client.Id,
 	}
@@ -1136,7 +1136,7 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	// 2. Web Origins
-	webOrigin := &models.WebOrigin{
+	webOrigin := &record.WebOrigin{
 		Origin:   "https://example.com",
 		ClientId: client.Id,
 	}
@@ -1146,7 +1146,7 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	// 3. Client Permissions
-	resource := &models.Resource{
+	resource := &record.Resource{
 		ResourceIdentifier: "test_resource_" + random,
 		Description:        "Test Resource",
 	}
@@ -1155,7 +1155,7 @@ func TestDeleteClient(t *testing.T) {
 		t.Fatalf("Failed to create resource: %v", err)
 	}
 
-	permission := &models.Permission{
+	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + random,
 		Description:          "Test Permission",
 		ResourceId:           resource.Id,
@@ -1165,7 +1165,7 @@ func TestDeleteClient(t *testing.T) {
 		t.Fatalf("Failed to create permission: %v", err)
 	}
 
-	clientPermission := &models.ClientPermission{
+	clientPermission := &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permission.Id,
 	}
@@ -1232,13 +1232,13 @@ func TestDeleteClient(t *testing.T) {
 
 // createTestClient seeds a client on the package's shared handle; createTestClientOn takes the
 // handle, for the reason createTestUserOn does.
-func createTestClient(t *testing.T) *models.Client {
+func createTestClient(t *testing.T) *record.Client {
 	return createTestClientOn(t, database)
 }
 
-func createTestClientOn(t *testing.T, db data.Database) *models.Client {
+func createTestClientOn(t *testing.T, db data.Database) *record.Client {
 	random := fake.LetterN(6)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "test_client_" + random,
 		Description:      "Test Client",
 	}
@@ -1252,7 +1252,7 @@ func createTestClientOn(t *testing.T, db data.Database) *models.Client {
 func TestClientNullableOverrideFields(t *testing.T) {
 	// Test 1: Create client with nil override fields (use global settings)
 	random := fake.LetterN(6)
-	clientWithNilOverrides := &models.Client{
+	clientWithNilOverrides := &record.Client{
 		ClientIdentifier:                        "test_client_nil_overrides_" + random,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client with nil overrides",
@@ -1264,8 +1264,8 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 		// PKCERequired, ImplicitGrantEnabled, ResourceOwnerPasswordCredentialsEnabled are nil (use global settings)
 	}
 
@@ -1295,7 +1295,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 	pkceTrue := true
 	implicitTrue := true
 	ropcTrue := true
-	clientWithTrueOverrides := &models.Client{
+	clientWithTrueOverrides := &record.Client{
 		ClientIdentifier:                        "test_client_true_overrides_" + random2,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client with true overrides",
@@ -1307,8 +1307,8 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 		PKCERequired:                            &pkceTrue,
 		ImplicitGrantEnabled:                    &implicitTrue,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcTrue,
@@ -1340,7 +1340,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 	pkceFalse := false
 	implicitFalse := false
 	ropcFalse := false
-	clientWithFalseOverrides := &models.Client{
+	clientWithFalseOverrides := &record.Client{
 		ClientIdentifier:                        "test_client_false_overrides_" + random3,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Description:                             "Test Client with false overrides",
@@ -1352,8 +1352,8 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 		PKCERequired:                            &pkceFalse,
 		ImplicitGrantEnabled:                    &implicitFalse,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcFalse,
@@ -1696,7 +1696,7 @@ func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 	// still public and is about to write every column back.
 	saver := beginTx(t)
 	type outcome struct {
-		refreshed *models.Client
+		refreshed *record.Client
 		err       error
 	}
 	done := make(chan outcome, 1)
@@ -1812,9 +1812,9 @@ func TestGetClientByClientIdentifierIsCaseSensitive(t *testing.T) {
 }
 
 // newCaseTestClient is the minimum a client row needs to satisfy the NOT NULL columns.
-func newCaseTestClient(t *testing.T, identifier string) *models.Client {
+func newCaseTestClient(t *testing.T, identifier string) *record.Client {
 	t.Helper()
-	return &models.Client{
+	return &record.Client{
 		ClientIdentifier:                        identifier,
 		ClientSecretEncrypted:                   []byte("encrypted_secret"),
 		Enabled:                                 true,
@@ -1822,8 +1822,8 @@ func newCaseTestClient(t *testing.T, identifier string) *models.Client {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 }
 
@@ -1841,7 +1841,7 @@ func newCaseTestClient(t *testing.T, identifier string) *models.Client {
 func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx := beginTx(t)
 
-	resource := &models.Resource{
+	resource := &record.Resource{
 		ResourceIdentifier: "tx_resource_" + fake.LetterN(8),
 		Description:        "Transaction pass-through resource",
 	}
@@ -1849,7 +1849,7 @@ func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to create resource inside the transaction: %v", err)
 	}
 
-	permission := &models.Permission{
+	permission := &record.Permission{
 		PermissionIdentifier: "tx_permission_" + fake.LetterN(8),
 		Description:          "Transaction pass-through permission",
 		ResourceId:           resource.Id,
@@ -1858,7 +1858,7 @@ func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to create permission inside the transaction: %v", err)
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "tx_client_" + fake.LetterN(8),
 		Description:      "Transaction pass-through client",
 	}
@@ -1866,7 +1866,7 @@ func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to create client inside the transaction: %v", err)
 	}
 
-	clientPermission := &models.ClientPermission{
+	clientPermission := &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permission.Id,
 	}

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // ClientDisplayInfo contains the client information to display on auth and consent screens
@@ -25,7 +25,7 @@ type clientDisplayDatabase interface {
 }
 
 // getClientDisplayInfo computes what client information should be displayed based on the client's display settings
-func getClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, client *models.Client) *ClientDisplayInfo {
+func getClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, client *record.Client) *ClientDisplayInfo {
 	info := &ClientDisplayInfo{}
 
 	if client.ShowDisplayName && client.DisplayName != "" {
@@ -73,7 +73,7 @@ func getClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, c
 // Consent only. getClientDisplayInfo is deliberately left alone, so the password and OTP screens
 // keep showing the identifier: a warning repeated on three screens stops being read, and consent is
 // the one screen where the user grants authority.
-func consentClientName(client *models.Client) (name string, unverified bool) {
+func consentClientName(client *record.Client) (name string, unverified bool) {
 	if client.ShowDisplayName && client.DisplayName != "" {
 		return client.DisplayName, false // an administrator named it
 	}

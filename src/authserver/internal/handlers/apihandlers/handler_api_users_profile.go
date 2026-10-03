@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/gender"
@@ -22,8 +22,8 @@ import (
 
 // usersProfileDatabase is what the administrator's user profile endpoint needs: the user row.
 type usersProfileDatabase interface {
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleUserProfilePut - PUT /api/v1/admin/users/{id}/profile

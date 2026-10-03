@@ -15,7 +15,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +24,7 @@ import (
 
 // Helper to get a user access token with account scope and also the auth code details (client, redirect, sid)
 // Returns (httpClientWithCookies, accessToken, code)
-func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, string, *models.Code) {
+func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, string, *record.Code) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
@@ -346,7 +346,7 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 	// A second client on the same session, created directly as this suite already does for its
 	// session listings. What handleExistingSessionOnLogout reads is the NUMBER of clients on the
 	// session, not how each got there.
-	otherClient := &models.Client{
+	otherClient := &record.Client{
 		ClientIdentifier:         "logout-other-" + fake.LetterN(8),
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Second client sharing the session",
@@ -357,7 +357,7 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 	defer func() { _ = database.DeleteClient(context.Background(), nil, otherClient.Id) }()
 
 	now := time.Now().UTC()
-	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
 		UserSessionId: session.Id,
 		ClientId:      otherClient.Id,
 		Started:       now.Add(-time.Hour),

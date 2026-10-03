@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +22,7 @@ func TestAPIUserGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@get.test"),
@@ -99,7 +99,7 @@ func TestAPIUserGet_InvalidId(t *testing.T) {
 
 func TestAPIUserGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@unauth.test"),
@@ -192,7 +192,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 	// Setup: Create existing user. The duplicate is the point of this test, so
 	// the address is drawn once and used twice rather than spelled twice.
 	duplicateEmail := uniqueEmail("duplicate@create.test")
-	existingUser := &models.User{
+	existingUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         duplicateEmail,
@@ -341,7 +341,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user (enabled by default)
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@enabled.test"),
@@ -388,7 +388,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create disabled test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       false,
 		Email:         uniqueEmail("disabled@enabled.test"),
@@ -463,7 +463,7 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@invalid.test"),
@@ -499,7 +499,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@delete.test"),
@@ -573,7 +573,7 @@ func TestAPIUserDelete_InvalidId(t *testing.T) {
 
 func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@delete-unauth.test"),

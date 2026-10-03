@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
@@ -42,8 +42,8 @@ var ErrIssuingSessionGone = errors.New("the session this ceremony is issuing for
 // for, the code row it writes, and the transaction the three share.
 type codeIssuerDatabase interface {
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
-	CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -68,7 +68,7 @@ type CreateCodeInput struct {
 	UserAgent           string
 	IpAddress           string
 	UserId              int64
-	AcrLevel            models.AcrLevel
+	AcrLevel            record.AcrLevel
 	AuthMethods         string
 	// AuthenticatedAt overrides the code's auth_time when set (prompt=none reuses the session's);
 	// nil or zero means the moment of issuance.
@@ -96,10 +96,10 @@ func NewCodeIssuer(database codeIssuerDatabase) *CodeIssuer {
 //
 // A commit that returns an error leaves the code row's fate indeterminate, the contract
 // revocation.TerminateUserSessionTx documents; the caller answers it with a 500 rather than a code.
-func (ci *CodeIssuer) IssueAuthCodeTx(ctx context.Context, input *CreateCodeInput) (*models.Code, error) {
+func (ci *CodeIssuer) IssueAuthCodeTx(ctx context.Context, input *CreateCodeInput) (*record.Code, error) {
 	// Opened through RunInTransaction, so a deadlock reruns the body (#301). It is safe to rerun:
 	// input is only read, and code is whatever the attempt that committed minted.
-	var code *models.Code
+	var code *record.Code
 	err := ci.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var err error
 		code, err = ci.IssueAuthCode(ctx, tx, input)
@@ -138,7 +138,7 @@ func (ci *CodeIssuer) IssueAuthCodeTx(ctx context.Context, input *CreateCodeInpu
 // and rerun by RunInTransaction, bounded, before the error surfaces. SQLite has one connection and
 // cannot deadlock. Do not add ordering here to prevent a deadlock; add a test that forces it and
 // shows the retry resolves it (#301).
-func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *CreateCodeInput) (*models.Code, error) {
+func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *CreateCodeInput) (*record.Code, error) {
 	if tx == nil {
 		return nil, errs.New("issuing an authorization code requires a transaction: the session row it takes first is released by an autocommitted statement")
 	}
@@ -164,7 +164,7 @@ func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *Crea
 // and the client lookup has to join it because sqlitedb sets SetMaxOpenConns(1), so a
 // nil-transaction read issued while tx holds the single connection waits for a connection tx itself
 // owns. That is a hang rather than an error, so neither statement may be reverted to nil (#139).
-func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *CreateCodeInput) (*models.Code, error) {
+func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *CreateCodeInput) (*record.Code, error) {
 
 	responseMode := input.ResponseMode
 	if responseMode == "" {
@@ -211,7 +211,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		authenticatedAt = *input.AuthenticatedAt
 	}
 
-	code := &models.Code{
+	code := &record.Code{
 		Code:                authCode,
 		CodeHash:            authCodeHash,
 		ClientId:            client.Id,

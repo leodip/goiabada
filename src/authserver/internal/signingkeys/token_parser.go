@@ -8,15 +8,15 @@ import (
 	"log/slog"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	oauth "github.com/leodip/goiabada/core/oauth"
 )
 
 // tokenParserDatabase is what token parsing needs: the keys a signature may have been made with.
 type tokenParserDatabase interface {
-	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
-	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error)
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
+	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)
 }
 
 // TokenParser validates tokens using keys loaded from the database.

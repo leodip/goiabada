@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,13 +27,13 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "loopback-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
@@ -41,7 +41,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 
 	// Registered without a port, which is all a native app can know up front.
 	registeredURI := "http://127.0.0.1/callback"
-	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      registeredURI,
 	})
@@ -57,7 +57,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

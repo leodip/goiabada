@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -57,19 +57,19 @@ type OtpSecretGenerator interface {
 // grant from the claim on what is redeemed to the minted tokens, so the handler parses, dispatches,
 // audits and answers, and writes nothing of a grant itself (#437).
 type TokenIssuer interface {
-	IssueAuthorizationCodeGrant(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error)
-	IssueClientCredentialsGrant(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error)
-	IssueRefreshTokenGrant(ctx context.Context, settings *models.Settings, input *issuance.RefreshTokenGrantInput) (*oauth.TokenResponse, *issuance.RefreshOutcome, error)
+	IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings, code *record.Code) (*oauth.TokenResponse, error)
+	IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings, client *record.Client, scope string) (*oauth.TokenResponse, error)
+	IssueRefreshTokenGrant(ctx context.Context, settings *record.Settings, input *issuance.RefreshTokenGrantInput) (*oauth.TokenResponse, *issuance.RefreshOutcome, error)
 	// IssuePasswordGrant issues the resource owner password credentials grant, RFC 6749 section 4.3.
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
-	IssuePasswordGrant(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
+	IssuePasswordGrant(ctx context.Context, settings *record.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
 }
 
 // ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens,
 // signed in a transaction that takes the session row first (#197). The token endpoint issues the other
 // four grants, through TokenIssuer.
 type ImplicitTokenIssuer interface {
-	IssueImplicitTx(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
+	IssueImplicitTx(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
 }
 
 type AuthorizeValidator interface {
@@ -83,16 +83,16 @@ type AuthorizeValidator interface {
 // CodeIssuer issues an authorization code in a transaction of its own, which takes the session row
 // before the insert (#139). The handler opens no transaction for it.
 type CodeIssuer interface {
-	IssueAuthCodeTx(ctx context.Context, input *issuance.CreateCodeInput) (*models.Code, error)
+	IssueAuthCodeTx(ctx context.Context, input *issuance.CreateCodeInput) (*record.Code, error)
 }
 
 type UserSessionManager interface {
-	HasValidUserSession(userSession *models.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool
+	HasValidUserSession(userSession *record.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
-		userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
+		userId int64, clientId int64, authMethods string, acrLevel record.AcrLevel,
 		authStateGeneration int64, otpConfigGeneration *int64,
 		authenticatedAt *time.Time, ipAddress string,
-		replacing *models.UserSession) (*models.UserSession, []models.UserSession, error)
+		replacing *record.UserSession) (*record.UserSession, []record.UserSession, error)
 
 	// BumpUserSession updates an existing session's last accessed time and client list.
 	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication
@@ -101,11 +101,11 @@ type UserSessionManager interface {
 	// Note: ACR is only upgraded, never downgraded, during a session's lifetime.
 	// A non-empty ipAddress replaces the session's recorded address; empty leaves it.
 	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-		authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error)
+		authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)
 }
 
 type TokenValidator interface {
-	ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)
+	ValidateTokenRequest(ctx context.Context, settings *record.Settings, input *protocolvalidation.ValidateTokenRequestInput) (protocolvalidation.TokenGrant, error)
 }
 
 type TokenParser interface {
@@ -135,5 +135,5 @@ type CredentialFailureRecorder interface {
 }
 
 type PermissionChecker interface {
-	FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error)
+	FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *record.User) (string, error)
 }

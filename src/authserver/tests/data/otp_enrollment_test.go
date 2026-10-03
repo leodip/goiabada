@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,7 @@ import (
 // createEnrollableUser makes a user who can accept a pending enrolment: no authenticator, and no
 // pending value. createTestUser randomises OTPEnabled, which every install case below depends on
 // being false, so this is not a convenience.
-func createEnrollableUser(t *testing.T) *models.User {
+func createEnrollableUser(t *testing.T) *record.User {
 	t.Helper()
 	user := createTestUser(t)
 	user.OTPEnabled = false
@@ -35,7 +35,7 @@ func createEnrollableUser(t *testing.T) *models.User {
 	return user
 }
 
-func reloadUser(t *testing.T, userId int64) *models.User {
+func reloadUser(t *testing.T, userId int64) *record.User {
 	t.Helper()
 	u, err := database.GetUserById(context.Background(), nil, userId)
 	require.NoError(t, err, "reload user %d", userId)

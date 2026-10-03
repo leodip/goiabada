@@ -8,7 +8,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,7 +40,7 @@ func theSettingsRequestsContext() interface{} {
 func TestSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	db.On("GetSettingsById", theSettingsRequestsContext(), mock.Anything, int64(1)).
-		Return(&models.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
+		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
 
 	reached := false
 	handler := Settings(db, PageFaults())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

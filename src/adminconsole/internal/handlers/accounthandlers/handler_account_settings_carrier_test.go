@@ -20,7 +20,7 @@ import (
 )
 
 // The settings value reqctx carries is api.PublicSettingsResponse, the same four-field
-// wire type the console decoded from /api/public/settings, rather than a models.Settings the
+// wire type the console decoded from /api/public/settings, rather than a record.Settings the
 // settings-cache middleware filled four fields of and left the other 28 at their zero values
 // (#350).
 //

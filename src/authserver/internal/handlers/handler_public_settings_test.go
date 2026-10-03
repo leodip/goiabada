@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,7 +22,7 @@ import (
 // /api/public/settings
 //
 // This endpoint requires no authentication: it is what the login and account
-// pages read before anyone has a token. models.Settings holds 32 fields, among
+// pages read before anyone has a token. record.Settings holds 32 fields, among
 // them the legacy AES encryption key and the encrypted SMTP password, so the
 // narrow PublicSettingsResponse DTO is the entire boundary between an anonymous
 // caller and all of it. The two guards further down exist to fail if that
@@ -34,7 +34,7 @@ func TestPublicSettings_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := NewPublicSettings(database)
 
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id:          1,
 		AppName:     "Goiabada Test",
 		UITheme:     "dark",
@@ -136,7 +136,7 @@ func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := NewPublicSettings(database)
 
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id: 1, AppName: "Goiabada",
 	}, nil).Once()
 
@@ -194,7 +194,7 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	aesKey := []byte("SENTINEL-legacy-aes-encryption-key")
 	smtpPassword := []byte("SENTINEL-smtp-password-encrypted")
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Id:                     1,
 		AppName:                "Goiabada Test",
 		UITheme:                "light",
@@ -256,10 +256,10 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	assert.Contains(t, payload, "Goiabada Test")
 }
 
-// A guard on the guard: if models.Settings itself stops carrying the sensitive
+// A guard on the guard: if record.Settings itself stops carrying the sensitive
 // fields the test above pins, the sentinels would silently stop proving anything.
 func TestPublicSettings_SensitiveSettingsFieldsStillExist(t *testing.T) {
-	settingsType := reflect.TypeOf(models.Settings{})
+	settingsType := reflect.TypeOf(record.Settings{})
 
 	for _, name := range []string{
 		"AESEncryptionKeyLegacy",
@@ -269,6 +269,6 @@ func TestPublicSettings_SensitiveSettingsFieldsStillExist(t *testing.T) {
 	} {
 		_, present := settingsType.FieldByName(name)
 		assert.True(t, present,
-			"models.Settings no longer has %q; update TestPublicSettings_DoesNotLeakSensitiveSettings", name)
+			"record.Settings no longer has %q; update TestPublicSettings_DoesNotLeakSensitiveSettings", name)
 	}
 }

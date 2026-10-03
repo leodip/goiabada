@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -31,9 +31,9 @@ func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGener
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, userId).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, newGeneration).
 		Return(nil).Once()
 	database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, userId).
-		Return([]models.UserSession{}, nil).Once()
+		Return([]record.UserSession{}, nil).Once()
 }

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,8 +25,8 @@ import (
 func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 	testCases := []struct {
 		name            string
-		target          models.AcrLevel
-		sessionAcr      models.AcrLevel
+		target          record.AcrLevel
+		sessionAcr      record.AcrLevel
 		sessionOtpGen   int64
 		userOtpGen      int64
 		userOTPEnabled  bool
@@ -35,14 +35,14 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 		{
 			// Step 5 would refuse too; step 4 is asked first.
 			name:            "a target above the session's level, before the missing authenticator",
-			target:          models.AcrLevel2Mandatory,
-			sessionAcr:      models.AcrLevel1,
+			target:          record.AcrLevel2Mandatory,
+			sessionAcr:      record.AcrLevel1,
 			userOTPEnabled:  false,
 			wantDescription: "Higher authentication level required",
 		},
 		{
 			name:            "an unknown session level is insufficient",
-			target:          models.AcrLevel1,
+			target:          record.AcrLevel1,
 			sessionAcr:      "urn:goiabada:pwd",
 			userOTPEnabled:  true,
 			wantDescription: "Higher authentication level required",
@@ -50,8 +50,8 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 		{
 			// Step 6 would refuse too; step 5 is asked first.
 			name:            "a mandatory target with no authenticator, before the changed configuration",
-			target:          models.AcrLevel2Mandatory,
-			sessionAcr:      models.AcrLevel2Mandatory,
+			target:          record.AcrLevel2Mandatory,
+			sessionAcr:      record.AcrLevel2Mandatory,
 			sessionOtpGen:   2,
 			userOtpGen:      3,
 			userOTPEnabled:  false,
@@ -59,8 +59,8 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 		},
 		{
 			name:            "the authenticator changed since the session answered level 2",
-			target:          models.AcrLevel2Optional,
-			sessionAcr:      models.AcrLevel2Optional,
+			target:          record.AcrLevel2Optional,
+			sessionAcr:      record.AcrLevel2Optional,
 			sessionOtpGen:   2,
 			userOtpGen:      3,
 			userOTPEnabled:  true,
@@ -85,7 +85,7 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none", nil)
 			require.NoError(t, err)
-			ctx := reqctx.WithSettings(req.Context(), &models.Settings{PKCERequired: true, Issuer: "https://test-issuer.com"})
+			ctx := reqctx.WithSettings(req.Context(), &record.Settings{PKCERequired: true, Issuer: "https://test-issuer.com"})
 			ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
 			req = req.WithContext(ctx)
 			rr := httptest.NewRecorder()
@@ -96,16 +96,16 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-			client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: tc.target}
+			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: tc.target}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-			userSession := &models.UserSession{
+			userSession := &record.UserSession{
 				Id:                  1,
 				UserId:              7,
 				AcrLevel:            tc.sessionAcr,
 				AuthMethods:         "pwd",
 				OtpConfigGeneration: tc.sessionOtpGen,
-				User: models.User{
+				User: record.User{
 					Id:                  7,
 					Enabled:             true,
 					OTPEnabled:          tc.userOTPEnabled,
@@ -164,7 +164,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none", nil)
 			require.NoError(t, err)
-			ctx := reqctx.WithSettings(req.Context(), &models.Settings{Issuer: "https://test-issuer.com"})
+			ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
 			ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
 			req = req.WithContext(ctx)
 			rr := httptest.NewRecorder()
@@ -176,15 +176,15 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 			// ConsentRequired, so the consent is read and every load is reached.
-			client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1, ConsentRequired: true}
+			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1, ConsentRequired: true}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-			userSession := &models.UserSession{
+			userSession := &record.UserSession{
 				Id:          1,
 				UserId:      7,
-				AcrLevel:    models.AcrLevel1,
+				AcrLevel:    record.AcrLevel1,
 				AuthMethods: "pwd",
-				User:        models.User{Id: 7, Enabled: true},
+				User:        record.User{Id: 7, Enabled: true},
 			}
 
 			// Each load answers until the one this row fails, and nothing after it is stubbed, so
@@ -220,14 +220,14 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 						database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, fault)
 						return
 					}
-					database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(&models.UserConsent{Scope: "openid"}, nil)
+					database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(&record.UserConsent{Scope: "openid"}, nil)
 				}},
 				{"BumpUserSession", func(fail bool) {
 					if fail {
-						userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", models.AcrLevel1, mock.Anything).Return(nil, fault)
+						userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", record.AcrLevel1, mock.Anything).Return(nil, fault)
 						return
 					}
-					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", models.AcrLevel1, mock.Anything).Return(userSession, nil)
+					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "pwd", record.AcrLevel1, mock.Anything).Return(userSession, nil)
 					auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 				}},
 				{"SaveAuthContext", func(fail bool) {

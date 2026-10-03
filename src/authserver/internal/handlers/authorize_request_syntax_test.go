@@ -11,8 +11,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // These cases are the handler's half of #244's remaining parts: the authorization endpoint hands the
@@ -32,14 +32,14 @@ func newSyntaxAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 		mocks_handlers.NewPermissionChecker(t), mocks_handlers.NewTokenParser(t), testBaseURL)
 
 	implicit := true
-	client := &models.Client{
+	client := &record.Client{
 		Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true,
-		ImplicitGrantEnabled: &implicit, DefaultAcrLevel: models.AcrLevel1,
+		ImplicitGrantEnabled: &implicit, DefaultAcrLevel: record.AcrLevel1,
 	}
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 	e.database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com"}}
+			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: "https://example.com"}}
 		}).Return(nil)
 	stubRegisteredRedirectURI(e.database, "https://example.com")
 	return e
@@ -123,9 +123,9 @@ func TestHandleAuthorizeGet_OfflineAccessIsHonouredOnlyWithACode(t *testing.T) {
 				// unknown: this row shows only that the text is not mistaken for offline_access, and
 				// what the endpoint stores is asserted for the rows above.
 				e.database.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "res").
-					Return(&models.Resource{Id: 1}, nil)
+					Return(&record.Resource{Id: 1}, nil)
 				e.database.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
-					Return([]models.Permission{{PermissionIdentifier: "offline_access_read"}}, nil)
+					Return([]record.Permission{{PermissionIdentifier: "offline_access_read"}}, nil)
 				tc.want = "openid res:offline_access_read"
 			}
 

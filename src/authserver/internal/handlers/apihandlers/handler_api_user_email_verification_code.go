@@ -11,7 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -19,8 +19,8 @@ import (
 // userEmailVerificationCodeDatabase is what the user email verification code endpoint needs: the
 // user row it stamps.
 type userEmailVerificationCodeDatabase interface {
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 // HandleUserEmailVerificationCodePost - POST /api/v1/admin/users/{id}/email/verification-code

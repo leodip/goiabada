@@ -10,7 +10,7 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -29,14 +29,14 @@ const (
 // a reader without settings is a wiring defect, not a condition a request can produce.
 var ErrNoSettings = errors.New("no settings on the request context")
 
-func WithSettings(ctx context.Context, s *models.Settings) context.Context {
+func WithSettings(ctx context.Context, s *record.Settings) context.Context {
 	return context.WithValue(ctx, settingsKey, s)
 }
 
 // SettingsFrom answers false both when no settings were written and when a nil pointer was,
 // so a caller that sees true can dereference the value.
-func SettingsFrom(ctx context.Context) (*models.Settings, bool) {
-	s, ok := ctx.Value(settingsKey).(*models.Settings)
+func SettingsFrom(ctx context.Context) (*record.Settings, bool) {
+	s, ok := ctx.Value(settingsKey).(*record.Settings)
 	return s, ok && s != nil
 }
 

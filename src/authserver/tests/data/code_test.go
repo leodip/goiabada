@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +18,7 @@ func TestCreateCode(t *testing.T) {
 	user := createTestUser(t)
 
 	random := fake.LetterN(6)
-	code := &models.Code{
+	code := &record.Code{
 		ClientId:            client.Id,
 		UserId:              user.Id,
 		Code:                "testcode_" + random,
@@ -110,7 +110,7 @@ func TestCreateCode(t *testing.T) {
 	}
 
 	// Test creating a code with invalid client ID
-	invalidCode := &models.Code{
+	invalidCode := &record.Code{
 		ClientId: 0,
 		UserId:   user.Id,
 	}
@@ -120,7 +120,7 @@ func TestCreateCode(t *testing.T) {
 	}
 
 	// Test creating a code with invalid user ID
-	invalidCode = &models.Code{
+	invalidCode = &record.Code{
 		ClientId: client.Id,
 		UserId:   0,
 	}
@@ -141,7 +141,7 @@ func TestCreateCode_ARedirectURIAtTheBoundRoundTrips(t *testing.T) {
 			client := createTestClient(t)
 			user := createTestUser(t)
 			random := fake.LetterN(6)
-			code := &models.Code{
+			code := &record.Code{
 				ClientId:          client.Id,
 				UserId:            user.Id,
 				Code:              "testcode_" + random,
@@ -156,7 +156,7 @@ func TestCreateCode_ARedirectURIAtTheBoundRoundTrips(t *testing.T) {
 			}
 
 			err := database.CreateCode(context.Background(), nil, code)
-			require.NoError(t, err, "a code carrying a %d-byte redirect URI was refused by the column", models.RedirectURIMaxBytes)
+			require.NoError(t, err, "a code carrying a %d-byte redirect URI was refused by the column", record.RedirectURIMaxBytes)
 
 			stored, err := database.GetCodeById(context.Background(), nil, code.Id)
 			require.NoError(t, err)
@@ -420,7 +420,7 @@ func TestCodeLoadClient(t *testing.T) {
 	}
 
 	// Test loading client for code with non-existent client
-	codeWithNonExistentClient := &models.Code{ClientId: 99999}
+	codeWithNonExistentClient := &record.Code{ClientId: 99999}
 	err = database.CodeLoadClient(context.Background(), nil, codeWithNonExistentClient)
 	if err != nil {
 		t.Errorf("Expected no error when loading non-existent client, got: %v", err)
@@ -457,7 +457,7 @@ func TestCodeLoadUser(t *testing.T) {
 	}
 
 	// Test loading user for code with non-existent user
-	codeWithNonExistentUser := &models.Code{UserId: 99999}
+	codeWithNonExistentUser := &record.Code{UserId: 99999}
 	err = database.CodeLoadUser(context.Background(), nil, codeWithNonExistentUser)
 	if err != nil {
 		t.Errorf("Expected no error when loading non-existent user, got: %v", err)
@@ -548,13 +548,13 @@ func TestDeleteCode(t *testing.T) {
 
 // createTestCode seeds a code on the package's shared handle; createTestCodeOn takes the handle,
 // for the reason createTestUserOn does.
-func createTestCode(t *testing.T, clientId, userId int64) *models.Code {
+func createTestCode(t *testing.T, clientId, userId int64) *record.Code {
 	return createTestCodeOn(t, database, clientId, userId)
 }
 
-func createTestCodeOn(t *testing.T, db data.Database, clientId, userId int64) *models.Code {
+func createTestCodeOn(t *testing.T, db data.Database, clientId, userId int64) *record.Code {
 	random := fake.LetterN(6)
-	code := &models.Code{
+	code := &record.Code{
 		ClientId:            clientId,
 		UserId:              userId,
 		Code:                "testcode_" + random,
@@ -583,13 +583,13 @@ func createTestCodeOn(t *testing.T, db data.Database, clientId, userId int64) *m
 
 // createCodeRefreshToken inserts a refresh token descended from code. An expired one is past
 // both expires_at and max_lifetime, so DeleteExpiredRefreshTokens removes it.
-func createCodeRefreshToken(t *testing.T, code *models.Code, expired bool) *models.RefreshToken {
+func createCodeRefreshToken(t *testing.T, code *record.Code, expired bool) *record.RefreshToken {
 	t.Helper()
 	offset := time.Hour
 	if expired {
 		offset = -time.Hour
 	}
-	refreshToken := &models.RefreshToken{
+	refreshToken := &record.RefreshToken{
 		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
 		RefreshTokenJti:   "test_jti_" + fake.LetterN(6),
 		SessionIdentifier: code.SessionIdentifier,
@@ -623,7 +623,7 @@ func TestDeleteCodesWithoutRefreshTokens(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	ropcToken := &models.RefreshToken{
+	ropcToken := &record.RefreshToken{
 		CodeId:            sql.NullInt64{Valid: false},
 		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
@@ -679,7 +679,7 @@ func TestDeleteCodesWithoutRefreshTokens(t *testing.T) {
 	createCodeRefreshToken(t, usedExpiredToken, true)
 
 	rows := []struct {
-		code   *models.Code
+		code   *record.Code
 		what   string
 		reaped bool
 	}{
@@ -768,7 +768,7 @@ func TestDeleteCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
 // since Code.Revoked is dont-update tagged and UpdateCode cannot set it. createTestCode
 // randomises the session identifier, so sweeping one code's session reaches that code
 // alone.
-func revokeCodesOf(t *testing.T, code *models.Code) {
+func revokeCodesOf(t *testing.T, code *record.Code) {
 	t.Helper()
 	if _, err := database.RevokeCodesBySessionIdentifier(context.Background(), nil, code.SessionIdentifier); err != nil {
 		t.Fatalf("Failed to revoke the session of code %d: %v", code.Id, err)
@@ -780,7 +780,7 @@ func revokeCodesOf(t *testing.T, code *models.Code) {
 // Revoked = false when the caller revoked it first, which is exactly the shape a handler
 // that loaded the code earlier holds, and the dont-update tag is what keeps it from
 // regressing the marker.
-func markCodeUsed(t *testing.T, code *models.Code) {
+func markCodeUsed(t *testing.T, code *record.Code) {
 	t.Helper()
 	code.Used = true
 	if err := database.UpdateCode(context.Background(), nil, code); err != nil {
@@ -850,14 +850,14 @@ func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
 // createTestCodeInSession creates a code bound to a specific session identifier,
 // which the session-scoped revocation sweep is keyed on. createTestCode randomises
 // the identifier, so a caller needing two codes on ONE session cannot use it.
-func createTestCodeInSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *models.Code {
+func createTestCodeInSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *record.Code {
 	return createTestCodeInSessionOn(t, database, clientId, userId, sessionIdentifier)
 }
 
 // createTestCodeInSessionOn takes the handle, for the reason createTestUserOn does. Both statements
 // move with it: seeding half a fixture on one database and half on another produces ids that
 // collide across identity columns and assertions that pass for the wrong reason (#139 stage 8).
-func createTestCodeInSessionOn(t *testing.T, db data.Database, clientId, userId int64, sessionIdentifier string) *models.Code {
+func createTestCodeInSessionOn(t *testing.T, db data.Database, clientId, userId int64, sessionIdentifier string) *record.Code {
 	t.Helper()
 	code := createTestCodeOn(t, db, clientId, userId)
 	code.SessionIdentifier = sessionIdentifier

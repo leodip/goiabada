@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
 
 // helper to set a user's password to a known value
-func setUserPassword(t *testing.T, user *models.User, newPassword string) {
+func setUserPassword(t *testing.T, user *record.User, newPassword string) {
 	t.Helper()
 	hash, err := passwordhash.Hash(newPassword)
 	assert.NoError(t, err)

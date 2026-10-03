@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
@@ -35,20 +35,20 @@ type clientsDatabase interface {
 	revocation.Database
 
 	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
-	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
-	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *models.WebOrigin) error
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
+	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
 	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
 	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
 	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
-	GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Client, error)
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
+	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
-	UpdateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 }
 
 // updateClientNotOwningAuthenticationMode writes a client through an endpoint that changes some
@@ -91,7 +91,7 @@ type clientsDatabase interface {
 // It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
-func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *models.Client) error {
+func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client) error {
 	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
 	// this attempt's own lock, and ApplyPublicClientInvariants is idempotent on the result.
@@ -344,7 +344,7 @@ func HandleClientCreatePost(
 		}
 
 		// Create client model mimicking current implementation defaults
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:                        strings.TrimSpace(req.ClientIdentifier),
 			Description:                             strings.TrimSpace(req.Description),
 			DisplayName:                             trimmedDisplayName,
@@ -353,10 +353,10 @@ func HandleClientCreatePost(
 			IsPublic:                                false,
 			ConsentRequired:                         false,
 			Enabled:                                 true,
-			DefaultAcrLevel:                         models.AcrLevel2Optional,
+			DefaultAcrLevel:                         record.AcrLevel2Optional,
 			AuthorizationCodeEnabled:                req.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled:                req.ClientCredentialsEnabled,
-			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
 		}
 
 		if err := database.CreateClient(r.Context(), nil, client); err != nil {
@@ -556,7 +556,7 @@ func HandleClientUpdatePut(
 		client.ShowWebsiteURL = updateReq.ShowWebsiteURL
 
 		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			acrLevel, err := models.AcrLevelFromString(updateReq.DefaultAcrLevel)
+			acrLevel, err := record.AcrLevelFromString(updateReq.DefaultAcrLevel)
 			if err != nil {
 				writeJSONError(w, "Invalid default ACR level", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
@@ -883,8 +883,8 @@ func HandleClientRedirectURIsPut(
 		// hold on every engine. This PUT replaces the whole set, so a client already over either
 		// bound cannot be saved until the administrator trims it in the same save, which is #122's
 		// precedent for a legacy row below (#428).
-		if len(req.RedirectURIs) > models.RedirectURIsMaxPerClient {
-			writeJSONError(w, fmt.Sprintf("A client can have at most %d redirect URIs, and this list has %d.", models.RedirectURIsMaxPerClient, len(req.RedirectURIs)), "VALIDATION_ERROR", http.StatusBadRequest)
+		if len(req.RedirectURIs) > record.RedirectURIsMaxPerClient {
+			writeJSONError(w, fmt.Sprintf("A client can have at most %d redirect URIs, and this list has %d.", record.RedirectURIsMaxPerClient, len(req.RedirectURIs)), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -899,8 +899,8 @@ func HandleClientRedirectURIsPut(
 			}
 			// Before the parse, so an overlong value is never parsed. The message names the
 			// value by its beginning rather than echoing up to the whole body back.
-			if len(uri) > models.RedirectURIMaxBytes {
-				writeJSONError(w, fmt.Sprintf("Redirect URI is too long (%d bytes, the maximum is %d): %s...", len(uri), models.RedirectURIMaxBytes, strings.ToValidUTF8(uri[:80], "")), "VALIDATION_ERROR", http.StatusBadRequest)
+			if len(uri) > record.RedirectURIMaxBytes {
+				writeJSONError(w, fmt.Sprintf("Redirect URI is too long (%d bytes, the maximum is %d): %s...", len(uri), record.RedirectURIMaxBytes, strings.ToValidUTF8(uri[:80], "")), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, parseErr := url.ParseRequestURI(uri); parseErr != nil {
@@ -940,8 +940,8 @@ func HandleClientRedirectURIsPut(
 		for _, raw := range req.ExpectedRedirectURIs {
 			expected = append(expected, strings.TrimSpace(raw))
 		}
-		redirectURIKey := func(ru models.RedirectURI) string { return strings.TrimSpace(ru.URI) }
-		redirectURIId := func(ru models.RedirectURI) int64 { return ru.Id }
+		redirectURIKey := func(ru record.RedirectURI) string { return strings.TrimSpace(ru.URI) }
+		redirectURIId := func(ru record.RedirectURI) int64 { return ru.Id }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator removing a compromised callback and adding its replacement ends with both
@@ -969,7 +969,7 @@ func HandleClientRedirectURIsPut(
 				}
 			}
 			for _, uri := range insert {
-				if createErr := database.CreateRedirectURI(r.Context(), tx, &models.RedirectURI{ClientId: client.Id, URI: uri}); createErr != nil {
+				if createErr := database.CreateRedirectURI(r.Context(), tx, &record.RedirectURI{ClientId: client.Id, URI: uri}); createErr != nil {
 					return errs.Wrap(createErr, "database error creating redirect URI")
 				}
 			}
@@ -1078,10 +1078,10 @@ func HandleClientWebOriginsPut(
 				writeJSONError(w, fmt.Sprintf("Invalid web origin: %s. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero.", val), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			// The column's width, models.WebOriginMaxBytes; its comment says why the bound is
+			// The column's width, record.WebOriginMaxBytes; its comment says why the bound is
 			// here rather than in CanonicalOrigin.
-			if len(origin) > models.WebOriginMaxBytes {
-				writeJSONError(w, fmt.Sprintf("Web origin is too long (%d characters, the maximum is %d): %s", len(origin), models.WebOriginMaxBytes, origin), "VALIDATION_ERROR", http.StatusBadRequest)
+			if len(origin) > record.WebOriginMaxBytes {
+				writeJSONError(w, fmt.Sprintf("Web origin is too long (%d characters, the maximum is %d): %s", len(origin), record.WebOriginMaxBytes, origin), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, exists := seen[origin]; exists {
@@ -1106,8 +1106,8 @@ func HandleClientWebOriginsPut(
 		}
 		// The stored value is already canonical, migration 000034 having repaired the rows
 		// written before this endpoint canonicalized, so it is keyed as it stands (#250).
-		webOriginKey := func(wo models.WebOrigin) string { return wo.Origin }
-		webOriginId := func(wo models.WebOrigin) int64 { return wo.Id }
+		webOriginKey := func(wo record.WebOrigin) string { return wo.Origin }
+		webOriginId := func(wo record.WebOrigin) int64 { return wo.Id }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator removing a compromised origin and adding its replacement ends with both
@@ -1137,7 +1137,7 @@ func HandleClientWebOriginsPut(
 				}
 			}
 			for _, origin := range insert {
-				if createErr := database.CreateWebOrigin(r.Context(), tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); createErr != nil {
+				if createErr := database.CreateWebOrigin(r.Context(), tx, &record.WebOrigin{ClientId: client.Id, Origin: origin}); createErr != nil {
 					return errs.Wrapf(createErr, "database error creating web origin %s", origin)
 				}
 			}
@@ -1228,12 +1228,12 @@ func HandleClientTokensPut(
 		// parsed is one of the three the type declares, so String() gives back exactly what was
 		// trimmed, and the stored value can no longer drift from the value that was validated
 		// (#385).
-		includeClaimsInAccessToken, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken))
+		includeClaimsInAccessToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken))
 		if err != nil {
 			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInAccessToken.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		includeClaimsInIdToken, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken))
+		includeClaimsInIdToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken))
 		if err != nil {
 			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInIdToken.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ import (
 // setRegSettings sets the three registration switches until the test ends.
 func setRegSettings(t *testing.T, selfRegEnabled, requiresVerify, smtpEnabled bool) {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.SelfRegistrationEnabled = selfRegEnabled
 		settings.SelfRegistrationRequiresEmailVerification = requiresVerify
 		settings.SMTPEnabled = smtpEnabled
@@ -390,7 +390,7 @@ func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
-	existing := &models.User{
+	existing := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

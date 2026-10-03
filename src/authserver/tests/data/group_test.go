@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateGroup(t *testing.T) {
-	group := &models.Group{
+	group := &record.Group{
 		GroupIdentifier:      "test_group_" + fake.LetterN(6),
 		Description:          "Test Group",
 		IncludeInIdToken:     true,
@@ -290,9 +290,9 @@ func TestDeleteGroup(t *testing.T) {
 	}
 }
 
-func createTestGroup(t *testing.T) *models.Group {
+func createTestGroup(t *testing.T) *record.Group {
 	random := fake.LetterN(6)
-	group := &models.Group{
+	group := &record.Group{
 		GroupIdentifier: "TestGroup_" + random,
 		Description:     "Test Group Description",
 	}
@@ -316,14 +316,14 @@ func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
 	lower := "case_group_" + strings.ToLower(fake.LetterN(6))
 	upper := strings.ToUpper(lower)
 
-	lowerGroup := &models.Group{GroupIdentifier: lower, Description: "lowercase"}
+	lowerGroup := &record.Group{GroupIdentifier: lower, Description: "lowercase"}
 	if err := database.CreateGroup(context.Background(), nil, lowerGroup); err != nil {
 		t.Fatalf("Failed to create the lowercase group: %v", err)
 	}
 
 	// A second group differing from the first only by case, which MySQL and SQL Server
 	// refused before 000040.
-	upperGroup := &models.Group{GroupIdentifier: upper, Description: "uppercase"}
+	upperGroup := &record.Group{GroupIdentifier: upper, Description: "uppercase"}
 	if err := database.CreateGroup(context.Background(), nil, upperGroup); err != nil {
 		t.Fatalf("Failed to create a group differing only by case, which every engine must now accept: %v", err)
 	}
@@ -368,7 +368,7 @@ func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
 func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx := beginTx(t)
 
-	group := &models.Group{
+	group := &record.Group{
 		GroupIdentifier: "TxGroup_" + fake.LetterN(8),
 		Description:     "Transaction pass-through group",
 	}
@@ -376,7 +376,7 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to create group inside the transaction: %v", err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Enabled:   true,
 		Subject:   fake.UUID(),
 		Username:  "u" + fake.LetterN(12),
@@ -387,7 +387,7 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to create user inside the transaction: %v", err)
 	}
 
-	userGroup := &models.UserGroup{UserId: user.Id, GroupId: group.Id}
+	userGroup := &record.UserGroup{UserId: user.Id, GroupId: group.Id}
 	if err := database.CreateUserGroup(context.Background(), tx, userGroup); err != nil {
 		t.Fatalf("Failed to create users_groups row inside the transaction: %v", err)
 	}

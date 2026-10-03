@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateGroupPermission(t *testing.T) {
@@ -13,7 +13,7 @@ func TestCreateGroupPermission(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 
-	groupPermission := &models.GroupPermission{
+	groupPermission := &record.GroupPermission{
 		GroupId:      group.Id,
 		PermissionId: permission.Id,
 	}
@@ -51,7 +51,7 @@ func TestCreateGroupPermission(t *testing.T) {
 	}
 
 	// Test creating with invalid GroupId
-	invalidGroupPermission := &models.GroupPermission{
+	invalidGroupPermission := &record.GroupPermission{
 		GroupId:      0,
 		PermissionId: permission.Id,
 	}
@@ -61,7 +61,7 @@ func TestCreateGroupPermission(t *testing.T) {
 	}
 
 	// Test creating with invalid PermissionId
-	invalidGroupPermission = &models.GroupPermission{
+	invalidGroupPermission = &record.GroupPermission{
 		GroupId:      group.Id,
 		PermissionId: 0,
 	}
@@ -127,7 +127,7 @@ func TestUpdateGroupPermission(t *testing.T) {
 	}
 
 	// Test updating with invalid Id
-	invalidGroupPermission := &models.GroupPermission{Id: 0}
+	invalidGroupPermission := &record.GroupPermission{Id: 0}
 	err = database.UpdateGroupPermission(context.Background(), nil, invalidGroupPermission)
 	if err == nil {
 		t.Error("Expected error when updating group permission with invalid Id")
@@ -269,8 +269,8 @@ func TestDeleteGroupPermission(t *testing.T) {
 	}
 }
 
-func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *models.GroupPermission {
-	groupPermission := &models.GroupPermission{
+func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *record.GroupPermission {
+	groupPermission := &record.GroupPermission{
 		GroupId:      groupId,
 		PermissionId: permissionId,
 	}

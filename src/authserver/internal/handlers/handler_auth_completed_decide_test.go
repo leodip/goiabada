@@ -3,7 +3,7 @@ package handlers
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func TestDecideCompletion(t *testing.T) {
 		// Reuse: the arrived-with session is valid and the ceremony's (#133).
 		{
 			name:  "a valid owned session is reused, with nothing else to do for an SSO pass",
-			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: models.AcrLevel1},
+			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel1},
 			want:  completionPlan{arm: completionArmReuse},
 		},
 		{
@@ -42,13 +42,13 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			name: "a captured OTP generation is promoted for level2_optional",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
-				otpConfigGenerationCaptured: true, target: models.AcrLevel2Optional},
+				otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
 			want: completionPlan{arm: completionArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
 			name: "a captured OTP generation is promoted for level2_mandatory",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
-				otpConfigGenerationCaptured: true, target: models.AcrLevel2Mandatory},
+				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
 			want: completionPlan{arm: completionArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
@@ -56,18 +56,18 @@ func TestDecideCompletion(t *testing.T) {
 			// decision 3).
 			name: "a captured OTP generation is not promoted for a level 1 target",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
-				otpConfigGenerationCaptured: true, target: models.AcrLevel1},
+				otpConfigGenerationCaptured: true, target: record.AcrLevel1},
 			want: completionPlan{arm: completionArmReuse},
 		},
 		{
 			name:  "nothing is promoted without a capture, whatever the target",
-			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: models.AcrLevel2Mandatory},
+			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel2Mandatory},
 			want:  completionPlan{arm: completionArmReuse},
 		},
 		{
 			name: "every reuse flag at once",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true,
-				credentialEntered: true, otpConfigGenerationCaptured: true, target: models.AcrLevel2Optional},
+				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
 			want: completionPlan{arm: completionArmReuse, rotateIdentifier: true, refreshAuthTime: true,
 				promoteOtpConfigGeneration: true},
 		},
@@ -81,7 +81,7 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			// AuthenticatedAt has two writers, and OTP alone is not level 1 (#129 decision 15).
 			name:  "a credential entered without level 1 still restarts",
-			facts: completionFacts{credentialEntered: true, otpConfigGenerationCaptured: true, target: models.AcrLevel2Optional},
+			facts: completionFacts{credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
 			want:  completionPlan{arm: completionArmRestart},
 		},
 		{
@@ -121,7 +121,7 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			name: "the reuse flags stay off on the create arm",
 			facts: completionFacts{level1Completed: true, raisesPrivilege: true, credentialEntered: true,
-				otpConfigGenerationCaptured: true, target: models.AcrLevel2Mandatory},
+				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
 			want: completionPlan{arm: completionArmCreate},
 		},
 	}

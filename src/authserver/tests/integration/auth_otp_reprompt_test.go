@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,8 +27,8 @@ import (
 // It stops at whichever of /auth/otp or /auth/issue it reaches. Those are the two answers these
 // cases are asking about: "the second factor was demanded again" and "SSO went straight through".
 // The caller closes the body.
-func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *models.Client,
-	redirectUri *models.RedirectURI) (string, *http.Response, string) {
+func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *record.Client,
+	redirectUri *record.RedirectURI) (string, *http.Response, string) {
 
 	t.Helper()
 

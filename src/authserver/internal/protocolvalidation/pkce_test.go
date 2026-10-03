@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -204,18 +204,18 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		require.NoError(t, err)
-		client := &models.Client{
+		client := &record.Client{
 			Id: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true,
 			ClientSecretEncrypted: clientSecretEncrypted,
 		}
-		codeEntity := &models.Code{
+		codeEntity := &record.Code{
 			CodeHash:            "hash_of_valid_code",
 			RedirectURI:         redirectURI,
 			CodeChallenge:       sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 			AuthStateGeneration: 3,
 			UserId:              7,
-			Client:              models.Client{ClientIdentifier: "client1"},
-			User:                models.User{Id: 7, Enabled: enabled, AuthStateGeneration: 3},
+			Client:              record.Client{ClientIdentifier: "client1"},
+			User:                record.User{Id: 7, Enabled: enabled, AuthStateGeneration: 3},
 			CreatedAt:           sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		}
 
@@ -226,7 +226,7 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		expectRedirectURIStillRegistered(mockDB, redirectURI)
 
-		return validator.ValidateTokenRequest(context.Background(), &models.Settings{}, &ValidateTokenRequestInput{
+		return validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
 			ClientId:     "client1",
 			ClientSecret: secret,
@@ -305,17 +305,17 @@ func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *te
 	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
 		mocks_protocolvalidation.NewPermissionChecker(t), testDataCipher)
 
-	client := &models.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
+	client := &record.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
 	// A code already redeemed, so the retry lookup with used=true finds it. It is older than the
 	// expiry window, which shows the grammar refusal is read above that check too.
-	codeEntity := &models.Code{
+	codeEntity := &record.Code{
 		Id:                42,
 		CodeHash:          "hash_of_reused_code",
 		RedirectURI:       "https://example.com/callback",
 		ClientId:          client.Id,
 		Client:            *client,
 		UserId:            1,
-		User:              models.User{Id: 1, Enabled: true},
+		User:              record.User{Id: 1, Enabled: true},
 		CodeChallenge:     sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 		CreatedAt:         sql.NullTime{Time: time.Now().UTC().Add(-10 * time.Minute), Valid: true},
 		SessionIdentifier: "session-abc",
@@ -327,7 +327,7 @@ func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *te
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-	_, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{}, &ValidateTokenRequestInput{
+	_, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
 		ClientId:     "client1",
 		Code:         "reused_code",

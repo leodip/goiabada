@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/securerandom"
@@ -40,9 +40,9 @@ func readRedirectURIs(t *testing.T, accessToken string, clientId int64) []string
 
 // newRedirectURIsClient creates a client whose authorization code flow is on, so its redirect URIs
 // can be saved, and removes it when the test ends.
-func newRedirectURIsClient(t *testing.T, prefix string) *models.Client {
+func newRedirectURIsClient(t *testing.T, prefix string) *record.Client {
 	t.Helper()
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         prefix + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,
@@ -139,7 +139,7 @@ func TestAPIClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "redir-outdated-")
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-		&models.RedirectURI{ClientId: client.Id, URI: "https://a.example.com/cb"}))
+		&record.RedirectURI{ClientId: client.Id, URI: "https://a.example.com/cb"}))
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 
 	loadedByBoth := readRedirectURIs(t, accessToken, client.Id)
@@ -171,7 +171,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	clientSecret := securerandom.String(60)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "redir-succ-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -187,9 +187,9 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	// Seed existing redirect URIs
 	uriA := "https://a.example.com/callback"
 	uriB := "https://b.example.com/callback"
-	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{ClientId: client.Id, URI: uriA})
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: uriA})
 	assert.NoError(t, err)
-	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{ClientId: client.Id, URI: uriB})
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: uriB})
 	assert.NoError(t, err)
 
 	// Desired: keep A (with spaces to test trimming), remove B, add C
@@ -242,7 +242,7 @@ func TestAPIClientRedirectURIsPut_NoRedirectFlowRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	implicitDisabled := false
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "redir-disabled-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -278,7 +278,7 @@ func TestAPIClientRedirectURIsPut_ImplicitOnlyClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	implicitEnabled := true
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "redir-implicit-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -346,7 +346,7 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Auth code enabled client
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "redir-vali-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -471,7 +471,7 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	}
 
 	// Invalid body
-	client2 := &models.Client{
+	client2 := &record.Client{
 		ClientIdentifier:         "redir-bad-body-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ConsentRequired:          false,
@@ -514,7 +514,7 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 	accessToken := createClientCredentialsTokenWithoutRouteScope(t)
 
 	// Create a target client with auth code enabled
-	target := &models.Client{
+	target := &record.Client{
 		ClientIdentifier:         "redir-target-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		IsPublic:                 true,

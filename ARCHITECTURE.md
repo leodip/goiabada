@@ -208,7 +208,7 @@ Notes on rows that are not self-evident:
   eight scope strings twice with nothing holding the two spellings equal.
 - There is no `ContextKeySettings` row because the two processes share nothing but its spelling.
   Each declares its own, now an unexported key in that module's `internal/reqctx` (#433, #440), and
-  each asserts a different type out of it — `*models.Settings` in the auth server against
+  each asserts a different type out of it — `*record.Settings` in the auth server against
   `*api.PublicSettingsResponse` in the admin console — so either assertion panics on the other's
   value. It satisfied the letter of `both-apps`, and that row would have been
   true and misleading (#351).

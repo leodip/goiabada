@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -33,8 +33,8 @@ var apiTerminateTx = &sql.Tx{}
 // purpose, following stubSweep: revocation_test.go owns the exhaustive termination table over the
 // happy path, both entry guards and all six failure points, and restating it here would mean two
 // places to update.
-func stubTermination(database *mocks_data.Database, userSession *models.UserSession,
-	revokedCodeCount int64, tokens []*models.RefreshToken) {
+func stubTermination(database *mocks_data.Database, userSession *record.UserSession,
+	revokedCodeCount int64, tokens []*record.RefreshToken) {
 
 	mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("RevokeCodesBySessionIdentifier", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
@@ -46,7 +46,7 @@ func stubTermination(database *mocks_data.Database, userSession *models.UserSess
 			continue
 		}
 		jti := tokens[i].RefreshTokenJti
-		database.On("UpdateRefreshToken", mock.Anything, apiTerminateTx, mock.MatchedBy(func(rt *models.RefreshToken) bool {
+		database.On("UpdateRefreshToken", mock.Anything, apiTerminateTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
 			return rt.RefreshTokenJti == jti
 		})).Return(nil).Once()
 	}
@@ -73,12 +73,12 @@ func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
+	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// One live token and one already revoked, so the JTI list below proves the payload reports what
 	// this call TRANSITIONED rather than what the session held.
-	stubTermination(database, userSession, 3, []*models.RefreshToken{
+	stubTermination(database, userSession, 3, []*record.RefreshToken{
 		{Id: 1, RefreshTokenJti: "rt-live"},
 		{Id: 2, RefreshTokenJti: "rt-already-gone", Revoked: true},
 	})
@@ -139,10 +139,10 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
+	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
-	stubTermination(database, userSession, 0, []*models.RefreshToken{})
+	stubTermination(database, userSession, 0, []*record.RefreshToken{})
 
 	var payloads []map[string]interface{}
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
@@ -173,7 +173,7 @@ func TestHandleUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
+	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.

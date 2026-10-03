@@ -11,7 +11,7 @@ import (
 	"errors"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -41,7 +41,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -57,7 +57,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecret: "client_secret",
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -67,12 +67,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		// An authorization code flow token: CodeId valid, so the handler's gate would be the
 		// one to refuse it. Reaching the end of the arm is the assertion.
-		user := models.User{Id: grantUserId, Enabled: true}
-		refreshToken := &models.RefreshToken{
+		user := record.User{Id: grantUserId, Enabled: true}
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "some_jti",
 			SessionIdentifier: "sid-1",
 			CodeId:            sql.NullInt64{Int64: 5, Valid: true},
-			Code: models.Code{
+			Code: record.Code{
 				Id:                5,
 				ClientId:          client.Id,
 				UserId:            grantUserId,
@@ -93,7 +93,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
-			Return(&models.UserSession{
+			Return(&record.UserSession{
 				Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
 				Started: now.Add(-10 * time.Minute), LastAccessed: now,
 			}, nil).Once()
@@ -114,7 +114,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -124,7 +124,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			// ClientSecret is intentionally left empty
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -152,7 +152,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -165,7 +165,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		correctSecret := "correct_secret"
 		encryptedSecret, _ := testDataCipher.Encrypt(correctSecret)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -194,7 +194,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -203,7 +203,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			// RefreshToken is intentionally left empty
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -230,7 +230,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -239,7 +239,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "invalid_refresh_token",
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -268,7 +268,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -277,7 +277,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "refresh_token_without_jti",
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -305,7 +305,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -314,7 +314,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "non_existent_refresh_token",
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -358,7 +358,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -370,7 +370,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "mismatched_refresh_token",
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -385,12 +385,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "mismatched_jti",
 			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 2, // Different client ID
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
@@ -421,7 +421,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -433,7 +433,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			RefreshToken: "disabled_user_refresh_token",
 		}
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -448,12 +448,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "disabled_user_jti",
 			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: false, // User is disabled
 				},
@@ -488,7 +488,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -504,7 +504,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -520,13 +520,13 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "nil_session_jti",
 			SessionIdentifier: "non_existent_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
@@ -559,7 +559,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -575,7 +575,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -591,20 +591,20 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "invalid_session_jti",
 			SessionIdentifier: "expired_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		expiredSession := &models.UserSession{
+		expiredSession := &record.UserSession{
 			SessionIdentifier: "expired_session",
 			UserId:            1,                                     // owned by the code's user, so expiry is what refuses it
 			Started:           time.Now().UTC().Add(-48 * time.Hour), // Started 2 days ago
@@ -637,7 +637,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -650,7 +650,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -668,12 +668,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "expired_offline_jti",
 			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
@@ -705,7 +705,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -718,7 +718,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -735,12 +735,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "invalid_offline_jti",
 			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
@@ -768,7 +768,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -781,7 +781,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -797,12 +797,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "invalid_typ_jti",
 			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
@@ -830,7 +830,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -847,7 +847,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -863,22 +863,22 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "invalid_scope_jti",
 			SessionIdentifier: "test_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   1,
 				Scope:    "openid profile email", // Original scopes
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			SessionIdentifier: "test_session",
 			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
@@ -914,7 +914,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -927,7 +927,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -947,21 +947,21 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "valid_offline_jti",
 			CodeId:          sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   1,
 				Scope:    "openid profile email offline_access",
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		userConsent := &models.UserConsent{
+		userConsent := &record.UserConsent{
 			UserId:   1,
 			ClientId: 1,
 			Scope:    "openid profile email offline_access",
@@ -973,7 +973,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&record.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -991,7 +991,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
@@ -1004,7 +1004,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1024,21 +1024,21 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "valid_offline_jti",
 			CodeId:          sql.NullInt64{Int64: 1, Valid: true},
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   1,
 				Scope:    "openid profile email offline_access",
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		userConsent := &models.UserConsent{
+		userConsent := &record.UserConsent{
 			UserId:   1,
 			ClientId: 1,
 			Scope:    "openid profile email offline_access",
@@ -1050,7 +1050,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&record.User{Id: 1, Enabled: true}, nil)
 		// The refresh carries four scopes; the consent lookup must run once, not once per scope.
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil).Times(1)
 
@@ -1068,7 +1068,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -1085,7 +1085,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1102,22 +1102,22 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "valid_refresh_jti",
 			SessionIdentifier: "test_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   1,
 				Scope:    "openid srv1:read srv1:write", // Original scope
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			SessionIdentifier: "test_session",
 			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
@@ -1131,7 +1131,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&record.User{Id: 1, Enabled: true}, nil)
 		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "srv1:read").Return(true, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -1151,7 +1151,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -1167,7 +1167,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1185,22 +1185,22 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "revoked_consent_jti",
 			SessionIdentifier: "test_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   1,
 				Scope:    "openid profile email",
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			SessionIdentifier: "test_session",
 			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
@@ -1214,7 +1214,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&record.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil) // Consent not found
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -1235,7 +1235,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -1251,7 +1251,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1269,22 +1269,22 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "partial_consent_jti",
 			SessionIdentifier: "test_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true},
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   1,
 				Scope:    "openid profile email",
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			SessionIdentifier: "test_session",
 			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
@@ -1292,7 +1292,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		// The user consented to openid and profile, but no longer to email.
-		userConsent := &models.UserConsent{
+		userConsent := &record.UserConsent{
 			UserId:   1,
 			ClientId: 1,
 			Scope:    "openid profile",
@@ -1305,7 +1305,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&record.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -1326,7 +1326,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -1342,7 +1342,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1359,22 +1359,22 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "revoked_permission_jti",
 			SessionIdentifier: "test_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // Auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   1,
 				Scope:    "openid profile email resource:read",
-				User: models.User{
+				User: record.User{
 					Id:      1,
 					Enabled: true,
 				},
 			},
 		}
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			SessionIdentifier: "test_session",
 			UserId:            1, // the code's user; a session belonging to anyone else is refused
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
@@ -1388,7 +1388,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&record.User{Id: 1, Enabled: true}, nil)
 		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "resource:read").Return(false, nil) // Permission revoked
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -1408,7 +1408,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 // grant is otherwise entirely valid, so the accepted row proves the fixture reaches the
 // end of the arm rather than stopping somewhere harmless on the way.
 func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullString, isPublic bool) (
-	*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
+	*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 	t.Helper()
 
 	const grantUserId = int64(7)
@@ -1418,12 +1418,12 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
@@ -1444,12 +1444,12 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 		input.ClientSecret = "client_secret"
 	}
 
-	user := models.User{Id: grantUserId, Enabled: true}
-	refreshToken := &models.RefreshToken{
+	user := record.User{Id: grantUserId, Enabled: true}
+	refreshToken := &record.RefreshToken{
 		RefreshTokenJti:   "the-jti",
 		SessionIdentifier: "sid-1",
 		CodeId:            sql.NullInt64{Int64: 5, Valid: true}, // auth code flow token
-		Code: models.Code{
+		Code: record.Code{
 			Id:                5,
 			ClientId:          1,
 			UserId:            grantUserId,
@@ -1472,7 +1472,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	// Only the accepted row reaches these two.
 	now := time.Now().UTC()
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
-		Return(&models.UserSession{
+		Return(&record.UserSession{
 			Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
 			Started: now.Add(-10 * time.Minute), LastAccessed: now,
 		}, nil).Maybe()
@@ -1533,10 +1533,10 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
@@ -1580,7 +1580,7 @@ type storedGrant struct {
 // the consent row come after that comparison, so they are stubbed only when reachesUser is set, and
 // a case that stops at the comparison fails if it reads either.
 func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, reachesUser bool) (
-	*TokenValidator, *mocks_protocolvalidation.PermissionChecker, *models.Settings, *ValidateTokenRequestInput) {
+	*TokenValidator, *mocks_protocolvalidation.PermissionChecker, *record.Settings, *ValidateTokenRequestInput) {
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
@@ -1588,7 +1588,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}
@@ -1599,22 +1599,22 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		RefreshToken: "stored_grant_refresh_token",
 		Scope:        requestedScope,
 	}
-	user := models.User{Id: 1, Subject: "user123", Enabled: true}
+	user := record.User{Id: 1, Subject: "user123", Enabled: true}
 
-	var client *models.Client
+	var client *record.Client
 	var refreshTokenJwt *oauth.JwtToken
-	var refreshToken *models.RefreshToken
+	var refreshToken *record.RefreshToken
 	if g.ropc {
 		// Always Offline, because ROPC creates no browser session, and presented by a public
 		// client, so no secret.
-		client = &models.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, IsPublic: true}
+		client = &record.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, IsPublic: true}
 		refreshTokenJwt = &oauth.JwtToken{Claims: jwt.MapClaims{
 			"jti":                         "stored_grant_jti",
 			"typ":                         "Offline",
 			"sub":                         "user123",
 			"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
 		}}
-		refreshToken = &models.RefreshToken{
+		refreshToken = &record.RefreshToken{
 			RefreshTokenJti: "stored_grant_jti",
 			CodeId:          sql.NullInt64{Valid: false},
 			UserId:          sql.NullInt64{Int64: 1, Valid: true},
@@ -1631,7 +1631,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		// matched offline_access exactly, so the uppercase spelling never made a grant offline.
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
-		client = &models.Client{
+		client = &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -1645,13 +1645,13 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 			"typ": "Refresh",
 			"sub": "user123",
 		}}
-		refreshToken = &models.RefreshToken{
+		refreshToken = &record.RefreshToken{
 			RefreshTokenJti:   "stored_grant_jti",
 			SessionIdentifier: "test_session",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true},
-			Code:              models.Code{ClientId: 1, UserId: 1, Scope: g.scope, User: user},
+			Code:              record.Code{ClientId: 1, UserId: 1, Scope: g.scope, User: user},
 		}
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			SessionIdentifier: "test_session",
 			UserId:            1,
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
@@ -1673,7 +1673,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&user, nil).Once()
 		if g.consentScope != "" {
 			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
-				Return(&models.UserConsent{UserId: 1, ClientId: 1, Scope: g.consentScope}, nil).Once()
+				Return(&record.UserConsent{UserId: 1, ClientId: 1, Scope: g.consentScope}, nil).Once()
 		}
 	}
 
@@ -2013,7 +2013,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-	settings := &models.Settings{}
+	settings := &record.Settings{}
 	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
@@ -2022,7 +2022,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 		RefreshToken: "expired_refresh_token",
 	}
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -2067,7 +2067,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 	const grantUserId = int64(1)
 
-	setup := func(t *testing.T, sessionUserId int64) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
+	setup := func(t *testing.T, sessionUserId int64) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -2075,7 +2075,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
@@ -2086,7 +2086,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
@@ -2103,22 +2103,22 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			},
 		}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti:   "ownership_jti",
 			SessionIdentifier: "session_of_interest",
 			CodeId:            sql.NullInt64{Int64: 1, Valid: true}, // auth code flow token
-			Code: models.Code{
+			Code: record.Code{
 				ClientId: 1,
 				UserId:   grantUserId,
 				Scope:    "openid",
-				User: models.User{
+				User: record.User{
 					Id:      grantUserId,
 					Enabled: true,
 				},
 			},
 		}
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			SessionIdentifier: "session_of_interest",
 			UserId:            sessionUserId,
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
@@ -2136,7 +2136,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			Return(userSession, nil)
 		// Only reached once the session is accepted, so the refusing subtest never calls it.
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").
-			Return(&models.User{Id: grantUserId, Enabled: true}, nil).Maybe()
+			Return(&record.User{Id: grantUserId, Enabled: true}, nil).Maybe()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2199,7 +2199,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	// maximum lifetime and registers NO lookup at all, so the strict mock is what asserts
 	// the ordering: reaching the session before rejecting an expired token is a failure,
 	// not a slower pass.
-	setup := func(t *testing.T, sessionOwner *int64, lookupErr error, expired bool) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
+	setup := func(t *testing.T, sessionOwner *int64, lookupErr error, expired bool) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -2207,7 +2207,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 
 		// Confidential, and it used to be public (#245). The subject is the offline grant's
 		// session ownership, and its code carries no challenge, so a public client would now
@@ -2215,7 +2215,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "test_client",
 			Enabled:                  true,
@@ -2223,15 +2223,15 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 			IsPublic:                 false,
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
-		user := models.User{Id: grantUserId, Enabled: true}
+		user := record.User{Id: grantUserId, Enabled: true}
 
-		refreshToken := &models.RefreshToken{
+		refreshToken := &record.RefreshToken{
 			RefreshTokenJti: "the-jti",
 			CodeId:          sql.NullInt64{Int64: 5, Valid: true},
 			// Empty, and that is production's shape for an Offline token rather than a
 			// shortcut: the issuer stores the max lifetime in this column instead.
 			SessionIdentifier: "",
-			Code: models.Code{
+			Code: record.Code{
 				Id: 5, ClientId: 1, UserId: grantUserId, Scope: "openid offline_access",
 				SessionIdentifier: sid,
 				User:              user,
@@ -2265,14 +2265,14 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, nil).Once()
 		default:
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
-				Return(&models.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
+				Return(&record.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
 		}
 
 		// Only the accepted rows reach these two: an Offline refresh always re-checks
 		// consent, whatever the client's ConsentRequired says.
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Maybe()
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, grantUserId, int64(1)).
-			Return(&models.UserConsent{UserId: grantUserId, ClientId: 1, Scope: "openid offline_access"}, nil).Maybe()
+			Return(&record.UserConsent{UserId: grantUserId, ClientId: 1, Scope: "openid offline_access"}, nil).Maybe()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2399,7 +2399,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
 			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
-			settings := &models.Settings{}
+			settings := &record.Settings{}
 			ctx := context.Background()
 
 			input := &ValidateTokenRequestInput{
@@ -2408,7 +2408,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 				RefreshToken: "ropc_refresh_token",
 			}
 
-			client := &models.Client{
+			client := &record.Client{
 				Id:                       1,
 				ClientIdentifier:         "ropc_client",
 				Enabled:                  true,
@@ -2427,14 +2427,14 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 
 			// CodeId invalid marks this a ROPC token, which is what makes the validator read
 			// RefreshToken.Scope and skip the consent check.
-			refreshToken := &models.RefreshToken{
+			refreshToken := &record.RefreshToken{
 				RefreshTokenJti: "ropc_jti",
 				CodeId:          sql.NullInt64{Valid: false},
 				UserId:          sql.NullInt64{Int64: 7, Valid: true},
 				ClientId:        sql.NullInt64{Int64: 1, Valid: true},
 				AuthenticatedAt: sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true},
 				Scope:           tc.storedScope,
-				User:            models.User{Id: 7, Enabled: true},
+				User:            record.User{Id: 7, Enabled: true},
 				Client:          *client,
 			}
 

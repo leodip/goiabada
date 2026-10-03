@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -42,13 +42,13 @@ const maxGroupIdsPerRequest = 1000
 // the rows that join them.
 type userGroupsDatabase interface {
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
-	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
+	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
-	GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.Group, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserGroup, error)
+	GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 func HandleUserGroupsGet(
@@ -168,8 +168,8 @@ func HandleUserGroupsPut(
 			}
 		}
 
-		membershipKey := func(ug models.UserGroup) int64 { return ug.GroupId }
-		membershipId := func(ug models.UserGroup) int64 { return ug.Id }
+		membershipKey := func(ug record.UserGroup) int64 { return ug.GroupId }
+		membershipId := func(ug record.UserGroup) int64 { return ug.Id }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true, where
 		// the autocommitted writes this replaced could leave a membership added, and audited, under
@@ -197,7 +197,7 @@ func HandleUserGroupsPut(
 				}
 			}
 			for _, groupId := range insert {
-				if createErr := database.CreateUserGroup(r.Context(), tx, &models.UserGroup{
+				if createErr := database.CreateUserGroup(r.Context(), tx, &record.UserGroup{
 					UserId:  user.Id,
 					GroupId: groupId,
 				}); createErr != nil {

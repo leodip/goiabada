@@ -9,7 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -147,7 +147,7 @@ func TestGetUserById_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // leave the table as it was. A method that took the context and then issued the insert without
 // it would fail this on the row count, not on the error.
 func TestCreateUser_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing.T) {
-	user := &models.User{
+	user := &record.User{
 		Enabled:  true,
 		Subject:  fake.UUID(),
 		Username: fake.Username(),
@@ -207,7 +207,7 @@ func TestCreateCode_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 	client := createTestClient(t)
 	random := fake.LetterN(8)
 
-	code := &models.Code{
+	code := &record.Code{
 		ClientId:          client.Id,
 		UserId:            user.Id,
 		Code:              "cancelled_" + random,
@@ -219,7 +219,7 @@ func TestCreateCode_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 		ResponseMode:      "query",
 		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier: "cancelledsession_" + random,
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       "pwd",
 	}
 
@@ -292,7 +292,7 @@ func TestGetClientByClientIdentifier_RefusesAnAlreadyCancelledContext(t *testing
 // client registration reaches from an unauthenticated request, where an abandoned caller is
 // ordinary rather than exceptional.
 func TestCreateClient_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "cancelled_client_" + fake.LetterN(8),
 		Description:      "Cancelled client",
 	}
@@ -325,7 +325,7 @@ func TestClientLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	client := createTestClient(t)
 
-	clientPermission := &models.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
+	clientPermission := &record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission))
 
 	err := database.ClientLoadPermissions(cancelled(), nil, client)
@@ -342,7 +342,7 @@ func TestGetClientPermissionsByClientId_RefusesAnAlreadyCancelledContext(t *test
 	permission := createTestPermission(t, resource)
 	client := createTestClient(t)
 
-	clientPermission := &models.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
+	clientPermission := &record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission))
 
 	got, err := database.GetClientPermissionsByClientId(cancelled(), nil, client.Id)

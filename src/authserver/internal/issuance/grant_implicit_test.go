@@ -9,7 +9,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -18,7 +18,7 @@ func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
@@ -33,19 +33,19 @@ func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "implicit-test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:       1,
 		Subject:  sub,
 		Email:    "implicit@example.com",
 		Username: "implicituser",
-		Groups:   []models.Group{},
+		Groups:   []record.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -98,7 +98,7 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true,
@@ -113,11 +113,11 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "idtoken-test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "idtoken@example.com",
@@ -126,10 +126,10 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 		GivenName:     "IdToken",
 		FamilyName:    "User",
 		UpdatedAt:     sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true},
-		Groups:        []models.Group{},
+		Groups:        []record.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -189,7 +189,7 @@ func TestIssueImplicitTx_BothTokens(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
@@ -204,11 +204,11 @@ func TestIssueImplicitTx_BothTokens(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "both-tokens-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "both@example.com",
@@ -217,10 +217,10 @@ func TestIssueImplicitTx_BothTokens(t *testing.T) {
 		GivenName:     "Both",
 		FamilyName:    "Tokens",
 		UpdatedAt:     sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true},
-		Groups:        []models.Group{},
+		Groups:        []record.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -281,7 +281,7 @@ func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -291,17 +291,17 @@ func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 	sub := fake.UUID()
 	privateKeyBytes := getTestPrivateKey(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "no-refresh-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      1,
 		Subject: sub,
-		Groups:  []models.Group{},
+		Groups:  []record.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -339,7 +339,7 @@ func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600, // 10 minutes global
 	}
@@ -350,18 +350,18 @@ func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "custom-expiry-client",
 		TokenExpirationInSeconds: 1800, // 30 minutes client override
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      1,
 		Subject: sub,
-		Groups:  []models.Group{},
+		Groups:  []record.Group{},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
@@ -402,7 +402,7 @@ func TestIssueImplicitTx_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -413,27 +413,27 @@ func TestIssueImplicitTx_WithGroupsAndAttributes(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "groups-attrs-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:        1,
 		Subject:   sub,
 		UpdatedAt: sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true},
-		Groups: []models.Group{
+		Groups: []record.Group{
 			{GroupIdentifier: "admin", IncludeInIdToken: true, IncludeInAccessToken: true},
 			{GroupIdentifier: "users", IncludeInIdToken: true, IncludeInAccessToken: false},
 			{GroupIdentifier: "readonly", IncludeInIdToken: false, IncludeInAccessToken: true},
 		},
-		Attributes: []models.UserAttribute{
+		Attributes: []record.UserAttribute{
 			{Key: "department", Value: "engineering", IncludeInIdToken: true, IncludeInAccessToken: true},
 			{Key: "level", Value: "senior", IncludeInIdToken: true, IncludeInAccessToken: false},
 			{Key: "team", Value: "platform", IncludeInIdToken: false, IncludeInAccessToken: true},
 		},
 	}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)

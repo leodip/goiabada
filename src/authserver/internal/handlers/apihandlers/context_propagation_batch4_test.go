@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +39,7 @@ func TestHandleGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllGroups", theApiRequestsContext(), mock.Anything).
-		Return([]models.Group{{Id: 5, GroupIdentifier: "admins"}}, nil).Once()
+		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}}, nil).Once()
 	database.On("CountGroupMembers", theApiRequestsContext(), mock.Anything, int64(5)).
 		Return(2, nil).Once()
 
@@ -71,7 +71,7 @@ func TestHandleGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t *te
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetGroupById", theApiRequestsContext(), mock.Anything, int64(5)).
-		Return(&models.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
+		Return(&record.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
 	database.On("GroupLoadPermissions", theApiRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 	database.On("CountGroupMembers", theApiRequestsContext(), mock.Anything, int64(5)).
@@ -103,7 +103,7 @@ func TestHandleSettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theApiRequestsContext(), mock.Anything).
-		Return([]models.KeyPair{{Id: 9, KeyIdentifier: "kid-9", State: models.KeyStateCurrent.String()}}, nil).Once()
+		Return([]record.KeyPair{{Id: 9, KeyIdentifier: "kid-9", State: record.KeyStateCurrent.String()}}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleSettingsKeysGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/settings/keys"))
@@ -136,7 +136,7 @@ func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
-		Return([]models.AuditLog{{Id: 1, AuditEvent: "login"}}, 1, nil).Once()
+		Return([]record.AuditLog{{Id: 1, AuditEvent: "login"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAuditLogsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/audit-logs"))
@@ -153,7 +153,7 @@ func TestHandleAuditLogsGet_AnOutOfRangeSizeReachesTheDatabaseClamped(t *testing
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
-		Return([]models.AuditLog{}, 0, nil).Once()
+		Return([]record.AuditLog{}, 0, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAuditLogsGet(database).ServeHTTP(rr,

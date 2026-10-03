@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -90,12 +90,12 @@ func TestValidateScopes(t *testing.T) {
 			name:  "authserver:userinfo, a permission the authserver resource no longer has",
 			scope: "openid authserver:userinfo",
 			mockSetup: func() {
-				builtIns := make([]models.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
+				builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 				for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-					builtIns = append(builtIns, models.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
+					builtIns = append(builtIns, record.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
 				}
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
-					Return(&models.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
+					Return(&record.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
 			},
 			expectedError: "Scope 'authserver:userinfo' is invalid. The resource identified by 'authserver' does not have a permission with identifier 'userinfo'.",
@@ -109,8 +109,8 @@ func TestValidateScopes(t *testing.T) {
 			name:  "Valid resource:permission scope",
 			scope: "resource1:permission1",
 			mockSetup: func() {
-				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&models.Resource{Id: 1}, nil)
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "permission1"}}, nil)
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{Id: 1}, nil)
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{PermissionIdentifier: "permission1"}}, nil)
 			},
 			expectedError: "",
 		},
@@ -126,8 +126,8 @@ func TestValidateScopes(t *testing.T) {
 			name:  "Invalid permission",
 			scope: "resource1:invalid-permission",
 			mockSetup: func() {
-				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&models.Resource{Id: 1}, nil)
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "valid-permission"}}, nil)
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{Id: 1}, nil)
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{PermissionIdentifier: "valid-permission"}}, nil)
 			},
 			expectedError: "Scope 'resource1:invalid-permission' is invalid. The resource identified by 'resource1' does not have a permission with identifier 'invalid-permission'.",
 		},
@@ -173,7 +173,7 @@ func TestValidateScopes_DatabaseFailurePropagates(t *testing.T) {
 			name: "GetPermissionsByResourceId error propagates",
 			setup: func(mockDB *mocks_data.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
-					Return(&models.Resource{Id: 1, ResourceIdentifier: "billing-api"}, nil)
+					Return(&record.Resource{Id: 1, ResourceIdentifier: "billing-api"}, nil)
 				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
 					Return(nil, errors.New("database is down"))
 			},
@@ -224,7 +224,7 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "disabled-client").Return(&models.Client{Enabled: false}, nil)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "disabled-client").Return(&record.Client{Enabled: false}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "disabled-client", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
@@ -239,7 +239,7 @@ func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *test
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "no-auth-code-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: false}, nil)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "no-auth-code-client").Return(&record.Client{Enabled: true, AuthorizationCodeEnabled: false}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
@@ -254,7 +254,7 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: true}, nil)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(&record.Client{Enabled: true, AuthorizationCodeEnabled: true}, nil)
 
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: ""}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
@@ -310,14 +310,14 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
 			validator := NewAuthorizeValidator(mockDB)
 
-			client := &models.Client{
+			client := &record.Client{
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
 			}
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(client, nil)
 			mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Run(func(args mock.Arguments) {
-				client := args.Get(2).(*models.Client)
-				client.RedirectURIs = []models.RedirectURI{{URI: tc.registered}}
+				client := args.Get(2).(*record.Client)
+				client.RedirectURIs = []record.RedirectURI{{URI: tc.registered}}
 			}).Return(nil)
 
 			input := ValidateClientAndRedirectURIInput{
@@ -466,7 +466,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
 			validator := NewAuthorizeValidator(mockDB)
 
-			client := &models.Client{
+			client := &record.Client{
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
 			}
@@ -480,8 +480,8 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			// the registered value matches the requested one exactly, no error comes back,
 			// and require.Error below fails. Verified by mutation.
 			mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Run(func(args mock.Arguments) {
-				client := args.Get(2).(*models.Client)
-				client.RedirectURIs = []models.RedirectURI{{URI: tc.registered}}
+				client := args.Get(2).(*record.Client)
+				client.RedirectURIs = []record.RedirectURI{{URI: tc.registered}}
 			}).Return(nil).Maybe()
 
 			input := ValidateClientAndRedirectURIInput{
@@ -782,10 +782,10 @@ func TestValidateScopes_MultipleScopesInSingleRequest(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&models.Resource{Id: 1}, nil)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "permission1"}}, nil)
-	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource2").Return(&models.Resource{Id: 2}, nil)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]models.Permission{{PermissionIdentifier: "permission2"}}, nil)
+	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{Id: 1}, nil)
+	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{PermissionIdentifier: "permission1"}}, nil)
+	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource2").Return(&record.Resource{Id: 2}, nil)
+	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]record.Permission{{PermissionIdentifier: "permission2"}}, nil)
 
 	scope := "openid profile resource1:permission1 resource2:permission2"
 	err := validator.ValidateScopes(context.Background(), scope)
@@ -836,14 +836,14 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	client := &models.Client{
+	client := &record.Client{
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(client, nil)
 	mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Run(func(args mock.Arguments) {
-		client := args.Get(2).(*models.Client)
-		client.RedirectURIs = []models.RedirectURI{{URI: "http://example.com"}}
+		client := args.Get(2).(*record.Client)
+		client.RedirectURIs = []record.RedirectURI{{URI: "http://example.com"}}
 	}).Return(nil)
 
 	longRedirectURI := "http://example.com/" + strings.Repeat("a", 2000)
@@ -876,15 +876,15 @@ func TestValidateScopes_MaximumNumberOfScopes(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	// Assuming a theoretical maximum of 100 scopes. The names are short so the whole scope stays
-	// under models.ScopeMaxBytes; the bound has its own cases in parameter_bounds_test.go (#437).
+	// under record.ScopeMaxBytes; the bound has its own cases in parameter_bounds_test.go (#437).
 	scopes := make([]string, 100)
 	for i := 0; i < 100; i++ {
 		resourceName := fmt.Sprintf("r%d", i)
 		permissionName := fmt.Sprintf("p%d", i)
 		scopes[i] = fmt.Sprintf("%s:%s", resourceName, permissionName)
 
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, resourceName).Return(&models.Resource{Id: int64(i)}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(i)).Return([]models.Permission{{PermissionIdentifier: permissionName}}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, resourceName).Return(&record.Resource{Id: int64(i)}, nil)
+		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(i)).Return([]record.Permission{{PermissionIdentifier: permissionName}}, nil)
 	}
 
 	scope := strings.Join(scopes, " ")
@@ -1409,12 +1409,12 @@ func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "implicit-only-client",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: false, // Auth code disabled
-		RedirectURIs: []models.RedirectURI{
+		RedirectURIs: []record.RedirectURI{
 			{ClientId: 1, URI: "https://example.com/callback"},
 		},
 	}
@@ -1438,7 +1438,7 @@ func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *te
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "implicit-only-client",
 		Enabled:                  true,

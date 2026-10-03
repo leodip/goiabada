@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -120,8 +120,8 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 // apiAuthDatabase is what the API session check needs: the bearer's user row and the session the
 // token names.
 type apiAuthDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 }
 
 // RequireValidSession rejects bearer tokens that no longer represent live, current

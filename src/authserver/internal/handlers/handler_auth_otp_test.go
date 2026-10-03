@@ -14,9 +14,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -147,13 +147,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			return ac.OTPKeyURL == ""
 		})).Return(nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:         1,
 			OTPEnabled: true,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -218,7 +218,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			AppName: "TestApp",
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -240,14 +240,14 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			return ac.OTPKeyURL == generatedKeyURL
 		})).Return(nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:         1,
 			OTPEnabled: false,
 			Email:      "test@example.com",
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -328,7 +328,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{
+		settings := &record.Settings{
 			AppName: "TestApp",
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -347,14 +347,14 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			return ac.OTPKeyURL == firstRenderKeyURL
 		})).Return(nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:         1,
 			OTPEnabled: false,
 			Email:      "test@example.com",
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -636,13 +636,13 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:      1,
 			Enabled: false,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -683,13 +683,13 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:      1,
 			Enabled: true,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -743,7 +743,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:                 1,
 			Enabled:            true,
 			OTPEnabled:         true,
@@ -751,7 +751,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -799,7 +799,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:                 1,
 			Enabled:            true,
 			OTPEnabled:         true,
@@ -807,7 +807,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -859,9 +859,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext.OTPKeyURL = otpTestKeyURL("test-secret")
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-			Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
+			Return(&record.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, mock.Anything).Return()
 
@@ -912,14 +912,14 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:         1,
 			Enabled:    true,
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -975,7 +975,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		otpSecret := key.Secret()
-		user := &models.User{
+		user := &record.User{
 			Id:                 1,
 			Enabled:            true,
 			OTPEnabled:         true,
@@ -983,7 +983,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1066,14 +1066,14 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		otpSecret := key.Secret()
 		authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 
-		user := &models.User{
+		user := &record.User{
 			Id:         1,
 			Enabled:    true,
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1090,7 +1090,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// carrying a nil tx and fail as an unexpected call.
 		var calls []string
 		mocks_data.ExpectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
-		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.MatchedBy(func(u *models.User) bool {
+		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.MatchedBy(func(u *record.User) bool {
 			// The secret must be stored encrypted. There is no plaintext column any more: migration
 			// 000048 dropped users.otp_secret (#98).
 			if u.Id != 1 || !u.OTPEnabled || len(u.OTPSecretEncrypted) == 0 {
@@ -1194,14 +1194,14 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		otpSecret := key.Secret()
 		authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 
-		user := &models.User{
+		user := &record.User{
 			Id:         1,
 			Enabled:    true,
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1270,10 +1270,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		authContext.OTPKeyURL = otpTestKeyURL(key.Secret())
 
-		user := &models.User{Id: 1, Enabled: true, OTPEnabled: false}
+		user := &record.User{Id: 1, Enabled: true, OTPEnabled: false}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{ClientIdentifier: "test-client"}
+		client := &record.Client{ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
@@ -1339,7 +1339,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:                 1,
 			Enabled:            true,
 			OTPEnabled:         true,
@@ -1347,7 +1347,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1437,9 +1437,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-			Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
+			Return(&record.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 
 		// requireOTPEnabled is false on this arm, for the reason #111 decision 10 gives:
 		// enrollment establishes the authenticator rather than asserting it. The code
@@ -1524,7 +1524,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:                 1,
 			Enabled:            true,
 			OTPEnabled:         true,
@@ -1532,7 +1532,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1586,14 +1586,14 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		user := &models.User{
+		user := &record.User{
 			Id:         1,
 			Enabled:    false,
 			OTPEnabled: true,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1647,7 +1647,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// Only the accepted-code case reaches it, and this table covers both outcomes.
 		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-		user := &models.User{Id: 1, Enabled: true, OTPEnabled: enrolled}
+		user := &record.User{Id: 1, Enabled: true, OTPEnabled: enrolled}
 		template := "/auth_otp.html"
 		if enrolled {
 			user.OTPSecretEncrypted = encryptOTPForTest(t, key.Secret())
@@ -1661,7 +1661,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 		// requireOTPEnabled mirrors enrolled: the enrolled half asserts an authenticator and
 		// the enrollment half establishes one (#111 decision 10).
 		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, enrolled).

@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +44,7 @@ func TestGetGroupById_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // left to undo it.
 func TestCreateGroup_RefusesAnAlreadyCancelledContextAndWritesNothing(t *testing.T) {
 	identifier := "TestGroupCancelled_" + fake.LetterN(6)
-	group := &models.Group{GroupIdentifier: identifier, Description: "never written"}
+	group := &record.Group{GroupIdentifier: identifier, Description: "never written"}
 
 	err := database.CreateGroup(cancelled(), nil, group)
 
@@ -111,10 +111,10 @@ func TestGetGroupAttributesByGroupId_RefusesAnAlreadyCancelledContext(t *testing
 // cancellation into a false would tell a rotation it had lost a race it never entered, and #251
 // is what happens when two rotations disagree about who moved which key.
 func TestUpdateKeyPairState_RefusesAnAlreadyCancelledContext(t *testing.T) {
-	keyPair := createKeyPairInState(t, models.KeyStateNext.String())
+	keyPair := createKeyPairInState(t, record.KeyStateNext.String())
 
 	moved, err := database.UpdateKeyPairState(cancelled(), nil, keyPair.Id,
-		models.KeyStateNext.String(), models.KeyStateCurrent.String())
+		record.KeyStateNext.String(), record.KeyStateCurrent.String())
 
 	require.Error(t, err, "the refusal must reach the caller as an error, not as a false")
 	assert.ErrorIs(t, err, context.Canceled)
@@ -123,7 +123,7 @@ func TestUpdateKeyPairState_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	after, readErr := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	require.NoError(t, readErr)
 	require.NotNil(t, after)
-	assert.Equal(t, models.KeyStateNext.String(), after.State, "the refused update moved nothing")
+	assert.Equal(t, record.KeyStateNext.String(), after.State, "the refused update moved nothing")
 }
 
 // TestTryClaimCleanupRun_RefusesAnAlreadyCancelledContext is the other of the two, and the
@@ -160,7 +160,7 @@ func TestScanEmailCase_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // whichever engine this tier is running.
 func TestDeleteOldAuditLogs_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	require.NoError(t, database.CreateAuditLog(context.Background(), nil,
-		&models.AuditLog{AuditEvent: "cancellation_probe", Details: `{}`}))
+		&record.AuditLog{AuditEvent: "cancellation_probe", Details: `{}`}))
 
 	deleted, err := database.DeleteOldAuditLogs(cancelled(), nil, time.Now().UTC().Add(time.Hour), 10)
 
@@ -175,7 +175,7 @@ func TestDeleteOldAuditLogs_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // calls, and whichever engine the tier is running is the one covered here.
 func TestGetAuditLogsPaginated_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	require.NoError(t, database.CreateAuditLog(context.Background(), nil,
-		&models.AuditLog{AuditEvent: "cancellation_probe", Details: `{}`}))
+		&record.AuditLog{AuditEvent: "cancellation_probe", Details: `{}`}))
 
 	logs, total, err := database.GetAuditLogsPaginated(cancelled(), nil, 1, 10, "", "")
 

@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -22,12 +22,12 @@ import (
 // usersAttributesDatabase is what the user attribute endpoints need: the user and the attributes
 // hanging off it.
 type usersAttributesDatabase interface {
-	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
+	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
 	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error
-	GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error)
-	GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserAttribute, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
+	GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*record.UserAttribute, error)
+	GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
 }
 
 // HandleUserAttributesGet - GET /api/v1/admin/users/{id}/attributes
@@ -172,7 +172,7 @@ func HandleUserAttributeCreatePost(
 		}
 
 		// Create user attribute
-		userAttribute := &models.UserAttribute{
+		userAttribute := &record.UserAttribute{
 			Key:                  req.Key,
 			Value:                req.Value,
 			IncludeInAccessToken: req.IncludeInAccessToken,

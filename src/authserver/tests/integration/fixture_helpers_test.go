@@ -10,16 +10,16 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
-func loadCodeFromDatabase(t *testing.T, codeVal string) *models.Code {
+func loadCodeFromDatabase(t *testing.T, codeVal string) *record.Code {
 	codeHash := hashutil.HashString(codeVal)
 	code, err := database.GetCodeByCodeHash(context.Background(), nil, codeHash, false)
 	if err != nil {
@@ -39,8 +39,8 @@ func loadCodeFromDatabase(t *testing.T, codeVal string) *models.Code {
 	return code
 }
 
-func createResource(t *testing.T) *models.Resource {
-	resource := &models.Resource{
+func createResource(t *testing.T) *record.Resource {
+	resource := &record.Resource{
 		ResourceIdentifier: "res-" + fake.LetterN(8),
 	}
 	err := database.CreateResource(context.Background(), nil, resource)
@@ -50,8 +50,8 @@ func createResource(t *testing.T) *models.Resource {
 	return resource
 }
 
-func createResourceWithId(t *testing.T, resourceIdentifier string) *models.Resource {
-	resource := &models.Resource{
+func createResourceWithId(t *testing.T, resourceIdentifier string) *record.Resource {
+	resource := &record.Resource{
 		ResourceIdentifier: resourceIdentifier,
 	}
 	err := database.CreateResource(context.Background(), nil, resource)
@@ -61,8 +61,8 @@ func createResourceWithId(t *testing.T, resourceIdentifier string) *models.Resou
 	return resource
 }
 
-func createPermission(t *testing.T, resourceId int64) *models.Permission {
-	permission := &models.Permission{
+func createPermission(t *testing.T, resourceId int64) *record.Permission {
+	permission := &record.Permission{
 		PermissionIdentifier: "perm-" + fake.LetterN(8),
 		ResourceId:           resourceId,
 	}
@@ -73,8 +73,8 @@ func createPermission(t *testing.T, resourceId int64) *models.Permission {
 	return permission
 }
 
-func createPermissionWithId(t *testing.T, resourceId int64, permissionIdentifier string) *models.Permission {
-	permission := &models.Permission{
+func createPermissionWithId(t *testing.T, resourceId int64, permissionIdentifier string) *record.Permission {
+	permission := &record.Permission{
 		PermissionIdentifier: permissionIdentifier,
 		ResourceId:           resourceId,
 	}
@@ -86,7 +86,7 @@ func createPermissionWithId(t *testing.T, resourceId int64, permissionIdentifier
 }
 
 func assignPermissionToUser(t *testing.T, userId int64, permissionId int64) {
-	userPermission := &models.UserPermission{
+	userPermission := &record.UserPermission{
 		UserId:       userId,
 		PermissionId: permissionId,
 	}
@@ -96,13 +96,13 @@ func assignPermissionToUser(t *testing.T, userId int64, permissionId int64) {
 	}
 }
 
-func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
-	client := &models.Client{
+func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User) {
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -110,7 +110,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -126,7 +126,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -198,20 +198,20 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	return httpClient, client, redirectUri, user
 }
 
-func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
-	client := &models.Client{
+func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User) {
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -219,7 +219,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -235,7 +235,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -311,20 +311,20 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	return httpClient, client, redirectUri, user
 }
 
-func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Client, *models.RedirectURI, *models.User) {
-	client := &models.Client{
+func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User) {
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -332,7 +332,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -357,7 +357,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              fake.Email(),
@@ -446,7 +446,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -481,7 +481,7 @@ type authCodeOptions struct {
 	// Their purpose is a fixture no single call can build: one user holding grants on two
 	// different clients, which is what proves a client-scoped revocation leaves the user's other
 	// clients alone (#245, D2).
-	user         *models.User
+	user         *record.User
 	userPassword string
 	// userAgent runs the ceremony as a different DEVICE. Two ceremonies for one user from the
 	// default client replace each other's session, because the server treats the same user on
@@ -490,7 +490,7 @@ type authCodeOptions struct {
 	userAgent string
 }
 
-func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...authCodeOptions) (*http.Client, *models.Code) {
+func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...authCodeOptions) (*http.Client, *record.Code) {
 
 	var opt authCodeOptions
 	if len(opts) > 0 {
@@ -500,13 +500,13 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 opt.isPublic,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		PKCERequired:             opt.pkceRequired,
 	}
@@ -521,7 +521,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -540,7 +540,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 			t.Fatal(createErr)
 		}
 
-		user = &models.User{
+		user = &record.User{
 			Subject:      fake.UUID(),
 			Enabled:      true,
 			Email:        fake.Email(),
@@ -619,18 +619,18 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 // all custom resource:permission scopes contained in the provided scope string, then runs the
 // authorization code flow to issue a code for that user and returns (httpClient, code).
 // It guarantees custom scopes survive filtering and end up in the token if requested.
-func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope string) (*http.Client, *models.Code) {
+func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope string) (*http.Client, *record.Code) {
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "acctscope-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
@@ -639,7 +639,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
@@ -652,7 +652,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		t.Fatal(err)
 	}
 
-	user := &models.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
+	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -682,7 +682,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		if grantErr != nil {
 			t.Fatal(grantErr)
 		}
-		var sel *models.Permission
+		var sel *record.Permission
 		for i := range perms {
 			if perms[i].PermissionIdentifier == permissionIdentifier {
 				sel = &perms[i]
@@ -692,7 +692,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		if sel == nil {
 			t.Fatalf("permission not found: %s:%s", resourceIdentifier, permissionIdentifier)
 		}
-		grantErr = database.CreateUserPermission(context.Background(), nil, &models.UserPermission{UserId: user.Id, PermissionId: sel.Id})
+		grantErr = database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserId: user.Id, PermissionId: sel.Id})
 		if grantErr != nil {
 			t.Fatal(grantErr)
 		}
@@ -755,8 +755,8 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 }
 
 // Helper function to create a test resource
-func createTestResource(t *testing.T, identifier, description string) *models.Resource {
-	resource := &models.Resource{
+func createTestResource(t *testing.T, identifier, description string) *record.Resource {
+	resource := &record.Resource{
 		ResourceIdentifier: identifier,
 		Description:        description,
 	}
@@ -772,7 +772,7 @@ func createTestResource(t *testing.T, identifier, description string) *models.Re
 // happened leaves Id == 0, so the delete matches no row, and an engine that
 // refuses the delete says so only in the error. Either way the rows stay, and
 // with them every later fixture that reuses an address.
-func deleteTestUsers(t *testing.T, users []*models.User) {
+func deleteTestUsers(t *testing.T, users []*record.User) {
 	t.Helper()
 	for _, user := range users {
 		if user == nil {
@@ -804,8 +804,8 @@ func uniqueEmail(addr string) string {
 }
 
 // Helper function to create a test group
-func createTestGroup(t *testing.T) *models.Group {
-	group := &models.Group{
+func createTestGroup(t *testing.T) *record.Group {
+	group := &record.Group{
 		GroupIdentifier:      "test-group-" + fake.UUID()[:8],
 		Description:          "Test Group",
 		IncludeInIdToken:     true,
@@ -817,8 +817,8 @@ func createTestGroup(t *testing.T) *models.Group {
 }
 
 // Helper function to create a test permission
-func createTestPermission(t *testing.T, resourceId int64, identifier, description string) *models.Permission {
-	permission := &models.Permission{
+func createTestPermission(t *testing.T, resourceId int64, identifier, description string) *record.Permission {
+	permission := &record.Permission{
 		ResourceId:           resourceId,
 		PermissionIdentifier: identifier,
 		Description:          description,
@@ -844,13 +844,13 @@ type ClientDisplaySettings struct {
 	ShowWebsiteURL   bool
 	UploadLogo       bool // Whether to actually upload a logo
 	ConsentRequired  bool
-	DefaultAcrLevel  models.AcrLevel
+	DefaultAcrLevel  record.AcrLevel
 }
 
 // createClientWithDisplaySettings creates a client with specified display settings
 // and optional logo upload. Returns the created client.
-func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySettings) *models.Client {
-	client := &models.Client{
+func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySettings) *record.Client {
+	client := &record.Client{
 		ClientIdentifier:         settings.ClientIdentifier,
 		DisplayName:              settings.DisplayName,
 		Description:              settings.Description,
@@ -885,7 +885,7 @@ func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySetting
 			0x42, 0x60, 0x82,
 		}
 
-		clientLogo := &models.ClientLogo{
+		clientLogo := &record.ClientLogo{
 			ClientId: client.Id,
 			Logo:     logoData,
 		}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // testUserAgent and testUserAgentUpdated are raw User-Agent headers, not parsed labels: the
@@ -51,7 +51,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.Started = time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 	userSession.LastAccessed = time.Now().UTC().Truncate(time.Microsecond)
 	userSession.AuthMethods = "pwd,otp"
-	userSession.AcrLevel = models.AcrLevel2Optional
+	userSession.AcrLevel = record.AcrLevel2Optional
 	userSession.AuthTime = time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Microsecond)
 	userSession.IpAddress = "192.168.1.2"
 	userSession.DeviceName = "Updated Device"
@@ -237,7 +237,7 @@ func TestUserSessionsLoadUsers_NilAndEmptySlices(t *testing.T) {
 	if err := database.UserSessionsLoadUsers(context.Background(), nil, nil); err != nil {
 		t.Errorf("UserSessionsLoadUsers(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UserSessionsLoadUsers(context.Background(), nil, []models.UserSession{}); err != nil {
+	if err := database.UserSessionsLoadUsers(context.Background(), nil, []record.UserSession{}); err != nil {
 		t.Errorf("UserSessionsLoadUsers(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -246,7 +246,7 @@ func TestUserSessionsLoadClients_NilAndEmptySlices(t *testing.T) {
 	if err := database.UserSessionsLoadClients(context.Background(), nil, nil); err != nil {
 		t.Errorf("UserSessionsLoadClients(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UserSessionsLoadClients(context.Background(), nil, []models.UserSession{}); err != nil {
+	if err := database.UserSessionsLoadClients(context.Background(), nil, []record.UserSession{}); err != nil {
 		t.Errorf("UserSessionsLoadClients(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -328,17 +328,17 @@ func TestDeleteUserSession(t *testing.T) {
 
 // createTestUserSession seeds a session on the package's shared handle; createTestUserSessionOn
 // takes the handle, for the reason createTestUserOn does.
-func createTestUserSession(t *testing.T, userId int64) *models.UserSession {
+func createTestUserSession(t *testing.T, userId int64) *record.UserSession {
 	return createTestUserSessionOn(t, database, userId)
 }
 
-func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *models.UserSession {
-	userSession := &models.UserSession{
+func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *record.UserSession {
+	userSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:      time.Now().UTC().Truncate(time.Microsecond),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          time.Now().UTC().Truncate(time.Microsecond),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -354,8 +354,8 @@ func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *mode
 	return userSession
 }
 
-func createTestUserSessions(t *testing.T, userId int64, count int) []models.UserSession {
-	var userSessions []models.UserSession
+func createTestUserSessions(t *testing.T, userId int64, count int) []record.UserSession {
+	var userSessions []record.UserSession
 	for i := 0; i < count; i++ {
 		userSession := createTestUserSession(t, userId)
 		userSessions = append(userSessions, *userSession)
@@ -363,13 +363,13 @@ func createTestUserSessions(t *testing.T, userId int64, count int) []models.User
 	return userSessions
 }
 
-func createTestUserSessionWithClient(t *testing.T, userId, clientId int64) *models.UserSession {
+func createTestUserSessionWithClient(t *testing.T, userId, clientId int64) *record.UserSession {
 	return createTestUserSessionWithClientOn(t, database, userId, clientId)
 }
 
-func createTestUserSessionWithClientOn(t *testing.T, db data.Database, userId, clientId int64) *models.UserSession {
+func createTestUserSessionWithClientOn(t *testing.T, db data.Database, userId, clientId int64) *record.UserSession {
 	userSession := createTestUserSessionOn(t, db, userId)
-	userSessionClient := &models.UserSessionClient{
+	userSessionClient := &record.UserSessionClient{
 		UserSessionId: userSession.Id,
 		ClientId:      clientId,
 		Started:       time.Now().UTC().Truncate(time.Microsecond),
@@ -382,8 +382,8 @@ func createTestUserSessionWithClientOn(t *testing.T, db data.Database, userId, c
 	return userSession
 }
 
-func createTestUserSessionsWithClient(t *testing.T, userId, clientId int64, count int) []models.UserSession {
-	var userSessions []models.UserSession
+func createTestUserSessionsWithClient(t *testing.T, userId, clientId int64, count int) []record.UserSession {
+	var userSessions []record.UserSession
 	for i := 0; i < count; i++ {
 		userSession := createTestUserSessionWithClient(t, userId, clientId)
 		userSessions = append(userSessions, *userSession)
@@ -391,7 +391,7 @@ func createTestUserSessionsWithClient(t *testing.T, userId, clientId int64, coun
 	return userSessions
 }
 
-func assertUserSessionEqual(t *testing.T, expected, actual *models.UserSession) {
+func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) {
 	if actual.Id != expected.Id {
 		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
 	}
@@ -444,7 +444,7 @@ func assertUserSessionEqual(t *testing.T, expected, actual *models.UserSession) 
 
 func TestDeleteIdleSessions(t *testing.T) {
 	// Create a test user
-	user := &models.User{
+	user := &record.User{
 		Username:      fake.Username(),
 		Email:         fake.Email(),
 		EmailVerified: true,
@@ -461,7 +461,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Create a test client
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        fake.UUID(),
 		Description:                             "Test Client",
 		Enabled:                                 true,
@@ -473,7 +473,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -484,12 +484,12 @@ func TestDeleteIdleSessions(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Create an active session (accessed 10 minutes ago)
-	activeSession := &models.UserSession{
+	activeSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-10 * time.Minute),
 		LastAccessed:      now.Add(-10 * time.Minute),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          now.Add(-10 * time.Minute),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -503,7 +503,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Create UserSessionClient for active session
-	activeSessionClient := &models.UserSessionClient{
+	activeSessionClient := &record.UserSessionClient{
 		UserSessionId: activeSession.Id,
 		ClientId:      client.Id,
 		Started:       activeSession.Started,
@@ -515,12 +515,12 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Create an idle session (accessed 2 hours ago)
-	idleSession := &models.UserSession{
+	idleSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-3 * time.Hour),
 		LastAccessed:      now.Add(-2 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          now.Add(-3 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -534,7 +534,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Create UserSessionClient for idle session
-	idleSessionClient := &models.UserSessionClient{
+	idleSessionClient := &record.UserSessionClient{
 		UserSessionId: idleSession.Id,
 		ClientId:      client.Id,
 		Started:       idleSession.Started,
@@ -546,12 +546,12 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Create a very idle session (accessed 4 hours ago)
-	veryIdleSession := &models.UserSession{
+	veryIdleSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-5 * time.Hour),
 		LastAccessed:      now.Add(-4 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          now.Add(-5 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -565,7 +565,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Create UserSessionClient for very idle session
-	veryIdleSessionClient := &models.UserSessionClient{
+	veryIdleSessionClient := &record.UserSessionClient{
 		UserSessionId: veryIdleSession.Id,
 		ClientId:      client.Id,
 		Started:       veryIdleSession.Started,
@@ -642,7 +642,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 func TestDeleteExpiredSessions(t *testing.T) {
 	// Create a test user
-	user := &models.User{
+	user := &record.User{
 		Username:      fake.Username(),
 		Email:         fake.Email(),
 		EmailVerified: true,
@@ -659,7 +659,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Create a test client
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:                        fake.UUID(),
 		Description:                             "Test Client",
 		Enabled:                                 true,
@@ -671,7 +671,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
-		DefaultAcrLevel:                         models.AcrLevel1,
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -682,12 +682,12 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Create a recent session (started 1 hour ago)
-	recentSession := &models.UserSession{
+	recentSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-1 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          now.Add(-1 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -701,7 +701,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Create UserSessionClient for recent session
-	recentSessionClient := &models.UserSessionClient{
+	recentSessionClient := &record.UserSessionClient{
 		UserSessionId: recentSession.Id,
 		ClientId:      client.Id,
 		Started:       recentSession.Started,
@@ -713,12 +713,12 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Create an old session (started 2 days ago)
-	oldSession := &models.UserSession{
+	oldSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-48 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          now.Add(-48 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -732,7 +732,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Create UserSessionClient for old session
-	oldSessionClient := &models.UserSessionClient{
+	oldSessionClient := &record.UserSessionClient{
 		UserSessionId: oldSession.Id,
 		ClientId:      client.Id,
 		Started:       oldSession.Started,
@@ -744,12 +744,12 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Create a very old session (started 5 days ago)
-	veryOldSession := &models.UserSession{
+	veryOldSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-120 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          now.Add(-120 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -763,7 +763,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Create UserSessionClient for very old session
-	veryOldSessionClient := &models.UserSessionClient{
+	veryOldSessionClient := &record.UserSessionClient{
 		UserSessionId: veryOldSession.Id,
 		ClientId:      client.Id,
 		Started:       veryOldSession.Started,
@@ -916,7 +916,7 @@ func TestPromoteUserSessionGeneration(t *testing.T) {
 		t.Fatalf("PromoteUserSessionGeneration failed: %v", err)
 	}
 
-	reload := func(id int64) *models.UserSession {
+	reload := func(id int64) *record.UserSession {
 		us, err := database.GetUserSessionById(context.Background(), nil, id)
 		if err != nil {
 			t.Fatalf("Failed to reload user session %d: %v", id, err)
@@ -1123,7 +1123,7 @@ func TestUpdateUserSession_TheOwnerIsNotRewritten(t *testing.T) {
 func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx := beginTx(t)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "tx_client_" + fake.LetterN(8),
 		Description:      "Transaction pass-through client",
 	}
@@ -1131,7 +1131,7 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 		t.Fatalf("Failed to create client inside the transaction: %v", err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Enabled:   true,
 		Subject:   fake.UUID(),
 		Username:  "u" + fake.LetterN(12),
@@ -1143,12 +1143,12 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 	}
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	userSession := &models.UserSession{
+	userSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now,
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthTime:          now,
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -1161,7 +1161,7 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 		t.Fatalf("Failed to create user session inside the transaction: %v", err)
 	}
 
-	userSessionClient := &models.UserSessionClient{
+	userSessionClient := &record.UserSessionClient{
 		UserSessionId: userSession.Id,
 		ClientId:      client.Id,
 		Started:       now,

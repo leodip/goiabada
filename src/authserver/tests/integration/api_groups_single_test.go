@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -119,7 +119,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 	}()
 
 	// Setup: Create test users
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@singlegroupmembercount.test"),
@@ -148,7 +148,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 	assert.Equal(t, 0, getResponse.Group.MemberCount, "Group should have 0 members initially")
 
 	// Setup: Add user to group
-	userGroup := &models.UserGroup{
+	userGroup := &record.UserGroup{
 		UserId:  testUser.Id,
 		GroupId: testGroup.Id,
 	}

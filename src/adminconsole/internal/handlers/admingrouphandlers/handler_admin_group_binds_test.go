@@ -20,7 +20,7 @@ import (
 
 // Seam 3 for the group family (#350).
 //
-// These handlers used to bind a models.Group the apiclient rebuilt from the response field by
+// These handlers used to bind a record.Group the apiclient rebuilt from the response field by
 // field. They bind the response itself now, and the fields they read off it are the pages' own
 // columns, so a field that stopped arriving renders an empty cell rather than failing. Each case
 // below reads one bind the template cannot do without.

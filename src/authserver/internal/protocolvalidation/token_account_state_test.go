@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -118,7 +118,7 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 
 				clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 				require.NoError(t, err)
-				client := &models.Client{
+				client := &record.Client{
 					Id:                       1,
 					ClientIdentifier:         "client1",
 					Enabled:                  true,
@@ -129,14 +129,14 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 
 				// No session identifier, so the ownership check reads nothing; the subject
 				// here is the order of the account-state checks, not ownership.
-				codeEntity := &models.Code{
+				codeEntity := &record.Code{
 					CodeHash:            "hash_of_valid_code",
 					RedirectURI:         redirectURI,
 					CodeChallenge:       sql.NullString{String: oauth.GeneratePKCECodeChallenge(verifier), Valid: true},
 					AuthStateGeneration: 3,
 					UserId:              7,
-					Client:              models.Client{ClientIdentifier: "client1"},
-					User:                models.User{Id: 7, Enabled: true, AuthStateGeneration: 3},
+					Client:              record.Client{ClientIdentifier: "client1"},
+					User:                record.User{Id: 7, Enabled: true, AuthStateGeneration: 3},
 					CreatedAt:           sql.NullTime{Time: time.Now().UTC(), Valid: true},
 				}
 				switch state {
@@ -155,7 +155,7 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 				mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 				expectRedirectURIStillRegistered(mockDB, redirectURI)
 
-				grant, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{},
+				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 					&ValidateTokenRequestInput{
 						GrantType:    "authorization_code",
 						ClientId:     "client1",
@@ -238,7 +238,7 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 
 					clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 					require.NoError(t, err)
-					clients := map[string]*models.Client{
+					clients := map[string]*record.Client{
 						// The token's own client, confidential.
 						"client1": {Id: 1, ClientIdentifier: "client1", Enabled: true,
 							AuthorizationCodeEnabled: true, ClientSecretEncrypted: clientSecretEncrypted},
@@ -248,7 +248,7 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 							AuthorizationCodeEnabled: true, IsPublic: true},
 					}
 
-					user := models.User{Id: 7, Enabled: true, AuthStateGeneration: 3}
+					user := record.User{Id: 7, Enabled: true, AuthStateGeneration: 3}
 					switch state {
 					case stateDisabled:
 						user.Enabled = false
@@ -256,14 +256,14 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 						user.AuthStateGeneration = 4
 					}
 
-					refreshToken := &models.RefreshToken{RefreshTokenJti: "the_jti", AuthStateGeneration: 3}
+					refreshToken := &record.RefreshToken{RefreshTokenJti: "the_jti", AuthStateGeneration: 3}
 					if ropc {
 						refreshToken.ClientId = sql.NullInt64{Int64: 1, Valid: true}
 						refreshToken.UserId = sql.NullInt64{Int64: 7, Valid: true}
 						refreshToken.User = user
 					} else {
 						refreshToken.CodeId = sql.NullInt64{Int64: 11, Valid: true}
-						refreshToken.Code = models.Code{Id: 11, ClientId: 1, UserId: 7, User: user}
+						refreshToken.Code = record.Code{Id: 11, ClientId: 1, UserId: 7, User: user}
 					}
 
 					mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, p.clientIdentifier).
@@ -280,7 +280,7 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 						mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil).Maybe()
 					}
 
-					grant, err := validator.ValidateTokenRequest(context.Background(), &models.Settings{},
+					grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 						&ValidateTokenRequestInput{
 							GrantType:    "refresh_token",
 							ClientId:     p.clientIdentifier,

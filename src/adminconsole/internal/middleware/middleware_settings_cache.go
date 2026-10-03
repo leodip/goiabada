@@ -74,7 +74,7 @@ func SettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler
 			}
 
 			// The decoded response goes on the context as it stands. It used to be copied into a
-			// models.Settings first, a persistence model with 32 fields of which four were ever
+			// record.Settings first, a persistence model with 32 fields of which four were ever
 			// filled and the other 28 sat at their zero values, so a reader that reached for one
 			// got a plausible answer that had never come from anywhere (#350).
 			next.ServeHTTP(w, r.WithContext(reqctx.WithSettings(r.Context(), publicSettings)))

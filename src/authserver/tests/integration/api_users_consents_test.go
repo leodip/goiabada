@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +21,7 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@consents.test"),
@@ -97,7 +97,7 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user without consents
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@empty-consents.test"),
@@ -167,7 +167,7 @@ func TestAPIUserConsentsGet_InvalidId(t *testing.T) {
 
 func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-consents.test"),
@@ -200,7 +200,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@consent-delete.test"),
@@ -286,7 +286,7 @@ func TestAPIUserConsentDelete_InvalidId(t *testing.T) {
 
 func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user and consent
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-consent-delete.test"),
@@ -335,7 +335,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@consent-client-details.test"),
@@ -350,7 +350,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	}()
 
 	// Setup: Create test client with specific details
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "detailed-test-client",
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Detailed Test Client for Consent Deletion",
@@ -367,7 +367,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	}()
 
 	// Setup: Create test consent with specific scope
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		ClientId:  client.Id,
 		UserId:    testUser.Id,
 		Scope:     "openid profile email address phone",
@@ -418,8 +418,8 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 }
 
 // Helper function to create a test client
-func createTestClient(t *testing.T, identifier string) *models.Client {
-	client := &models.Client{
+func createTestClient(t *testing.T, identifier string) *record.Client {
+	client := &record.Client{
 		ClientIdentifier:                        identifier,
 		ClientSecretEncrypted:                   []byte("encrypted-secret"),
 		Description:                             "Test Client for Consents",
@@ -431,8 +431,8 @@ func createTestClient(t *testing.T, identifier string) *models.Client {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         models.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
@@ -440,8 +440,8 @@ func createTestClient(t *testing.T, identifier string) *models.Client {
 }
 
 // Helper function to create a test user consent
-func createTestUserConsent(t *testing.T, userId int64, clientId int64) *models.UserConsent {
-	consent := &models.UserConsent{
+func createTestUserConsent(t *testing.T, userId int64, clientId int64) *record.UserConsent {
+	consent := &record.UserConsent{
 		ClientId:  clientId,
 		UserId:    userId,
 		Scope:     "openid profile email",

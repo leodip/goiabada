@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -37,13 +37,13 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		user     *models.User
+		user     *record.User
 		scopes   []string
 		expected jwt.MapClaims
 	}{
 		{
 			name: "Full scope",
-			user: &models.User{
+			user: &record.User{
 				Email:               "test@example.com",
 				EmailVerified:       true,
 				Username:            "testuser",
@@ -89,7 +89,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Minimal scope",
-			user: &models.User{
+			user: &record.User{
 				Email:     "minimal@example.com",
 				UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
@@ -98,7 +98,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Profile scope only",
-			user: &models.User{
+			user: &record.User{
 				Username:   "profileuser",
 				GivenName:  "Profile",
 				FamilyName: "User",
@@ -116,7 +116,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Email scope only",
-			user: &models.User{
+			user: &record.User{
 				Email:         "email@example.com",
 				EmailVerified: true,
 				UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
@@ -129,7 +129,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Address scope only",
-			user: &models.User{
+			user: &record.User{
 				AddressLine1:      "456 Address St",
 				AddressLocality:   "Addressville",
 				AddressRegion:     "Addressshire",
@@ -142,7 +142,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		},
 		{
 			name: "Phone scope only",
-			user: &models.User{
+			user: &record.User{
 				PhoneNumber:         "+9876543210",
 				PhoneNumberVerified: false,
 				UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
@@ -226,7 +226,7 @@ func TestAddOpenIDConnectClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) 
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			user := &models.User{Id: 7, Email: "a@example.com",
+			user := &record.User{Id: 7, Email: "a@example.com",
 				UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
 			mockDB := mocks_data.NewDatabase(t)
 			if slices.Contains(test.scopes, "profile") {
@@ -252,7 +252,7 @@ func TestAddOpenIDConnectClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) 
 // slice one caller has extended and the other has not, would show up here.
 func TestAddOpenIDConnectClaims_UpdatedAtDoesNotDependOnTheTokenType(t *testing.T) {
 	updatedAt := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
-	user := &models.User{Id: 7, Email: "a@example.com", UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
+	user := &record.User{Id: 7, Email: "a@example.com", UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
 
 	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
 		mapper := Mapper{Database: mocks_data.NewDatabase(t), BaseURL: "http://localhost:8081",
@@ -275,7 +275,7 @@ func TestAddOpenIDConnectClaims_CarriesTheCallersContext(t *testing.T) {
 		return got.Value(marker{}) == "the caller's own"
 	})
 
-	user := &models.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
+	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
 
 	t.Run("the profile scope reads the picture flag under the caller's context", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
@@ -309,7 +309,7 @@ func TestAddOpenIDConnectClaims_CarriesTheCallersContext(t *testing.T) {
 // nothing and the case fails, and the nil case is the other half: /userinfo runs in no transaction
 // and reads on none.
 func TestAddOpenIDConnectClaims_ReadsThePictureOnTheTransactionItIsHanded(t *testing.T) {
-	user := &models.User{Id: 42, Subject: "sub-42", GivenName: "Ada"}
+	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada"}
 
 	t.Run("the transaction it is handed", func(t *testing.T) {
 		tx := &sql.Tx{}
@@ -342,7 +342,7 @@ func TestAddOpenIDConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, int64(9)).
 		Return(false, assert.AnError).Once()
 
-	user := &models.User{Id: 9, Subject: "sub-9", GivenName: "Ada"}
+	user := &record.User{Id: 9, Subject: "sub-9", GivenName: "Ada"}
 	claims := jwt.MapClaims{}
 	idTokenMapper(mockDB).
 		AddOpenIDConnectClaims(context.Background(), nil, claims, user, []string{"openid", "profile"})
@@ -354,14 +354,14 @@ func TestAddOpenIDConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T
 
 // groupsAndAttributesUser is one user whose group, user attribute and group attribute each carry
 // one include flag and not the other, so a mapper reading the wrong flag cannot pass.
-func groupsAndAttributesUser() *models.User {
-	return &models.User{
+func groupsAndAttributesUser() *record.User {
+	return &record.User{
 		Id: 1,
-		Groups: []models.Group{
+		Groups: []record.Group{
 			{
 				GroupIdentifier:  "id-token-group",
 				IncludeInIdToken: true, IncludeInAccessToken: false,
-				Attributes: []models.GroupAttribute{
+				Attributes: []record.GroupAttribute{
 					{Key: "group-id-attr", Value: "id", IncludeInIdToken: true, IncludeInAccessToken: false},
 					{Key: "group-access-attr", Value: "access", IncludeInIdToken: false, IncludeInAccessToken: true},
 				},
@@ -371,7 +371,7 @@ func groupsAndAttributesUser() *models.User {
 				IncludeInIdToken: false, IncludeInAccessToken: true,
 			},
 		},
-		Attributes: []models.UserAttribute{
+		Attributes: []record.UserAttribute{
 			{Key: "user-id-attr", Value: "id", IncludeInIdToken: true, IncludeInAccessToken: false},
 			{Key: "user-access-attr", Value: "access", IncludeInIdToken: false, IncludeInAccessToken: true},
 		},
@@ -433,10 +433,10 @@ func TestGroupAndAttributeClaimsWithoutTheirScopes(t *testing.T) {
 	})
 
 	t.Run("scoped but nothing carries the flag", func(t *testing.T) {
-		none := &models.User{
+		none := &record.User{
 			Id:         2,
-			Groups:     []models.Group{{GroupIdentifier: "hidden", IncludeInIdToken: false}},
-			Attributes: []models.UserAttribute{{Key: "hidden", Value: "x", IncludeInIdToken: false}},
+			Groups:     []record.Group{{GroupIdentifier: "hidden", IncludeInIdToken: false}},
+			Attributes: []record.UserAttribute{{Key: "hidden", Value: "x", IncludeInIdToken: false}},
 		}
 
 		claims := jwt.MapClaims{}
@@ -453,12 +453,12 @@ func TestGroupAndAttributeClaimsWithoutTheirScopes(t *testing.T) {
 // attribute sharing a key with a user attribute overwrites it, because the group pass runs
 // second.
 func TestAttributeClaims_GroupPassWinsACollision(t *testing.T) {
-	user := &models.User{
+	user := &record.User{
 		Id:         3,
-		Attributes: []models.UserAttribute{{Key: "shared", Value: "from the user", IncludeInIdToken: true}},
-		Groups: []models.Group{{
+		Attributes: []record.UserAttribute{{Key: "shared", Value: "from the user", IncludeInIdToken: true}},
+		Groups: []record.Group{{
 			GroupIdentifier: "g",
-			Attributes:      []models.GroupAttribute{{Key: "shared", Value: "from the group", IncludeInIdToken: true}},
+			Attributes:      []record.GroupAttribute{{Key: "shared", Value: "from the group", IncludeInIdToken: true}},
 		}},
 	}
 
@@ -545,21 +545,21 @@ func TestAddClaimIfNotEmpty(t *testing.T) {
 	}
 }
 
-// TestHasAddress came with the predicate from models/user_test.go (#387).
+// TestHasAddress came with the predicate from record/user_test.go (#387).
 func TestHasAddress(t *testing.T) {
 	tests := []struct {
 		name     string
-		user     models.User
+		user     record.User
 		expected bool
 	}{
-		{"Empty address", models.User{}, false},
-		{"Only AddressLine1", models.User{AddressLine1: "123 Main St"}, true},
-		{"Only AddressLine2", models.User{AddressLine2: "Apt 4B"}, true},
-		{"Only AddressLocality", models.User{AddressLocality: "Springfield"}, true},
-		{"Only AddressRegion", models.User{AddressRegion: "IL"}, true},
-		{"Only AddressPostalCode", models.User{AddressPostalCode: "12345"}, true},
-		{"Only AddressCountry", models.User{AddressCountry: "USA"}, true},
-		{"Full address", models.User{
+		{"Empty address", record.User{}, false},
+		{"Only AddressLine1", record.User{AddressLine1: "123 Main St"}, true},
+		{"Only AddressLine2", record.User{AddressLine2: "Apt 4B"}, true},
+		{"Only AddressLocality", record.User{AddressLocality: "Springfield"}, true},
+		{"Only AddressRegion", record.User{AddressRegion: "IL"}, true},
+		{"Only AddressPostalCode", record.User{AddressPostalCode: "12345"}, true},
+		{"Only AddressCountry", record.User{AddressCountry: "USA"}, true},
+		{"Full address", record.User{
 			AddressLine1:      "123 Main St",
 			AddressLine2:      "Apt 4B",
 			AddressLocality:   "Springfield",
@@ -577,16 +577,16 @@ func TestHasAddress(t *testing.T) {
 	}
 }
 
-// TestAddressClaim came with the builder from models/user_test.go, where it was
+// TestAddressClaim came with the builder from record/user_test.go, where it was
 // TestUser_GetAddressClaim (#387).
 func TestAddressClaim(t *testing.T) {
 	tests := []struct {
 		name     string
-		user     models.User
+		user     record.User
 		expected map[string]string
 	}{
-		{"Empty address", models.User{}, map[string]string{}},
-		{"Full address", models.User{
+		{"Empty address", record.User{}, map[string]string{}},
+		{"Full address", record.User{
 			AddressLine1:      "123 Main St",
 			AddressLine2:      "Apt 4B",
 			AddressLocality:   "Springfield",
@@ -601,7 +601,7 @@ func TestAddressClaim(t *testing.T) {
 			"country":        "USA",
 			"formatted":      "123 Main St\r\nApt 4B\r\nSpringfield\r\nIL\r\n12345\r\nUSA",
 		}},
-		{"Partial address", models.User{
+		{"Partial address", record.User{
 			AddressLine1:    "123 Main St",
 			AddressLocality: "Springfield",
 			AddressCountry:  "USA",
@@ -611,7 +611,7 @@ func TestAddressClaim(t *testing.T) {
 			"country":        "USA",
 			"formatted":      "123 Main St\r\n\r\nSpringfield\r\nUSA",
 		}},
-		{"No country, so no formatted rendering", models.User{
+		{"No country, so no formatted rendering", record.User{
 			AddressLine1:    "123 Main St",
 			AddressLocality: "Springfield",
 		}, map[string]string{
@@ -640,7 +640,7 @@ func TestAddressClaim(t *testing.T) {
 func TestAddOpenIDConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 	claims := jwt.MapClaims{}
 	idTokenMapper(mocks_data.NewDatabase(t)).
-		AddOpenIDConnectClaims(context.Background(), nil, claims, &models.User{Id: 4}, []string{"openid", "address"})
+		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 4}, []string{"openid", "address"})
 
 	assert.NotContains(t, claims, "address")
 }

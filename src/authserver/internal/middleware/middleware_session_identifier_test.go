@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -61,7 +61,7 @@ func TestSessionIdentifier(t *testing.T) {
 		session.Values[sessionkeys.SessionIdentifier] = "valid-session-id"
 		mockSessionStore.On("Get", mock.Anything, sessionkeys.AuthServerSessionName).Return(session, nil)
 
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "valid-session-id").Return(&models.UserSession{}, nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "valid-session-id").Return(&record.UserSession{}, nil)
 
 		middleware := SessionIdentifier(mockSessionStore, mockDB, PageFaults())
 

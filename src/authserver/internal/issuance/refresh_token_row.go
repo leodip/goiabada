@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -26,8 +26,8 @@ func grantIsOffline(authorizedScope string, sessionIdentifier string) bool {
 // tx is the transaction the row is inserted in and the session read behind the max lifetime runs
 // in, nil for a grant that runs in none. A rotation hands over its own, so the child commits with
 // the claim on its parent and the check of the family's revocation record (#132, #437).
-func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, settings *models.Settings, code *models.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *models.RefreshToken) (string, int64, error) {
+func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *record.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -93,7 +93,7 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 	claims["scope"] = scope
 
 	// save 1st refresh token
-	refreshTokenEntity := &models.RefreshToken{
+	refreshTokenEntity := &record.RefreshToken{
 		RefreshTokenJti:  jti,
 		IssuedAt:         sql.NullTime{Time: now, Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
@@ -139,8 +139,8 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 	return rt, refreshExpiresIn, nil
 }
 
-func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now time.Time, settings *models.Settings,
-	client *models.Client) (int64, error) {
+func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now time.Time, settings *record.Settings,
+	client *record.Client) (int64, error) {
 	switch refreshTokenType {
 	case TokenTypeOffline:
 		refreshTokenExpirationInSeconds := settings.RefreshTokenOfflineIdleTimeoutInSeconds
@@ -161,8 +161,8 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now 
 // session-bound token reads the session it is bound to, on tx when the caller holds one: sqlitedb
 // has one connection, so a read on nil waits on the connection the caller's transaction holds
 // until the context expires (#139, #437).
-func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx, refreshTokenType TokenType, now time.Time, settings *models.Settings,
-	client *models.Client, sessionIdentifier string) (int64, error) {
+func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx, refreshTokenType TokenType, now time.Time, settings *record.Settings,
+	client *record.Client, sessionIdentifier string) (int64, error) {
 	switch refreshTokenType {
 	case TokenTypeOffline:
 		maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
@@ -191,8 +191,8 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
 // Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
 // instead of referencing a Code entity.
-func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *models.Settings, input *ROPCGrantInput, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *models.RefreshToken) (string, int64, error) {
+func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *record.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -229,7 +229,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 	claims["scope"] = scope
 
 	// Create refresh token entity with direct UserId and ClientId (no Code reference)
-	refreshTokenEntity := &models.RefreshToken{
+	refreshTokenEntity := &record.RefreshToken{
 		RefreshTokenJti:  jti,
 		IssuedAt:         sql.NullTime{Time: now, Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
@@ -277,7 +277,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 
 // getRefreshTokenMaxLifetimeForROPC calculates max lifetime for ROPC refresh tokens.
 // ROPC tokens don't have user sessions, so we use the offline access max lifetime settings.
-func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(now time.Time, settings *models.Settings, client *models.Client) int64 {
+func (t *TokenIssuer) getRefreshTokenMaxLifetimeForROPC(now time.Time, settings *record.Settings, client *record.Client) int64 {
 	// ROPC always uses offline access settings since there's no browser session
 	maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
 	if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {

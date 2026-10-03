@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +28,7 @@ import (
 //
 // last_cleanup_at is left as the cleanup finds it: the background worker claims its runs through
 // that column (Database.TryClaimCleanupRun), so it is the server's, not the test's, to write.
-func restoreSettings(t *testing.T) *models.Settings {
+func restoreSettings(t *testing.T) *record.Settings {
 	t.Helper()
 
 	found, err := database.GetSettingsById(context.Background(), nil, 1)
@@ -54,7 +54,7 @@ func restoreSettings(t *testing.T) *models.Settings {
 
 // changeSettings is restoreSettings followed by one direct write: edit changes the copy, the copy
 // is written, and the row as written is answered.
-func changeSettings(t *testing.T, edit func(settings *models.Settings)) *models.Settings {
+func changeSettings(t *testing.T, edit func(settings *record.Settings)) *record.Settings {
 	t.Helper()
 
 	settings := restoreSettings(t)
@@ -79,7 +79,7 @@ var settingsColumnsNoTestOwns = map[string]bool{
 // added later is compared without anyone remembering to list it here. A byte slice is compared by
 // content, since a driver may read an empty blob back as nil, and is not printed, since the one
 // there is the encrypted SMTP password.
-func settingsChanges(before, after *models.Settings) []string {
+func settingsChanges(before, after *record.Settings) []string {
 	beforeValue, afterValue := reflect.ValueOf(*before), reflect.ValueOf(*after)
 	fields := beforeValue.Type()
 

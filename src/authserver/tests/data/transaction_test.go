@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,8 +25,8 @@ import (
 // TestTransaction_RollbackDiscards is the test that catches exactly that.
 
 // newTestGroup returns an unsaved group with a unique identifier.
-func newTestGroup() *models.Group {
-	return &models.Group{
+func newTestGroup() *record.Group {
+	return &record.Group{
 		GroupIdentifier: "TxGroup_" + fake.LetterN(8),
 		Description:     "Transaction test group",
 	}

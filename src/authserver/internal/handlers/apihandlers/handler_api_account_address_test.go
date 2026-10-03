@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +82,7 @@ func TestHandleAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_handlers.NewAuditLogger(t)
 
-	user := &models.User{Id: 42, Subject: "the-subject"}
+	user := &record.User{Id: 42, Subject: "the-subject"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()
 	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnAddress, mock.Anything).Return().Once()

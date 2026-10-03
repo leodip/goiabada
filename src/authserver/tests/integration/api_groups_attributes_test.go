@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -751,8 +751,8 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 }
 
 // Helper function to create a test group attribute
-func createTestGroupAttribute(t *testing.T, groupId int64, key, value string) *models.GroupAttribute {
-	attr := &models.GroupAttribute{
+func createTestGroupAttribute(t *testing.T, groupId int64, key, value string) *record.GroupAttribute {
+	attr := &record.GroupAttribute{
 		Key:                  key,
 		Value:                value,
 		IncludeInIdToken:     true,

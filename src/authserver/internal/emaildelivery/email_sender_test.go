@@ -16,7 +16,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 	"github.com/leodip/goiabada/core/hostport/hostporttest"
 	"github.com/stretchr/testify/assert"
@@ -105,7 +105,7 @@ func TestSMTPConfigFromSettings(t *testing.T) {
 	encrypted, err := testDataCipher.Encrypt(fixturePassword)
 	require.NoError(t, err)
 
-	got := SMTPConfigFromSettings(&models.Settings{
+	got := SMTPConfigFromSettings(&record.Settings{
 		SMTPHost:              "smtp.example.com",
 		SMTPPort:              2525,
 		SMTPUsername:          fixtureUser,

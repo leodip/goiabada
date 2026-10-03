@@ -6,18 +6,18 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // ImplicitGrantInput contains the parameters needed to generate tokens for implicit flow.
 // SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
 type ImplicitGrantInput struct {
-	Client *models.Client
-	User   *models.User
+	Client *record.Client
+	User   *record.User
 	Scope  string
 	// AcrLevel and AuthMethods are what the tokens' acr and amr claims are written from.
-	AcrLevel    models.AcrLevel
+	AcrLevel    record.AcrLevel
 	AuthMethods string
 	// SessionIdentifier is the session the tokens are bound to, through their sid claim, and the
 	// row IssueImplicit takes before it signs anything. An identifier with no row is refused
@@ -52,7 +52,7 @@ type ImplicitGrantResponse struct {
 // IssueAuthCodeTx states: /auth/issue answers it through the server-side session store, which
 // writes on a nil transaction, and on SQLite the whole process shares the one connection this
 // transaction holds (#139).
-func (t *TokenIssuer) IssueImplicitTx(ctx context.Context, settings *models.Settings,
+func (t *TokenIssuer) IssueImplicitTx(ctx context.Context, settings *record.Settings,
 	input *ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*ImplicitGrantResponse, error) {
 
 	// Opened through RunInTransaction, so a deadlock reruns the body (#301). It is safe to rerun:
@@ -94,7 +94,7 @@ func (t *TokenIssuer) IssueImplicitTx(ctx context.Context, settings *models.Sett
 // is imposed: concurrent transactions on the same account can still deadlock on MySQL,
 // PostgreSQL or SQL Server, and RunInTransaction reruns the loser. Do not add ordering here to
 // prevent a deadlock; add a test that forces it and shows the retry resolves it (#301).
-func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *models.Settings,
+func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *record.Settings,
 	input *ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*ImplicitGrantResponse, error) {
 
 	if tx == nil {
@@ -168,7 +168,7 @@ func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *m
 }
 
 // generateImplicitAccessToken creates an access token for implicit flow.
-func (t *TokenIssuer) generateImplicitAccessToken(ctx context.Context, tx *sql.Tx, settings *models.Settings,
+func (t *TokenIssuer) generateImplicitAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings,
 	input *ImplicitGrantInput, now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	tokenInput := t.createTokenInputFromImplicit(input)
@@ -177,7 +177,7 @@ func (t *TokenIssuer) generateImplicitAccessToken(ctx context.Context, tx *sql.T
 
 // generateImplicitIdToken creates an id_token for implicit flow.
 // Per OIDC Core 3.2.2.10, at_hash is REQUIRED when id_token is issued alongside access_token.
-func (t *TokenIssuer) generateImplicitIdToken(ctx context.Context, tx *sql.Tx, settings *models.Settings,
+func (t *TokenIssuer) generateImplicitIdToken(ctx context.Context, tx *sql.Tx, settings *record.Settings,
 	input *ImplicitGrantInput, now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, accessToken string) (string, error) {
 
 	tokenInput := t.createTokenInputFromImplicit(input)

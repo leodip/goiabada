@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 )
 
-func getUserAccessTokenWithAccountScope_Phone(t *testing.T) (string, *models.User) {
+func getUserAccessTokenWithAccountScope_Phone(t *testing.T) (string, *record.User) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	return createUserAccessTokenWithScope(t, scope)
 }

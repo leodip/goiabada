@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,9 +69,9 @@ func rawSQLHandle(t *testing.T) *sql.DB {
 // newBrowserSession builds an unsaved session with a fresh identifier. `now` fixes both
 // timestamps so nothing here depends on the wall clock: every case below states its own
 // times and the engine compares against the value it was handed.
-func newBrowserSession(owner string, now time.Time, ttl time.Duration) *models.BrowserSession {
+func newBrowserSession(owner string, now time.Time, ttl time.Duration) *record.BrowserSession {
 	id := fake.UUID() + fake.UUID()
-	return &models.BrowserSession{
+	return &record.BrowserSession{
 		Owner:         owner,
 		SessionId:     id,
 		SessionIdHash: sha256Hex(id),
@@ -81,7 +81,7 @@ func newBrowserSession(owner string, now time.Time, ttl time.Duration) *models.B
 	}
 }
 
-func createTestBrowserSession(t *testing.T, owner string, now time.Time, ttl time.Duration) *models.BrowserSession {
+func createTestBrowserSession(t *testing.T, owner string, now time.Time, ttl time.Duration) *record.BrowserSession {
 	t.Helper()
 	bs := newBrowserSession(owner, now, ttl)
 	require.NoError(t, database.CreateBrowserSession(context.Background(), nil, bs), "CreateBrowserSession")
@@ -165,11 +165,11 @@ func TestBrowserSession_TwoOwnersMayHoldTheSameHash(t *testing.T) {
 	shared := fake.UUID() + fake.UUID()
 	hash := sha256Hex(shared)
 
-	authServer := &models.BrowserSession{
+	authServer := &record.BrowserSession{
 		Owner: ownerAuthServer, SessionId: shared, SessionIdHash: hash,
 		Data: "auth server contents", LastAccessed: now, ExpiresAt: now.Add(time.Hour),
 	}
-	adminConsole := &models.BrowserSession{
+	adminConsole := &record.BrowserSession{
 		Owner: ownerAdminConsole, SessionId: shared, SessionIdHash: hash,
 		Data: "admin console contents", LastAccessed: now, ExpiresAt: now.Add(time.Hour),
 	}
@@ -216,7 +216,7 @@ func TestBrowserSession_UniqueOwnerAndSessionIdHash(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	existing := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	duplicate := &models.BrowserSession{
+	duplicate := &record.BrowserSession{
 		Owner: existing.Owner, SessionId: existing.SessionId, SessionIdHash: existing.SessionIdHash,
 		Data: "second row", LastAccessed: now, ExpiresAt: now.Add(time.Hour),
 	}

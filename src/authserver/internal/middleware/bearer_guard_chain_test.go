@@ -10,7 +10,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -299,7 +299,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 				logs := logtest.CaptureSlog(t)
 				mockDB := mocks_data.NewDatabase(t)
 				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "u1").
-					Return(&models.User{Id: 7, Enabled: true}, nil)
+					Return(&record.User{Id: 7, Enabled: true}, nil)
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 					Return(nil, errors.New("the database is down"))
 

@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// The bounds are storage's (models.StateMaxBytes, NonceMaxBytes, ScopeMaxBytes): the widths of the
+// The bounds are storage's (record.StateMaxBytes, NonceMaxBytes, ScopeMaxBytes): the widths of the
 // columns the values are stored in, which the data tier writes to every engine at exactly that many
 // bytes. What follows holds the validators to them, on both sides of the edge and in bytes (#437).
 
@@ -105,8 +105,8 @@ func TestValidateRequest_StateAndNonceAreBoundedInBytes(t *testing.T) {
 		bound int
 		set   func(*ValidateRequestInput, string)
 	}{
-		{"state", models.StateMaxBytes, func(in *ValidateRequestInput, v string) { in.State = v }},
-		{"nonce", models.NonceMaxBytes, func(in *ValidateRequestInput, v string) { in.Nonce = v }},
+		{"state", record.StateMaxBytes, func(in *ValidateRequestInput, v string) { in.State = v }},
+		{"nonce", record.NonceMaxBytes, func(in *ValidateRequestInput, v string) { in.Nonce = v }},
 	} {
 		for _, candidate := range boundedValues(t, parameter.bound) {
 			t.Run(parameter.name+"/"+candidate.name, func(t *testing.T) {
@@ -147,12 +147,12 @@ func TestValidateRequest_StateAndNonceBoundHoldsForImplicitRequests(t *testing.T
 		input        *ValidateRequestInput
 		wantRefusing string
 	}{
-		{"token, state at the bound", implicit("token", atTheBound(models.StateMaxBytes), ""), ""},
-		{"token, state over", implicit("token", over(models.StateMaxBytes), ""), "state"},
-		{"id_token, nonce at the bound", implicit("id_token", "", atTheBound(models.NonceMaxBytes)), ""},
-		{"id_token, nonce over", implicit("id_token", "", over(models.NonceMaxBytes)), "nonce"},
-		{"id_token token, both at the bound", implicit("id_token token", atTheBound(models.StateMaxBytes), atTheBound(models.NonceMaxBytes)), ""},
-		{"id_token token, state over beside a nonce that fits", implicit("id_token token", over(models.StateMaxBytes), "n"), "state"},
+		{"token, state at the bound", implicit("token", atTheBound(record.StateMaxBytes), ""), ""},
+		{"token, state over", implicit("token", over(record.StateMaxBytes), ""), "state"},
+		{"id_token, nonce at the bound", implicit("id_token", "", atTheBound(record.NonceMaxBytes)), ""},
+		{"id_token, nonce over", implicit("id_token", "", over(record.NonceMaxBytes)), "nonce"},
+		{"id_token token, both at the bound", implicit("id_token token", atTheBound(record.StateMaxBytes), atTheBound(record.NonceMaxBytes)), ""},
+		{"id_token token, state over beside a nonce that fits", implicit("id_token token", over(record.StateMaxBytes), "n"), "state"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validator.ValidateRequest(tc.input)
@@ -176,21 +176,21 @@ func TestValidateRequest_StateAndNonceBoundHoldsForImplicitRequests(t *testing.T
 func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 	t.Run("distinct resource:permission scopes filling the bound are resolved and accepted", func(t *testing.T) {
 		// 255 scopes of seven bytes and one of eight, joined by 255 spaces.
-		permissionList := make([]models.Permission, 0, 256)
+		permissionList := make([]record.Permission, 0, 256)
 		scopes := make([]string, 0, 256)
 		for i := 0; i < 255; i++ {
 			identifier := fmt.Sprintf("p%04d", i)
 			scopes = append(scopes, "r:"+identifier)
-			permissionList = append(permissionList, models.Permission{PermissionIdentifier: identifier})
+			permissionList = append(permissionList, record.Permission{PermissionIdentifier: identifier})
 		}
 		scopes = append(scopes, "r:p00255")
-		permissionList = append(permissionList, models.Permission{PermissionIdentifier: "p00255"})
+		permissionList = append(permissionList, record.Permission{PermissionIdentifier: "p00255"})
 		scope := strings.Join(scopes, " ")
-		require.Len(t, scope, models.ScopeMaxBytes, "the fixture is off the bound, so the case no longer observes the edge")
+		require.Len(t, scope, record.ScopeMaxBytes, "the fixture is off the bound, so the case no longer observes the edge")
 
 		mockDB := mocks_data.NewDatabase(t)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "r").
-			Return(&models.Resource{Id: 1, ResourceIdentifier: "r"}, nil)
+			Return(&record.Resource{Id: 1, ResourceIdentifier: "r"}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return(permissionList, nil)
 
 		assert.NoError(t, NewAuthorizeValidator(mockDB).ValidateScopes(context.Background(), scope))
@@ -199,7 +199,7 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 	// ValidateScopes takes the scope as sent, to judge its grammar, and counts it as it is stored,
 	// with duplicates dropped: a raw scope over the bound that normalizes under it is accepted (#244).
 	t.Run("claim scopes over the bound that normalize under it are accepted", func(t *testing.T) {
-		scope := claimScopesOfBytes(t, models.ScopeMaxBytes+1)
+		scope := claimScopesOfBytes(t, record.ScopeMaxBytes+1)
 		assert.NoError(t, NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), scope))
 	})
 
@@ -212,10 +212,10 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 		}
 		scopes = append(scopes, "r:p002555")
 		scope := strings.Join(scopes, " ")
-		require.Len(t, scope, models.ScopeMaxBytes+1, "the fixture is off the bound, so the case no longer observes the edge")
+		require.Len(t, scope, record.ScopeMaxBytes+1, "the fixture is off the bound, so the case no longer observes the edge")
 
 		err := NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), scope)
-		requireTooLong(t, err, "invalid_scope", "scope", models.ScopeMaxBytes+1, models.ScopeMaxBytes, scope)
+		requireTooLong(t, err, "invalid_scope", "scope", record.ScopeMaxBytes+1, record.ScopeMaxBytes, scope)
 	})
 
 	t.Run("an over-long scope of resource:permission scopes is refused without resolving any", func(t *testing.T) {
@@ -224,11 +224,11 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 			scopes = append(scopes, fmt.Sprintf("r:p%04d", i))
 		}
 		scope := strings.Join(scopes, " ")
-		require.Greater(t, len(scope), models.ScopeMaxBytes)
+		require.Greater(t, len(scope), record.ScopeMaxBytes)
 
 		err := NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), scope)
 
-		requireTooLong(t, err, "invalid_scope", "scope", len(scope), models.ScopeMaxBytes, scope)
+		requireTooLong(t, err, "invalid_scope", "scope", len(scope), record.ScopeMaxBytes, scope)
 	})
 
 	// A count of characters would accept the second row (1025 characters); a count of bytes refuses
@@ -236,16 +236,16 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 	// is: not a scope in resource:permission form. That is a different error, which is the proof
 	// that the bound admitted it.
 	t.Run("bytes are counted, not characters", func(t *testing.T) {
-		filling := strings.Repeat("é", models.ScopeMaxBytes/2)
+		filling := strings.Repeat("é", record.ScopeMaxBytes/2)
 		err := NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), filling)
 		var detail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &detail)
 		assert.Equal(t, "invalid_scope", detail.Code())
 		assert.Contains(t, detail.Description(), "Invalid scope format", "the bound admitted it, so the refusal is the format's")
 
-		over := strings.Repeat("é", models.ScopeMaxBytes/2+1)
+		over := strings.Repeat("é", record.ScopeMaxBytes/2+1)
 		err = NewAuthorizeValidator(mocks_data.NewDatabase(t)).ValidateScopes(context.Background(), over)
-		requireTooLong(t, err, "invalid_scope", "scope", len(over), models.ScopeMaxBytes, over)
+		requireTooLong(t, err, "invalid_scope", "scope", len(over), record.ScopeMaxBytes, over)
 	})
 }
 
@@ -255,7 +255,7 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 // with an over-long scope is invalid_grant, exactly as with a short one, and is charged as one
 // (#137, #219).
 func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
-	setup := func(t *testing.T) (*TokenValidator, *mocks_data.Database, *models.Settings) {
+	setup := func(t *testing.T) (*TokenValidator, *mocks_data.Database, *record.Settings) {
 		t.Helper()
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t),
@@ -263,15 +263,15 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 
 		passwordHash, err := passwordhash.Hash("correctpassword")
 		require.NoError(t, err)
-		user := &models.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+		user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
 		ropcEnabled := true
-		client := &models.Client{
+		client := &record.Client{
 			Id: 1, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
 			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 		}
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
-		return validator, mockDB, &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
+		return validator, mockDB, &record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 	}
 	request := func(password, scope string) *ValidateTokenRequestInput {
 		return &ValidateTokenRequestInput{
@@ -284,7 +284,7 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 		validator, mockDB, settings := setup(t)
 		mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		scope := claimScopesOfBytes(t, models.ScopeMaxBytes)
+		scope := claimScopesOfBytes(t, record.ScopeMaxBytes)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, request("correctpassword", scope))
 
@@ -296,17 +296,17 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 		validator, mockDB, settings := setup(t)
 		mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		scope := claimScopesOfBytes(t, models.ScopeMaxBytes+1)
+		scope := claimScopesOfBytes(t, record.ScopeMaxBytes+1)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, request("correctpassword", scope))
 
 		assert.Nil(t, result)
-		requireTooLong(t, err, "invalid_scope", "scope", models.ScopeMaxBytes+1, models.ScopeMaxBytes, scope)
+		requireTooLong(t, err, "invalid_scope", "scope", record.ScopeMaxBytes+1, record.ScopeMaxBytes, scope)
 	})
 
 	t.Run("one byte over the bound, with a wrong password, is still invalid_grant", func(t *testing.T) {
 		validator, _, settings := setup(t)
-		scope := claimScopesOfBytes(t, models.ScopeMaxBytes+1)
+		scope := claimScopesOfBytes(t, record.ScopeMaxBytes+1)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, request("wrongpassword", scope))
 

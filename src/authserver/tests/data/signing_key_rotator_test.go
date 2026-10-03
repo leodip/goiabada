@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 )
 
@@ -27,12 +27,12 @@ import (
 // because stage 4's UNIQUE (state) must not be able to falsify this case, and because the
 // data-test database is shared and never dropped, so rows from an earlier run would
 // otherwise decide what the rotation finds.
-func seedOneKeyPerState(t *testing.T) (previous, current, next *models.KeyPair) {
+func seedOneKeyPerState(t *testing.T) (previous, current, next *record.KeyPair) {
 	t.Helper()
 
-	previous = createKeyPairInState(t, models.KeyStatePrevious.String())
-	current = createKeyPairInState(t, models.KeyStateCurrent.String())
-	next = createKeyPairInState(t, models.KeyStateNext.String())
+	previous = createKeyPairInState(t, record.KeyStatePrevious.String())
+	current = createKeyPairInState(t, record.KeyStateCurrent.String())
+	next = createKeyPairInState(t, record.KeyStateNext.String())
 	return previous, current, next
 }
 
@@ -51,7 +51,7 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 		t.Fatalf("Expected 3 key pairs after rotating, got %d", len(keyPairs))
 	}
 
-	byState := map[string]*models.KeyPair{}
+	byState := map[string]*record.KeyPair{}
 	for i := range keyPairs {
 		kp := &keyPairs[i]
 		if existing, duplicate := byState[kp.State]; duplicate {
@@ -62,7 +62,7 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 
 	// The old current key is now the only previous one. This is the key that signed every
 	// token still in flight, and retaining it is what OIDC Core 10.1.1 asks for.
-	newPrevious := byState[models.KeyStatePrevious.String()]
+	newPrevious := byState[record.KeyStatePrevious.String()]
 	if newPrevious == nil {
 		t.Fatal("Expected a previous key after rotating")
 	}
@@ -72,7 +72,7 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	}
 
 	// The old next key is now current, so the deployment can still sign.
-	newCurrent := byState[models.KeyStateCurrent.String()]
+	newCurrent := byState[record.KeyStateCurrent.String()]
 	if newCurrent == nil {
 		t.Fatal("Expected a current key after rotating")
 	}
@@ -93,7 +93,7 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	}
 
 	// A freshly generated next key, not a row moved from somewhere else.
-	newNext := byState[models.KeyStateNext.String()]
+	newNext := byState[record.KeyStateNext.String()]
 	if newNext == nil {
 		t.Fatal("Expected a next key after rotating")
 	}
@@ -136,7 +136,7 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 // key. Against a real engine, so the refusal's rollback is a real rollback.
 func TestRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
 	previous, current, _ := seedOneKeyPerState(t)
-	clearKeyPairState(t, models.KeyStateNext.String())
+	clearKeyPairState(t, record.KeyStateNext.String())
 
 	err := signingkeys.NewRotator(database, dataCipher).Rotate(context.Background())
 	if err == nil {
@@ -155,7 +155,7 @@ func TestRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
 	if survivor == nil {
 		t.Fatal("The previous key was deleted by a rotation that then refused")
 	}
-	if survivor.State != models.KeyStatePrevious.String() {
+	if survivor.State != record.KeyStatePrevious.String() {
 		t.Errorf("Expected the previous key to be untouched, it is in state %s", survivor.State)
 	}
 
@@ -163,7 +163,7 @@ func TestRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to look up the current key: %v", err)
 	}
-	if stillCurrent == nil || stillCurrent.State != models.KeyStateCurrent.String() {
+	if stillCurrent == nil || stillCurrent.State != record.KeyStateCurrent.String() {
 		t.Error("Expected the current key to be untouched by the refused rotation")
 	}
 

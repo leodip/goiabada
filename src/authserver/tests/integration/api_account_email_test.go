@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getUserAccessTokenWithAccountScope_Email(t *testing.T) (string, *models.User) {
+func getUserAccessTokenWithAccountScope_Email(t *testing.T) (string, *record.User) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	return createUserAccessTokenWithScope(t, scope)
 }
@@ -30,7 +30,7 @@ const accountEmailPassword = "Corr3ct!Pass"
 
 // givePassword sets a user's password through the narrow write, so nothing else the fixture
 // stored is written back.
-func givePassword(t *testing.T, user *models.User, password string) {
+func givePassword(t *testing.T, user *record.User, password string) {
 	t.Helper()
 	hash, err := passwordhash.Hash(password)
 	require.NoError(t, err)
@@ -38,7 +38,7 @@ func givePassword(t *testing.T, user *models.User, password string) {
 }
 
 // accountEmailUserWithPassword is a user holding an account-scoped token and a known password.
-func accountEmailUserWithPassword(t *testing.T) (string, *models.User) {
+func accountEmailUserWithPassword(t *testing.T) (string, *record.User) {
 	t.Helper()
 	accessToken, user := getUserAccessTokenWithAccountScope_Email(t)
 	givePassword(t, user, accountEmailPassword)
@@ -115,7 +115,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 
 	// Create another user with a known email
 	otherEmail := "existing_" + strings.ToLower(fake.LetterN(6)) + "@example.com"
-	otherUser := &models.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
+	otherUser := &record.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
 	err := database.CreateUser(context.Background(), nil, otherUser)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.Id) }()
@@ -181,7 +181,7 @@ func TestAPIAccountEmailPut_AWrongPasswordIsRefusedAndChangesNothing(t *testing.
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	otherEmail := "existing_" + strings.ToLower(fake.LetterN(6)) + "@example.com"
-	otherUser := &models.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
+	otherUser := &record.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
 	require.NoError(t, database.CreateUser(context.Background(), nil, otherUser))
 	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.Id) }()
 

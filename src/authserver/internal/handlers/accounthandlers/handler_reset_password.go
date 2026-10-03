@@ -16,8 +16,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
@@ -97,7 +97,7 @@ var errResetPasswordClaimLost = errors.New("the forgot password code was no long
 //
 // A user with no code issued has a zero ForgotPasswordCodeIssuedAt and is
 // therefore treated as expired, which fails closed.
-func isForgotPasswordCodeExpired(user *models.User) bool {
+func isForgotPasswordCodeExpired(user *record.User) bool {
 	return user.ForgotPasswordCodeIssuedAt.Time.Add(forgotPasswordCodeLifetime).Before(time.Now().UTC())
 }
 
@@ -211,7 +211,7 @@ func rejectResetPassword(pageRenderer PageRenderer, auditLogger AuditLogger, w h
 type resetPasswordDatabase interface {
 	revocation.Database
 
-	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error)
+	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.User, error)
 	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
 }
 
@@ -231,7 +231,7 @@ type resetPasswordDatabase interface {
 // Returns (nil, nil) when the request was refused, having already audited and responded.
 func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession sessionstore.Store,
 	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
-	httpStatus int) (*emaillinks.LinkMarker, *models.User) {
+	httpStatus int) (*emaillinks.LinkMarker, *record.User) {
 
 	marker, rejection, err := emaillinks.GetLinkMarker(httpSession, r, emaillinks.LinkMarkerFlowResetPassword)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -106,7 +106,7 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		validator := NewEmailValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
-			&models.User{Id: 1, Subject: subject}, nil).Once()
+			&record.User{Id: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
 
 		err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
@@ -118,7 +118,7 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		user := &models.User{Id: 1, Subject: subject}
+		user := &record.User{Id: 1, Subject: subject}
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "same@example.com").Return(user, nil).Once()
 
@@ -135,7 +135,7 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		assert.Len(t, email, 60)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
-			&models.User{Id: 1, Subject: subject}, nil).Once()
+			&record.User{Id: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(nil, nil).Once()
 
 		err := validator.ValidateEmailChange(context.Background(), email, subject)
@@ -152,9 +152,9 @@ func TestValidateEmailChange_AddressTakenByAnotherUser(t *testing.T) {
 	otherSubject := fake.UUID()
 
 	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
-		&models.User{Id: 1, Subject: subject}, nil).Once()
+		&record.User{Id: 1, Subject: subject}, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "taken@example.com").Return(
-		&models.User{Id: 2, Subject: otherSubject}, nil).Once()
+		&record.User{Id: 2, Subject: otherSubject}, nil).Once()
 
 	err := validator.ValidateEmailChange(context.Background(), "taken@example.com", subject)
 
@@ -233,7 +233,7 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 		validator := NewEmailValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
-			&models.User{Id: 1, Subject: subject}, nil).Once()
+			&record.User{Id: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, dbErr).Once()
 
 		err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
@@ -305,7 +305,7 @@ func TestValidateEmailChange_CarriesTheCallersContextToBothReads(t *testing.T) {
 
 	mockDB := mocks_data.NewDatabase(t)
 	mockDB.On("GetUserBySubject", callersContext, mock.Anything, "sub-1").
-		Return(&models.User{Id: 1, Subject: "sub-1", Email: "old@example.com"}, nil).Once()
+		Return(&record.User{Id: 1, Subject: "sub-1", Email: "old@example.com"}, nil).Once()
 	mockDB.On("GetUserByEmail", callersContext, mock.Anything, "new@example.com").
 		Return(nil, nil).Once()
 

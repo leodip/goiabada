@@ -9,8 +9,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
@@ -24,7 +24,7 @@ import (
 type accountPasswordDatabase interface {
 	revocation.Database
 
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 }
 

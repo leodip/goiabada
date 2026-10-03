@@ -12,8 +12,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -25,7 +25,7 @@ type ScopeInfo struct {
 	AlreadyConsented bool
 }
 
-func buildScopeInfoArray(ctx context.Context, scope string, consent *models.UserConsent) []ScopeInfo {
+func buildScopeInfoArray(ctx context.Context, scope string, consent *record.UserConsent) []ScopeInfo {
 	scopeInfoArr := []ScopeInfo{}
 
 	if len(scope) == 0 {
@@ -65,8 +65,8 @@ type consentDatabase interface {
 	clientDisplayDatabase
 	userconsent.Database
 
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
 func HandleConsentGet(
@@ -211,8 +211,8 @@ func HandleConsentPost(
 
 		// client and user are loaded only on the path that weighs the selection against the
 		// permissions the user holds; a refusal before it resolves provenance instead.
-		var client *models.Client
-		var user *models.User
+		var client *record.Client
+		var user *record.User
 
 		answer, need := decideConsentSubmission(facts)
 		for need != consentSubmissionFactNone {

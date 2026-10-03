@@ -18,7 +18,7 @@ import (
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -47,7 +47,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/logout", nil)
 		rr := httptest.NewRecorder()
 
-		settings := &models.Settings{}
+		settings := &record.Settings{}
 		ctx := req.Context()
 		ctx = reqctx.WithSettings(ctx, settings)
 		req = req.WithContext(ctx)
@@ -82,7 +82,7 @@ func TestHandleLogoutGet(t *testing.T) {
 			"state":                    {"abc"},
 		}.Encode(), nil)
 		rr := httptest.NewRecorder()
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		var bound map[string]interface{}
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
@@ -131,7 +131,7 @@ func TestHandleLogoutGet(t *testing.T) {
 
 				req, _ := http.NewRequest("GET", tc.target, nil)
 				rr := httptest.NewRecorder()
-				req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 				var bound map[string]interface{}
 				pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
@@ -161,7 +161,7 @@ func TestHandleLogoutGet(t *testing.T) {
 
 		req, _ := http.NewRequest("GET", "/auth/logout?ui_locales=pt-BR", nil)
 		rr := httptest.NewRecorder()
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		pageRenderer.On("RenderTemplate", rr, mock.MatchedBy(func(rendered *http.Request) bool {
 			return i18n.T(rendered.Context(), "logout_consent.title") == "Sair"
@@ -474,7 +474,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
-		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
+		client := &record.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		innerToken := "test_token"
@@ -513,7 +513,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
-		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
+		client := &record.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		logs := logtest.CaptureSlog(t)
@@ -537,7 +537,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := testDataCipher.Encrypt(clientSecret)
-		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
+		client := &record.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		// Encrypted with a different secret than the client's.
@@ -571,7 +571,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").
 			Return(nil, errors.New("lookup exploded"))
 
-		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger)
+		err := handleExistingSessionOnLogout(r, "test-session", &record.Client{}, database, auditLogger)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "lookup exploded")
@@ -586,7 +586,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(nil, nil)
 
-		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger)
+		err := handleExistingSessionOnLogout(r, "test-session", &record.Client{}, database, auditLogger)
 
 		assert.NoError(t, err, "a session that is not there is nothing to tear down, not a failure")
 		database.AssertExpectations(t)
@@ -599,25 +599,25 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	t.Run("Delete user session client", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:     1,
 			UserId: 123,
-			Clients: []models.UserSessionClient{
+			Clients: []record.UserSessionClient{
 				{
 					Id: 1,
-					Client: models.Client{
+					Client: record.Client{
 						ClientIdentifier: "test-client",
 					},
 				},
 				{
 					Id: 2,
-					Client: models.Client{
+					Client: record.Client{
 						ClientIdentifier: "other-client",
 					},
 				},
@@ -642,19 +642,19 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	t.Run("Delete entire user session", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:     1,
 			UserId: 123,
-			Clients: []models.UserSessionClient{
+			Clients: []record.UserSessionClient{
 				{
 					Id: 1,
-					Client: models.Client{
+					Client: record.Client{
 						ClientIdentifier: "test-client",
 					},
 				},
@@ -680,19 +680,19 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	t.Run("Client not found in user session", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test-client",
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:     1,
 			UserId: 123,
-			Clients: []models.UserSessionClient{
+			Clients: []record.UserSessionClient{
 				{
 					Id: 1,
-					Client: models.Client{
+					Client: record.Client{
 						ClientIdentifier: "other-client",
 					},
 				},
@@ -762,7 +762,7 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 		assert.NoError(t, err)
 	}
 
-	ctx := reqctx.WithSettings(req.Context(), &models.Settings{Issuer: hintedIssuer})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: hintedIssuer})
 	if len(sessionIdentifier) > 0 {
 		ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
 	}
@@ -784,23 +784,23 @@ func stubConfirmedHint(
 	database *mocks_data.Database,
 	tokenParser *mocks_handlers.TokenParser,
 	claims map[string]interface{},
-) *models.Client {
-	client := &models.Client{Id: 11, ClientIdentifier: hintedClientId}
+) *record.Client {
+	client := &record.Client{Id: 11, ClientIdentifier: hintedClientId}
 
 	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
 		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientId).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
-		Return(&models.User{Id: hintedUserId}, nil).Maybe()
+		Return(&record.User{Id: hintedUserId}, nil).Maybe()
 
 	return client
 }
 
 // stubRegisteredURI gives the client one registered redirect URI, which is the set a post-logout
 // target is matched against exactly.
-func stubRegisteredURI(database *mocks_data.Database, client *models.Client, uri string) {
+func stubRegisteredURI(database *mocks_data.Database, client *record.Client, uri string) {
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Run(func(args mock.Arguments) {
-		args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: uri}}
+		args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: uri}}
 	}).Return(nil)
 }
 
@@ -826,16 +826,16 @@ func loggedInUserIsPresentAndEmpty(details map[string]interface{}) bool {
 func stubPerClientTeardown(
 	database *mocks_data.Database,
 	auditLogger *mocks_handlers.AuditLogger,
-	client *models.Client,
+	client *record.Client,
 	sessionIdentifier string,
 ) {
-	userSession := &models.UserSession{
+	userSession := &record.UserSession{
 		Id: 42,
 		// The hint's own subject, corrected from a bare 123 that matched nothing. This one expectation
 		// serves two calls now, the classifier's ownership lookup and the teardown's, so a session
 		// owned by somebody else would refuse the hint before the teardown ran at all (#133).
 		UserId:  hintedUserId,
-		Clients: []models.UserSessionClient{{Id: 7, ClientId: client.Id, Client: *client}},
+		Clients: []record.UserSessionClient{{Id: 7, ClientId: client.Id, Client: *client}},
 	}
 
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
@@ -864,7 +864,7 @@ func logoutPostRequest(t *testing.T, form url.Values) *http.Request {
 	req, err := http.NewRequest("POST", "/auth/logout", strings.NewReader(form.Encode()))
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return req.WithContext(reqctx.WithSettings(req.Context(), &models.Settings{}))
+	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
 
 // withSessionIdentifier puts the identifier the session-identifier middleware would have attached,
@@ -935,7 +935,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
 
-		userSession := &models.UserSession{Id: 42, UserId: 123}
+		userSession := &record.UserSession{Id: 42, UserId: 123}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
@@ -984,14 +984,14 @@ func TestHandleLogoutPost(t *testing.T) {
 		}), "test-session")
 		rr := httptest.NewRecorder()
 
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: "test_client",
-			RedirectURIs:     []models.RedirectURI{{URI: "https://example.com/out?state=registered&lang=en"}},
+			RedirectURIs:     []record.RedirectURI{{URI: "https://example.com/out?state=registered&lang=en"}},
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil)
 
-		userSession := &models.UserSession{Id: 42, UserId: 123}
+		userSession := &record.UserSession{Id: 42, UserId: 123}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
@@ -1047,9 +1047,9 @@ func TestHandleLogoutPost(t *testing.T) {
 		// One registered URI on test_client, so a row need only say how the requested URI differs.
 		registers := func(uri string) func(*mocks_data.Database) {
 			return func(database *mocks_data.Database) {
-				client := &models.Client{
+				client := &record.Client{
 					ClientIdentifier: "test_client",
-					RedirectURIs:     []models.RedirectURI{{URI: uri}},
+					RedirectURIs:     []record.RedirectURI{{URI: uri}},
 				}
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 				database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil)
@@ -1062,9 +1062,9 @@ func TestHandleLogoutPost(t *testing.T) {
 		// a reason that says nothing about redirects (#122).
 		registersLoadOptional := func(uri string) func(*mocks_data.Database) {
 			return func(database *mocks_data.Database) {
-				client := &models.Client{
+				client := &record.Client{
 					ClientIdentifier: "test_client",
-					RedirectURIs:     []models.RedirectURI{{URI: uri}},
+					RedirectURIs:     []record.RedirectURI{{URI: uri}},
 				}
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 				database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil).Maybe()
@@ -1219,7 +1219,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				name:     "the client's registered URIs cannot be loaded",
 				clientId: "test_client",
 				stubDB: func(database *mocks_data.Database) {
-					client := &models.Client{ClientIdentifier: "test_client"}
+					client := &record.Client{ClientIdentifier: "test_client"}
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 					database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).
 						Return(errors.New("load redirect URIs exploded"))
@@ -1274,7 +1274,7 @@ func TestHandleLogoutPost(t *testing.T) {
 
 				tc.stubDB(database)
 
-				userSession := &models.UserSession{Id: 42, UserId: 123}
+				userSession := &record.UserSession{Id: 42, UserId: 123}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
@@ -1324,7 +1324,7 @@ func TestHandleLogoutPost(t *testing.T) {
 			{
 				name: "the delete fails",
 				stubDB: func(database *mocks_data.Database) {
-					userSession := &models.UserSession{Id: 42, UserId: 123}
+					userSession := &record.UserSession{Id: 42, UserId: 123}
 					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 					database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(errors.New("delete exploded"))
 				},
@@ -1890,9 +1890,9 @@ func assertRejectionRecord(t *testing.T, logs *logtest.SlogCapture, want hintSta
 	t.Helper()
 
 	var rejections []logtest.CapturedRecord
-	for _, record := range logs.Records() {
-		if record.Message == "id_token_hint rejected" {
-			rejections = append(rejections, record)
+	for _, logRecord := range logs.Records() {
+		if logRecord.Message == "id_token_hint rejected" {
+			rejections = append(rejections, logRecord)
 		}
 	}
 
@@ -1948,8 +1948,8 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		}
 	}
 
-	newClient := func() *models.Client {
-		return &models.Client{Id: theClientDbId, ClientIdentifier: theClientId}
+	newClient := func() *record.Client {
+		return &record.Client{Id: theClientDbId, ClientIdentifier: theClientId}
 	}
 
 	// The confirmed row's database: the hint's aud resolves to a client and nothing else is asked.
@@ -1967,9 +1967,9 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	// a secret, can still reach the sid gate.
 	resolvesOwnedSessionRows := func(database *mocks_data.Database) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
-			Return(&models.UserSession{Id: 7, UserId: theUserDbId}, nil).Maybe()
+			Return(&record.UserSession{Id: 7, UserId: theUserDbId}, nil).Maybe()
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
-			Return(&models.User{Id: theUserDbId}, nil).Maybe()
+			Return(&record.User{Id: theUserDbId}, nil).Maybe()
 	}
 	resolvesOwnedSession := func(database *mocks_data.Database) {
 		resolvesClient(database)
@@ -1979,23 +1979,23 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	// A session for decision 14's tolerance lookup, required rather than Maybe so the row proves the
 	// lookup ran. Its owner is left as the hint's own subject, since these rows are about expiry and a
 	// foreign owner would refuse them one gate later for a reason they are not testing.
-	resolvesClientAndSession := func(userSession *models.UserSession, err error) func(*mocks_data.Database) {
+	resolvesClientAndSession := func(userSession *record.UserSession, err error) func(*mocks_data.Database) {
 		return func(database *mocks_data.Database) {
 			resolvesClient(database)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).Return(userSession, err)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
-				Return(&models.User{Id: theUserDbId}, nil).Maybe()
+				Return(&record.User{Id: theUserDbId}, nil).Maybe()
 		}
 	}
 
 	// The ownership gate's own fixture: who owns the row sid names, and what sub resolves to. Neither
 	// lookup is Maybe, so a row using this fails outright if the gate stops making them rather than
 	// quietly agreeing with whatever the classifier decided for another reason.
-	resolvesOwnership := func(sessionUserId int64, user *models.User, userErr error) func(*mocks_data.Database) {
+	resolvesOwnership := func(sessionUserId int64, user *record.User, userErr error) func(*mocks_data.Database) {
 		return func(database *mocks_data.Database) {
 			resolvesClient(database)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
-				Return(&models.UserSession{Id: 7, UserId: sessionUserId}, nil)
+				Return(&record.UserSession{Id: 7, UserId: sessionUserId}, nil)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).Return(user, userErr)
 		}
 	}
@@ -2069,7 +2069,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 				secret, err := testDataCipher.Encrypt("some_client_secret")
 				assert.NoError(t, err)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
-					Return(&models.Client{ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
+					Return(&record.Client{ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
 			},
 			want: hintRejected,
 		},
@@ -2084,7 +2084,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 				secret, err := testDataCipher.Encrypt("some_client_secret")
 				assert.NoError(t, err)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
-					Return(&models.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
+					Return(&record.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
 				resolvesOwnedSessionRows(database)
 			},
 			want: hintConfirmed, wantSid: theSessionId,
@@ -2273,7 +2273,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// gate that only ran when the middleware had supplied an identifier would pass here.
 			name: "no browser session, so sid seeds the identifier", gate: "sid",
 			noSession: true,
-			stubDB:    resolvesOwnership(theUserDbId, &models.User{Id: theUserDbId}, nil),
+			stubDB:    resolvesOwnership(theUserDbId, &record.User{Id: theUserDbId}, nil),
 			want:      hintConfirmed, wantSid: theSessionId,
 		},
 		{
@@ -2283,7 +2283,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			mutate: func(claims map[string]interface{}) {
 				claims["exp"] = float64(now.Add(-1 * time.Minute).Unix())
 			},
-			stubDB: resolvesClientAndSession(&models.UserSession{Id: 7, UserId: theUserDbId}, nil),
+			stubDB: resolvesClientAndSession(&record.UserSession{Id: 7, UserId: theUserDbId}, nil),
 			want:   hintConfirmed, wantSid: theSessionId,
 		},
 		{
@@ -2312,7 +2312,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// ... currently logged in End-User", and the section makes asking the End-User a MUST in
 			// that case. Rejecting is how this endpoint asks, so the refusal here IS the conformance.
 			name: "sid names a session belonging to another user", gate: "session ownership",
-			stubDB: resolvesOwnership(theOtherUserDbId, &models.User{Id: theUserDbId}, nil),
+			stubDB: resolvesOwnership(theOtherUserDbId, &record.User{Id: theUserDbId}, nil),
 			want:   hintRejected,
 		},
 		{
@@ -2324,7 +2324,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// one, and leave the whole suite green.
 			name: "no browser session, and sid names a session belonging to another user", gate: "session ownership",
 			noSession: true,
-			stubDB:    resolvesOwnership(theOtherUserDbId, &models.User{Id: theUserDbId}, nil),
+			stubDB:    resolvesOwnership(theOtherUserDbId, &record.User{Id: theUserDbId}, nil),
 			want:      hintRejected,
 		},
 		{
@@ -2332,7 +2332,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// not expired: the fixture is not Maybe, so a build that left the session lookup inside the
 			// expiry branch would find no call for it and fail here.
 			name: "sid names a session belonging to sub", gate: "session ownership",
-			stubDB: resolvesOwnership(theUserDbId, &models.User{Id: theUserDbId}, nil),
+			stubDB: resolvesOwnership(theUserDbId, &record.User{Id: theUserDbId}, nil),
 			want:   hintConfirmed, wantSid: theSessionId,
 		},
 		{

@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCreateAuditLog(t *testing.T) {
 	t.Run("Success - Create audit log", func(t *testing.T) {
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: "test_event",
 			Details:    `{"user_id": "123", "action": "login"}`,
 		}
@@ -33,7 +33,7 @@ func TestCreateAuditLog(t *testing.T) {
 	t.Run("Success - CreatedAt overridden", func(t *testing.T) {
 		// Even if we set CreatedAt, it should be overridden
 		pastTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: "test_event",
 			Details:    `{"key": "value"}`,
 			CreatedAt:  pastTime,
@@ -48,7 +48,7 @@ func TestCreateAuditLog(t *testing.T) {
 	})
 
 	t.Run("Error - Empty audit event", func(t *testing.T) {
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: "",
 			Details:    `{"key": "value"}`,
 		}
@@ -59,7 +59,7 @@ func TestCreateAuditLog(t *testing.T) {
 	})
 
 	t.Run("Success - Empty details defaults to empty JSON", func(t *testing.T) {
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: "test_event",
 			Details:    "",
 		}
@@ -90,7 +90,7 @@ func TestCreateAuditLog(t *testing.T) {
 		for _, tc := range requestIds {
 			t.Run(tc.name, func(t *testing.T) {
 				event := "request_id_roundtrip_" + fake.LetterN(12)
-				require.NoError(t, database.CreateAuditLog(context.Background(), nil, &models.AuditLog{
+				require.NoError(t, database.CreateAuditLog(context.Background(), nil, &record.AuditLog{
 					AuditEvent: event,
 					Details:    `{"test": "data"}`,
 					RequestId:  tc.id,
@@ -110,7 +110,7 @@ func TestCreateAuditLog(t *testing.T) {
 func TestDeleteOldAuditLogs_NoMatchingLogs(t *testing.T) {
 	// Create recent audit logs
 	for i := 0; i < 5; i++ {
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: "recent_log",
 			Details:    `{"test": "data"}`,
 		}
@@ -142,7 +142,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 	}
 
 	for _, event := range events {
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: event,
 			Details:    `{"test": "data"}`,
 		}
@@ -213,7 +213,7 @@ func TestGetAuditLogsPaginated_Sorting(t *testing.T) {
 	testEvents := []string{"event_1", "event_2", "event_3", "event_4", "event_5"}
 
 	for _, event := range testEvents {
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			AuditEvent: event,
 			Details:    `{"test": "data"}`,
 		}
@@ -262,7 +262,7 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 		{event, otherRequestId},
 	}
 	for _, row := range rows {
-		require.NoError(t, database.CreateAuditLog(context.Background(), nil, &models.AuditLog{
+		require.NoError(t, database.CreateAuditLog(context.Background(), nil, &record.AuditLog{
 			AuditEvent: row.event,
 			Details:    `{"test": "data"}`,
 			RequestId:  row.requestId,
@@ -321,7 +321,7 @@ func TestGetAuditLogsPaginated_RequestIdFilterIsByteExact(t *testing.T) {
 	padded := unpadded + " "
 
 	for _, id := range []string{unpadded, padded} {
-		require.NoError(t, database.CreateAuditLog(context.Background(), nil, &models.AuditLog{
+		require.NoError(t, database.CreateAuditLog(context.Background(), nil, &record.AuditLog{
 			AuditEvent: event,
 			Details:    `{"test": "data"}`,
 			RequestId:  id,

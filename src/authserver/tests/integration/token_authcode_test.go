@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -129,12 +129,12 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
 	// Create a new client to use as the wrong client
-	wrongClient := &models.Client{
+	wrongClient := &record.Client{
 		ClientIdentifier:         "wrong-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, wrongClient)
 	assert.NoError(t, err)

@@ -10,8 +10,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/core/errs"
@@ -20,11 +20,11 @@ import (
 // userinfoDatabase is what the userinfo endpoint needs: the caller's user row and the claims
 // hanging off it.
 type userinfoDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []models.Group) error
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []record.Group) error
 	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
-	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error
-	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *record.User) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 func HandleUserInfoGetPost(

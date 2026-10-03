@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -24,8 +24,8 @@ import (
 type authorizeValidatorDatabase interface {
 	permissions.ScopeResolverDatabase
 
-	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 }
 
 type AuthorizeValidator struct {
@@ -90,7 +90,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 	}
 
 	// Before the first lookup, so a scope of hundreds of values costs no query. The column it must
-	// fit is three tables wide (models.ScopeMaxBytes), and one that did not fit would be granted
+	// fit is three tables wide (record.ScopeMaxBytes), and one that did not fit would be granted
 	// here and refused as a 500 after the user had signed in (#437).
 	if err := scopeBound.check(scope); err != nil {
 		return err
@@ -379,8 +379,8 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	}
 
 	// The two free-form values the ceremony carries to codes.state and codes.nonce. RFC 6749 and
-	// OIDC Core set no length on either, so the bound is the columns' (models.StateMaxBytes,
-	// models.NonceMaxBytes), and it holds for every response type: the ceremony carries both
+	// OIDC Core set no length on either, so the bound is the columns' (record.StateMaxBytes,
+	// record.NonceMaxBytes), and it holds for every response type: the ceremony carries both
 	// whatever is issued, and one rule is simpler to state to an integrator than three. Without
 	// it a longer value is accepted here and refused by the column, as a 500, at /auth/issue
 	// after the user has signed in (#437).

@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,12 +26,12 @@ const bumpSessionIdentifier = "bump-session-id"
 
 // bumpedSession is the session as a read returns it, holding the given associations. A fresh value
 // per read is what a database returns, and what lets a rerun's read differ from the first's.
-func bumpedSession(clients ...models.UserSessionClient) *models.UserSession {
-	return &models.UserSession{
+func bumpedSession(clients ...record.UserSessionClient) *record.UserSession {
+	return &record.UserSession{
 		Id:                1,
 		SessionIdentifier: bumpSessionIdentifier,
 		UserId:            123,
-		AcrLevel:          models.AcrLevel1,
+		AcrLevel:          record.AcrLevel1,
 		AuthMethods:       "pwd",
 		IpAddress:         "192.168.1.1",
 		LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
@@ -55,7 +55,7 @@ func TestBumpUserSession_ReadsAndWritesOnTheTransaction(t *testing.T) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
-	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.MatchedBy(func(c *models.UserSessionClient) bool {
+	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.MatchedBy(func(c *record.UserSessionClient) bool {
 		return c.ClientId == 456 && c.UserSessionId == 1
 	})).Return(nil).Once()
 
@@ -76,7 +76,7 @@ func TestBumpUserSession_ALostAssociationKeyRunsOnceMoreAndFindsThePair(t *testi
 	manager := &Manager{database: database}
 
 	first := bumpedSession()
-	second := bumpedSession(models.UserSessionClient{Id: 9, UserSessionId: 1, ClientId: 456, LastAccessed: time.Now().UTC().Add(-time.Minute)})
+	second := bumpedSession(record.UserSessionClient{Id: 9, UserSessionId: 1, ClientId: 456, LastAccessed: time.Now().UTC().Add(-time.Minute)})
 
 	attempt1 := mocks_data.ExpectRunInTransaction(database, txSentinel)
 	attempt2 := mocks_data.ExpectRunInTransaction(database, txSentinel)
@@ -87,7 +87,7 @@ func TestBumpUserSession_ALostAssociationKeyRunsOnceMoreAndFindsThePair(t *testi
 	database.On("UpdateUserSession", mock.Anything, txSentinel, first).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, second).Return(nil).Once()
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(lostTheAssociationKey()).Once()
-	database.On("UpdateUserSessionClient", mock.Anything, txSentinel, mock.MatchedBy(func(c *models.UserSessionClient) bool {
+	database.On("UpdateUserSessionClient", mock.Anything, txSentinel, mock.MatchedBy(func(c *record.UserSessionClient) bool {
 		return c.Id == 9 && c.ClientId == 456
 	})).Return(nil).Once()
 
@@ -131,21 +131,21 @@ func TestBumpUserSession_AFailureOtherThanTheKeyIsNotRetried(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		arm  func(database *mocks_data.Database, session *models.UserSession)
+		arm  func(database *mocks_data.Database, session *record.UserSession)
 	}{
-		{"the session read fails", func(database *mocks_data.Database, _ *models.UserSession) {
+		{"the session read fails", func(database *mocks_data.Database, _ *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(nil, boom).Once()
 		}},
-		{"the association read fails", func(database *mocks_data.Database, session *models.UserSession) {
+		{"the association read fails", func(database *mocks_data.Database, session *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(boom).Once()
 		}},
-		{"the session write fails", func(database *mocks_data.Database, session *models.UserSession) {
+		{"the session write fails", func(database *mocks_data.Database, session *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 			database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(boom).Once()
 		}},
-		{"the association insert fails", func(database *mocks_data.Database, session *models.UserSession) {
+		{"the association insert fails", func(database *mocks_data.Database, session *record.UserSession) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 			database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 			database.On("UpdateUserSession", mock.Anything, txSentinel, session).Return(nil).Once()
@@ -198,14 +198,14 @@ func TestBumpUserSession_ADeadlockRerunDecidesFromAFreshRead(t *testing.T) {
 	manager := &Manager{database: database}
 
 	first := bumpedSession()
-	second := bumpedSession(models.UserSessionClient{Id: 9, UserSessionId: 1, ClientId: 456})
+	second := bumpedSession(record.UserSessionClient{Id: 9, UserSessionId: 1, ClientId: 456})
 	stub := mocks_data.ExpectRunInTransactionRerun(database, txSentinel)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(first, nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(second, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
-	database.On("UpdateUserSessionClient", mock.Anything, txSentinel, mock.MatchedBy(func(c *models.UserSessionClient) bool {
+	database.On("UpdateUserSessionClient", mock.Anything, txSentinel, mock.MatchedBy(func(c *record.UserSessionClient) bool {
 		return c.Id == 9
 	})).Return(nil).Once()
 

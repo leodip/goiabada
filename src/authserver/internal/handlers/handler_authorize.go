@@ -17,9 +17,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/authorizerequest"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
@@ -33,7 +33,7 @@ import (
 // - SHOULD accept expired tokens (withExpirationCheck=false)
 // Returns the sub claim from the hint, or empty string if no hint provided.
 // Returns error if hint is malformed or not issued by this server.
-func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser TokenParser, settings *models.Settings) (string, error) {
+func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser TokenParser, settings *record.Settings) (string, error) {
 	if idTokenHint == "" {
 		return "", nil
 	}
@@ -84,11 +84,11 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 // for a GET carrying its handle.
 type authorizeDatabase interface {
 	authorizerequest.Consuming
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
-	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.RedirectURI, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
 func HandleAuthorizeGet(
@@ -251,7 +251,7 @@ func HandleAuthorizeGet(
 		}
 
 		var (
-			userSession *models.UserSession
+			userSession *record.UserSession
 			refusal     *oauth.ErrorDetail
 		)
 
@@ -573,7 +573,7 @@ type authorizeValidation struct {
 // site and the emitter, so an accented sentence would reach the client as a row of question marks
 // instead. That is the failure a translation here buys (#213 decision 9).
 func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeValidator, tokenParser TokenParser,
-	settings *models.Settings, params url.Values, request *protocolvalidation.ValidateRequestInput) (authorizeValidation, error) {
+	settings *record.Settings, params url.Values, request *protocolvalidation.ValidateRequestInput) (authorizeValidation, error) {
 
 	var validation authorizeValidation
 
@@ -777,7 +777,7 @@ func decideAuthorizeRoute(f authorizeRouteFacts) (authorizeRoute, authorizeFact)
 // handlePromptNone handles the OIDC prompt=none flow for silent authentication. It performs all
 // necessary checks without displaying any UI and either answers the client with an error when
 // silent authentication is not possible, or goes on to issue a code silently.
-func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings, baseURL string) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, ceremonyStore CeremonyStore, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string, settings *record.Settings, baseURL string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -929,20 +929,20 @@ const (
 type silentAuthenticationFacts struct {
 	maxAgeRequested bool
 	hintSubject     string
-	target          models.AcrLevel
+	target          record.AcrLevel
 	// consentRequired is the client's ConsentRequired.
 	consentRequired bool
 
 	// sessionLoaded is set once the session has been looked up; session is nil when there is none,
 	// and otherwise carries its User.
 	sessionLoaded             bool
-	session                   *models.UserSession
+	session                   *record.UserSession
 	sessionValid              *bool
 	sessionValidWithoutMaxAge *bool
 	effectiveScope            *string
 	// consentLoaded is set once the consent has been looked up; consent is nil when there is none.
 	consentLoaded bool
-	consent       *models.UserConsent
+	consent       *record.UserConsent
 }
 
 // silentAuthenticationAnswer is decideSilentAuthentication's answer: an error for the client, or
@@ -1017,7 +1017,7 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 	if stepUpErr != nil || stepUp == ceremony.StepUpLevel {
 		return refuse(oidc.ErrorInteractionRequired, "Higher authentication level required")
 	}
-	if f.target == models.AcrLevel2Mandatory && !user.OTPEnabled {
+	if f.target == record.AcrLevel2Mandatory && !user.OTPEnabled {
 		return refuse(oidc.ErrorInteractionRequired, "Additional authentication setup required")
 	}
 	if stepUp == ceremony.StepUpOtpConfigChanged {
@@ -1058,7 +1058,7 @@ type redirectErrorInput struct {
 	// the error arose. Nil means "provenance unknown", never "there is no client": the trust
 	// decision is about where the redirect URI came from, so an unresolved client is the
 	// untrusted case rather than an exempt one.
-	client *models.Client
+	client *record.Client
 
 	code         string
 	description  string
@@ -1099,7 +1099,7 @@ const userDisabledDescription = "The user account is disabled."
 // come from the ceremony, which is where every error redirect takes them from. At /auth/authorize
 // that is the literal HandleAuthorizeGet has just built, which holds the four as the request sent
 // them before anything is validated, so an error arising there answers what the request carried.
-func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *models.Client,
+func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *record.Client,
 	code string, description string) redirectErrorInput {
 
 	return redirectErrorInput{
@@ -1161,7 +1161,7 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, database auth
 // error response to the client, so a lookup that fails must not turn a refusal that works today
 // into a 500; and unresolved provenance is the untrusted case, which errs towards withholding a
 // redirect rather than towards performing one (#108).
-func clientProvenance(ctx context.Context, database authorizeDatabase, clientIdentifier string) *models.Client {
+func clientProvenance(ctx context.Context, database authorizeDatabase, clientIdentifier string) *record.Client {
 	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to load the client while answering it with an error, treating its provenance as unresolved",
@@ -1257,7 +1257,7 @@ func clientProvenance(ctx context.Context, database authorizeDatabase, clientIde
 // This predicate is asked twice within one authorization request, and the second answer may not be
 // more permissive than the first: see redirectErrorInput.redirectAlreadyWithheld, which carries the
 // first refusal into the emitter.
-func redirectWillBeEmitted(ctx context.Context, database authorizeDatabase, client *models.Client, redirectURI string,
+func redirectWillBeEmitted(ctx context.Context, database authorizeDatabase, client *record.Client, redirectURI string,
 	responseType string, site string) bool {
 
 	if client == nil || client.CreatedViaDCR {

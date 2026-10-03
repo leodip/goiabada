@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,10 +20,10 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true, // Consent required
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -35,7 +35,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -69,10 +69,10 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -84,7 +84,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -118,10 +118,10 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -133,7 +133,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -170,10 +170,10 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -185,7 +185,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -223,10 +223,10 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true, // Logo exists but hidden
 		ConsentRequired:  true,
-		DefaultAcrLevel:  models.AcrLevel1,
+		DefaultAcrLevel:  record.AcrLevel1,
 	})
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -238,7 +238,7 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

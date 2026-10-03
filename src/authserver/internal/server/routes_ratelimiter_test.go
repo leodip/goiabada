@@ -16,9 +16,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/web"
@@ -107,8 +107,8 @@ const (
 // check. Both audit sinks are off, which keeps the real audit.Logger from writing rows the
 // database mock was never asked for; that it reads settings at all is #212's finding, not
 // this test's business.
-func routesTestSettings() *models.Settings {
-	return &models.Settings{
+func routesTestSettings() *record.Settings {
+	return &record.Settings{
 		Id:                         1,
 		AppName:                    "Goiabada",
 		SelfRegistrationEnabled:    true,
@@ -136,7 +136,7 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 
 	database := mocks_data.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
-	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&models.User{
+	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 		Id:           1,
 		Enabled:      true,
 		Subject:      routesTestSubject,
@@ -148,13 +148,13 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 	}, nil).Maybe()
 	// /forgot-password looks the address up before deciding what to render. No account
 	// means no mail is sent, which keeps these cases about the limiter alone.
-	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*models.User)(nil), nil).Maybe()
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*record.User)(nil), nil).Maybe()
 	// What the OTP step reads: the user the auth context names, not yet enrolled, and the
 	// client whose branding the form carries.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-		Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
+		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientId).
-		Return(&models.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
+		Return(&record.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
 	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
 
 	// The limiter on, which initRoutes reads when it builds the limiter.

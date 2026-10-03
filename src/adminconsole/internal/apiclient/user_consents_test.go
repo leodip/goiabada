@@ -10,7 +10,7 @@ import (
 )
 
 // The consents page reads the client's identifier and description off the consent itself, where it
-// used to read them off a models.Client the console assembled beside it, and it dates each row from
+// used to read them off a record.Client the console assembled beside it, and it dates each row from
 // grantedAt. All three are flat keys on the wire and none of them is the consent's own id, so a
 // decode that filled the id and nothing else would render a table of blank rows.
 func TestAuthServerClient_GetUserConsentsDecodesTheClientColumnsAndTheGrant(t *testing.T) {

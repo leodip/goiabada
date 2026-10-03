@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -85,7 +85,7 @@ func TestHandleClientLogoGet_HasLogo(t *testing.T) {
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -108,7 +108,7 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
 	req = setChiURLParam(req, "id", "123")
@@ -201,7 +201,7 @@ func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", invalidImageData)
@@ -232,7 +232,7 @@ func TestHandleClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) 
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, 64)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	pictureData := createTestPNG(100, 100)
 	require.Greater(t, len(pictureData), 64)
@@ -259,7 +259,7 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 	adminSub := "admin-user-sub"
 
 	pictureData := createTestPNG(100, 100)
@@ -271,7 +271,7 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
-	database.On("CreateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
+	database.On("CreateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *record.ClientLogo) bool {
 		return cl.ClientId == int64(123) && cl.ContentType == "image/png"
 	})).Return(nil)
 
@@ -295,8 +295,8 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
-	existingLogo := &models.ClientLogo{
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	existingLogo := &record.ClientLogo{
 		Id:          1,
 		ClientId:    123,
 		Logo:        []byte("old logo data"),
@@ -313,7 +313,7 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(existingLogo, nil)
-	database.On("UpdateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
+	database.On("UpdateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *record.ClientLogo) bool {
 		return cl.Id == existingLogo.Id && cl.ContentType == "image/png"
 	})).Return(nil)
 
@@ -404,7 +404,7 @@ func TestHandleClientLogoDelete_Success(t *testing.T) {
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 	adminSub := "admin-user-sub"
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
@@ -435,7 +435,7 @@ func TestHandleClientLogoDelete_DatabaseError(t *testing.T) {
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
 	req = setChiURLParam(req, "id", "123")

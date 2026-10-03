@@ -7,7 +7,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,7 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theRequestsContext(), mock.Anything).
-		Return([]models.KeyPair{}, nil).Once()
+		Return([]record.KeyPair{}, nil).Once()
 	jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -42,7 +42,7 @@ func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetSettingsById", theRequestsContext(), mock.Anything, int64(1)).
-		Return(&models.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
+		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	NewPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))

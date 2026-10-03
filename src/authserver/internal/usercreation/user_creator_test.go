@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,14 +36,14 @@ const accountPermissionId = int64(31)
 
 // expectAccountPermissionLookup registers the two reads that precede the transaction: the
 // authserver resource and its permissions.
-func expectAccountPermissionLookup(db *mocks_data.Database, permissions []models.Permission) {
+func expectAccountPermissionLookup(db *mocks_data.Database, permissions []record.Permission) {
 	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
-		Return(&models.Resource{Id: 3}, nil).Once()
+		Return(&record.Resource{Id: 3}, nil).Once()
 	db.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return(permissions, nil).Once()
 }
 
-func accountPermissions() []models.Permission {
-	return []models.Permission{
+func accountPermissions() []record.Permission {
+	return []record.Permission{
 		{Id: 30, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier + "-lookalike"},
 		{Id: accountPermissionId, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier},
 	}
@@ -56,11 +56,11 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 	var calls []string
 	stub := mocks_data.ExpectRunInTransaction(db, txSentinel)
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		created := args.Get(2).(*models.User)
+		created := args.Get(2).(*record.User)
 		created.Id = 77 // stand in for the generated primary key
 		calls = append(calls, "user row")
 	}).Return(nil).Once()
-	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.MatchedBy(func(up *models.UserPermission) bool {
+	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.MatchedBy(func(up *record.UserPermission) bool {
 		return up.UserId == 77 && up.PermissionId == accountPermissionId
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
@@ -121,7 +121,7 @@ func TestCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.T) {
 
 func TestCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTransaction(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	expectAccountPermissionLookup(db, []models.Permission{
+	expectAccountPermissionLookup(db, []record.Permission{
 		{Id: 30, PermissionIdentifier: "something-else"},
 	})
 
@@ -170,11 +170,11 @@ func TestCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 	ids := []int64{77, 78}
 	var permissionUserIds []int64
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		args.Get(2).(*models.User).Id = ids[0]
+		args.Get(2).(*record.User).Id = ids[0]
 		ids = ids[1:]
 	}).Return(nil).Twice()
 	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		permissionUserIds = append(permissionUserIds, args.Get(2).(*models.UserPermission).UserId)
+		permissionUserIds = append(permissionUserIds, args.Get(2).(*record.UserPermission).UserId)
 	}).Return(nil).Twice()
 
 	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})

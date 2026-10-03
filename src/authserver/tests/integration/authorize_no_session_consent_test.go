@@ -11,20 +11,20 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -32,7 +32,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -48,7 +48,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -137,7 +137,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -154,12 +154,12 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -167,7 +167,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -183,7 +183,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -275,7 +275,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -292,12 +292,12 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -305,7 +305,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -321,7 +321,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -415,7 +415,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -432,12 +432,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -445,7 +445,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -461,7 +461,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -559,7 +559,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -576,12 +576,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -589,7 +589,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -614,7 +614,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -720,7 +720,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -737,12 +737,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -750,7 +750,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -775,7 +775,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -885,7 +885,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -902,12 +902,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -915,7 +915,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -932,7 +932,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	userEmail := fake.Email()
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        userEmail,
@@ -1038,7 +1038,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1055,12 +1055,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1068,7 +1068,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -1085,7 +1085,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	userEmail := fake.Email()
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        userEmail,
@@ -1195,7 +1195,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1212,12 +1212,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1225,7 +1225,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -1250,7 +1250,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -1356,7 +1356,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1373,12 +1373,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1386,7 +1386,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -1411,7 +1411,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -1521,7 +1521,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, models.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
@@ -1538,12 +1538,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCancelled(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1551,7 +1551,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -1567,7 +1567,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -1668,12 +1668,12 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsCancelled(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1681,7 +1681,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -1697,7 +1697,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -1786,12 +1786,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsCancelled(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1799,7 +1799,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -1824,7 +1824,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -1925,12 +1925,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsCancelled(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1938,7 +1938,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -1955,7 +1955,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	userEmail := fake.Email()
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        userEmail,
@@ -2056,12 +2056,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsCancelled(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -2069,7 +2069,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -2094,7 +2094,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
@@ -2200,12 +2200,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 // asserts the denial survives into both the code the client is handed and the persisted consent
 // row, which is the part no mock-backed test reaches (#79).
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScopes_DeniedScopeIsNotGranted(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -2213,7 +2213,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -2229,7 +2229,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

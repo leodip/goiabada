@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	mocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -22,15 +22,15 @@ func TestWorker_PerformTask_SweepsFamilyRevocationsAfterTheTokens(t *testing.T) 
 	worker := New(mockDB)
 
 	var order []string
-	record := func(step string) func(mock.Arguments) {
+	recordStep := func(step string) func(mock.Arguments) {
 		return func(mock.Arguments) { order = append(order, step) }
 	}
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).
-		Run(record("tokens")).Return(nil).Once()
+		Run(recordStep("tokens")).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).
-		Run(record("families")).Return(nil).Once()
+		Run(recordStep("families")).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).
-		Run(record("codes")).Return(nil).Once()
+		Run(recordStep("codes")).Return(nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	worker.performTask(context.Background())
@@ -49,7 +49,7 @@ func TestWorker_PerformTask_ContinuesAfterTheFamilySweepFails(t *testing.T) {
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}, nil).Once()

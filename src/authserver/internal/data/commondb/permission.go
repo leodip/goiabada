@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error {
+func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error {
 
 	if permission.ResourceId == 0 {
 		return errs.New("can't create permission with resource_id 0")
@@ -23,7 +23,7 @@ func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission 
 	permission.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	permission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
+	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
 		For(d.Flavor)
 
 	insertBuilder := permissionStruct.WithoutTag("pk").InsertInto("permissions", permission)
@@ -39,7 +39,7 @@ func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission 
 	return nil
 }
 
-func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error {
+func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error {
 
 	if permission.Id == 0 {
 		return errs.New("can't update permission with id 0")
@@ -48,7 +48,7 @@ func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission 
 	originalUpdatedAt := permission.UpdatedAt
 	permission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
+	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
 		For(d.Flavor)
 
 	updateBuilder := permissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("permissions", permission)
@@ -65,7 +65,7 @@ func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission 
 }
 
 func (d *Database) getPermissionCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
+	permissionStruct *sqlbuilder.Struct) (*record.Permission, error) {
 
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySQL(ctx, tx, sql, args...)
@@ -74,7 +74,7 @@ func (d *Database) getPermissionCommon(ctx context.Context, tx *sql.Tx, selectBu
 	}
 	defer func() { _ = rows.Close() }()
 
-	var permission models.Permission
+	var permission record.Permission
 	if rows.Next() {
 		addr := permissionStruct.Addr(&permission)
 		err = rows.Scan(addr...)
@@ -90,9 +90,9 @@ func (d *Database) getPermissionCommon(ctx context.Context, tx *sql.Tx, selectBu
 	return nil, nil
 }
 
-func (d *Database) GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error) {
+func (d *Database) GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error) {
 
-	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
+	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
 		For(d.Flavor)
 
 	selectBuilder := permissionStruct.SelectFrom("permissions")
@@ -106,9 +106,9 @@ func (d *Database) GetPermissionById(ctx context.Context, tx *sql.Tx, permission
 	return permission, nil
 }
 
-func (d *Database) GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error) {
+func (d *Database) GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error) {
 
-	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
+	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
 		For(d.Flavor)
 
 	selectBuilder := permissionStruct.SelectFrom("permissions")
@@ -121,9 +121,9 @@ func (d *Database) GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, r
 	}
 	defer func() { _ = rows.Close() }()
 
-	var permissions []models.Permission
+	var permissions []record.Permission
 	for rows.Next() {
-		var permission models.Permission
+		var permission record.Permission
 		addr := permissionStruct.Addr(&permission)
 		err = rows.Scan(addr...)
 		if err != nil {
@@ -139,7 +139,7 @@ func (d *Database) GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, r
 	return permissions, nil
 }
 
-func (d *Database) PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error {
+func (d *Database) PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error {
 
 	if permissions == nil {
 		return nil
@@ -155,7 +155,7 @@ func (d *Database) PermissionsLoadResources(ctx context.Context, tx *sql.Tx, per
 		return errs.Wrap(err, "unable to get resources for permissions")
 	}
 
-	resourceMap := make(map[int64]models.Resource, len(resources))
+	resourceMap := make(map[int64]record.Resource, len(resources))
 	for _, resource := range resources {
 		resourceMap[resource.Id] = resource
 	}
@@ -167,16 +167,16 @@ func (d *Database) PermissionsLoadResources(ctx context.Context, tx *sql.Tx, per
 	return nil
 }
 
-func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissionIds []int64) ([]models.Permission, error) {
+func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissionIds []int64) ([]record.Permission, error) {
 
 	if len(permissionIds) == 0 {
 		return nil, nil
 	}
 
-	var permissions []models.Permission
+	var permissions []record.Permission
 
 	err := forEachIdBatch(permissionIds, func(batch []int64) error {
-		permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
+		permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
 			For(d.Flavor)
 
 		selectBuilder := permissionStruct.SelectFrom("permissions")
@@ -190,7 +190,7 @@ func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissi
 		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
-			var permission models.Permission
+			var permission record.Permission
 			addr := permissionStruct.Addr(&permission)
 			err = rows.Scan(addr...)
 			if err != nil {
@@ -214,7 +214,7 @@ func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissi
 
 func (d *Database) DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(models.Permission)).
+	clientStruct := sqlbuilder.NewStruct(new(record.Permission)).
 		For(d.Flavor)
 
 	deleteBuilder := clientStruct.DeleteFrom("permissions")

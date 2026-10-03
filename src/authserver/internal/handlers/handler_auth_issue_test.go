@@ -18,8 +18,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -54,18 +54,18 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handl
 	permissionChecker *mocks_handlers.PermissionChecker, redirectURI string) {
 
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
-		Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil).Maybe()
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil).Maybe()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			client := args.Get(2).(*models.Client)
-			client.RedirectURIs = []models.RedirectURI{{URI: redirectURI}}
+			client := args.Get(2).(*record.Client)
+			client.RedirectURIs = []record.RedirectURI{{URI: redirectURI}}
 		}).Return(nil).Maybe()
 	database.On("GetUserById", mock.Anything, mock.Anything, mock.Anything).
-		Return(&models.User{Id: 1, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
+		Return(&record.User{Id: 1, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 	userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).
 		Return(true).Maybe()
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
-		Return(func(_ context.Context, scope string, _ *models.User) string { return scope }, nil).Maybe()
+		Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
 }
 
 func TestHandleIssueGet(t *testing.T) {
@@ -175,7 +175,7 @@ func TestHandleIssueGet(t *testing.T) {
 		stubLiveSession(database, 123)
 
 		// Mock code creation
-		mockCode := &models.Code{
+		mockCode := &record.Code{
 			Id:          1,
 			Code:        "test-code",
 			ClientId:    1,
@@ -777,7 +777,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input, newCreateCodeInput(f.authContext, liveSessionIdentifier))
 		})).Run(func(mock.Arguments) { order = append(order, "issued") }).
-			Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
+			Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).
 			Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
@@ -802,10 +802,10 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 
 		clearErr := errs.New("the session store is unreachable")
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&models.Code{Id: 1, Code: "first-code", ClientId: 1,
+			Return(&record.Code{Id: 1, Code: "first-code", ClientId: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&models.Code{Id: 2, Code: "second-code", ClientId: 1,
+			Return(&record.Code{Id: 2, Code: "second-code", ClientId: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Twice()
 		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req).Return(clearErr).Once()
@@ -887,10 +887,10 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			assert.Equal(t, []string{"issued", "save"}, order)
 
 			if refusal.warns {
-				record, ok := warningSaying(t, logs, "the client this ceremony is issuing for no longer exists")
+				warning, ok := warningSaying(t, logs, "the client this ceremony is issuing for no longer exists")
 				if ok {
-					assert.Equal(t, "test-client", record.Attrs["client_identifier"])
-					assert.Equal(t, liveSessionIdentifier, record.Attrs["session_identifier"])
+					assert.Equal(t, "test-client", warning.Attrs["client_identifier"])
+					assert.Equal(t, liveSessionIdentifier, warning.Attrs["session_identifier"])
 				}
 			} else {
 				noRecordSays(t, logs, "no longer exists")
@@ -1186,9 +1186,9 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		stubLiveSession(database, 123)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
+			Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-			Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
+			Return(&record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
 		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.User.Id == int64(123) && input.SessionIdentifier == liveSessionIdentifier
@@ -1380,7 +1380,7 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 // belongs to and a subtest that wants the gate to pass has to name its own ceremony's user.
 func stubLiveSession(database *mocks_data.Database, ownerUserId int64) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
+		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
 }
 
 // The records are read whole rather than as rendered text, because two of the properties decision
@@ -1397,9 +1397,9 @@ func warningSaying(t *testing.T, logs *logtest.SlogCapture, discriminator string
 	t.Helper()
 	captured := logs.Records()
 	var matched []logtest.CapturedRecord
-	for _, record := range captured {
-		if record.Level == slog.LevelWarn && strings.Contains(record.Message, discriminator) {
-			matched = append(matched, record)
+	for _, logRecord := range captured {
+		if logRecord.Level == slog.LevelWarn && strings.Contains(logRecord.Message, discriminator) {
+			matched = append(matched, logRecord)
 		}
 	}
 	if !assert.Len(t, matched, 1,
@@ -1414,8 +1414,8 @@ func warningSaying(t *testing.T, logs *logtest.SlogCapture, discriminator string
 // failure, not merely its appearance on the record examined above.
 func noRecordSays(t *testing.T, logs *logtest.SlogCapture, phrase string) {
 	t.Helper()
-	for _, record := range logs.Records() {
-		assert.NotContains(t, record.Message, phrase, "no record should say %q here", phrase)
+	for _, logRecord := range logs.Records() {
+		assert.NotContains(t, logRecord.Message, phrase, "no record should say %q here", phrase)
 	}
 }
 
@@ -1425,11 +1425,11 @@ func noRecordSays(t *testing.T, logs *logtest.SlogCapture, phrase string) {
 // whole record of an account takeover attempt that got as far as issuance (#133).
 func assertWarnedForeignSession(t *testing.T, logs *logtest.SlogCapture, ceremonyUserId int64) {
 	t.Helper()
-	record, ok := warningSaying(t, logs, "belongs to a different user")
+	warning, ok := warningSaying(t, logs, "belongs to a different user")
 	if !ok {
 		return
 	}
-	attrs := record.Attrs
+	attrs := warning.Attrs
 	assert.Equal(t, foreignSessionUserId, attrs["session_user_id"],
 		"the ambient session's owner, on the record that names the refusal")
 	assert.Equal(t, ceremonyUserId, attrs["ceremony_user_id"],
@@ -1443,11 +1443,11 @@ func assertWarnedForeignSession(t *testing.T, logs *logtest.SlogCapture, ceremon
 // it. An operator handed one here would be reading an owner nothing established.
 func assertWarnedSessionGone(t *testing.T, logs *logtest.SlogCapture) {
 	t.Helper()
-	record, ok := warningSaying(t, logs, "is gone")
+	warning, ok := warningSaying(t, logs, "is gone")
 	if !ok {
 		return
 	}
-	attrs := record.Attrs
+	attrs := warning.Attrs
 	assert.NotContains(t, attrs, "sessionUserId")
 	assert.NotContains(t, attrs, "ceremonyUserId")
 	noRecordSays(t, logs, "belongs to a different user")
@@ -1535,7 +1535,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		assert.NoError(t, err)
 
 		// The issuer is handed the request's own settings, matched by identity below.
-		requestSettings := &models.Settings{Issuer: "https://issuer.example",
+		requestSettings := &record.Settings{Issuer: "https://issuer.example",
 			UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds, UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds}
 		req = withSettings(req, requestSettings)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -1563,7 +1563,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// Mock client lookup
-		mockClient := &models.Client{
+		mockClient := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "test-client",
 			Enabled:                  true,
@@ -1573,7 +1573,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		// Mock user lookup
-		mockUser := &models.User{
+		mockUser := &record.User{
 			Id:                  123,
 			Subject:             "11111111-1111-1111-1111-111111111111",
 			Email:               "test@example.com",
@@ -1662,7 +1662,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{
+		mockClient := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "test-client",
 			Enabled:                  true,
@@ -1671,7 +1671,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{
+		mockUser := &record.User{
 			Id:                  123,
 			Subject:             "11111111-1111-1111-1111-111111111111",
 			Email:               "test@example.com",
@@ -1753,7 +1753,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{
+		mockClient := &record.Client{
 			Id:                       1,
 			ClientIdentifier:         "test-client",
 			Enabled:                  true,
@@ -1762,7 +1762,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{
+		mockUser := &record.User{
 			Id:                  123,
 			Subject:             "11111111-1111-1111-1111-111111111111",
 			Email:               "test@example.com",
@@ -1842,10 +1842,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
+		mockUser := &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -1968,7 +1968,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(999)).Return(nil, nil)
@@ -2017,10 +2017,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
+		mockUser := &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenError := errs.New("token generation failed")
@@ -2361,7 +2361,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		dbError := errs.New("user database error")
@@ -2411,10 +2411,10 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
+		mockUser := &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2524,7 +2524,7 @@ func TestIssueAuthCode(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
 			State:       "test_state",
@@ -2541,7 +2541,7 @@ func TestIssueAuthCode(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
 			State:       "test_state",
@@ -2558,7 +2558,7 @@ func TestIssueAuthCode(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
 			State:       "test_state",
@@ -2584,7 +2584,7 @@ func TestIssueAuthCode(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
 			State:       "test_state",
@@ -2601,7 +2601,7 @@ func TestIssueAuthCode(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
 			State:       "test_state",
@@ -2667,7 +2667,7 @@ func TestIssueAuthCode(t *testing.T) {
 					w := httptest.NewRecorder()
 					r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 					r = withSessionSettings(r)
-					code := &models.Code{
+					code := &record.Code{
 						Code:        "test_code",
 						RedirectURI: tc.redirectURI,
 						State:       "test_state",
@@ -2706,7 +2706,7 @@ func TestIssueAuthCode(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "http://127.0.0.1/cb?a=1",
 			State:       "test_state",
@@ -2737,7 +2737,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
 			State:       "client-csrf-token",
@@ -2756,7 +2756,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?code=stale",
 			State:       "abc123",
@@ -2777,7 +2777,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?lang=en;mode=dark",
 			State:       "abc123",
@@ -2797,7 +2797,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
 			State:       "client-csrf-token",
@@ -2820,7 +2820,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
 			State:       "",
@@ -2840,7 +2840,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{
+		code := &record.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?error=stale&error_description=stale-detail&lang=en",
 			State:       "client-csrf-token",
@@ -2871,7 +2871,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
@@ -2883,7 +2883,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
@@ -2895,7 +2895,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
@@ -2907,7 +2907,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
@@ -2928,7 +2928,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
 		err := issueAuthCode(w, r, nil, code, "query")
 
@@ -2941,7 +2941,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
@@ -2954,7 +2954,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
 		// form_post carries the value in a form field rather than a URI, so what has to survive is
 		// the raw string reaching the template, HTML-escaped by html/template and nothing else.
@@ -2982,7 +2982,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
@@ -2999,7 +2999,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		r = withSessionSettings(r)
-		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
+		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
 		// The companion to the buffering case below. A failed render must leave the response
 		// completely untouched, headers included, so the caller's last-resort 500 answers with its
@@ -3029,7 +3029,7 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 	r = withSessionSettings(r)
-	code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
+	code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
 	// Parses cleanly and fails at the index call, after the prefix has been walked. Rendering
 	// straight to w writes that prefix before the failure; rendering to a buffer writes nothing.
@@ -3088,7 +3088,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 				r = withSessionSettings(r)
-				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
+				code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
 				templateFS := fstest.MapFS{
 					"form_post.html": {Data: []byte(keysTemplate)},
@@ -3160,7 +3160,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 				r = withSessionSettings(r)
-				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
+				code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
 				err := issueAuthCode(w, r, web.TemplateFS(), code, "form_post")
 
@@ -3251,7 +3251,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// Mock user lookup - subject matches IdTokenHintSub
-		mockUser := &models.User{
+		mockUser := &record.User{
 			Id:      1,
 			Subject: userSubject,
 			Email:   "test@example.com",
@@ -3262,7 +3262,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		stubLiveSession(database, 1)
 
 		// Mock code creation
-		mockCode := &models.Code{
+		mockCode := &record.Code{
 			Id:          1,
 			Code:        "test-code",
 			ClientId:    1,
@@ -3338,7 +3338,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		stubClientProvenanceLookup(database)
 
 		// Mock user lookup - authenticated user is user B (DIFFERENT)
-		mockUser := &models.User{
+		mockUser := &record.User{
 			Id:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3421,7 +3421,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 			Id:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3499,7 +3499,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 			Id:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3569,7 +3569,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 			Id:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3637,7 +3637,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		stubLiveSession(database, 1)
 
 		// Mock code creation
-		mockCode := &models.Code{
+		mockCode := &record.Code{
 			Id:          1,
 			Code:        "test-code",
 			ClientId:    1,
@@ -3717,7 +3717,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			return savedAuthContext
 		}, nil)
 
-		mockUserB := &models.User{
+		mockUserB := &record.User{
 			Id:      99,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3732,8 +3732,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// shadow it and leave it unmet.
 		database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
-				client := args.Get(2).(*models.Client)
-				client.RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+				client := args.Get(2).(*record.Client)
+				client.RedirectURIs = []record.RedirectURI{{URI: "https://example.com/callback"}}
 			}).Return(nil)
 
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
@@ -3853,31 +3853,31 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
-					client := args.Get(2).(*models.Client)
+					client := args.Get(2).(*record.Client)
 					client.RedirectURIs = nil
 					for _, uri := range tc.registered {
-						client.RedirectURIs = append(client.RedirectURIs, models.RedirectURI{URI: uri})
+						client.RedirectURIs = append(client.RedirectURIs, record.RedirectURI{URI: uri})
 					}
 				}).Return(nil)
 
 			// Everything below the gate, armed as a pass so that a row reaching it gets there on
 			// its own merits. A refused row touches none of these, which is why they are Maybe().
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-				Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
+				Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true).Maybe()
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-				Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
+				Return(&record.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
-				Return(func(_ context.Context, scope string, _ *models.User) string { return scope }, nil).Maybe()
+				Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
 			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
 				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
+					Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
 				auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -3955,7 +3955,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-	issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+	issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).Return(nil)
 
@@ -4034,11 +4034,11 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
-					args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+					args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: "https://example.com/callback"}}
 				}).Return(nil)
 
 			// Present and OWNED, so #129's liveness test and #133's ownership test both pass it.
@@ -4046,7 +4046,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 
 			// The one thing that refuses it, and nil is what says max_age is not re-applied.
 			userSessionManager.On("HasValidUserSession",
-				mock.MatchedBy(func(session *models.UserSession) bool {
+				mock.MatchedBy(func(session *record.UserSession) bool {
 					return session != nil && session.SessionIdentifier == liveSessionIdentifier
 				}),
 				testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(false)
@@ -4084,9 +4084,9 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			// The operator's line has to say WHICH of the three shapes refused. #133's sentence
 			// would claim an owner mismatch that did not happen, and #129's would claim a row
 			// that did not resolve.
-			record, ok := warningSaying(t, logs, "no longer within its idle timeout or maximum lifetime")
+			warning, ok := warningSaying(t, logs, "no longer within its idle timeout or maximum lifetime")
 			if ok {
-				assert.Equal(t, liveSessionIdentifier, record.Attrs["session_identifier"])
+				assert.Equal(t, liveSessionIdentifier, warning.Attrs["session_identifier"])
 			}
 			noRecordSays(t, logs, "belongs to a different user")
 			noRecordSays(t, logs, "is gone")
@@ -4185,17 +4185,17 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
-					args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+					args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: "https://example.com/callback"}}
 				}).Return(nil)
 
 			stubLiveSession(database, 123)
 			userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true)
 
-			user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
+			user := &record.User{Id: 123, Subject: fake.UUID(), Enabled: true}
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 
 			// The field the filter is asked about is the one the issuer will read, and asserting
@@ -4213,7 +4213,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 					return input.Scope == tc.wantScope &&
 						input.ConsentedScope == tc.wantConsented
-				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
+				})).Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1,
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
@@ -4269,13 +4269,13 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
-		arm     func(*mocks_data.Database, *mocks_handlers.PermissionChecker, *models.Client)
+		arm     func(*mocks_data.Database, *mocks_handlers.PermissionChecker, *record.Client)
 		wantErr string
 		why     string
 	}{
 		{
 			name: "the registration load fails",
-			arm: func(database *mocks_data.Database, _ *mocks_handlers.PermissionChecker, client *models.Client) {
+			arm: func(database *mocks_data.Database, _ *mocks_handlers.PermissionChecker, client *record.Client) {
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).
 					Return(errs.New("registration read sentinel"))
 			},
@@ -4286,16 +4286,16 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		},
 		{
 			name: "the permission filter fails",
-			arm: func(database *mocks_data.Database, permissionChecker *mocks_handlers.PermissionChecker, client *models.Client) {
+			arm: func(database *mocks_data.Database, permissionChecker *mocks_handlers.PermissionChecker, client *record.Client) {
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).
 					Run(func(args mock.Arguments) {
-						args.Get(2).(*models.Client).RedirectURIs =
-							[]models.RedirectURI{{URI: "https://example.com/callback"}}
+						args.Get(2).(*record.Client).RedirectURIs =
+							[]record.RedirectURI{{URI: "https://example.com/callback"}}
 					}).Return(nil)
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-					Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
+					Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
 				database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-					Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
+					Return(&record.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
 				permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", mock.Anything).
 					Return("", errs.New("permission filter sentinel"))
 			},
@@ -4335,7 +4335,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 
 			// Only reached on the second row, and only because its own arming got that far.
@@ -4411,12 +4411,12 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
-				args.Get(2).(*models.Client).RedirectURIs =
-					[]models.RedirectURI{{URI: "https://other.example/cb"}}
+				args.Get(2).(*record.Client).RedirectURIs =
+					[]record.RedirectURI{{URI: "https://other.example/cb"}}
 			}).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.Anything).Return()
@@ -4482,12 +4482,12 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
-				args.Get(2).(*models.Client).RedirectURIs =
-					[]models.RedirectURI{{URI: "https://other.example/cb"}}
+				args.Get(2).(*record.Client).RedirectURIs =
+					[]record.RedirectURI{{URI: "https://other.example/cb"}}
 			}).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.Anything).Return()
@@ -4551,19 +4551,19 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 		// The gate's own registration read, and separately the emitter's: the refusal below is an
 		// answer to the client, so it passes through redirectWillBeEmitted too (#241 decision 11).
-		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
-				args.Get(2).(*models.Client).RedirectURIs =
-					[]models.RedirectURI{{URI: "https://example.com/callback"}}
+				args.Get(2).(*record.Client).RedirectURIs =
+					[]record.RedirectURI{{URI: "https://example.com/callback"}}
 			}).Return(nil)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 
 		stubLiveSession(database, 123)
 		userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true)
 
-		user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
+		user := &record.User{Id: 123, Subject: fake.UUID(), Enabled: true}
 		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
@@ -4724,7 +4724,7 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		UserAgent:           "user-agent-value",
 		IpAddress:           "203.0.113.7",
 		UserId:              42,
-		AcrLevel:            models.AcrLevel2Optional,
+		AcrLevel:            record.AcrLevel2Optional,
 		AuthMethods:         "pwd otp",
 		AuthenticatedAt:     &authenticatedAt,
 		AuthStateGeneration: 9,
@@ -4748,7 +4748,7 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		UserAgent:           "user-agent-value",
 		IpAddress:           "203.0.113.7",
 		UserId:              42,
-		AcrLevel:            models.AcrLevel2Optional,
+		AcrLevel:            record.AcrLevel2Optional,
 		AuthMethods:         "pwd otp",
 		AuthenticatedAt:     &authenticatedAt,
 		AuthStateGeneration: 9,

@@ -14,8 +14,8 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
@@ -40,11 +40,11 @@ func stubSweep(database *mocks_data.Database, userId int64, newGeneration int64)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, newGeneration).
 		Return(nil).Once()
 	database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).
-		Return([]models.UserSession{}, nil).Once()
+		Return([]record.UserSession{}, nil).Once()
 }
 
 func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current, next string) *http.Request {
@@ -58,7 +58,7 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 	req.Header.Set("Content-Type", "application/json")
 	// The handler reads the password policy off the request's settings and passes it to the
 	// validator, so settings must be there or it panics on the type assertion.
-	ctx := reqctx.WithSettings(req.Context(), &models.Settings{PasswordPolicy: models.PasswordPolicyLow})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{PasswordPolicy: record.PasswordPolicyLow})
 	return setTokenContextWithClaims(req.WithContext(ctx), claims)
 }
 
@@ -73,11 +73,11 @@ func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
-		Return(&models.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
 
 	// accountPasswordRequest carries PasswordPolicyLow; matching that value, not any, is the
 	// assertion.
-	passwordValidator.On("ValidatePassword", models.PasswordPolicyLow, "next").
+	passwordValidator.On("ValidatePassword", record.PasswordPolicyLow, "next").
 		Return(i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": 6})).Once()
 
 	rr := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
-	user := &models.User{Id: 42, Enabled: true, PasswordHash: currentHash}
+	user := &record.User{Id: 42, Enabled: true, PasswordHash: currentHash}
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
@@ -122,18 +122,18 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(8), nil).Once()
 	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, int64(42)).
-		Return([]*models.RefreshToken{
+		Return([]*record.RefreshToken{
 			{Id: 1, RefreshTokenJti: "rt-keep", SessionIdentifier: callerSid},
 			{Id: 2, RefreshTokenJti: "rt-other", SessionIdentifier: "sid-other"},
 		}, nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, apiRevokeTx, callerSid).
-		Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-keep", SessionIdentifier: callerSid}}, nil).Once()
-	database.On("UpdateRefreshToken", mock.Anything, apiRevokeTx, mock.MatchedBy(func(rt *models.RefreshToken) bool {
+		Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-keep", SessionIdentifier: callerSid}}, nil).Once()
+	database.On("UpdateRefreshToken", mock.Anything, apiRevokeTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
 		return rt.Id == 2
 	})).Return(nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{1}, int64(8)).Return(nil).Once()
 	database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, int64(42)).
-		Return([]models.UserSession{
+		Return([]record.UserSession{
 			{Id: 100, SessionIdentifier: callerSid},
 			{Id: 200, SessionIdentifier: "sid-other"},
 		}, nil).Once()
@@ -197,7 +197,7 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 	require.NoError(t, err)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-		Return(&models.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	stubSweep(database, 42, 8)
 
@@ -244,7 +244,7 @@ func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	require.NoError(t, err)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
-		Return(&models.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
 	stub := mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).

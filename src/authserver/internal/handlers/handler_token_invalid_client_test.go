@@ -15,8 +15,8 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 )
 
@@ -35,14 +35,14 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 	encryptedSecret, err := testDataCipher.Encrypt(theSecret)
 	require.NoError(t, err)
 
-	confidential := func(enabled bool) *models.Client {
-		return &models.Client{Id: 7, ClientIdentifier: "the_client", Enabled: enabled,
+	confidential := func(enabled bool) *record.Client {
+		return &record.Client{Id: 7, ClientIdentifier: "the_client", Enabled: enabled,
 			ClientCredentialsEnabled: true, ClientSecretEncrypted: encryptedSecret}
 	}
 
 	rows := []struct {
 		name   string
-		client *models.Client
+		client *record.Client
 		secret string
 		want   string
 	}{
@@ -73,7 +73,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 				}
 				req, err := http.NewRequest("POST", "/auth/token", strings.NewReader(form.Encode()))
 				require.NoError(t, err)
-				req = withSettings(req, &models.Settings{})
+				req = withSettings(req, &record.Settings{})
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 				if basic {
 					req.Header.Set("Authorization", "Basic "+
@@ -103,7 +103,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 
 		req, err := http.NewRequest("POST", "/auth/token", strings.NewReader("grant_type=client_credentials"))
 		require.NoError(t, err)
-		req = withSettings(req, &models.Settings{})
+		req = withSettings(req, &record.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		rr := httptest.NewRecorder()

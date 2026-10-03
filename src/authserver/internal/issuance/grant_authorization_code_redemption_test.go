@@ -10,7 +10,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -25,10 +25,10 @@ import (
 
 // armCodeMint arms every read and write minting a code's tokens makes, on a fixture whose scope is
 // openid alone, and notes "mint" at the first of them.
-func armCodeMint(t *testing.T, mockDB *mocks_data.Database, note func(string)) *models.Code {
+func armCodeMint(t *testing.T, mockDB *mocks_data.Database, note func(string)) *record.Code {
 	t.Helper()
 	now := time.Now().UTC()
-	code := &models.Code{
+	code := &record.Code{
 		Id:                2,
 		ClientId:          2,
 		UserId:            2,
@@ -37,11 +37,11 @@ func armCodeMint(t *testing.T, mockDB *mocks_data.Database, note func(string)) *
 		SessionIdentifier: "sid-2",
 		AcrLevel:          "urn:goiabada:level1",
 		AuthMethods:       "pwd",
-		Client:            models.Client{Id: 2, ClientIdentifier: "the-client"},
-		User:              models.User{Id: 2, Subject: fake.UUID(), Email: "someone@example.com"},
+		Client:            record.Client{Id: 2, ClientIdentifier: "the-client"},
+		User:              record.User{Id: 2, Subject: fake.UUID(), Email: "someone@example.com"},
 	}
 	mockDB.On("CodeLoadClient", mock.Anything, (*sql.Tx)(nil), code).Run(func(mock.Arguments) { note("mint") }).Return(nil).Once()
-	mockDB.On("GetCurrentSigningKey", mock.Anything, (*sql.Tx)(nil)).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, (*sql.Tx)(nil)).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil).Once()
@@ -49,16 +49,16 @@ func armCodeMint(t *testing.T, mockDB *mocks_data.Database, note func(string)) *
 	mockDB.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), &code.User).Return(nil).Once()
 	mockDB.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), code.User.Groups).Return(nil).Once()
 	mockDB.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), &code.User).Return(nil).Once()
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-2").Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-2").Return(&record.UserSession{
 		Id: 1, UserId: 2, Started: now.Add(-30 * time.Minute), LastAccessed: now.Add(-5 * time.Minute),
 	}, nil).Once()
-	mockDB.On("CreateRefreshToken", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*models.RefreshToken")).
+	mockDB.On("CreateRefreshToken", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.RefreshToken")).
 		Run(func(mock.Arguments) { note("insert") }).Return(nil).Once()
 	return code
 }
 
-func codeGrantSettings() *models.Settings {
-	return &models.Settings{
+func codeGrantSettings() *record.Settings {
+	return &record.Settings{
 		Issuer:                          "https://test-issuer.com",
 		TokenExpirationInSeconds:        600,
 		UserSessionIdleTimeoutInSeconds: 1200,
@@ -96,7 +96,7 @@ func TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing(t *testing.T) {
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 	logs := logtest.CaptureSlog(t)
 
-	code := &models.Code{Id: 42}
+	code := &record.Code{Id: 42}
 	mockDB.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), code.Id).Return(false, nil).Once()
 
 	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
@@ -121,7 +121,7 @@ func TestIssueAuthorizationCodeGrant_AClaimFailureIsAFault(t *testing.T) {
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	failure := errs.New("connection refused")
-	code := &models.Code{Id: 1}
+	code := &record.Code{Id: 1}
 	mockDB.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), code.Id).Return(false, failure).Once()
 
 	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
@@ -139,7 +139,7 @@ func TestIssueAuthorizationCodeGrant_AFailedMintAfterTheClaimIsAFault(t *testing
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
 	failure := errs.New("connection refused")
-	code := &models.Code{Id: 1}
+	code := &record.Code{Id: 1}
 	mockDB.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), code.Id).Return(true, nil).Once()
 	mockDB.On("CodeLoadClient", mock.Anything, (*sql.Tx)(nil), code).Return(failure).Once()
 

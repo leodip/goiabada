@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
@@ -23,10 +23,10 @@ type accountSessionsDatabase interface {
 	sessionDetailsDatabase
 	revocation.Database
 
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error)
-	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
-	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
 // HandleAccountSessionsGet - GET /api/v1/account/sessions

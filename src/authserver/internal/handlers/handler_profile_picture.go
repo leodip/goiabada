@@ -7,14 +7,14 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // profilePictureDatabase is what the profile picture page needs: the caller's user row and the
 // picture attached to it.
 type profilePictureDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
-	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
 }
 
 func HandleProfilePictureGet(

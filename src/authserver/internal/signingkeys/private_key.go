@@ -5,14 +5,14 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // ParsePrivateKey decrypts a key pair's stored private-key PEM with the data cipher it is given
 // and parses it into an *rsa.PrivateKey for signing.
 //
-// It is here rather than on models.KeyPair, where it was a method until #387, because decrypting
-// and parsing a key is a capability and models.KeyPair is a persistence record: the row as it is
+// It is here rather than on record.KeyPair, where it was a method until #387, because decrypting
+// and parsing a key is a capability and record.KeyPair is a persistence record: the row as it is
 // stored. A method doing this on the record put a cipher and a JWT library behind every package
 // that names a stored row, and the record then answered a question — what does this key sign? —
 // that nothing about being a row can answer. This package already owns the other two halves of the
@@ -21,7 +21,7 @@ import (
 //
 // The error is returned as it arrives, from the cipher or from the parser, which is what the four
 // call sites expect: each wraps or answers it in its own terms.
-func ParsePrivateKey(dataCipher *encryption.DataCipher, keyPair *models.KeyPair) (*rsa.PrivateKey, error) {
+func ParsePrivateKey(dataCipher *encryption.DataCipher, keyPair *record.KeyPair) (*rsa.PrivateKey, error) {
 	pem, err := dataCipher.Decrypt(keyPair.PrivateKeyPEM)
 	if err != nil {
 		return nil, err

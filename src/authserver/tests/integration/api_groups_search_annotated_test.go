@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,9 +33,9 @@ func TestAPIGroupsSearch_Annotated_Success(t *testing.T) {
 	defer func() { _ = database.DeleteGroup(context.Background(), nil, g3.Id) }()
 
 	// Assign permission to g1 and g3
-	err := database.CreateGroupPermission(context.Background(), nil, &models.GroupPermission{GroupId: g1.Id, PermissionId: perm.Id})
+	err := database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupId: g1.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
-	err = database.CreateGroupPermission(context.Background(), nil, &models.GroupPermission{GroupId: g3.Id, PermissionId: perm.Id})
+	err = database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupId: g3.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
 	// Query page 1 with a large size to increase chance our groups are returned

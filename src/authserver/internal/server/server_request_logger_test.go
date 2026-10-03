@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 )
@@ -46,7 +46,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	t.Helper()
 
 	database := mocks_data.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{Id: 1}, nil)
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil)
 
 	// The flag initMiddleware reads when it mounts the request logger.
 	cfg := &config.Config{}

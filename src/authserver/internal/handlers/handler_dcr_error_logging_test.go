@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -45,7 +45,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := reqctx.WithSettings(req.Context(), &models.Settings{Id: 1, DynamicClientRegistrationEnabled: true})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true})
 	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, requestId)
 	req = req.WithContext(ctx)
 

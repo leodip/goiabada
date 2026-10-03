@@ -7,7 +7,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -17,7 +17,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -34,14 +34,14 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
 		TokenExpirationInSeconds:                900,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -50,7 +50,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -60,15 +60,15 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -118,7 +118,7 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -134,13 +134,13 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 1209600,
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -149,7 +149,7 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -159,15 +159,15 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -198,7 +198,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -215,11 +215,11 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:         1,
 		Subject:    sub,
 		Email:      "user@example.com",
@@ -230,7 +230,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 		Enabled:    true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -240,16 +240,16 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -278,7 +278,7 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -295,11 +295,11 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -308,7 +308,7 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -318,15 +318,15 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -353,7 +353,7 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -369,11 +369,11 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -382,7 +382,7 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -392,15 +392,15 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -436,7 +436,7 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -452,11 +452,11 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -465,7 +465,7 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -475,18 +475,18 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 	// Set up mock expectations with groups - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{
 			{Id: 1, GroupIdentifier: "admins", IncludeInAccessToken: true, IncludeInIdToken: true},
 			{Id: 2, GroupIdentifier: "users", IncludeInAccessToken: true, IncludeInIdToken: false},
 		}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -520,7 +520,7 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -536,11 +536,11 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -549,7 +549,7 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -559,15 +559,15 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -592,7 +592,7 @@ func TestIssuePasswordGrant_DatabaseError_GetSigningKey(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -600,11 +600,11 @@ func TestIssuePasswordGrant_DatabaseError_GetSigningKey(t *testing.T) {
 	ctx := context.Background()
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:       1,
 		Subject:  sub,
 		Email:    "user@example.com",
@@ -635,7 +635,7 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -651,11 +651,11 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:       1,
 		Subject:  sub,
 		Email:    "user@example.com",
@@ -663,7 +663,7 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 		Enabled:  true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -673,15 +673,15 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 	// Set up mock expectations with CreateRefreshToken error
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(fmt.Errorf("refresh token creation failed"))
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(fmt.Errorf("refresh token creation failed"))
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -703,7 +703,7 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600, // Global setting
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -719,12 +719,12 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "test-client",
 		TokenExpirationInSeconds: 1800, // Client-specific override
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -733,7 +733,7 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -743,15 +743,15 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,
@@ -773,7 +773,7 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600, // Global setting
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -789,12 +789,12 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	sub := fake.UUID()
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       1,
 		ClientIdentifier:         "test-client",
 		TokenExpirationInSeconds: 0, // No client override
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
@@ -803,7 +803,7 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 		Enabled:       true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -813,15 +813,15 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Groups = []models.Group{}
+		u := args.Get(2).(*record.User)
+		u.Groups = []record.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(2).(*models.User)
-		u.Attributes = []models.UserAttribute{}
+		u := args.Get(2).(*record.User)
+		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
 		Client: client,

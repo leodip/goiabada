@@ -7,14 +7,14 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // keyRotationStore is what the startup task reads and writes: the signing keys, one of which is
 // the canary, and the re-key the decision ends in.
 type keyRotationStore interface {
-	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
 	ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error
 }
 

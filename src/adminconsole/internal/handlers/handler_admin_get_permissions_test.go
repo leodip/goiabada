@@ -143,7 +143,7 @@ func TestAdminGetPermissions_AMissingResourceStillAnswers404(t *testing.T) {
 // The success path, so the rows above cannot be satisfied by a handler that fails everything.
 //
 // The literal is also this endpoint's wire shape, and it moved. The array used to hold
-// models.Permission, which declares no json tags, so its members reached the console's own scripts
+// record.Permission, which declares no json tags, so its members reached the console's own scripts
 // as "PermissionIdentifier"; they are api.PermissionResponse now and arrive lowerCamelCase. The
 // three scripts that read this body moved with it (#350). The outer "Permissions" key did not: it
 // belongs to GetPermissionsResult, a console-local view type rather than part of the auth server's

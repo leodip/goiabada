@@ -6,14 +6,14 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // publicSettingsDatabase is what the public settings endpoint needs: the settings row.
 type publicSettingsDatabase interface {
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 }
 
 type PublicSettings struct {
@@ -50,7 +50,7 @@ func (h *PublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Map to public response DTO. Only the fields below may ever appear here:
 	// this endpoint needs no authentication, so the DTO is the whole boundary
-	// between an anonymous caller and the 32 fields of models.Settings, which
+	// between an anonymous caller and the 32 fields of record.Settings, which
 	// include the legacy AES encryption key and the encrypted SMTP password.
 	// handler_public_settings_test.go fails if that boundary widens.
 	//

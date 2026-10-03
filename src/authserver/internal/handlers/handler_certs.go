@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
 // certsDatabase is what the JWKS endpoint needs: the signing keys it publishes.
 type certsDatabase interface {
-	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
 }
 
 func HandleCertsGet(
@@ -30,24 +30,24 @@ func HandleCertsGet(
 
 		result := oauth.Jwks{}
 
-		var nextKey *models.KeyPair
-		var currentKey *models.KeyPair
-		var previousKey *models.KeyPair
+		var nextKey *record.KeyPair
+		var currentKey *record.KeyPair
+		var previousKey *record.KeyPair
 
 		for idx, signingKey := range allSigningKeys {
 
-			keyState, err := models.KeyStateFromString(signingKey.State)
+			keyState, err := record.KeyStateFromString(signingKey.State)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
 				return
 			}
 
 			switch keyState {
-			case models.KeyStateNext:
+			case record.KeyStateNext:
 				nextKey = &allSigningKeys[idx]
-			case models.KeyStateCurrent:
+			case record.KeyStateCurrent:
 				currentKey = &allSigningKeys[idx]
-			case models.KeyStatePrevious:
+			case record.KeyStatePrevious:
 				previousKey = &allSigningKeys[idx]
 			}
 		}

@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -55,7 +55,7 @@ type redirectURIInsertRefused struct {
 	data.Database
 }
 
-func (d redirectURIInsertRefused) CreateRedirectURI(context.Context, *sql.Tx, *models.RedirectURI) error {
+func (d redirectURIInsertRefused) CreateRedirectURI(context.Context, *sql.Tx, *record.RedirectURI) error {
 	return errs.New("the redirect URI insert was refused")
 }
 
@@ -67,7 +67,7 @@ type pausedAfterRedirectURIRead struct {
 	b *barrier
 }
 
-func (d pausedAfterRedirectURIRead) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (d pausedAfterRedirectURIRead) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 	err := d.Database.ClientLoadRedirectURIs(ctx, tx, client)
 	if tx != nil {
 		d.b.arriveBefore(tx)
@@ -77,9 +77,9 @@ func (d pausedAfterRedirectURIRead) ClientLoadRedirectURIs(ctx context.Context, 
 
 // createRedirectClient creates a client whose authorization code flow is enabled, which the save
 // requires, holding the given redirect URIs.
-func createRedirectClient(t *testing.T, uris ...string) *models.Client {
+func createRedirectClient(t *testing.T, uris ...string) *record.Client {
 	t.Helper()
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "list_save_" + fake.LetterN(8),
 		Description:              "List save client",
 		Enabled:                  true,
@@ -89,7 +89,7 @@ func createRedirectClient(t *testing.T, uris ...string) *models.Client {
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
 	for _, uri := range uris {
 		require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-			&models.RedirectURI{ClientId: client.Id, URI: uri}))
+			&record.RedirectURI{ClientId: client.Id, URI: uri}))
 	}
 	return client
 }
@@ -108,7 +108,7 @@ func saveRedirectURIs(t *testing.T, db data.Database, auditLogger apihandlers.Au
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", id)
 	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-	ctx = reqctx.WithSettings(ctx, &models.Settings{Id: 1})
+	ctx = reqctx.WithSettings(ctx, &record.Settings{Id: 1})
 
 	rr := httptest.NewRecorder()
 	apihandlers.HandleClientRedirectURIsPut(db, auditLogger).ServeHTTP(rr, req.WithContext(ctx))

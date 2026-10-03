@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,22 +40,22 @@ import (
 // pkceRequired is a pointer because nil is one of the states under test: A4 is about a nil
 // column inheriting a global setting that is off. No supported writer stores that state on a
 // public client, so the fixture builds it directly.
-func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, string, *models.User, string) {
+func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*record.Client, string, *record.User, string) {
 	t.Helper()
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "public-pkce-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 		PKCERequired:             pkceRequired,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectURI := "https://public-pkce.example.com/callback"
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      redirectURI,
 	}))
@@ -64,7 +64,7 @@ func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, stri
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -99,8 +99,8 @@ func authorizeErrorFromLocation(t *testing.T, resp *http.Response) (string, stri
 // assertRefusedForMissingChallenge drives the deferral to its end and asserts the refusal. The
 // mechanism is authorize_validator's input.PKCERequired arm, which is reached only because the
 // model rule makes IsPKCERequired return true for a public client whatever the row says.
-func assertRefusedForMissingChallenge(t *testing.T, client *models.Client, redirectURI string,
-	user *models.User, password string) {
+func assertRefusedForMissingChallenge(t *testing.T, client *record.Client, redirectURI string,
+	user *record.User, password string) {
 
 	t.Helper()
 
@@ -137,7 +137,7 @@ func TestAuthorize_PublicClient_StoredPKCERequiredFalse_IsStillRefused(t *testin
 // row is one no supported path produces. It is inserted directly here because what is under test
 // is the model rule, which has to answer required for a row whatever wrote it.
 func TestAuthorize_PublicClient_NullColumnAndGlobalPKCEOff_IsStillRefused(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) { settings.PKCERequired = false })
+	changeSettings(t, func(settings *record.Settings) { settings.PKCERequired = false })
 
 	client, redirectURI, user, password := newPublicPKCEClient(t, nil)
 

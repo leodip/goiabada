@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/authorizerequest"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,9 +31,9 @@ import (
 
 // newAuthorizeRequest builds an unsaved parked request with a fresh handle. `now` fixes the
 // deadline so nothing here depends on the wall clock.
-func newAuthorizeRequest(now time.Time, ttl time.Duration) *models.AuthorizeRequest {
+func newAuthorizeRequest(now time.Time, ttl time.Duration) *record.AuthorizeRequest {
 	handle := fake.UUID() + fake.UUID()
-	return &models.AuthorizeRequest{
+	return &record.AuthorizeRequest{
 		Handle:      handle,
 		HandleHash:  sha256Hex(handle),
 		RequestForm: url.Values{"client_id": {"client-" + fake.UUID()}, "state": {"s"}}.Encode(),
@@ -41,7 +41,7 @@ func newAuthorizeRequest(now time.Time, ttl time.Duration) *models.AuthorizeRequ
 	}
 }
 
-func createTestAuthorizeRequest(t *testing.T, now time.Time, ttl time.Duration) *models.AuthorizeRequest {
+func createTestAuthorizeRequest(t *testing.T, now time.Time, ttl time.Duration) *record.AuthorizeRequest {
 	t.Helper()
 	ar := newAuthorizeRequest(now, ttl)
 	require.NoError(t, database.CreateAuthorizeRequest(context.Background(), nil, ar), "CreateAuthorizeRequest")
@@ -177,10 +177,10 @@ func TestAuthorizeRequest_TheLookupComparesTheHashExactly(t *testing.T) {
 func TestAuthorizeRequest_RefusesWhatCannotBeKeyed(t *testing.T) {
 	now := time.Now().UTC()
 
-	err := database.CreateAuthorizeRequest(context.Background(), nil, &models.AuthorizeRequest{RequestForm: "a=b", ExpiresAt: now.Add(time.Hour)})
+	err := database.CreateAuthorizeRequest(context.Background(), nil, &record.AuthorizeRequest{RequestForm: "a=b", ExpiresAt: now.Add(time.Hour)})
 	assert.Error(t, err, "an empty handle hash names no row")
 
-	err = database.CreateAuthorizeRequest(context.Background(), nil, &models.AuthorizeRequest{HandleHash: sha256Hex("x"), RequestForm: "a=b"})
+	err = database.CreateAuthorizeRequest(context.Background(), nil, &record.AuthorizeRequest{HandleHash: sha256Hex("x"), RequestForm: "a=b"})
 	assert.Error(t, err, "a request that never expires is a row nothing would ever sweep")
 
 	_, err = database.GetAuthorizeRequestByHandleHash(context.Background(), nil, "", now)
@@ -416,7 +416,7 @@ func TestAuthorizeRequest_ConsumeRefusesAnExpiredAndAnUnknownHandle(t *testing.T
 	// only writes live ones. The row is still in the table: the sweep has not run. Well formed, or
 	// Consume would refuse it before reading, and random, so the case can run twice on one database.
 	handle := wellFormedHandle()
-	require.NoError(t, database.CreateAuthorizeRequest(ctx, nil, &models.AuthorizeRequest{
+	require.NoError(t, database.CreateAuthorizeRequest(ctx, nil, &record.AuthorizeRequest{
 		HandleHash:  sha256Hex(handle),
 		RequestForm: "client_id=c",
 		ExpiresAt:   time.Now().UTC().Add(-time.Second),

@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateUserGroup(t *testing.T) {
 	user := createTestUser(t)
 	group := createTestGroup(t)
 
-	userGroup := &models.UserGroup{
+	userGroup := &record.UserGroup{
 		UserId:  user.Id,
 		GroupId: group.Id,
 	}
@@ -223,14 +223,14 @@ func TestDeleteUserGroup(t *testing.T) {
 	}
 }
 
-func createTestUserGroup(t *testing.T) *models.UserGroup {
+func createTestUserGroup(t *testing.T) *record.UserGroup {
 	user := createTestUser(t)
 	group := createTestGroup(t)
 	return createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
 }
 
-func createTestUserGroupWithUserAndGroup(t *testing.T, userId, groupId int64) *models.UserGroup {
-	userGroup := &models.UserGroup{
+func createTestUserGroupWithUserAndGroup(t *testing.T, userId, groupId int64) *record.UserGroup {
+	userGroup := &record.UserGroup{
 		UserId:  userId,
 		GroupId: groupId,
 	}

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +20,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope(t)
 
 	// Create a client and a consent for this user
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "acct-consents-client-" + fake.UUID()[:8],
 		Description:      "Account Consents Test Client",
 		Enabled:          true,
@@ -30,7 +30,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    u.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email",
@@ -106,7 +106,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope(t)
 
 	// Create a client and consent for this user
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "acct-consents-del-client-" + fake.UUID()[:8],
 		Description:      "Account Consents Delete Client",
 		Enabled:          true,
@@ -116,7 +116,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    u.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile",
@@ -148,7 +148,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	accessToken, user1 := getUserAccessTokenWithAccountScope(t)
 
 	// Create another user (user2)
-	user2 := &models.User{
+	user2 := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("otheruser@consents.test"),
@@ -160,7 +160,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	defer func() { _ = database.DeleteUser(context.Background(), nil, user2.Id) }()
 
 	// Create client and consent for user2
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier: "acct-consents-oth-client-" + fake.UUID()[:8],
 		Description:      "Other User Client",
 		Enabled:          true,
@@ -170,7 +170,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user2.Id,
 		ClientId:  client.Id,
 		Scope:     "openid",

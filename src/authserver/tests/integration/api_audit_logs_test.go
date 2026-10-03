@@ -14,7 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -38,7 +38,7 @@ func seedAuditLogs(t *testing.T, count int) string {
 	base := time.Now().UTC().Add(-time.Duration(count) * time.Second)
 
 	for i := 0; i < count; i++ {
-		auditLog := &models.AuditLog{
+		auditLog := &record.AuditLog{
 			CreatedAt:  base.Add(time.Duration(i) * time.Second),
 			AuditEvent: auditEvent,
 			Details:    fmt.Sprintf(`{"seq":%d}`, i),
@@ -316,7 +316,7 @@ func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string)
 // without it, and restores the row when the test ends.
 func enableAuditLogsInDatabase(t *testing.T) {
 	t.Helper()
-	changeSettings(t, func(settings *models.Settings) { settings.AuditLogsInDatabaseEnabled = true })
+	changeSettings(t, func(settings *record.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 }
 
 func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -246,14 +246,14 @@ func TestIssue_ACeremonyWithNothingChangedStillIssues(t *testing.T) {
 // end-to-end case is a user who has a picture, signing in for profile claims in both tokens: the
 // picture must be in each.
 func TestIssue_AnImplicitSignInKeepsThePictureClaim(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.IncludeOpenIDConnectClaimsInAccessToken = true
 		settings.IncludeOpenIDConnectClaimsInIdToken = true
 	})
 
 	parked := parkCeremonyOnConsentScreen(t, "id_token token", "openid profile", fake.LetterN(32), testCodeVerifier, nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
-	require.NoError(t, database.CreateUserProfilePicture(context.Background(), nil, &models.UserProfilePicture{
+	require.NoError(t, database.CreateUserProfilePicture(context.Background(), nil, &record.UserProfilePicture{
 		UserId:      parked.user.Id,
 		Picture:     createTestPNGImage(64, 64),
 		ContentType: "image/png",

@@ -8,33 +8,33 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
 // createConsentClient makes a client whose authorization always reaches the consent screen.
-func createConsentClient(t *testing.T) (*models.Client, *models.RedirectURI) {
+func createConsentClient(t *testing.T) (*record.Client, *record.RedirectURI) {
 	return createLevel1Client(t, true)
 }
 
 // createLevel1Client makes a password-only client. Without consent it is the sharpest second tab
 // for the password case: its authorization needs no screen after the password, so under the defect
 // a stale login form finished it and the code was issued with nothing shown to the user at all.
-func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *models.RedirectURI) {
-	client := &models.Client{
+func createLevel1Client(t *testing.T, consentRequired bool) (*record.Client, *record.RedirectURI) {
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          consentRequired,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	if err := database.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -45,14 +45,14 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *mo
 }
 
 // createCeremonyUser makes an enabled user with a password, and returns that password.
-func createCeremonyUser(t *testing.T) (*models.User, string) {
+func createCeremonyUser(t *testing.T) (*record.User, string) {
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -91,7 +91,7 @@ func assertNothingWasCompleted(t *testing.T, userId int64) {
 	assert.Empty(t, sessions, "the refused submission must not have authenticated anybody")
 }
 
-func authorizeUrlFor(client *models.Client, redirectUri *models.RedirectURI, scope string,
+func authorizeUrlFor(client *record.Client, redirectUri *record.RedirectURI, scope string,
 	state string) string {
 	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -194,7 +194,7 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	assert.NotEmpty(t, doc.Find("#errorMsg").Text(), "the refusal renders the auth error page")
 
 	// Nothing was issued and nothing was persisted, for either client.
-	for _, c := range []*models.Client{clientA, clientB} {
+	for _, c := range []*record.Client{clientA, clientB} {
 		consent, getConsentErr := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, c.Id)
 		if getConsentErr != nil {
 			t.Fatal(getConsentErr)
@@ -325,8 +325,8 @@ func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 // walkToOtpPrompt drives one authorization request from /auth/authorize to the OTP prompt, on an
 // http client the caller owns. startOtpCeremony cannot be used here: it creates a fresh cookie jar
 // per call, and this case needs two ceremonies in ONE browser, which is the whole defect.
-func walkToOtpPrompt(t *testing.T, httpClient *http.Client, client *models.Client,
-	redirectUri *models.RedirectURI, state string, user *models.User, password string) (string, *http.Response) {
+func walkToOtpPrompt(t *testing.T, httpClient *http.Client, client *record.Client,
+	redirectUri *record.RedirectURI, state string, user *record.User, password string) (string, *http.Response) {
 
 	t.Helper()
 

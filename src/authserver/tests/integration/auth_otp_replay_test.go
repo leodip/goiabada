@@ -11,9 +11,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -26,20 +26,20 @@ import (
 // createLevel2MandatoryClient creates a client whose default ACR is level2_mandatory, so any
 // authorization request against it reaches the OTP screen. Separate from the user, because a
 // user the account API created needs the same fixture to be driven through the browser flow.
-func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.RedirectURI) {
-	client := &models.Client{
+func createLevel2MandatoryClient(t *testing.T) (*record.Client, *record.RedirectURI) {
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel2Mandatory,
+		DefaultAcrLevel:          record.AcrLevel2Mandatory,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -61,8 +61,8 @@ func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.Redirect
 // users.otp_secret was dropped by migration 000048 (#98), so the caller generating codes holds
 // the seed in a local. Without otpEnabled the first ceremony enrols, which is what the second
 // test needs, and the returned seed is empty.
-func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *models.RedirectURI,
-	*models.User, string, string) {
+func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*record.Client, *record.RedirectURI,
+	*record.User, string, string) {
 
 	client, redirectUri := createLevel2MandatoryClient(t)
 
@@ -72,7 +72,7 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -120,8 +120,8 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 // extra is appended verbatim to the authorization URL, already query-escaped, matching the
 // crossUserAuthorizeUrl(b, extra) idiom used elsewhere in this suite. Every existing caller passes
 // "".
-func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.RedirectURI,
-	user *models.User, password string, extra string) (*http.Client, *http.Response, string) {
+func startOtpCeremony(t *testing.T, client *record.Client, redirectUri *record.RedirectURI,
+	user *record.User, password string, extra string) (*http.Client, *http.Response, string) {
 
 	return startOtpCeremonyOn(t, createHttpClient(t), client, redirectUri, user, password, extra)
 }
@@ -131,8 +131,8 @@ func startOtpCeremony(t *testing.T, client *models.Client, redirectUri *models.R
 // above is the common case; this one exists because the enrolment seed's binding to its ceremony
 // is only observable from inside one browser, where the two ceremonies share everything the seed
 // used to be stored in (#242 decision 4).
-func startOtpCeremonyOn(t *testing.T, httpClient *http.Client, client *models.Client,
-	redirectUri *models.RedirectURI, user *models.User, password string,
+func startOtpCeremonyOn(t *testing.T, httpClient *http.Client, client *record.Client,
+	redirectUri *record.RedirectURI, user *record.User, password string,
 	extra string) (*http.Client, *http.Response, string) {
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -420,7 +420,7 @@ func TestOtpCeremony_AcrValuesLevel1CannotSkipMandatoryOtp(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password,
-		"&acr_values="+url.QueryEscape(models.AcrLevel1.String()))
+		"&acr_values="+url.QueryEscape(record.AcrLevel1.String()))
 	defer func() { _ = otpPage.Body.Close() }()
 
 	assert.NotNil(t, httpClient)

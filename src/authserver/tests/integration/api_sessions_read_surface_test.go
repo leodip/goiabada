@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +51,7 @@ func readBody(t *testing.T, resp *http.Response) string {
 //
 // A client_credentials admin token cannot stand in: sid is suppressed on that grant, so isCurrent
 // is false everywhere under it, which is the other case below rather than this one.
-func adminUserTokenReachingAllThree(t *testing.T) (string, *models.User, *models.UserSession) {
+func adminUserTokenReachingAllThree(t *testing.T) (string, *record.User, *record.UserSession) {
 	t.Helper()
 
 	scope := "openid " +
@@ -76,7 +76,7 @@ func adminUserTokenReachingAllThree(t *testing.T) (string, *models.User, *models
 func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 	accessToken, user, session := adminUserTokenReachingAllThree(t)
 
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "read-surface-client-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Read Surface Client",
@@ -87,7 +87,7 @@ func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	now := time.Now().UTC()
-	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
 		UserSessionId: session.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -130,7 +130,7 @@ func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 	accessToken, user, session := adminUserTokenReachingAllThree(t)
 
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "is-current-client-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Is Current Client",
@@ -141,7 +141,7 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	now := time.Now().UTC()
-	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
 		UserSessionId: session.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -152,7 +152,7 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 	// producer that set isCurrent true on every row would pass.
 	other := createTestUserSession(t, user.Id, fake.UUID())
 	defer func() { _ = database.DeleteUserSession(context.Background(), nil, other.Id) }()
-	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
 		UserSessionId: other.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -201,7 +201,7 @@ func TestAPIUserSessionsGet_AClientCredentialsTokenMarksNothingCurrent(t *testin
 	accessToken, _ := createAdminClientWithToken(t)
 	require.Empty(t, extractSidClaim(t, accessToken), "a client_credentials token must carry no sid")
 
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("nocurrent@sessions.test"),

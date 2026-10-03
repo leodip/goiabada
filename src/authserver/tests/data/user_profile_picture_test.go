@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // createTestPNG creates a valid PNG image with the specified dimensions
@@ -60,7 +60,7 @@ func TestCreateUserProfilePicture(t *testing.T) {
 }
 
 func TestCreateUserProfilePicture_ZeroUserId(t *testing.T) {
-	profilePicture := &models.UserProfilePicture{
+	profilePicture := &record.UserProfilePicture{
 		UserId:      0,
 		Picture:     createTestPNG(100, 100),
 		ContentType: "image/png",
@@ -105,7 +105,7 @@ func TestUpdateUserProfilePicture(t *testing.T) {
 }
 
 func TestUpdateUserProfilePicture_ZeroId(t *testing.T) {
-	profilePicture := &models.UserProfilePicture{
+	profilePicture := &record.UserProfilePicture{
 		Id:          0,
 		UserId:      1,
 		Picture:     createTestPNG(100, 100),
@@ -230,7 +230,7 @@ func TestUserProfilePicture_MultipleUsers(t *testing.T) {
 	picture1Data := createTestPNG(50, 50)
 	picture2Data := createTestPNG(100, 100)
 
-	picture1 := &models.UserProfilePicture{
+	picture1 := &record.UserProfilePicture{
 		UserId:      user1.Id,
 		Picture:     picture1Data,
 		ContentType: "image/png",
@@ -240,7 +240,7 @@ func TestUserProfilePicture_MultipleUsers(t *testing.T) {
 		t.Fatalf("Failed to create profile picture for user1: %v", err)
 	}
 
-	picture2 := &models.UserProfilePicture{
+	picture2 := &record.UserProfilePicture{
 		UserId:      user2.Id,
 		Picture:     picture2Data,
 		ContentType: "image/png",
@@ -288,7 +288,7 @@ func TestUserProfilePicture_LargePictureData(t *testing.T) {
 	// Create a larger image (512x512)
 	largePictureData := createTestPNG(512, 512)
 
-	profilePicture := &models.UserProfilePicture{
+	profilePicture := &record.UserProfilePicture{
 		UserId:      user.Id,
 		Picture:     largePictureData,
 		ContentType: "image/png",
@@ -309,9 +309,9 @@ func TestUserProfilePicture_LargePictureData(t *testing.T) {
 	}
 }
 
-func createTestUserProfilePicture(t *testing.T, userId int64) *models.UserProfilePicture {
+func createTestUserProfilePicture(t *testing.T, userId int64) *record.UserProfilePicture {
 	pictureData := createTestPNG(100, 100)
-	profilePicture := &models.UserProfilePicture{
+	profilePicture := &record.UserProfilePicture{
 		UserId:      userId,
 		Picture:     pictureData,
 		ContentType: "image/png",

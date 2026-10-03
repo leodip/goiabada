@@ -12,7 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -174,7 +174,7 @@ func TestDecodeAndValidateTokenString_InvalidSignature(t *testing.T) {
 	tp := NewTokenParser(mockDB)
 
 	// When signature validation fails, the parser tries all signing keys as fallback
-	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
+	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{}, nil)
 
 	claims := jwt.MapClaims{
 		"sub": "1234567890",
@@ -198,9 +198,9 @@ func TestDecodeAndValidateTokenString_AcceptsATokenSignedByAFallbackKey(t *testi
 	mockDB := currentKeyDatabase(t, currentKey)
 	tp := NewTokenParser(mockDB)
 
-	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{
-		{Id: 1, State: models.KeyStateCurrent.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))},
-		{Id: 2, State: models.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
+	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{
+		{Id: 1, State: record.KeyStateCurrent.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))},
+		{Id: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
 	}, nil).Once()
 
 	token := createTestToken(previousKey, map[string]interface{}{"sub": "user123"}, time.Now().Add(time.Hour))
@@ -240,7 +240,7 @@ func TestDecodeAndValidateTokenString_RejectsNonRS256Token(t *testing.T) {
 	mockDB := currentKeyDatabase(t, privateKey)
 	tp := NewTokenParser(mockDB)
 
-	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
+	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{}, nil)
 
 	claims := jwt.MapClaims{
 		"sub": "1234567890",
@@ -275,7 +275,7 @@ func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 func currentKeyDatabase(t *testing.T, privateKey *rsa.PrivateKey) *mocks_data.Database {
 	t.Helper()
 	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey)),
 	}, nil)
 	return mockDB

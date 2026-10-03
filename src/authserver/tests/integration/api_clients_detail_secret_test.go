@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +36,7 @@ func TestAPIClientGet_ConfidentialIncludesSecretInDetailButNotList(t *testing.T)
 	enc, err := dataCipher.Encrypt(clientSecret)
 	assert.NoError(t, err)
 
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "secret-client-" + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,

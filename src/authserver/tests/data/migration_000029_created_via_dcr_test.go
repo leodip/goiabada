@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +101,7 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 
 	ids := make([]int64, len(cases))
 	for i, c := range cases {
-		client := &models.Client{
+		client := &record.Client{
 			ClientIdentifier: c.identifier,
 			Description:      "Migration 000029 test client",
 			ConsentRequired:  false,

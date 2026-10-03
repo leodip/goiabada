@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -118,7 +118,7 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + models.AcrLevel2Optional.String()
+		"&acr_values=" + record.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -156,7 +156,7 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + models.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -209,19 +209,19 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 
 func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	// Create client that requires consent
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -237,7 +237,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -338,7 +338,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 // client reaches /auth/consent, never /auth/issue. Seam 4 owns that as a claim about the rendered
 // page; here it is a precondition, asserted so a regression shows up as this helper failing
 // rather than as a confusing prompt=none result further down.
-func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client, *models.Client, *models.RedirectURI, *models.User, string) {
+func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client, *record.Client, *record.RedirectURI, *record.User, string) {
 	t.Helper()
 
 	client := registerDCRClient(t, clientName, "https://dcr-app.example.com/callback")
@@ -358,7 +358,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -461,7 +461,7 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 
 	httpClient, client, redirectUri, user, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile",
@@ -587,7 +587,7 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + models.AcrLevel2Optional.String()
+		"&acr_values=" + record.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -655,7 +655,7 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + models.AcrLevel2Optional.String()
+		"&acr_values=" + record.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -719,7 +719,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 			"&scope=" + url.QueryEscape("openid profile") +
 			"&state=" + requestState +
 			"&prompt=none" +
-			"&acr_values=" + models.AcrLevel2Optional.String()
+			"&acr_values=" + record.AcrLevel2Optional.String()
 
 		resp, getErr := httpClient.Get(destUrl)
 		if getErr != nil {
@@ -775,7 +775,7 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none" +
-		"&acr_values=" + models.AcrLevel1.String()
+		"&acr_values=" + record.AcrLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -923,19 +923,19 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 
 func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	// Create client that requires consent
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -950,7 +950,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -962,7 +962,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	}
 
 	// Create consent that covers MORE than what we'll request
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email", // Covers openid profile
@@ -1067,19 +1067,19 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 
 func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	// Create client that requires consent
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -1094,7 +1094,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -1106,7 +1106,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	}
 
 	// Create consent for only openid (partial coverage)
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid", // Only openid, not profile
@@ -1190,19 +1190,19 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 
 func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	// Create client that requires consent
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -1217,7 +1217,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -1229,7 +1229,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	}
 
 	// Create consent WITHOUT offline_access
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile",
@@ -1322,19 +1322,19 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 
 func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	// Create client that requires consent
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -1349,7 +1349,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -1361,7 +1361,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	}
 
 	// Create consent WITH offline_access
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile offline_access",
@@ -1466,19 +1466,19 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 
 func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	// Create client that requires consent
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
@@ -1493,7 +1493,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -1505,7 +1505,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	}
 
 	// Create consent for more scopes than we'll request
-	consent := &models.UserConsent{
+	consent := &record.UserConsent{
 		UserId:    user.Id,
 		ClientId:  client.Id,
 		Scope:     "openid profile email address phone",
@@ -1628,7 +1628,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),

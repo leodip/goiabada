@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +57,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	// property 3 would compare the statement with itself. Measured: the comparison passed with the
 	// down declaring BLOB instead of TEXT.
 	//
-	// Migrating up is also enough to seed through the ORM. models.User carries no OTPSecret field
+	// Migrating up is also enough to seed through the ORM. record.User carries no OTPSecret field
 	// since #98, and every column it does carry exists at 000047.
 	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOtpSecret000048),
 		"migrate an empty database up to 000047 on %s", dbType())
@@ -73,7 +73,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	encrypted, err := dataCipher.Encrypt(seed)
 	require.NoError(t, err, "the process cipher is initialized in TestMain")
 
-	user := &models.User{
+	user := &record.User{
 		Enabled:            true,
 		Subject:            "00000000-0000-0000-0000-000000048001",
 		Username:           "mig48user",

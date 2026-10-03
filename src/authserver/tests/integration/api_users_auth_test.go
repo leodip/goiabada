@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@password.test"),
@@ -72,7 +72,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@password-validation.test"),
@@ -156,7 +156,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              otpEmail,
@@ -263,7 +263,7 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user without OTP
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@otp-enable.test"),
@@ -311,7 +311,7 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user without OTP enabled
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@otp-not-enabled.test"),
@@ -344,7 +344,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@session.test"),
@@ -359,7 +359,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test session
-	testSession := &models.UserSession{
+	testSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC(),
 		LastAccessed:      time.Now().UTC(),

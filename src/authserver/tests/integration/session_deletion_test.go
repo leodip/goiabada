@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,17 +32,17 @@ import (
 // 7. After fix: Login succeeds (AuthContext preserved)
 func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	// Step 1: Create a client and user for testing
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          models.AcrLevel1,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -53,7 +53,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -208,19 +208,19 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 // than the credential: a password really was entered in this ceremony, so a predicate keyed
 // on authentication passes and only one keyed on the session refuses.
 func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		// The consent screen is what holds the ceremony still between /auth/completed and
 		// /auth/issue, which is the whole window this case is about.
 		ConsentRequired: true,
-		DefaultAcrLevel: models.AcrLevel1,
+		DefaultAcrLevel: record.AcrLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
-	redirectUri := &models.RedirectURI{
+	redirectUri := &record.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
@@ -231,7 +231,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:      fake.UUID(),
 		Enabled:      true,
 		Email:        fake.Email(),
@@ -385,7 +385,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + models.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)

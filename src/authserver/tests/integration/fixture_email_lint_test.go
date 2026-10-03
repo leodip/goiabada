@@ -12,7 +12,7 @@ import (
 )
 
 // TestIntegration_UserFixturesDrawUniqueEmails refuses a hardcoded address in a
-// models.User fixture anywhere in this tier.
+// record.User fixture anywhere in this tier.
 //
 // users.email is UNIQUE, and a fixture address is only safe while every row
 // carrying it is deleted again. Within a run, two fixtures sharing one address
@@ -31,7 +31,7 @@ import (
 // still names the test that wrote it, and adds a run that makes two calls of it
 // distinct.
 //
-// The rule is deliberately scoped to models.User composite literals, which is
+// The rule is deliberately scoped to record.User composite literals, which is
 // what reaches database.CreateUser. An address in an api.*Request literal is
 // exempt, because the five that remain in this tier all sit in requests asserted
 // to be rejected (400, 401, 404): nothing reaches the database, and in two of
@@ -68,7 +68,7 @@ func TestIntegration_UserFixturesDrawUniqueEmails(t *testing.T) {
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
 			lit, ok := n.(*ast.CompositeLit)
-			if !ok || !isModelsUser(lit.Type) {
+			if !ok || !isRecordUser(lit.Type) {
 				return true
 			}
 			fixtures++
@@ -89,7 +89,7 @@ func TestIntegration_UserFixturesDrawUniqueEmails(t *testing.T) {
 					continue
 				}
 				literals++
-				t.Errorf("%s:%d: models.User fixture hardcodes the address %q. "+
+				t.Errorf("%s:%d: record.User fixture hardcodes the address %q. "+
 					"users.email is UNIQUE and a leaked row outlives its run on "+
 					"mysql, postgres and mssql, so every later run collides on it; "+
 					"write uniqueEmail(%q) instead",
@@ -103,27 +103,27 @@ func TestIntegration_UserFixturesDrawUniqueEmails(t *testing.T) {
 		return
 	}
 	// A walk that covers nothing passes while guarding nothing, which is how this
-	// kind of instrument dies quietly. The floor is the number of models.User
+	// kind of instrument dies quietly. The floor is the number of record.User
 	// literals the tier held when the sweep landed, rounded down hard: it catches
 	// a walk pointed at the wrong tree or a parser that silently stopped, without
 	// failing every time a test is added or removed.
 	if fixtures < 100 {
-		t.Errorf("walked %d models.User fixtures, which is too few for this tier to "+
+		t.Errorf("walked %d record.User fixtures, which is too few for this tier to "+
 			"have been read; the walk is looking at the wrong tree", fixtures)
 	}
 }
 
-// isModelsUser reports whether a composite literal's type is models.User, which
+// isRecordUser reports whether a composite literal's type is record.User, which
 // is the fixture shape that reaches database.CreateUser. It accepts the bare
-// literal; &models.User{...} is an ast.UnaryExpr wrapping the same node, which
+// literal; &record.User{...} is an ast.UnaryExpr wrapping the same node, which
 // ast.Inspect reaches on its own.
-func isModelsUser(expr ast.Expr) bool {
+func isRecordUser(expr ast.Expr) bool {
 	sel, ok := expr.(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "User" {
 		return false
 	}
 	pkg, ok := sel.X.(*ast.Ident)
-	return ok && pkg.Name == "models"
+	return ok && pkg.Name == "record"
 }
 
 // TestIntegration_UniqueEmailDrawsADistinctAddress pins uniqueEmail itself.

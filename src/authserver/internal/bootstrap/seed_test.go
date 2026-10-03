@@ -11,8 +11,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -126,7 +126,7 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 		_, parseErr := signingkeys.ParsePrivateKey(testDataCipher, &key)
 		require.NoError(t, parseErr, "the %s key does not open under the seed's cipher", key.State)
 	}
-	assert.ElementsMatch(t, []string{models.KeyStateCurrent.String(), models.KeyStateNext.String()}, states,
+	assert.ElementsMatch(t, []string{record.KeyStateCurrent.String(), record.KeyStateNext.String()}, states,
 		"one current key and one next key")
 
 	client, err := db.GetClientByClientIdentifier(ctx, nil, builtin.AdminConsoleClientIdentifier)
@@ -306,39 +306,39 @@ func (f *faultDB) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) erro
 	})
 }
 
-func (f *faultDB) CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error {
+func (f *faultDB) CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 	return f.write(func() error { return f.runDatabase.CreateClient(ctx, tx, client) })
 }
 
-func (f *faultDB) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error {
+func (f *faultDB) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error {
 	return f.write(func() error { return f.runDatabase.CreateRedirectURI(ctx, tx, redirectURI) })
 }
 
-func (f *faultDB) CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error {
+func (f *faultDB) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
 	return f.write(func() error { return f.runDatabase.CreateUser(ctx, tx, user) })
 }
 
-func (f *faultDB) CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error {
+func (f *faultDB) CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error {
 	return f.write(func() error { return f.runDatabase.CreateResource(ctx, tx, resource) })
 }
 
-func (f *faultDB) CreatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error {
+func (f *faultDB) CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error {
 	return f.write(func() error { return f.runDatabase.CreatePermission(ctx, tx, permission) })
 }
 
-func (f *faultDB) CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error {
+func (f *faultDB) CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error {
 	return f.write(func() error { return f.runDatabase.CreateClientPermission(ctx, tx, clientPermission) })
 }
 
-func (f *faultDB) CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error {
+func (f *faultDB) CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error {
 	return f.write(func() error { return f.runDatabase.CreateUserPermission(ctx, tx, userPermission) })
 }
 
-func (f *faultDB) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error {
+func (f *faultDB) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error {
 	return f.write(func() error { return f.runDatabase.CreateKeyPair(ctx, tx, keyPair) })
 }
 
-func (f *faultDB) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
+func (f *faultDB) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 	return f.write(func() error { return f.runDatabase.CreateInitialSettings(ctx, tx, settings) })
 }
 
@@ -503,10 +503,10 @@ func TestRun_WritesOneSeededRecord(t *testing.T) {
 	require.NoError(t, err)
 
 	var seeded []logtest.CapturedRecord
-	for _, record := range logs.Records() {
-		assert.False(t, strings.HasSuffix(record.Message, " created"), "no per-row record: %s", record.Message)
-		if record.Message == "database seeded" {
-			seeded = append(seeded, record)
+	for _, logRecord := range logs.Records() {
+		assert.False(t, strings.HasSuffix(logRecord.Message, " created"), "no per-row record: %s", logRecord.Message)
+		if logRecord.Message == "database seeded" {
+			seeded = append(seeded, logRecord)
 		}
 	}
 	require.Len(t, seeded, 1)
@@ -519,8 +519,8 @@ func TestRun_WritesOneSeededRecord(t *testing.T) {
 	}
 	assert.Equal(t, builtin.AdminConsoleClientIdentifier, seeded[0].Attrs["client_identifier"])
 	assert.Equal(t, "admin@example.com", seeded[0].Attrs["email"])
-	assert.Equal(t, byState[models.KeyStateCurrent.String()], seeded[0].Attrs["current_key_identifier"])
-	assert.Equal(t, byState[models.KeyStateNext.String()], seeded[0].Attrs["next_key_identifier"])
+	assert.Equal(t, byState[record.KeyStateCurrent.String()], seeded[0].Attrs["current_key_identifier"])
+	assert.Equal(t, byState[record.KeyStateNext.String()], seeded[0].Attrs["next_key_identifier"])
 
 	messages := recordMessages(logs)
 	assert.Contains(t, messages, "app name is not set, defaulting it")

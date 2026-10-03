@@ -16,7 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -77,7 +77,7 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 
 	handler := HandleClientLogoGet(pageRenderer, database)
 
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
 	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
@@ -99,8 +99,8 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
-	clientLogo := &models.ClientLogo{
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	clientLogo := &record.ClientLogo{
 		Id:          1,
 		ClientId:    123,
 		Logo:        logoData,
@@ -133,8 +133,8 @@ func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
-	clientLogo := &models.ClientLogo{
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	clientLogo := &record.ClientLogo{
 		Id:          1,
 		ClientId:    123,
 		Logo:        logoData,
@@ -169,8 +169,8 @@ func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
-	clientLogo := &models.ClientLogo{
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	clientLogo := &record.ClientLogo{
 		Id:          1,
 		ClientId:    123,
 		Logo:        logoData,
@@ -200,8 +200,8 @@ func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
-	clientLogo := &models.ClientLogo{
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	clientLogo := &record.ClientLogo{
 		Id:          1,
 		ClientId:    123,
 		Logo:        logoData,
@@ -235,8 +235,8 @@ func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
-	clientLogo := &models.ClientLogo{
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	clientLogo := &record.ClientLogo{
 		Id:          1,
 		ClientId:    123,
 		Logo:        logoData,
@@ -270,8 +270,8 @@ func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &models.Client{Id: 123, ClientIdentifier: "my-app"}
-	clientLogo := &models.ClientLogo{
+	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	clientLogo := &record.ClientLogo{
 		Id:          1,
 		ClientId:    123,
 		Logo:        logoData,

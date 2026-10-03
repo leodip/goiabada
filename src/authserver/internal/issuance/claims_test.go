@@ -12,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/builtin"
@@ -25,7 +25,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
@@ -41,7 +41,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                1,
 		ClientId:          1,
 		UserId:            1,
@@ -52,13 +52,13 @@ func TestGenerateAccessToken(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      1,
 		ClientIdentifier:                        "test-client",
 		TokenExpirationInSeconds:                900,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
@@ -113,7 +113,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
@@ -129,7 +129,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                2,
 		ClientId:          2,
 		UserId:            2,
@@ -140,11 +140,11 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd:otp_mandatory",
 		AuthMethods:       "pwd otp",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:               2,
 		ClientIdentifier: "custom-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      2,
 		Subject: sub,
 	}
@@ -187,7 +187,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
@@ -203,7 +203,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                3,
 		ClientId:          3,
 		UserId:            3,
@@ -214,13 +214,13 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                      3,
 		ClientIdentifier:                        "groups-attributes-client",
 		TokenExpirationInSeconds:                1200,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            3,
 		Subject:       sub,
 		Email:         "groups.attributes@example.com",
@@ -229,12 +229,12 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 		GivenName:     "Groups",
 		FamilyName:    "User",
 		UpdatedAt:     sql.NullTime{Time: now.Add(-2 * time.Hour), Valid: true},
-		Groups: []models.Group{
+		Groups: []record.Group{
 			{GroupIdentifier: "group1", IncludeInAccessToken: true},
 			{GroupIdentifier: "group2", IncludeInAccessToken: false},
 			{GroupIdentifier: "group3", IncludeInAccessToken: true},
 		},
-		Attributes: []models.UserAttribute{
+		Attributes: []record.UserAttribute{
 			{Key: "attr1", Value: "value1", IncludeInAccessToken: true},
 			{Key: "attr2", Value: "value2", IncludeInAccessToken: false},
 			{Key: "attr3", Value: "value3", IncludeInAccessToken: true},
@@ -298,7 +298,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true,
@@ -313,7 +313,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                4,
 		ClientId:          4,
 		UserId:            4,
@@ -324,11 +324,11 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:               4,
 		ClientIdentifier: "invalid-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      4,
 		Subject: sub,
 	}
@@ -345,7 +345,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true,
@@ -361,7 +361,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                1,
 		ClientId:          1,
 		UserId:            1,
@@ -372,12 +372,12 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd:otp_mandatory",
 		AuthMethods:       "pwd otp",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                                  1,
 		ClientIdentifier:                    "test-client",
 		IncludeOpenIDConnectClaimsInIdToken: "on",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:                  1,
 		Subject:             sub,
 		Email:               "test@example.com",
@@ -401,11 +401,11 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 		AddressPostalCode:   "TE1 2ST",
 		AddressCountry:      "Testland",
 		UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-		Groups: []models.Group{
+		Groups: []record.Group{
 			{GroupIdentifier: "group1", IncludeInIdToken: true},
 			{GroupIdentifier: "group2", IncludeInIdToken: false},
 		},
-		Attributes: []models.UserAttribute{
+		Attributes: []record.UserAttribute{
 			{Key: "attr1", Value: "value1", IncludeInIdToken: true},
 			{Key: "attr2", Value: "value2", IncludeInIdToken: false},
 		},
@@ -477,7 +477,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 300,
 	}
@@ -492,7 +492,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                2,
 		ClientId:          2,
 		UserId:            2,
@@ -503,11 +503,11 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:               2,
 		ClientIdentifier: "minimal-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:      2,
 		Subject: sub,
 	}
@@ -549,7 +549,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
 		IncludeOpenIDConnectClaimsInIdToken: true,
@@ -565,7 +565,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                3,
 		ClientId:          3,
 		UserId:            3,
@@ -576,12 +576,12 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 		AcrLevel:          "urn:goiabada:pwd:otp_ifpossible",
 		AuthMethods:       "pwd otp",
 	}
-	client := &models.Client{
+	client := &record.Client{
 		Id:                       3,
 		ClientIdentifier:         "override-client",
 		TokenExpirationInSeconds: 1200,
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            3,
 		Subject:       sub,
 		Email:         "override@example.com",
@@ -633,7 +633,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 // The one lifetime rule every grant reads (#437 decision 11): a client's positive lifetime wins,
 // and anything else inherits the server's.
 func TestTokenLifetimeSeconds(t *testing.T) {
-	settings := &models.Settings{TokenExpirationInSeconds: 3600}
+	settings := &record.Settings{TokenExpirationInSeconds: 3600}
 
 	tests := []struct {
 		name           string
@@ -648,7 +648,7 @@ func TestTokenLifetimeSeconds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := &models.Client{TokenExpirationInSeconds: tt.clientLifetime}
+			client := &record.Client{TokenExpirationInSeconds: tt.clientLifetime}
 			assert.Equal(t, tt.expected, tokenLifetimeSeconds(settings, client))
 		})
 	}
@@ -807,7 +807,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -825,18 +825,18 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	sub := fake.UUID()
 	sessionIdentifier := "test-session-123"
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
 		EmailVerified: true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -844,7 +844,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	}
 
 	t.Run("AuthCode flow - single method (pwd)", func(t *testing.T) {
-		code := &models.Code{
+		code := &record.Code{
 			Id:                1,
 			ClientId:          1,
 			UserId:            1,
@@ -864,10 +864,10 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil).Once()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 			Started: time.Now().UTC().Add(-10 * time.Minute),
 		}, nil).Once()
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 
 		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 		assert.NoError(t, err)
@@ -888,7 +888,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	})
 
 	t.Run("AuthCode flow - multiple methods (pwd otp)", func(t *testing.T) {
-		code := &models.Code{
+		code := &record.Code{
 			Id:                2,
 			ClientId:          1,
 			UserId:            1,
@@ -908,10 +908,10 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil).Once()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 			Started: time.Now().UTC().Add(-10 * time.Minute),
 		}, nil).Once()
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 
 		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
 		assert.NoError(t, err)
@@ -936,7 +936,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 
 		input := &ROPCGrantInput{
 			Client: client,
@@ -1014,7 +1014,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -1032,18 +1032,18 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	sub := fake.UUID()
 	sessionIdentifier := "test-session-amr-absent"
 
-	client := &models.Client{
+	client := &record.Client{
 		Id:               1,
 		ClientIdentifier: "test-client",
 	}
-	user := &models.User{
+	user := &record.User{
 		Id:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
 		EmailVerified: true,
 	}
 
-	keyPair := &models.KeyPair{
+	keyPair := &record.KeyPair{
 		Id:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -1057,10 +1057,10 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(keyPair, nil).Once()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 			Started: time.Now().UTC().Add(-10 * time.Minute),
 		}, nil).Once()
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 	}
 
 	expectImplicitCalls := func() {
@@ -1076,7 +1076,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	t.Run("AuthCode flow - no method recorded, amr absent from both tokens", func(t *testing.T) {
 		expectAuthCodeCalls()
 
-		code := &models.Code{
+		code := &record.Code{
 			Id:                10,
 			ClientId:          1,
 			UserId:            1,
@@ -1107,7 +1107,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	t.Run("AuthCode flow - method recorded, amr still present", func(t *testing.T) {
 		expectAuthCodeCalls()
 
-		code := &models.Code{
+		code := &record.Code{
 			Id:                11,
 			ClientId:          1,
 			UserId:            1,
@@ -1233,18 +1233,18 @@ func TestCreateTokenInputFromCode(t *testing.T) {
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
 
-	code := &models.Code{
+	code := &record.Code{
 		Scope:             "openid profile email",
 		AcrLevel:          "urn:goiabada:level2",
 		AuthMethods:       "pwd otp",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: "session-123",
 		Nonce:             "nonce-abc",
-		User: models.User{
+		User: record.User{
 			Subject: userSubject,
 			Email:   "test@example.com",
 		},
-		Client: models.Client{
+		Client: record.Client{
 			ClientIdentifier: "test-client",
 		},
 	}
@@ -1271,10 +1271,10 @@ func TestCreateTokenInputFromImplicit(t *testing.T) {
 	userSubject := fake.UUID()
 
 	implicitInput := &ImplicitGrantInput{
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "implicit-client",
 		},
-		User: &models.User{
+		User: &record.User{
 			Subject: userSubject,
 			Email:   "implicit@example.com",
 		},
@@ -1307,10 +1307,10 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 	userSubject := fake.UUID()
 
 	ropcInput := &ROPCGrantInput{
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "ropc-client",
 		},
-		User: &models.User{
+		User: &record.User{
 			Subject: userSubject,
 			Email:   "ropc@example.com",
 		},
@@ -1324,7 +1324,7 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 	assert.Equal(t, ropcInput.Client, input.Client)
 	assert.Equal(t, ropcInput.Scope, input.Scope)
 	// ROPC-specific hardcoded values
-	assert.Equal(t, models.AcrLevel1, input.AcrLevel)
+	assert.Equal(t, record.AcrLevel1, input.AcrLevel)
 	assert.Equal(t, []string{"pwd"}, input.AuthMethods)
 	assert.Equal(t, now, input.AuthenticatedAt)
 	// Reversed deliberately. This used to assert the session identifier was forwarded from
@@ -1344,7 +1344,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -1354,10 +1354,10 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 
 	t.Run("Invalid scope format - no colon", func(t *testing.T) {
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject: userSubject,
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:           "invalidscope", // Missing colon separator
@@ -1376,10 +1376,10 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject: userSubject,
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:           "openid",
@@ -1406,7 +1406,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -1415,10 +1415,10 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 	userSubject := fake.UUID()
 
 	input := &tokenGenerationInput{
-		User: &models.User{
+		User: &record.User{
 			Subject: userSubject,
 		},
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "test-client",
 		},
 		Scope:           "resource1:read resource2:write resource3:admin",
@@ -1448,7 +1448,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -1458,10 +1458,10 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 
 	t.Run("With nonce and sid", func(t *testing.T) {
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject: userSubject,
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:             "resource:read",
@@ -1482,10 +1482,10 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 
 	t.Run("Without nonce and sid", func(t *testing.T) {
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject: userSubject,
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:           "resource:read",
@@ -1518,7 +1518,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -1528,11 +1528,11 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 
 	t.Run("With access token - at_hash included", func(t *testing.T) {
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject:   userSubject,
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:           "openid",
@@ -1553,11 +1553,11 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 
 	t.Run("Without access token - no at_hash", func(t *testing.T) {
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject:   userSubject,
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:           "openid",
@@ -1588,7 +1588,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600,
 	}
@@ -1596,15 +1596,15 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
 
-	user := &models.User{
+	user := &record.User{
 		Subject:   userSubject,
 		UpdatedAt: sql.NullTime{Time: now, Valid: true},
-		Groups: []models.Group{
+		Groups: []record.Group{
 			{GroupIdentifier: "group1", IncludeInIdToken: true, IncludeInAccessToken: false},
 			{GroupIdentifier: "group2", IncludeInIdToken: false, IncludeInAccessToken: true},
 			{GroupIdentifier: "group3", IncludeInIdToken: true, IncludeInAccessToken: true},
 		},
-		Attributes: []models.UserAttribute{
+		Attributes: []record.UserAttribute{
 			{Key: "attr1", Value: "value1", IncludeInIdToken: true, IncludeInAccessToken: false},
 			{Key: "attr2", Value: "value2", IncludeInIdToken: false, IncludeInAccessToken: true},
 		},
@@ -1612,7 +1612,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 
 	input := &tokenGenerationInput{
 		User: user,
-		Client: &models.Client{
+		Client: &record.Client{
 			ClientIdentifier: "test-client",
 		},
 		Scope:           "openid groups attributes",
@@ -1650,18 +1650,18 @@ func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
 	userSubject := fake.UUID()
 
 	// Test with Code - ensure all fields transferred
-	code := &models.Code{
+	code := &record.Code{
 		Scope:             "openid profile email groups attributes",
 		AcrLevel:          "urn:goiabada:level2_mandatory",
 		AuthMethods:       "pwd otp",
 		AuthenticatedAt:   authTime,
 		SessionIdentifier: "session-xyz",
 		Nonce:             "nonce-123",
-		User: models.User{
+		User: record.User{
 			Id:      42,
 			Subject: userSubject,
 		},
-		Client: models.Client{
+		Client: record.Client{
 			Id:               99,
 			ClientIdentifier: "full-test-client",
 		},
@@ -1691,7 +1691,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                   "https://test-issuer.com",
 		TokenExpirationInSeconds: 600, // Default 10 minutes
 	}
@@ -1701,10 +1701,10 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 
 	t.Run("Uses client override when set", func(t *testing.T) {
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject: userSubject,
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier:         "override-client",
 				TokenExpirationInSeconds: 1800, // 30 minutes override
 			},
@@ -1725,10 +1725,10 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 
 	t.Run("Uses settings default when client not set", func(t *testing.T) {
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject: userSubject,
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier:         "default-client",
 				TokenExpirationInSeconds: 0, // Not set
 			},
@@ -1764,19 +1764,19 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	t.Run("Global setting ON - includes OIDC claims", func(t *testing.T) {
-		settings := &models.Settings{
+		settings := &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			IncludeOpenIDConnectClaimsInAccessToken: true,
 		}
 
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:           "openid email resource:read",
@@ -1793,19 +1793,19 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	})
 
 	t.Run("Global setting OFF - no OIDC claims", func(t *testing.T) {
-		settings := &models.Settings{
+		settings := &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			IncludeOpenIDConnectClaimsInAccessToken: false,
 		}
 
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier: "test-client",
 			},
 			Scope:           "openid email resource:read",
@@ -1823,19 +1823,19 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	})
 
 	t.Run("Client override ON overrides global OFF", func(t *testing.T) {
-		settings := &models.Settings{
+		settings := &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			IncludeOpenIDConnectClaimsInAccessToken: false,
 		}
 
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier:                        "override-client",
 				IncludeOpenIDConnectClaimsInAccessToken: "on",
 			},
@@ -1853,19 +1853,19 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	})
 
 	t.Run("Client override OFF overrides global ON", func(t *testing.T) {
-		settings := &models.Settings{
+		settings := &record.Settings{
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			IncludeOpenIDConnectClaimsInAccessToken: true,
 		}
 
 		input := &tokenGenerationInput{
-			User: &models.User{
+			User: &record.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
 			},
-			Client: &models.Client{
+			Client: &record.Client{
 				ClientIdentifier:                        "override-client",
 				IncludeOpenIDConnectClaimsInAccessToken: "off",
 			},
@@ -1903,7 +1903,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 		return got.Value(marker{}) == "the caller's own"
 	})
 
-	user := &models.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
+	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
 
 	t.Run("the profile scope reads the picture flag under the caller's context", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
@@ -1947,14 +1947,14 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 //
 // The profile-picture port is registered only for a scope that carries "profile", so a lookup
 // from any other arm fails the case as an unexpected call.
-func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, user *models.User,
+func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, user *record.User,
 	hasProfilePicture bool) (jwt.MapClaims, jwt.MapClaims) {
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, baseURL, testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -1967,7 +1967,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 	now := time.Now().UTC()
 	sessionIdentifier := "test-session-characterization"
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                1,
 		ClientId:          1,
 		UserId:            user.Id,
@@ -1977,7 +1977,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &models.Client{Id: 1, ClientIdentifier: "characterization-client"}
+	client := &record.Client{Id: 1, ClientIdentifier: "characterization-client"}
 
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	code.Client = *client
@@ -1991,15 +1991,15 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 			Return(hasProfilePicture, nil)
 	}
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
-		Return(&models.UserSession{
+		Return(&record.UserSession{
 			Id:           1,
 			UserId:       user.Id,
 			Started:      now.Add(-30 * time.Minute),
 			LastAccessed: now.Add(-5 * time.Minute),
 		}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).
 		Return(nil)
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil)
@@ -2061,7 +2061,7 @@ func TestClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			updatedAt := time.Now().UTC().Add(-1 * time.Minute)
-			user := &models.User{
+			user := &record.User{
 				Id:            1,
 				Subject:       fake.UUID(),
 				Email:         "characterization@example.com",
@@ -2093,30 +2093,30 @@ func TestClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
 // reads IncludeInIdToken at all three of its filter sites. A mapper taking one predicate would
 // have to pick a token type, which is why #387 makes the predicate an input.
 func TestClaimCharacterization_GroupsAndAttributesFollowThePerTokenTypeFlag(t *testing.T) {
-	idTokenGroup := models.Group{
+	idTokenGroup := record.Group{
 		Id:               1,
 		GroupIdentifier:  "id-token-group",
 		IncludeInIdToken: true, IncludeInAccessToken: false,
-		Attributes: []models.GroupAttribute{
+		Attributes: []record.GroupAttribute{
 			{Key: "idTokenGroupAttr", Value: "idTokenGroupValue",
 				IncludeInIdToken: true, IncludeInAccessToken: false},
 		},
 	}
-	accessTokenGroup := models.Group{
+	accessTokenGroup := record.Group{
 		Id:               2,
 		GroupIdentifier:  "access-token-group",
 		IncludeInIdToken: false, IncludeInAccessToken: true,
-		Attributes: []models.GroupAttribute{
+		Attributes: []record.GroupAttribute{
 			{Key: "accessTokenGroupAttr", Value: "accessTokenGroupValue",
 				IncludeInIdToken: false, IncludeInAccessToken: true},
 		},
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Id:      1,
 		Subject: fake.UUID(),
-		Groups:  []models.Group{idTokenGroup, accessTokenGroup},
-		Attributes: []models.UserAttribute{
+		Groups:  []record.Group{idTokenGroup, accessTokenGroup},
+		Attributes: []record.UserAttribute{
 			{Key: "idTokenAttr", Value: "idTokenValue",
 				IncludeInIdToken: true, IncludeInAccessToken: false},
 			{Key: "accessTokenAttr", Value: "accessTokenValue",
@@ -2150,7 +2150,7 @@ func TestClaimCharacterization_GroupsAndAttributesFollowThePerTokenTypeFlag(t *t
 // fail this case rather than pass it silently.
 func TestClaimCharacterization_ProfileAndPictureComeFromTheInjectedBaseURL(t *testing.T) {
 	sub := fake.UUID()
-	user := &models.User{
+	user := &record.User{
 		Id:         1,
 		Subject:    sub,
 		GivenName:  "Test",
@@ -2173,7 +2173,7 @@ type scopeIsTheGrantIssue struct {
 	accessToken   string
 	idToken       string
 	refreshToken  string
-	storedRefresh *models.RefreshToken
+	storedRefresh *record.RefreshToken
 }
 
 // issueForScopeIsTheGrant runs one flow for one grant on a strict mock stubbed with the loads that
@@ -2185,7 +2185,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	mockDB := mocks_data.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", testDataCipher, nil)
 
-	settings := &models.Settings{
+	settings := &record.Settings{
 		Issuer:                                  "https://test-issuer.com",
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
@@ -2199,15 +2199,15 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	now := time.Now().UTC()
 	sessionIdentifier := "scope-is-the-grant-session"
 
-	user := models.User{
+	user := record.User{
 		Id:      1,
 		Subject: fake.UUID(),
 		Email:   "grant@example.com",
-		Groups:  []models.Group{{GroupIdentifier: "grant-group", IncludeInIdToken: true, IncludeInAccessToken: true}},
+		Groups:  []record.Group{{GroupIdentifier: "grant-group", IncludeInIdToken: true, IncludeInAccessToken: true}},
 	}
-	client := models.Client{Id: 1, ClientIdentifier: "grant-client"}
+	client := record.Client{Id: 1, ClientIdentifier: "grant-client"}
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil)
@@ -2217,7 +2217,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	// Only a grant with the profile scope asks for the picture, and only a session-bound refresh
 	// token asks for the session: both depend on the grant, not the flow.
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil).Maybe()
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
 		Id:      1,
 		UserId:  user.Id,
 		Started: now.Add(-5 * time.Minute),
@@ -2225,14 +2225,14 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 
 	var issued scopeIsTheGrantIssue
 	captureRefresh := func() {
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).
 			Run(func(args mock.Arguments) {
-				issued.storedRefresh = args.Get(2).(*models.RefreshToken)
+				issued.storedRefresh = args.Get(2).(*record.RefreshToken)
 			}).
 			Return(nil)
 	}
 
-	code := &models.Code{
+	code := &record.Code{
 		Id:                1,
 		ClientId:          client.Id,
 		UserId:            user.Id,
@@ -2244,7 +2244,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		Client:            client,
 		User:              user,
 	}
-	parent := &models.RefreshToken{
+	parent := &record.RefreshToken{
 		Id:                   1,
 		RefreshTokenJti:      "parent-jti",
 		FirstRefreshTokenJti: "first-jti",

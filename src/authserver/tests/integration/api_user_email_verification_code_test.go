@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ import (
 func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("email-code-user@example.test"),
@@ -62,7 +62,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("verified-email-code@example.test"),
@@ -170,7 +170,7 @@ func TestAPIUserEmailVerificationCodePost_InvalidToken(t *testing.T) {
 func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	user := &models.User{
+	user := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("regen-email-code@example.test"),

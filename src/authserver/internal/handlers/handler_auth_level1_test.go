@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -199,18 +199,18 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:       1,
 			UserId:   1,
-			AcrLevel: models.AcrLevel1,
+			AcrLevel: record.AcrLevel1,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel2Optional,
+			DefaultAcrLevel:  record.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -256,11 +256,11 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		userSession := &models.UserSession{Id: 1, UserId: 1, AcrLevel: "urn:goiabada:pwd"}
+		userSession := &record.UserSession{Id: 1, UserId: 1, AcrLevel: "urn:goiabada:pwd"}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
+			&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "invalid ACR level urn:goiabada:pwd")
@@ -299,18 +299,18 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:       1,
 			UserId:   1,
-			AcrLevel: models.AcrLevel1,
+			AcrLevel: record.AcrLevel1,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -356,18 +356,18 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		req = req.WithContext(ctx)
 
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:       1,
 			UserId:   1,
-			AcrLevel: models.AcrLevel1,
+			AcrLevel: record.AcrLevel1,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel1,
+			DefaultAcrLevel:  record.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -419,20 +419,20 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		// UserSessionLoadUser is stubbed, so User is set here directly: the session answered
 		// against generation 0 and the user has since moved to 1.
-		userSession := &models.UserSession{
+		userSession := &record.UserSession{
 			Id:                  1,
 			UserId:              1,
-			AcrLevel:            models.AcrLevel2Optional,
+			AcrLevel:            record.AcrLevel2Optional,
 			OtpConfigGeneration: 0,
-			User:                models.User{Id: 1, OtpConfigGeneration: 1},
+			User:                record.User{Id: 1, OtpConfigGeneration: 1},
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		client := &models.Client{
+		client := &record.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  models.AcrLevel2Optional,
+			DefaultAcrLevel:  record.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -464,76 +464,76 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("ACR level transitions", func(t *testing.T) {
 		tests := []struct {
 			name             string
-			sessionAcrLevel  models.AcrLevel
-			targetAcrLevel   models.AcrLevel
+			sessionAcrLevel  record.AcrLevel
+			targetAcrLevel   record.AcrLevel
 			otpConfigChanged bool
 			expectedRedirect string
 		}{
 			{
 				name:             "AcrLevel1 to AcrLevel1",
-				sessionAcrLevel:  models.AcrLevel1,
-				targetAcrLevel:   models.AcrLevel1,
+				sessionAcrLevel:  record.AcrLevel1,
+				targetAcrLevel:   record.AcrLevel1,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "AcrLevel1 to AcrLevel2Optional",
-				sessionAcrLevel:  models.AcrLevel1,
-				targetAcrLevel:   models.AcrLevel2Optional,
+				sessionAcrLevel:  record.AcrLevel1,
+				targetAcrLevel:   record.AcrLevel2Optional,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "AcrLevel1 to AcrLevel2Mandatory",
-				sessionAcrLevel:  models.AcrLevel1,
-				targetAcrLevel:   models.AcrLevel2Mandatory,
+				sessionAcrLevel:  record.AcrLevel1,
+				targetAcrLevel:   record.AcrLevel2Mandatory,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "AcrLevel2Optional to AcrLevel1",
-				sessionAcrLevel:  models.AcrLevel2Optional,
-				targetAcrLevel:   models.AcrLevel1,
+				sessionAcrLevel:  record.AcrLevel2Optional,
+				targetAcrLevel:   record.AcrLevel1,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "AcrLevel2Optional to AcrLevel2Optional (no change)",
-				sessionAcrLevel:  models.AcrLevel2Optional,
-				targetAcrLevel:   models.AcrLevel2Optional,
+				sessionAcrLevel:  record.AcrLevel2Optional,
+				targetAcrLevel:   record.AcrLevel2Optional,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "AcrLevel2Optional to AcrLevel2Optional (otp config generation moved)",
-				sessionAcrLevel:  models.AcrLevel2Optional,
-				targetAcrLevel:   models.AcrLevel2Optional,
+				sessionAcrLevel:  record.AcrLevel2Optional,
+				targetAcrLevel:   record.AcrLevel2Optional,
 				otpConfigChanged: true,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "AcrLevel2Optional to AcrLevel2Mandatory",
-				sessionAcrLevel:  models.AcrLevel2Optional,
-				targetAcrLevel:   models.AcrLevel2Mandatory,
+				sessionAcrLevel:  record.AcrLevel2Optional,
+				targetAcrLevel:   record.AcrLevel2Mandatory,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "AcrLevel2Mandatory to AcrLevel1",
-				sessionAcrLevel:  models.AcrLevel2Mandatory,
-				targetAcrLevel:   models.AcrLevel1,
+				sessionAcrLevel:  record.AcrLevel2Mandatory,
+				targetAcrLevel:   record.AcrLevel1,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "AcrLevel2Mandatory to AcrLevel2Optional",
-				sessionAcrLevel:  models.AcrLevel2Mandatory,
-				targetAcrLevel:   models.AcrLevel2Optional,
+				sessionAcrLevel:  record.AcrLevel2Mandatory,
+				targetAcrLevel:   record.AcrLevel2Optional,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "AcrLevel2Mandatory to AcrLevel2Mandatory",
-				sessionAcrLevel:  models.AcrLevel2Mandatory,
-				targetAcrLevel:   models.AcrLevel2Mandatory,
+				sessionAcrLevel:  record.AcrLevel2Mandatory,
+				targetAcrLevel:   record.AcrLevel2Mandatory,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "AcrLevel2Mandatory to AcrLevel2Mandatory (otp config generation moved)",
-				sessionAcrLevel:  models.AcrLevel2Mandatory,
-				targetAcrLevel:   models.AcrLevel2Mandatory,
+				sessionAcrLevel:  record.AcrLevel2Mandatory,
+				targetAcrLevel:   record.AcrLevel2Mandatory,
 				otpConfigChanged: true,
 				expectedRedirect: "/auth/level2",
 			},
@@ -572,17 +572,17 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				if tt.otpConfigChanged {
 					userGeneration = 1
 				}
-				userSession := &models.UserSession{
+				userSession := &record.UserSession{
 					Id:                  1,
 					UserId:              1,
 					AcrLevel:            tt.sessionAcrLevel,
 					OtpConfigGeneration: 0,
-					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
+					User:                record.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 				database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-				client := &models.Client{
+				client := &record.Client{
 					Id:               1,
 					ClientIdentifier: "test-client",
 					DefaultAcrLevel:  tt.targetAcrLevel,
@@ -624,44 +624,44 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Foreign session does not decide step-up", func(t *testing.T) {
 		tests := []struct {
 			name             string
-			sessionAcrLevel  models.AcrLevel
-			targetAcrLevel   models.AcrLevel
+			sessionAcrLevel  record.AcrLevel
+			targetAcrLevel   record.AcrLevel
 			otpConfigChanged bool
 			expectedRedirect string
 			description      string
 		}{
 			{
 				name:             "foreign session at the target still prompts for level2",
-				sessionAcrLevel:  models.AcrLevel2Optional,
-				targetAcrLevel:   models.AcrLevel2Optional,
+				sessionAcrLevel:  record.AcrLevel2Optional,
+				targetAcrLevel:   record.AcrLevel2Optional,
 				expectedRedirect: "/auth/level2",
 				description:      "the second-factor bypass: user 1's ACR must not satisfy user 2's step-up",
 			},
 			{
 				name:             "foreign mandatory session still prompts for level2",
-				sessionAcrLevel:  models.AcrLevel2Mandatory,
-				targetAcrLevel:   models.AcrLevel2Mandatory,
+				sessionAcrLevel:  record.AcrLevel2Mandatory,
+				targetAcrLevel:   record.AcrLevel2Mandatory,
 				expectedRedirect: "/auth/level2",
 				description:      "the same bypass at the mandatory level, where the second factor is not optional",
 			},
 			{
 				name:             "level1 target is not raised by a foreign session",
-				sessionAcrLevel:  models.AcrLevel2Mandatory,
-				targetAcrLevel:   models.AcrLevel1,
+				sessionAcrLevel:  record.AcrLevel2Mandatory,
+				targetAcrLevel:   record.AcrLevel1,
 				expectedRedirect: "/auth/completed",
 				description:      "the guard must not invent a second factor a level1 client never asked for",
 			},
 			{
 				name:             "foreign session below the target",
-				sessionAcrLevel:  models.AcrLevel1,
-				targetAcrLevel:   models.AcrLevel2Optional,
+				sessionAcrLevel:  record.AcrLevel1,
+				targetAcrLevel:   record.AcrLevel2Optional,
 				expectedRedirect: "/auth/level2",
 				description:      "control: the target arm already handled this, so a failure here means it broke",
 			},
 			{
 				name:             "the other user's snapshot is left alone",
-				sessionAcrLevel:  models.AcrLevel2Optional,
-				targetAcrLevel:   models.AcrLevel2Optional,
+				sessionAcrLevel:  record.AcrLevel2Optional,
+				targetAcrLevel:   record.AcrLevel2Optional,
 				otpConfigChanged: true,
 				expectedRedirect: "/auth/level2",
 				description:      "nothing may write to the other user's row, and nothing writes to any row now",
@@ -701,17 +701,17 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				if tt.otpConfigChanged {
 					userGeneration = 1
 				}
-				userSession := &models.UserSession{
+				userSession := &record.UserSession{
 					Id:                  1,
 					UserId:              1,
 					AcrLevel:            tt.sessionAcrLevel,
 					OtpConfigGeneration: 0,
-					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
+					User:                record.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 				database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-				client := &models.Client{
+				client := &record.Client{
 					Id:               1,
 					ClientIdentifier: "test-client",
 					DefaultAcrLevel:  tt.targetAcrLevel,
@@ -799,7 +799,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			}).Return(nil)
 
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+				&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 			stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
 			handler.ServeHTTP(rr, req)
@@ -840,7 +840,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(parked, nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
 		handler.ServeHTTP(rr, req)
@@ -872,7 +872,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(assert.AnError)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
 		handler.ServeHTTP(rr, req)
@@ -916,7 +916,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -945,7 +945,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
 		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
+			&record.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
 			"/auth_redirect_blocked.html", mock.Anything).Return(nil)
 
@@ -984,7 +984,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sess-1").Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
+			&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(false)
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,13 +108,13 @@ func fetchDiscoveryFields(t *testing.T) map[string]json.RawMessage {
 // request_uri_parameter_supported reads as true), public clients' "none", and the
 // auth_state_generation claim the server signs (#231, #437).
 func TestDiscovery_ImplementedCapabilities(t *testing.T) {
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.ImplicitFlowEnabled = false
 		settings.ResourceOwnerPasswordCredentialsEnabled = false
 	})
 	switchesOff := fetchDiscoveryFields(t)
 
-	changeSettings(t, func(settings *models.Settings) {
+	changeSettings(t, func(settings *record.Settings) {
 		settings.ImplicitFlowEnabled = true
 		settings.ResourceOwnerPasswordCredentialsEnabled = true
 	})

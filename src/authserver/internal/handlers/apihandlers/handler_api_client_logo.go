@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -19,11 +19,11 @@ import (
 // read, write and delete.
 type clientLogoDatabase interface {
 	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
-	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error
+	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
 	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
-	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error)
-	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
+	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
 }
 
 // HandleClientLogoPost - POST /api/v1/admin/clients/{id}/logo
@@ -84,7 +84,7 @@ func HandleClientLogoPost(
 			err = database.UpdateClientLogo(r.Context(), nil, existingLogo)
 		} else {
 			// Create new logo
-			clientLogo := &models.ClientLogo{
+			clientLogo := &record.ClientLogo{
 				ClientId:    clientId,
 				Logo:        fileData,
 				ContentType: result.ContentType,

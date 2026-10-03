@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,14 +28,14 @@ func TestLoadSigningKey(t *testing.T) {
 
 	testCases := []struct {
 		name    string
-		keyPair *models.KeyPair
+		keyPair *record.KeyPair
 		readErr error
 		// wantErr is empty for success; otherwise the text the returned error must carry.
 		wantErr string
 	}{
 		{
 			name:    "the current key, parsed, with its identifier",
-			keyPair: &models.KeyPair{KeyIdentifier: "kid-current", PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t))},
+			keyPair: &record.KeyPair{KeyIdentifier: "kid-current", PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t))},
 		},
 		{
 			name:    "a read failure is returned as the database reported it",
@@ -44,12 +44,12 @@ func TestLoadSigningKey(t *testing.T) {
 		},
 		{
 			name:    "a key sealed under another cipher does not decrypt",
-			keyPair: &models.KeyPair{KeyIdentifier: "kid-current", PrivateKeyPEM: sealedElsewhere},
+			keyPair: &record.KeyPair{KeyIdentifier: "kid-current", PrivateKeyPEM: sealedElsewhere},
 			wantErr: "unable to parse private key from PEM",
 		},
 		{
 			name:    "a key that decrypts to something other than a PEM does not parse",
-			keyPair: &models.KeyPair{KeyIdentifier: "kid-current", PrivateKeyPEM: encryptPEM(t, []byte("not a pem"))},
+			keyPair: &record.KeyPair{KeyIdentifier: "kid-current", PrivateKeyPEM: encryptPEM(t, []byte("not a pem"))},
 			wantErr: "unable to parse private key from PEM",
 		},
 	}

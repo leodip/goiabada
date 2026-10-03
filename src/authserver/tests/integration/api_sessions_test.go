@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -48,7 +48,7 @@ func hashTestSessionId(id string) string {
 // createBrowserSessionFixture writes a row the endpoint would not produce: one already
 // expired, or one belonging to the other application.
 func createBrowserSessionFixture(t *testing.T, owner, id string, expiresAt time.Time) {
-	err := database.CreateBrowserSession(context.Background(), nil, &models.BrowserSession{
+	err := database.CreateBrowserSession(context.Background(), nil, &record.BrowserSession{
 		Owner:         owner,
 		SessionId:     id,
 		SessionIdHash: hashTestSessionId(id),

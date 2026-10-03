@@ -13,9 +13,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
@@ -30,10 +30,10 @@ import (
 type authIssueDatabase interface {
 	authorizeDatabase
 
-	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 }
 
 func HandleIssueGet(
@@ -71,9 +71,9 @@ func HandleIssueGet(
 
 		// What the loads produce beyond the facts, for the acts below.
 		var (
-			issuingClient  *models.Client
-			ambientSession *models.UserSession
-			settings       *models.Settings
+			issuingClient  *record.Client
+			ambientSession *record.UserSession
+			settings       *record.Settings
 			scopeField     *string
 			effectiveScope string
 		)
@@ -358,7 +358,7 @@ type issuanceFacts struct {
 	flows *clientFlows
 	// userLoaded is set once the user has been looked up; user is nil when there is none.
 	userLoaded bool
-	user       *models.User
+	user       *record.User
 	// sessionLoaded is set once the session has been looked up; the two after it are false when
 	// there is none. sessionOwned is AuthContext.OwnsSession's answer for it.
 	sessionLoaded  bool
@@ -521,7 +521,7 @@ func refuseIssuanceUnregisteredRedirect(
 	w http.ResponseWriter,
 	r *http.Request,
 	authContext *ceremony.AuthContext,
-	issuingClient *models.Client,
+	issuingClient *record.Client,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	auditLogger AuditLogger,
@@ -608,7 +608,7 @@ func refuseIssuanceFlowDisabled(
 	r *http.Request,
 	description string,
 	authContext *ceremony.AuthContext,
-	issuingClient *models.Client,
+	issuingClient *record.Client,
 	database authIssueDatabase,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
@@ -629,8 +629,8 @@ func issueAuthorizationCodeGrant(
 	r *http.Request,
 	authContext *ceremony.AuthContext,
 	sessionIdentifier string,
-	issuingClient *models.Client,
-	ambientSession *models.UserSession,
+	issuingClient *record.Client,
+	ambientSession *record.UserSession,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	templateFS fs.FS,
@@ -688,7 +688,7 @@ func issueAuthorizationCodeGrant(
 
 	// A failed clear leaves the context in ready_to_issue_code, so a reload mints a second code, and
 	// that is a retry rather than a second grant. The code row stores only the plaintext's SHA-256
-	// (models.Code.Code is db:"-"), and this 500 is answered before issueAuthCode, so the first code
+	// (record.Code.Code is db:"-"), and this 500 is answered before issueAuthCode, so the first code
 	// reaches nobody and cannot be redeemed; the reload's is the only one delivered, and the
 	// worker's code sweep deletes the orphaned row once it is past its grace cutoff. Clearing before
 	// minting would strand the user on a transient mint fault where a reload now retries (#248 part
@@ -774,8 +774,8 @@ func refuseIssuanceUnusableSession(
 	r *http.Request,
 	shape sessionRefusalShape,
 	authContext *ceremony.AuthContext,
-	issuingClient *models.Client,
-	ambientSession *models.UserSession,
+	issuingClient *record.Client,
+	ambientSession *record.UserSession,
 	sessionIdentifier string,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
@@ -887,10 +887,10 @@ func issueImplicitGrant(
 	r *http.Request,
 	authContext *ceremony.AuthContext,
 	sessionIdentifier string,
-	client *models.Client,
-	user *models.User,
-	settings *models.Settings,
-	ambientSession *models.UserSession,
+	client *record.Client,
+	user *record.User,
+	settings *record.Settings,
+	ambientSession *record.UserSession,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
 	templateFS fs.FS,
@@ -1038,7 +1038,7 @@ func issueImplicitTokens(
 	return writeAuthorizationResponse(w, r, templateFS, implicitResponseMode(responseMode), redirectURI, params)
 }
 
-func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code *models.Code, responseMode string) error {
+func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code *record.Code, responseMode string) error {
 
 	// Gate 4, the last resort, ABOVE the response-mode dispatch so that it covers query, fragment
 	// and form_post alike. All three emit the stored value: the first two into a Location header,

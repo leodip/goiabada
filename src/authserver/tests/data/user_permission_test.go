@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateUserPermission(t *testing.T) {
@@ -14,7 +14,7 @@ func TestCreateUserPermission(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 
-	userPermission := &models.UserPermission{
+	userPermission := &record.UserPermission{
 		UserId:       user.Id,
 		PermissionId: permission.Id,
 	}
@@ -319,15 +319,15 @@ func TestDeleteUserPermission(t *testing.T) {
 	}
 }
 
-func createTestUserPermission(t *testing.T) *models.UserPermission {
+func createTestUserPermission(t *testing.T) *record.UserPermission {
 	user := createTestUser(t)
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 	return createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
 }
 
-func createTestUserPermissionWithUserAndPermission(t *testing.T, userId, permissionId int64) *models.UserPermission {
-	userPermission := &models.UserPermission{
+func createTestUserPermissionWithUserAndPermission(t *testing.T, userId, permissionId int64) *record.UserPermission {
+	userPermission := &record.UserPermission{
 		UserId:       userId,
 		PermissionId: permissionId,
 	}
@@ -346,7 +346,7 @@ func createTestUserPermissionWithUserAndPermission(t *testing.T, userId, permiss
 func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx := beginTx(t)
 
-	resource := &models.Resource{
+	resource := &record.Resource{
 		ResourceIdentifier: "tx_resource_" + fake.LetterN(8),
 		Description:        "Transaction pass-through resource",
 	}
@@ -354,7 +354,7 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 		t.Fatalf("Failed to create resource inside the transaction: %v", err)
 	}
 
-	permission := &models.Permission{
+	permission := &record.Permission{
 		PermissionIdentifier: "tx_permission_" + fake.LetterN(8),
 		Description:          "Transaction pass-through permission",
 		ResourceId:           resource.Id,
@@ -363,7 +363,7 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 		t.Fatalf("Failed to create permission inside the transaction: %v", err)
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Enabled:   true,
 		Subject:   fake.UUID(),
 		Username:  "u" + fake.LetterN(12),
@@ -374,7 +374,7 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 		t.Fatalf("Failed to create user inside the transaction: %v", err)
 	}
 
-	userPermission := &models.UserPermission{UserId: user.Id, PermissionId: permission.Id}
+	userPermission := &record.UserPermission{UserId: user.Id, PermissionId: permission.Id}
 	if err := database.CreateUserPermission(context.Background(), tx, userPermission); err != nil {
 		t.Fatalf("Failed to create users_permissions row inside the transaction: %v", err)
 	}

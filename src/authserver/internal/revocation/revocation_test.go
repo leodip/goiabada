@@ -8,7 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -49,8 +49,8 @@ const (
 // and any implementation that derives the preserved set from those rows revokes it. That
 // contradicts decision 4: the user changes their own password and their own session's
 // offline tokens die.
-func revocationFixture() []*models.RefreshToken {
-	return []*models.RefreshToken{
+func revocationFixture() []*record.RefreshToken {
+	return []*record.RefreshToken{
 		{
 			Id: 1, RefreshTokenJti: "rt-keep-session",
 			SessionIdentifier:   revokeKeepSid,
@@ -91,8 +91,8 @@ func revocationFixture() []*models.RefreshToken {
 	}
 }
 
-func revocationSessions() []models.UserSession {
-	return []models.UserSession{
+func revocationSessions() []record.UserSession {
+	return []record.UserSession{
 		{Id: 100, SessionIdentifier: revokeKeepSid, UserId: revokeUserId,
 			AuthStateGeneration: revokeOldGeneration},
 		{Id: 200, SessionIdentifier: revokeOtherSid, UserId: revokeUserId,
@@ -114,7 +114,7 @@ func TestRevokeUserAuthState_PreservingASession(t *testing.T) {
 	// to the preserved session. It matches codes.session_identifier, so it returns both the
 	// session-bound and the offline token of that session.
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, revokeKeepSid).
-		Return([]*models.RefreshToken{tokens[0], tokens[1]}, nil).Once()
+		Return([]*record.RefreshToken{tokens[0], tokens[1]}, nil).Once()
 
 	db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).
 		Return(tokens, nil).Once()
@@ -275,10 +275,10 @@ func TestRevokeUserAuthState_OldGenerationIsDerivedFromTheIncrement(t *testing.T
 
 	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).Return(int64(9), nil).Once()
 	db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 	db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, int64(9)).Return(nil).Once()
 	db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).
-		Return([]models.UserSession{}, nil).Once()
+		Return([]record.UserSession{}, nil).Once()
 
 	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "")
 
@@ -309,14 +309,14 @@ func TestRevokeUserAuthState_OldGenerationIsDerivedFromTheIncrement(t *testing.T
 func TestRevokeUserAuthState_ChildCommittedBetweenTheDiscoveryQueries(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	parent := &models.RefreshToken{
+	parent := &record.RefreshToken{
 		Id: 1, RefreshTokenJti: "rt-parent", SessionIdentifier: revokeKeepSid,
 		RefreshTokenType: "Refresh", CodeId: sql.NullInt64{Int64: 11, Valid: true},
 		AuthStateGeneration: revokeOldGeneration,
 	}
 	// Committed by the racing refresh after the user-scoped query ran, so it appears only in
 	// the sid-scoped result below.
-	child := &models.RefreshToken{
+	child := &record.RefreshToken{
 		Id: 2, RefreshTokenJti: "rt-child", SessionIdentifier: revokeKeepSid,
 		RefreshTokenType: "Refresh", CodeId: sql.NullInt64{Int64: 11, Valid: true},
 		PreviousRefreshTokenJti: "rt-parent", AuthStateGeneration: revokeOldGeneration,
@@ -325,13 +325,13 @@ func TestRevokeUserAuthState_ChildCommittedBetweenTheDiscoveryQueries(t *testing
 	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 		Return(revokeNewGeneration, nil).Once()
 	db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).
-		Return([]*models.RefreshToken{parent}, nil).Once()
+		Return([]*record.RefreshToken{parent}, nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, revokeKeepSid).
-		Return([]*models.RefreshToken{parent, child}, nil).Once()
+		Return([]*record.RefreshToken{parent, child}, nil).Once()
 	db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{1, 2}, revokeNewGeneration).
 		Return(nil).Once()
 	db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).
-		Return([]models.UserSession{revocationSessions()[0]}, nil).Once()
+		Return([]record.UserSession{revocationSessions()[0]}, nil).Once()
 	db.On("PromoteUserSessionGeneration", mock.Anything, revokeTx, int64(100), revokeNewGeneration).
 		Return(nil).Once()
 
@@ -375,7 +375,7 @@ func callIndex(t *testing.T, db *mocks_data.Database, method string) int {
 // there is simply nothing to promote.
 func TestRevokeUserAuthState_PreservedSessionAlreadyReaped(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	offline := &models.RefreshToken{
+	offline := &record.RefreshToken{
 		Id: 2, RefreshTokenJti: "rt-keep-offline", RefreshTokenType: "Offline",
 		CodeId: sql.NullInt64{Int64: 12, Valid: true}, AuthStateGeneration: revokeOldGeneration,
 	}
@@ -383,13 +383,13 @@ func TestRevokeUserAuthState_PreservedSessionAlreadyReaped(t *testing.T) {
 	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 		Return(revokeNewGeneration, nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, revokeKeepSid).
-		Return([]*models.RefreshToken{offline}, nil).Once()
+		Return([]*record.RefreshToken{offline}, nil).Once()
 	db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).
-		Return([]*models.RefreshToken{offline}, nil).Once()
+		Return([]*record.RefreshToken{offline}, nil).Once()
 	db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{2}, revokeNewGeneration).
 		Return(nil).Once()
 	db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).
-		Return([]models.UserSession{}, nil).Once()
+		Return([]record.UserSession{}, nil).Once()
 
 	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, revokeKeepSid)
 	require.NoError(t, err)
@@ -422,7 +422,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 
 	t.Run("all already revoked writes nothing and reports nothing", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		tokens := []*models.RefreshToken{
+		tokens := []*record.RefreshToken{
 			{Id: 1, RefreshTokenJti: "a", Revoked: true},
 			{Id: 2, RefreshTokenJti: "b", Revoked: true},
 		}
@@ -438,7 +438,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 
 	t.Run("mixed input reports only the transitioned ones", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		tokens := []*models.RefreshToken{
+		tokens := []*record.RefreshToken{
 			{Id: 1, RefreshTokenJti: "live-1"},
 			{Id: 2, RefreshTokenJti: "dead", Revoked: true},
 			{Id: 3, RefreshTokenJti: "live-2"},
@@ -456,7 +456,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 
 	t.Run("an error mid-loop discards the partial list", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		tokens := []*models.RefreshToken{
+		tokens := []*record.RefreshToken{
 			{Id: 1, RefreshTokenJti: "live-1"},
 			{Id: 2, RefreshTokenJti: "live-2"},
 		}
@@ -482,8 +482,8 @@ const (
 	terminateSid       = "sid-terminate"
 )
 
-func terminatedSession() *models.UserSession {
-	return &models.UserSession{
+func terminatedSession() *record.UserSession {
+	return &record.UserSession{
 		Id:                terminateSessionId,
 		SessionIdentifier: terminateSid,
 		UserId:            revokeUserId,
@@ -501,8 +501,8 @@ func terminatedSession() *models.UserSession {
 // because GetRefreshTokensBySessionIdentifier matches codes.session_identifier, and any
 // implementation that re-filters these rows by rt.SessionIdentifier drops exactly the offline
 // tokens decision 2 exists to revoke.
-func terminationFixture() []*models.RefreshToken {
-	return []*models.RefreshToken{
+func terminationFixture() []*record.RefreshToken {
+	return []*record.RefreshToken{
 		{
 			Id: 1, RefreshTokenJti: "rt-session-bound",
 			SessionIdentifier: terminateSid,
@@ -595,7 +595,7 @@ func TestTerminateUserSessionTx_NothingToRevoke(t *testing.T) {
 	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(int64(0), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 
 	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
 	require.NoError(t, err)
@@ -735,7 +735,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 					Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
-					Return([]*models.RefreshToken{}, nil).Once()
+					Return([]*record.RefreshToken{}, nil).Once()
 			},
 		},
 	}
@@ -786,8 +786,8 @@ const revokeClientId = int64(4242)
 // Token 2 has no sid of its own, so only the joined codes row ties it to anything. Token 3 has no
 // code at all, which is why the code marker cannot reach it and why the sweep is still owed after
 // decision 16 made the marker the boundary.
-func clientGrantFixture() []*models.RefreshToken {
-	return []*models.RefreshToken{
+func clientGrantFixture() []*record.RefreshToken {
+	return []*record.RefreshToken{
 		{
 			Id: 1, RefreshTokenJti: "rt-client-session", FirstRefreshTokenJti: "fam-session",
 			SessionIdentifier: "sid-client",
@@ -884,7 +884,7 @@ func TestRevokeClientGrants_NothingToRevoke(t *testing.T) {
 
 	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(0), nil).Once()
 	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 
 	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId)
 	require.NoError(t, err)
@@ -922,7 +922,7 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 	mocks_data.ExpectRunInTransaction(db, revokeTx)
 	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
 	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
-		Return([]*models.RefreshToken{}, nil).Once()
+		Return([]*record.RefreshToken{}, nil).Once()
 
 	var wroteWith *sql.Tx
 	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
@@ -1054,7 +1054,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				mocks_data.ExpectRunInTransactionThenFail(db, revokeTx, boom)
 				db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
-					Return([]*models.RefreshToken{}, nil).Once()
+					Return([]*record.RefreshToken{}, nil).Once()
 			},
 			extraAssert: func(t *testing.T, result ClientGrantRevocationResult) {
 				// The honest contract, documented on the helper: a reported commit failure means
@@ -1116,11 +1116,11 @@ func methodOrder(db *mocks_data.Database) []string {
 func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T) {
 	t.Run("the session block precedes both refresh-token reads", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
 		db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 			Return(revokeNewGeneration, nil).Once()
-		db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).Return([]models.UserSession{
+		db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).Return([]record.UserSession{
 			{Id: 10, SessionIdentifier: revokeKeepSid},
 			{Id: 20, SessionIdentifier: revokeOtherSid},
 		}, nil).Once()
@@ -1128,9 +1128,9 @@ func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T
 			Return(nil).Once()
 		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(20)).Return(nil).Once()
 		db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).
-			Return([]*models.RefreshToken{token}, nil).Once()
+			Return([]*record.RefreshToken{token}, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, revokeKeepSid).
-			Return([]*models.RefreshToken{}, nil).Once()
+			Return([]*record.RefreshToken{}, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, revokeNewGeneration).
 			Return(nil).Once()
@@ -1160,14 +1160,14 @@ func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T
 			Return(revokeNewGeneration, nil).Once()
 		// The order the engine chose to return them in. GetUserSessionsByUserId carries no
 		// ORDER BY, so this is a shape it really can produce.
-		db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).Return([]models.UserSession{
+		db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).Return([]record.UserSession{
 			{Id: 30, SessionIdentifier: "sid-c"},
 			{Id: 10, SessionIdentifier: "sid-a"},
 			{Id: 20, SessionIdentifier: "sid-b"},
 		}, nil).Once()
 		db.On("DeleteUserSession", mock.Anything, revokeTx, mock.AnythingOfType("int64")).Return(nil).Times(3)
 		db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).
-			Return([]*models.RefreshToken{}, nil).Once()
+			Return([]*record.RefreshToken{}, nil).Once()
 		db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, revokeNewGeneration).
 			Return(nil).Once()
 
@@ -1212,18 +1212,18 @@ const reuseSid = "sid-reused"
 func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 	t.Run("the session row is taken before any grant is read", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
 		mocks_data.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
-			Return([]*models.RefreshToken{token}, nil).Once()
+			Return([]*record.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
-			Return(&models.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
+			Return(&record.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
 		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
@@ -1242,18 +1242,18 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 
 	t.Run("the acquisition's answer is not a branch", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
 		mocks_data.ExpectRunInTransaction(db, revokeTx)
 		// The row is already gone, which is ordinary: an offline grant's tokens are designed
 		// to outlive their session, and the background reapers remove idle sessions routinely.
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(false, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
-			Return([]*models.RefreshToken{token}, nil).Once()
+			Return([]*record.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis,
@@ -1269,7 +1269,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		stub := mocks_data.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(false, boom).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
 
 		require.ErrorIs(t, err, boom,
 			"a statement that did not run has not established anything, so the caller gets a 500")
@@ -1280,14 +1280,14 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 
 	t.Run("a code with no session identifier acquires nothing", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
 		mocks_data.ExpectRunInTransaction(db, revokeTx)
 		db.On("GetRefreshTokensByCodeId", mock.Anything, revokeTx, int64(42)).
-			Return([]*models.RefreshToken{token}, nil).Once()
+			Return([]*record.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42})
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
@@ -1303,9 +1303,9 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		mocks_data.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
-			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
+			Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
 
 		require.NoError(t, err)
 		// Empty, and a list rather than nil, so the audit payload carries [].
@@ -1321,19 +1321,19 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 
 	t.Run("a failure after the sweep yields the zero result", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 		boom := errors.New("the delete failed")
 
 		mocks_data.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
-			Return([]*models.RefreshToken{token}, nil).Once()
+			Return([]*record.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
-			Return(&models.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
+			Return(&record.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
 		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(boom).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
 
 		// The sweep succeeded and the transaction rolled back, so a caller auditing this result
 		// would list a revocation that never happened.
@@ -1350,7 +1350,7 @@ func TestRevokeOnAuthCodeReuse_RefusesAnUnusableCall(t *testing.T) {
 	t.Run("a nil transaction", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 
-		result, err := RevokeOnAuthCodeReuse(context.Background(), db, nil, &models.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuse(context.Background(), db, nil, &record.Code{Id: 42, SessionIdentifier: reuseSid})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires a transaction")
@@ -1397,7 +1397,7 @@ func (r *reuseAuditRecorder) Log(_ context.Context, auditEvent string, details m
 // TestLogAuthCodeReuse_Payload pins the auth_code_reuse_detected payload field by field, which the
 // token endpoint wrote inline before the response moved here (#435).
 func TestLogAuthCodeReuse_Payload(t *testing.T) {
-	code := &models.Code{Id: 42, ClientId: 7, UserId: 13, SessionIdentifier: reuseSid}
+	code := &record.Code{Id: 42, ClientId: 7, UserId: 13, SessionIdentifier: reuseSid}
 	recorder := &reuseAuditRecorder{}
 
 	LogAuthCodeReuse(context.Background(), recorder, code, AuthCodeReuseResult{RevokedRefreshTokenJtis: []string{"rt-1", "rt-2"}})

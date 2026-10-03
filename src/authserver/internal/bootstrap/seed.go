@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/builtin"
@@ -23,15 +23,15 @@ import (
 // seedDatabase is the seed's port: the transaction and the nine creates its 18 writes call.
 type seedDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
-	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
-	CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
-	CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
-	CreatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
-	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error
-	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
-	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error
-	CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
+	CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
+	CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
+	CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
+	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
+	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
+	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error
+	CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // seedValues is everything the seed generates before it writes: each can fail, and a failure
@@ -41,8 +41,8 @@ type seedValues struct {
 	passwordHash          string
 	appName               string
 	clientSecretEncrypted []byte
-	currentKey            *models.KeyPair
-	nextKey               *models.KeyPair
+	currentKey            *record.KeyPair
+	nextKey               *record.KeyPair
 }
 
 // seed writes a deployment's first state: the admin console's client, the admin, the auth
@@ -138,11 +138,11 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 		return errs.Wrap(err, "unable to encrypt admin console client secret")
 	}
 
-	currentKey, err := signingkeys.NewKeyPair(r.dataCipher, models.KeyStateCurrent, r.keySizeBits)
+	currentKey, err := signingkeys.NewKeyPair(r.dataCipher, record.KeyStateCurrent, r.keySizeBits)
 	if err != nil {
 		return err
 	}
-	nextKey, err := signingkeys.NewKeyPair(r.dataCipher, models.KeyStateNext, r.keySizeBits)
+	nextKey, err := signingkeys.NewKeyPair(r.dataCipher, record.KeyStateNext, r.keySizeBits)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 // every write takes tx: one made outside it would survive a rollback, which on SQLite's single
 // connection hangs instead.
 func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValues) error {
-	client := &models.Client{
+	client := &record.Client{
 		ClientIdentifier:         builtin.AdminConsoleClientIdentifier,
 		Description:              "Admin console client (system-level)",
 		DisplayName:              "Admin console",
@@ -225,15 +225,15 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		ConsentRequired:          false,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          models.AcrLevel2Optional,
+		DefaultAcrLevel:          record.AcrLevel2Optional,
 		// The admin console obtains a bearer token through client_credentials to reach
 		// its own browser sessions on the auth server, so this grant is on from the
 		// start. It carries the single browser-sessions permission granted below and
 		// nothing wider (#266).
 		ClientCredentialsEnabled:                true,
 		ClientSecretEncrypted:                   values.clientSecretEncrypted,
-		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
 		ShowDisplayName:                         true,
 	}
 	if err := r.db.CreateClient(ctx, tx, client); err != nil {
@@ -241,12 +241,12 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	}
 
 	for _, uri := range []string{r.cfg.AdminConsoleBaseURL + "/auth/callback", r.cfg.AdminConsoleBaseURL} {
-		if err := r.db.CreateRedirectURI(ctx, tx, &models.RedirectURI{URI: uri, ClientId: client.Id}); err != nil {
+		if err := r.db.CreateRedirectURI(ctx, tx, &record.RedirectURI{URI: uri, ClientId: client.Id}); err != nil {
 			return err
 		}
 	}
 
-	user := &models.User{
+	user := &record.User{
 		Subject:       uuid.New(),
 		Email:         values.adminEmail,
 		EmailVerified: true,
@@ -257,7 +257,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		return err
 	}
 
-	resource := &models.Resource{
+	resource := &record.Resource{
 		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
@@ -265,7 +265,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		return err
 	}
 
-	permissions := make(map[string]*models.Permission)
+	permissions := make(map[string]*record.Permission)
 	for _, p := range []struct{ identifier, description string }{
 		{builtin.ManageAccountPermissionIdentifier, "View and update user account data for the current user"},
 		{builtin.ManagePermissionIdentifier, "Manage the authorization server via the admin console"},
@@ -276,7 +276,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		{builtin.ManageSettingsPermissionIdentifier, "Manage system settings and signing keys"},
 		{builtin.BrowserSessionsPermissionIdentifier, "Read and write admin console browser sessions"},
 	} {
-		permission := &models.Permission{
+		permission := &record.Permission{
 			PermissionIdentifier: p.identifier,
 			Description:          p.description,
 			ResourceId:           resource.Id,
@@ -290,7 +290,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	// Migration 000035 produces this same end state for an installation that already
 	// existed, and the two must not drift: the permission on the authserver resource,
 	// the grant to the admin console client, and client_credentials_enabled on it.
-	if err := r.db.CreateClientPermission(ctx, tx, &models.ClientPermission{
+	if err := r.db.CreateClientPermission(ctx, tx, &record.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissions[builtin.BrowserSessionsPermissionIdentifier].Id,
 	}); err != nil {
@@ -298,7 +298,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	}
 
 	for _, identifier := range []string{builtin.ManageAccountPermissionIdentifier, builtin.ManagePermissionIdentifier} {
-		if err := r.db.CreateUserPermission(ctx, tx, &models.UserPermission{
+		if err := r.db.CreateUserPermission(ctx, tx, &record.UserPermission{
 			UserId:       user.Id,
 			PermissionId: permissions[identifier].Id,
 		}); err != nil {
@@ -308,7 +308,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 
 	// Copies, because CreateKeyPair sets the id on the struct it is given and these two were
 	// built before the transaction, once for every attempt.
-	for _, prebuilt := range []*models.KeyPair{values.currentKey, values.nextKey} {
+	for _, prebuilt := range []*record.KeyPair{values.currentKey, values.nextKey} {
 		keyPair := *prebuilt
 		if err := r.db.CreateKeyPair(ctx, tx, &keyPair); err != nil {
 			return err
@@ -317,13 +317,13 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 
 	// Last, and at the id IsEmpty reads, so the database reads as seeded exactly when the
 	// transaction holding this row commits (#424 decision 14).
-	return r.db.CreateInitialSettings(ctx, tx, &models.Settings{
+	return r.db.CreateInitialSettings(ctx, tx, &record.Settings{
 		AppName:                 values.appName,
 		Issuer:                  r.cfg.AuthServerBaseURL,
 		UITheme:                 "",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: false,
-		PasswordPolicy: models.PasswordPolicyLow,
+		PasswordPolicy: record.PasswordPolicyLow,
 		// The data key is supplied from the environment (issue #83); the legacy
 		// aes_encryption_key column is left empty on fresh installs. It is NOT NULL,
 		// so store an empty (non-nil) blob rather than nil.

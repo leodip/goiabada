@@ -13,7 +13,7 @@ import (
 )
 
 // The new-user page is this package's only reader of the settings reqctx carries, and that value is
-// api.PublicSettingsResponse rather than a models.Settings the settings-cache middleware filled four
+// api.PublicSettingsResponse rather than a record.Settings the settings-cache middleware filled four
 // fields of (#350). The type is held at compile time by reqctx's typed accessors since #440; what
 // this case still holds is that the page reads the value the middleware wrote rather than one of
 // its own.

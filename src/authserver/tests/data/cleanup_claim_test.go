@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // TryClaimCleanupRun is the cross-instance lock for the background cleanup, so the
@@ -16,7 +16,7 @@ import (
 // UPDATE rather than an engine-specific advisory lock.
 
 // setLastCleanupAt puts settings row 1 into a known state.
-func setLastCleanupAt(t *testing.T, at *time.Time) *models.Settings {
+func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 	t.Helper()
 
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)

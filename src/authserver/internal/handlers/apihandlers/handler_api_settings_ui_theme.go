@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
@@ -34,7 +34,7 @@ func HandleSettingsUIThemeGet() http.HandlerFunc {
 
 // settingsUIThemeDatabase is what the UI theme settings endpoint needs: the settings write.
 type settingsUIThemeDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // HandleSettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme

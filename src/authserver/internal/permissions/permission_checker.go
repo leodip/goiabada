@@ -10,8 +10,8 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -35,7 +35,7 @@ type ScopeResolution struct {
 	Outcome              ScopeOutcome
 	ResourceIdentifier   string             // parts[0], empty when Outcome is ScopeMalformed
 	PermissionIdentifier string             // parts[1], empty when Outcome is ScopeMalformed
-	Permission           *models.Permission // the resolved row, set only when Outcome is ScopeOK
+	Permission           *record.Permission // the resolved row, set only when Outcome is ScopeOK
 }
 
 // ScopeResolverDatabase is what resolving one `resource:permission` scope needs: the resource, and
@@ -45,8 +45,8 @@ type ScopeResolution struct {
 // and embed this in ports of their own. Handing them the checker's six to reach these two is the
 // shape #386 decision 3 rejected when it chose a port per file over a port per package.
 type ScopeResolverDatabase interface {
-	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
 }
 
 // IsResourceScope reports whether a scope has the resource:permission shape, which is exactly one
@@ -118,10 +118,10 @@ func ResolveScope(ctx context.Context, db ScopeResolverDatabase, scopeStr string
 type permissionCheckerDatabase interface {
 	ScopeResolverDatabase
 
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []models.Group) error
-	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
-	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []record.Group) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
+	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
 type Checker struct {
@@ -138,10 +138,10 @@ func NewChecker(database permissionCheckerDatabase) *Checker {
 // groups' permissions onto that row. A nil user and a nil error mean the row is gone, which every
 // caller answers as holding nothing.
 //
-// The fresh row is the point: the caller's *models.User is never loaded onto, so a check cannot
+// The fresh row is the point: the caller's *record.User is never loaded onto, so a check cannot
 // mutate a struct its caller goes on to use, and a user deleted since the caller read it holds
 // nothing rather than whatever the caller's copy still says.
-func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*models.User, error) {
+func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*record.User, error) {
 	user, err := pc.database.GetUserById(ctx, nil, userId)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*models.U
 // holdsPermission reports whether the loaded user holds the permission row, directly or through
 // any of their groups. It compares row ids, never identifiers, because a permission identifier is
 // only unique within its resource (#104).
-func holdsPermission(user *models.User, permissionId int64) bool {
+func holdsPermission(user *record.User, permissionId int64) bool {
 	for _, userPerm := range user.Permissions {
 		if userPerm.Id == permissionId {
 			return true
@@ -222,7 +222,7 @@ func (pc *Checker) UserHasScopePermission(ctx context.Context, userId int64, sco
 // lookup alone. The user and their grants are then loaded once, at the first scope that resolves,
 // and every later scope is answered from that one load: it used to reload them per scope, four of
 // the six reads each resource scope cost (#425).
-func (pc *Checker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error) {
+func (pc *Checker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *record.User) (string, error) {
 
 	if user == nil {
 		return "", errs.New("user is nil")
@@ -230,7 +230,7 @@ func (pc *Checker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, 
 
 	newScope := ""
 
-	var holder *models.User
+	var holder *record.User
 	holderLoaded := false
 
 	// filter

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 func TestCreateClientLogo(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCreateClientLogo(t *testing.T) {
 }
 
 func TestCreateClientLogo_ZeroClientId(t *testing.T) {
-	clientLogo := &models.ClientLogo{
+	clientLogo := &record.ClientLogo{
 		ClientId:    0,
 		Logo:        createTestPNG(100, 100),
 		ContentType: "image/png",
@@ -88,7 +88,7 @@ func TestUpdateClientLogo(t *testing.T) {
 }
 
 func TestUpdateClientLogo_ZeroId(t *testing.T) {
-	clientLogo := &models.ClientLogo{
+	clientLogo := &record.ClientLogo{
 		Id:          0,
 		ClientId:    1,
 		Logo:        createTestPNG(100, 100),
@@ -213,7 +213,7 @@ func TestClientLogo_MultipleClients(t *testing.T) {
 	logo1Data := createTestPNG(50, 50)
 	logo2Data := createTestPNG(100, 100)
 
-	logo1 := &models.ClientLogo{
+	logo1 := &record.ClientLogo{
 		ClientId:    client1.Id,
 		Logo:        logo1Data,
 		ContentType: "image/png",
@@ -223,7 +223,7 @@ func TestClientLogo_MultipleClients(t *testing.T) {
 		t.Fatalf("Failed to create logo for client1: %v", err)
 	}
 
-	logo2 := &models.ClientLogo{
+	logo2 := &record.ClientLogo{
 		ClientId:    client2.Id,
 		Logo:        logo2Data,
 		ContentType: "image/png",
@@ -271,7 +271,7 @@ func TestClientLogo_LargeLogoData(t *testing.T) {
 	// Create a larger image (512x512)
 	largeLogoData := createTestPNG(512, 512)
 
-	clientLogo := &models.ClientLogo{
+	clientLogo := &record.ClientLogo{
 		ClientId:    client.Id,
 		Logo:        largeLogoData,
 		ContentType: "image/png",
@@ -292,9 +292,9 @@ func TestClientLogo_LargeLogoData(t *testing.T) {
 	}
 }
 
-func createTestClientLogo(t *testing.T, clientId int64) *models.ClientLogo {
+func createTestClientLogo(t *testing.T, clientId int64) *record.ClientLogo {
 	logoData := createTestPNG(100, 100)
-	clientLogo := &models.ClientLogo{
+	clientLogo := &record.ClientLogo{
 		ClientId:    clientId,
 		Logo:        logoData,
 		ContentType: "image/png",

@@ -18,8 +18,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
@@ -57,7 +57,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		capture := newSMTPCapture(t)
 
 		database := mocks_data.NewDatabase(t)
-		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&models.User{
+		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 			Id:            1,
 			Enabled:       true,
 			Subject:       routesTestSubject,
@@ -65,7 +65,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 			EmailVerified: true,
 			PasswordHash:  passwordHash,
 		}, nil)
-		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*models.User)(nil), nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*record.User)(nil), nil)
 		database.On("TrySetUserEmail", mock.Anything, mock.Anything, int64(1), previousEmail, true, newEmail).Return(true, nil).Once()
 		s := newServer(t, database)
 
@@ -81,19 +81,19 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		capture := newSMTPCapture(t)
 
 		database := mocks_data.NewDatabase(t)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 			Id:      1,
 			Enabled: true,
 			Subject: routesTestSubject,
 			Email:   previousEmail,
 		}, nil)
-		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&models.User{
+		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 			Id:      1,
 			Subject: routesTestSubject,
 			Email:   previousEmail,
 		}, nil)
-		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*models.User)(nil), nil)
-		database.On("UpdateUser", mock.Anything, mock.Anything, mock.MatchedBy(func(user *models.User) bool {
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*record.User)(nil), nil)
+		database.On("UpdateUser", mock.Anything, mock.Anything, mock.MatchedBy(func(user *record.User) bool {
 			return user.Id == 1 && user.Email == newEmail
 		})).Return(nil).Once()
 		s := newServer(t, database)
@@ -167,7 +167,7 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 	require.NoError(t, err)
 
 	var mu sync.Mutex
-	row := models.User{Id: 1, Enabled: true, Subject: routesTestSubject, Email: previousEmail,
+	row := record.User{Id: 1, Enabled: true, Subject: routesTestSubject, Email: previousEmail,
 		EmailVerified: true, PasswordHash: passwordHash}
 
 	arrived := 0
@@ -175,13 +175,13 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 
 	database := mocks_data.NewDatabase(t)
 	database.EXPECT().GetUserBySubject(mock.Anything, mock.Anything, routesTestSubject).
-		RunAndReturn(func(context.Context, *sql.Tx, string) (*models.User, error) {
+		RunAndReturn(func(context.Context, *sql.Tx, string) (*record.User, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			read := row
 			return &read, nil
 		}).Maybe()
-	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*models.User)(nil), nil).Maybe()
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*record.User)(nil), nil).Maybe()
 	database.EXPECT().TrySetUserEmail(mock.Anything, mock.Anything, int64(1), mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, _ *sql.Tx, _ int64, fromEmail string, fromVerified bool, toEmail string) (bool, error) {
 			mu.Lock()

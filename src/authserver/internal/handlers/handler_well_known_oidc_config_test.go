@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -50,7 +50,7 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 	}
 }
 
-func serveDiscovery(t *testing.T, settings *models.Settings) oidc.WellKnownConfig {
+func serveDiscovery(t *testing.T, settings *record.Settings) oidc.WellKnownConfig {
 	t.Helper()
 	jsonWriter := mocks_handlers.NewJSONWriter(t)
 	handler := HandleWellKnownOIDCConfigGet(jsonWriter, testBaseURL)
@@ -80,11 +80,11 @@ func serveDiscovery(t *testing.T, settings *models.Settings) oidc.WellKnownConfi
 func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 	testCases := []struct {
 		name     string
-		settings *models.Settings
+		settings *record.Settings
 	}{
-		{"every flow switch off", &models.Settings{Issuer: "https://example.com"}},
-		{"implicit on", &models.Settings{Issuer: "https://example.com", ImplicitFlowEnabled: true}},
-		{"password grant on", &models.Settings{Issuer: "https://example.com", ResourceOwnerPasswordCredentialsEnabled: true}},
+		{"every flow switch off", &record.Settings{Issuer: "https://example.com"}},
+		{"implicit on", &record.Settings{Issuer: "https://example.com", ImplicitFlowEnabled: true}},
+		{"password grant on", &record.Settings{Issuer: "https://example.com", ResourceOwnerPasswordCredentialsEnabled: true}},
 	}
 
 	for _, tc := range testCases {
@@ -99,7 +99,7 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 		want := expectedDiscoveryDocument()
 		want.RegistrationEndpoint = testBaseURL + "/connect/register"
 
-		got := serveDiscovery(t, &models.Settings{Issuer: "https://example.com", DynamicClientRegistrationEnabled: true})
+		got := serveDiscovery(t, &record.Settings{Issuer: "https://example.com", DynamicClientRegistrationEnabled: true})
 
 		assert.Equal(t, want, got)
 	})
@@ -110,7 +110,7 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 // the authorize endpoint refuses request_uri, so the key must be on the wire even though its value
 // is the zero value. An omitempty tag drops it and this fails (#231, #437).
 func TestWellKnownConfig_WritesFalseRequestParameters(t *testing.T) {
-	encoded, err := json.Marshal(serveDiscovery(t, &models.Settings{Issuer: "https://example.com"}))
+	encoded, err := json.Marshal(serveDiscovery(t, &record.Settings{Issuer: "https://example.com"}))
 	require.NoError(t, err)
 
 	var fields map[string]json.RawMessage

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +19,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@profile.test"),
@@ -88,7 +88,7 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user with existing data
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@partial.test"),
@@ -135,7 +135,7 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@gender.test"),
@@ -168,7 +168,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@valid-gender.test"),
@@ -222,7 +222,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@dob.test"),
@@ -256,7 +256,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:             fake.UUID(),
 		Enabled:             true,
 		Email:               uniqueEmail("testuser@zone-pair.test"),
@@ -349,7 +349,7 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@invalid.test"),
@@ -380,7 +380,7 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 
 func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth.test"),
@@ -413,7 +413,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@address.test"),
@@ -475,7 +475,7 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user with existing address
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:           fake.UUID(),
 		Enabled:           true,
 		Email:             uniqueEmail("testuser@partial-addr.test"),
@@ -525,7 +525,7 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user with existing address data
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:           fake.UUID(),
 		Enabled:           true,
 		Email:             uniqueEmail("testuser@clear-addr.test"),
@@ -574,7 +574,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@angle-brackets.test"),
@@ -617,7 +617,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@verbatim-address.test"),
@@ -703,7 +703,7 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@invalid-addr.test"),
@@ -734,7 +734,7 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 
 func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-addr.test"),

@@ -6,7 +6,7 @@ import (
 
 // RedirectURIResponse is a client's redirect URI as this API publishes it.
 //
-// It exists because ClientResponse used to carry models.RedirectURI directly. That is a
+// It exists because ClientResponse used to carry record.RedirectURI directly. That is a
 // persistence row: it declares no json tags, so its keys reached the wire in Go's own spelling
 // ("Id", "URI", "ClientId") inside a body whose every other key is lowerCamelCase, and its
 // sql.NullTime CreatedAt arrived as {"Time":"0001-01-01T00:00:00Z","Valid":false} where a NULL

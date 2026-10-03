@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -66,8 +66,8 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := seedThrowawayDatabase(t, "startup_rotation.db", func(db data.Database) {
-		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
-			State:         models.KeyStateCurrent.String(),
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &record.KeyPair{
+			State:         record.KeyStateCurrent.String(),
 			KeyIdentifier: fake.UUID(),
 			Type:          "RSA",
 			Algorithm:     "RS256",
@@ -129,8 +129,8 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := seedThrowawayDatabase(t, "startup_tasks_failed.db", func(db data.Database) {
-		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
-			State:         models.KeyStateCurrent.String(),
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &record.KeyPair{
+			State:         record.KeyStateCurrent.String(),
 			KeyIdentifier: fake.UUID(),
 			Type:          "RSA",
 			Algorithm:     "RS256",
@@ -182,14 +182,14 @@ func TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing(t *testing.T) {
 	clientIdentifier := "c-" + fake.UUID()
 
 	cfg := seedThrowawayDatabase(t, "startup_plaintext_pem.db", func(db data.Database) {
-		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
-			State:         models.KeyStateCurrent.String(),
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &record.KeyPair{
+			State:         record.KeyStateCurrent.String(),
 			KeyIdentifier: fake.UUID(),
 			Type:          "RSA",
 			Algorithm:     "RS256",
 			PrivateKeyPEM: []byte(pemPlain), // the pre-1.6.0 state: never encrypted
 		}), "the plaintext canary is the fixture")
-		require.NoError(t, db.CreateClient(context.Background(), nil, &models.Client{
+		require.NoError(t, db.CreateClient(context.Background(), nil, &record.Client{
 			ClientIdentifier:      clientIdentifier,
 			ClientSecretEncrypted: secretUnderPrevious,
 		}), "and a secret under the previous key, which a re-key would have moved")

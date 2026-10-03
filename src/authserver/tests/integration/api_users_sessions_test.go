@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@sessions.test"),
@@ -36,7 +36,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	}()
 
 	// Setup: Create test client (inline createTestClientForSessions)
-	testClient := &models.Client{
+	testClient := &record.Client{
 		ClientIdentifier:         "test-client-sessions-" + fake.UUID()[:8],
 		ClientSecretEncrypted:    []byte("encrypted-secret"),
 		Description:              "Test Client for Sessions",
@@ -62,7 +62,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 
 	// Setup: Link sessions to client (inline createTestUserSessionClient)
 	now := time.Now().UTC()
-	sessionClient1 := &models.UserSessionClient{
+	sessionClient1 := &record.UserSessionClient{
 		UserSessionId: session1.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -70,7 +70,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	}
 	err = database.CreateUserSessionClient(context.Background(), nil, sessionClient1)
 	assert.NoError(t, err)
-	sessionClient2 := &models.UserSessionClient{
+	sessionClient2 := &record.UserSessionClient{
 		UserSessionId: session2.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -119,7 +119,7 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user without sessions
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@empty-sessions.test"),
@@ -190,7 +190,7 @@ func TestAPIUserSessionsGet_InvalidId(t *testing.T) {
 
 func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@unauth-sessions.test"),
@@ -222,7 +222,7 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@no-clients.test"),
@@ -266,7 +266,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@session-delete.test"),
@@ -397,7 +397,7 @@ func TestAPIUserSessionDelete_InvalidId(t *testing.T) {
 
 func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test user and session
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@session-delete-unauth.test"),
@@ -436,7 +436,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 
 func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 	// Setup: Create test user and session
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:    fake.UUID(),
 		Enabled:    true,
 		Email:      uniqueEmail("testuser@session-delete-invalid-token.test"),
@@ -474,7 +474,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Create test user
-	testUser := &models.User{
+	testUser := &record.User{
 		Subject:       fake.UUID(),
 		Enabled:       true,
 		Email:         uniqueEmail("testuser@valid-sessions.test"),
@@ -489,7 +489,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	}()
 
 	// Setup: Create a valid session (recently accessed)
-	validSession := &models.UserSession{
+	validSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-time.Minute * 30), // Started 30 minutes ago
 		LastAccessed:      time.Now().UTC().Add(-time.Minute * 5),  // Last accessed 5 minutes ago
@@ -509,7 +509,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	}()
 
 	// Setup: Create an expired session (very old last access)
-	expiredSession := &models.UserSession{
+	expiredSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-time.Hour * 25), // Started 25 hours ago
 		LastAccessed:      time.Now().UTC().Add(-time.Hour * 24), // Last accessed 24 hours ago (expired)
@@ -552,8 +552,8 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 // itself, not a label derived from it (#281).
 const testSessionUserAgent = "goiabada-integration-fixture/1.0 (raw header)"
 
-func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string) *models.UserSession {
-	session := &models.UserSession{
+func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string) *record.UserSession {
+	session := &record.UserSession{
 		SessionIdentifier: sessionIdentifier,
 		Started:           time.Now().UTC().Add(-time.Hour),        // Started 1 hour ago
 		LastAccessed:      time.Now().UTC().Add(-time.Minute * 30), // Last accessed 30 minutes ago

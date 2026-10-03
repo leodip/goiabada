@@ -9,7 +9,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -17,7 +17,7 @@ import (
 // settingsDatabase is what the settings middleware needs: the settings row it puts on every
 // request's context.
 type settingsDatabase interface {
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 }
 
 // Settings puts the settings row on the request's context. A failure to read it is

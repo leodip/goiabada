@@ -9,7 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -31,10 +31,10 @@ func TestRecord_CreatesAConsentWhenNoneIsStored(t *testing.T) {
 	stub := mocks_data.ExpectRunInTransaction(db, consentTx)
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 
-	var created *models.UserConsent
+	var created *record.UserConsent
 	db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			created = args.Get(2).(*models.UserConsent)
+			created = args.Get(2).(*record.UserConsent)
 			created.Id = 11
 		}).
 		Return(nil).Once()
@@ -60,7 +60,7 @@ func TestRecord_CreatesAConsentWhenNoneIsStored(t *testing.T) {
 // granted again (#115). The scope the row had is gone, which is what unticking a scope means.
 func TestRecord_ReplacesAStoredConsentWholeAndRefreshesItsDate(t *testing.T) {
 	grantedAt := sql.NullTime{Time: time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC), Valid: true}
-	stored := &models.UserConsent{
+	stored := &record.UserConsent{
 		Id: 5, UserId: consentUserId, ClientId: consentClientId, Scope: "openid profile email", GrantedAt: grantedAt,
 	}
 	db := mocks_data.NewDatabase(t)
@@ -93,7 +93,7 @@ func TestRecord_ASaveThatLosesTheKeyRunsOnceMoreAndRewritesTheWinnersRow(t *test
 	db := mocks_data.NewDatabase(t)
 	first := mocks_data.ExpectRunInTransaction(db, consentTx)
 	second := mocks_data.ExpectRunInTransaction(db, consentTx)
-	winners := &models.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId, Scope: "openid"}
+	winners := &record.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId, Scope: "openid"}
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(winners, nil).Once()
 	db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(lostTheKey).Once()
@@ -160,7 +160,7 @@ func TestRecord_Failures(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 		stub := mocks_data.ExpectRunInTransaction(db, consentTx)
 		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).
-			Return(&models.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId}, nil).Once()
+			Return(&record.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId}, nil).Once()
 		db.On("UpdateUserConsent", mock.Anything, consentTx, mock.Anything).Return(boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")

@@ -4,7 +4,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -35,7 +35,7 @@ const (
 // nothing was exposed by ignoring one; what it buys is that one request gets one answer whichever
 // grant carries it. The client credentials grant never reaches that branch, because it refuses a
 // public client before authenticating.
-func (val *TokenValidator) authenticateClient(client *models.Client, presentedSecret string) error {
+func (val *TokenValidator) authenticateClient(client *record.Client, presentedSecret string) error {
 	if client.IsPublic {
 		if len(presentedSecret) > 0 {
 			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",

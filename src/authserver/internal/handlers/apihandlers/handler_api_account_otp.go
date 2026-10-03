@@ -12,10 +12,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -54,7 +54,7 @@ const maxOTPRequestBodyBytes = 64 * 1024
 // the caller down the minting path, where that same conditional UPDATE declines to replace a value
 // that is not yet stale, so the request would answer 200 with a seed that was never stored and
 // that the PUT could therefore never accept (#247).
-func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *models.User, staleBefore time.Time) (string, error) {
+func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *record.User, staleBefore time.Time) (string, error) {
 	if len(user.OtpEnrollmentSecretEncrypted) == 0 || !user.OtpEnrollmentIssuedAt.Valid {
 		return "", nil
 	}
@@ -73,8 +73,8 @@ func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *models
 type accountOTPDatabase interface {
 	otpcredential.Database
 
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte,
 		issuedAt time.Time, staleBefore time.Time) (bool, error)
 }

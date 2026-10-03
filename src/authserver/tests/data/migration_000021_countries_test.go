@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -241,7 +241,7 @@ func migration000021Fixtures() []migFixture {
 
 func seedMigrationFixture(t *testing.T, h *isolatedDB, f migFixture) int64 {
 	t.Helper()
-	u := &models.User{
+	u := &record.User{
 		Subject: fake.UUID(),
 		// username is varchar(32); the fixture label is unique and short.
 		Username:                      f.label,
