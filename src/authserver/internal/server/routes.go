@@ -85,7 +85,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
 	pages.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	pages.Get("/forgot-password", accounthandlers.HandleForgotPasswordGet(httpHelper))
-	pages.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher, baseURL))
+	pages.With(rateLimiter.LimitForgotPwd).Post("/forgot-password", accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))

@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -167,7 +168,11 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),
 		cfg:          cfg,
+		jobs:         afterresponse.New(),
 	}
+	// What a forgot-password request hands off runs against this test's mocks, so it is waited
+	// for before they are torn down, as the server waits for it on shutdown.
+	t.Cleanup(func() { s.jobs.Wait(10 * time.Second) })
 	// Every branch is the bare router: these tests drive the registrations rather than the
 	// application chain, and put the settings on each request's context themselves.
 	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router})

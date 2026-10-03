@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -46,6 +47,9 @@ type Server struct {
 	// constructs, so no service reads a process-wide key (#434).
 	dataCipher *encryption.DataCipher
 	worker     *workers.Worker
+	// The work handlers hand off to run after their responses, waited for on shutdown once the
+	// listeners have drained (#404 decision 8).
+	jobs *afterresponse.Jobs
 
 	// Parsed by main, which refuses to start on a malformed entry (#425), so the real-IP
 	// middleware takes ranges and has no error path of its own.
@@ -68,6 +72,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 		sessionStore: sessionStore,
 		dataCipher:   dataCipher,
 		worker:       workers.NewWorker(database),
+		jobs:         afterresponse.New(),
 
 		trustedProxies: trustedProxies,
 
@@ -94,7 +99,8 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 }
 
 // Start brings up the listeners and blocks until ctx is cancelled or a listener fails. On both it
-// drains in-flight requests and then stops the worker before returning. It returns nil after a
+// drains in-flight requests, waits for the work they handed off, and then stops the worker before
+// returning. It returns nil after a
 // cancellation, and otherwise the error, unlogged: main writes the one record for it and owns the
 // exit, so nothing below main decides to end the process (#426, #390).
 func (s *Server) Start(ctx context.Context) error {
@@ -169,7 +175,22 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.worker.Start()
 
-	return serveAndDrain(ctx, listeners, func() { s.worker.Stop(workerStopTimeout) })
+	return serveAndDrain(ctx, listeners, s.stopBackgroundWork)
+}
+
+// stopBackgroundWork is what Start does once every listener has drained: it waits for the jobs the
+// handlers handed off to run after their responses, then stops the cleanup worker.
+//
+// The jobs come first because nothing can start another once the listeners are down, and each one
+// is a request's unfinished business, a forgot-password request's code, record and mail, which a
+// graceful stop should not lose. They are given the shutdown timeout the requests themselves were
+// given, and one still running after it is left to the process's exit (#404 decision 8).
+func (s *Server) stopBackgroundWork() {
+	if !s.jobs.Wait(httpShutdownTimeout) {
+		slog.Warn("the work handed off after responses did not finish within the timeout, continuing shutdown",
+			"timeout", httpShutdownTimeout)
+	}
+	s.worker.Stop(workerStopTimeout)
 }
 
 // listener is one of Start's servers and the call that serves it, which is ListenAndServe or
@@ -287,7 +308,8 @@ const (
 )
 
 const (
-	// httpShutdownTimeout bounds how long in-flight requests get to finish.
+	// httpShutdownTimeout bounds how long in-flight requests get to finish, and then, separately,
+	// how long the work they handed off to run after their responses gets.
 	httpShutdownTimeout = 15 * time.Second
 
 	// workerStopTimeout bounds the wait for the background worker. Cancelling now reaches
