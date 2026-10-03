@@ -12,7 +12,7 @@ import (
 
 // TestRender_AdminClients is the template hop of the self-registered badge. The pipeline from the
 // database to this page is the client row, then apimapping.ToClientResponse, then that value straight into
-// the template, since HandleAdminClientsGet binds "clients" and does no adminconsole-side mapping.
+// the template, since adminclienthandlers.HandleListGet binds "clients" and does no adminconsole-side mapping.
 // So rendering the real page over two real api.ClientResponse values is what proves the badge is
 // driven by CreatedViaDCR: an ordinary client next to a self-registered one is the case that fails
 // if the conditional is dropped and every client gets marked (#108).

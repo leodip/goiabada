@@ -19,7 +19,7 @@ type groupAttributesAddAPI interface {
 	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
 }
 
-func HandleAdminGroupAttributesAddGet(
+func HandleAttributesAddGet(
 	httpHelper HttpHelper,
 	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {
@@ -72,7 +72,7 @@ func HandleAdminGroupAttributesAddGet(
 	}
 }
 
-func HandleAdminGroupAttributesAddPost(
+func HandleAttributesAddPost(
 	httpHelper HttpHelper,
 	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {

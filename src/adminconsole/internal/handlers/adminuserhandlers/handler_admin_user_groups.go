@@ -23,7 +23,7 @@ type userGroupsAPI interface {
 	UpdateUserGroups(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error)
 }
 
-func HandleAdminUserGroupsGet(
+func HandleGroupsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userGroupsAPI,
@@ -102,7 +102,7 @@ func HandleAdminUserGroupsGet(
 	}
 }
 
-func HandleAdminUserGroupsPost(
+func HandleGroupsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userGroupsAPI,

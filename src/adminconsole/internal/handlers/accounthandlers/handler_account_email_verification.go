@@ -23,7 +23,7 @@ type accountEmailVerificationAPI interface {
 	VerifyAccountEmail(ctx context.Context, accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error)
 }
 
-func HandleAccountEmailVerificationGet(
+func HandleEmailVerificationGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailVerificationAPI,
@@ -83,7 +83,7 @@ func HandleAccountEmailVerificationGet(
 	}
 }
 
-func HandleAccountEmailSendVerificationPost(
+func HandleEmailSendVerificationPost(
 	httpHelper HttpHelper,
 	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
@@ -114,7 +114,7 @@ func HandleAccountEmailSendVerificationPost(
 	}
 }
 
-func HandleAccountEmailVerificationPost(
+func HandleEmailVerificationPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailVerificationAPI,

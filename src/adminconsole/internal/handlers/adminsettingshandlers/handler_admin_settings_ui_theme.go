@@ -20,7 +20,7 @@ type settingsUIThemeAPI interface {
 	UpdateSettingsUITheme(ctx context.Context, accessToken string, request *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error)
 }
 
-func HandleAdminSettingsUIThemeGet(
+func HandleUIThemeGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsUIThemeAPI,
@@ -75,7 +75,7 @@ func HandleAdminSettingsUIThemeGet(
 	}
 }
 
-func HandleAdminSettingsUIThemePost(
+func HandleUIThemePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsUIThemeAPI,

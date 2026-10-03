@@ -22,7 +22,7 @@ type clientOAuth2FlowsAPI interface {
 	UpdateClientOAuth2Flows(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error)
 }
 
-func HandleAdminClientOAuth2FlowsGet(
+func HandleOAuth2FlowsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientOAuth2FlowsAPI,
@@ -120,7 +120,7 @@ func HandleAdminClientOAuth2FlowsGet(
 	}
 }
 
-func HandleAdminClientOAuth2FlowsPost(
+func HandleOAuth2FlowsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientOAuth2FlowsAPI,

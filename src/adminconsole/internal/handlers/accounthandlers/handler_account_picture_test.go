@@ -36,7 +36,7 @@ func (c *accountPictureApiClient) GetAccountProfilePicture(_ context.Context, ac
 	return c.picture, c.err
 }
 
-func TestHandleAccountPictureGet_AnswersAFailedPictureRead(t *testing.T) {
+func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 	testCases := []struct {
 		name         string
 		picture      *api.ProfilePictureInfoResponse
@@ -85,7 +85,7 @@ func TestHandleAccountPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_picture.html").Once()
 			}
 
-			HandleAccountPictureGet(httpHelper, &accountPictureApiClient{picture: testCase.picture, err: testCase.err}).
+			HandlePictureGet(httpHelper, &accountPictureApiClient{picture: testCase.picture, err: testCase.err}).
 				ServeHTTP(httptest.NewRecorder(),
 					handlertest.Request(http.MethodGet, "/account/picture", handlertest.WithAccessToken()))
 
@@ -218,7 +218,7 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 			}
 			req := handlertest.Request(http.MethodPost, "/account/picture", opts...)
 
-			handler := HandleAccountProfilePicturePost(httpHelper, &pictureApiClient{err: testCase.apiErr})
+			handler := HandleProfilePicturePost(httpHelper, &pictureApiClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
@@ -267,7 +267,7 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 			handlertest.WithContentType(contentType), handlertest.WithAccessToken())
 		req.Body = http.MaxBytesReader(rr, io.NopCloser(bytes.NewReader(body)), int64(limit))
 
-		HandleAccountProfilePicturePost(httpHelper, apiClient).ServeHTTP(rr, req)
+		HandleProfilePicturePost(httpHelper, apiClient).ServeHTTP(rr, req)
 		return rr
 	}
 
@@ -338,7 +338,7 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 			}
 			req := handlertest.Request(http.MethodDelete, "/account/picture", opts...)
 
-			handler := HandleAccountProfilePictureDelete(httpHelper, &pictureApiClient{err: testCase.apiErr})
+			handler := HandleProfilePictureDelete(httpHelper, &pictureApiClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

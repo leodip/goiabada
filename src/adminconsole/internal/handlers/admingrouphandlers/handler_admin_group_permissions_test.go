@@ -41,7 +41,7 @@ func (*groupPermissionsSaveApiClient) GetGroupPermissions(context.Context, strin
 // The page posts the set as it loaded it beside the set it wants, and the handler hands both to
 // the API unchanged, as the user permission page does (#428). [] reaches the wire as [], and an
 // absent field as the null the API refuses.
-func TestHandleAdminGroupPermissionsPost_SendsTheLoadedList(t *testing.T) {
+func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 	testCases := []struct {
 		name         string
 		body         string
@@ -82,7 +82,7 @@ func TestHandleAdminGroupPermissionsPost_SendsTheLoadedList(t *testing.T) {
 
 			// The API refuses, so the handler returns before the nil session is touched.
 			stub := &groupPermissionsSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
-			HandleAdminGroupPermissionsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
+			HandlePermissionsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, stub.sent)
 			assert.Equal(t, tc.wantWanted, stub.sent.PermissionIds)
@@ -96,7 +96,7 @@ func TestHandleAdminGroupPermissionsPost_SendsTheLoadedList(t *testing.T) {
 
 // A save from an outdated page reaches the administrator as the API's own sentence and status,
 // telling them to reload, rather than the generic error (#428).
-func TestHandleAdminGroupPermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
+func TestHandlePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
 	httpHelper := render.New(nil)
 	req := handlertest.Request(http.MethodPost, "/admin/groups/5/permissions",
@@ -106,7 +106,7 @@ func TestHandleAdminGroupPermissionsPost_AConflictReachesTheBrowser(t *testing.T
 	rec := httptest.NewRecorder()
 
 	stub := &groupPermissionsSaveApiClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
-	HandleAdminGroupPermissionsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
+	HandlePermissionsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	var response map[string]string

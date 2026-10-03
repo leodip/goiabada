@@ -21,7 +21,7 @@ type accountAddressAPI interface {
 	UpdateAccountAddress(ctx context.Context, accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
 }
 
-func HandleAccountAddressGet(
+func HandleAddressGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountAddressAPI,
@@ -93,7 +93,7 @@ func HandleAccountAddressGet(
 	}
 }
 
-func HandleAccountAddressPost(
+func HandleAddressPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountAddressAPI,

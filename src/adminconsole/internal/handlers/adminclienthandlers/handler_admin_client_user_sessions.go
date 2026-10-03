@@ -21,7 +21,7 @@ type clientSessionsAPI interface {
 	GetClientSessionsByClientId(ctx context.Context, accessToken string, clientId int64, page, size int) (*api.GetClientSessionsResponse, error)
 }
 
-func HandleAdminClientUserSessionsGet(
+func HandleUserSessionsGet(
 	httpHelper HttpHelper,
 	apiClient clientSessionsAPI,
 ) http.HandlerFunc {
@@ -114,7 +114,7 @@ func HandleAdminClientUserSessionsGet(
 	}
 }
 
-func HandleAdminClientUserSessionsPost(
+func HandleUserSessionsPost(
 	httpHelper HttpHelper,
 	apiClient clientSessionsAPI,
 ) http.HandlerFunc {

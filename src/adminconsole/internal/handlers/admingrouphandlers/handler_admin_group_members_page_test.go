@@ -74,13 +74,13 @@ func renderMembers(t *testing.T, rawPage string, total int) (map[string]interfac
 		handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "3"))
 
 	apiClient := &membersPagingApiClient{total: total}
-	HandleAdminGroupMembersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleMembersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
 	return bind, apiClient.asked
 }
 
-func TestHandleAdminGroupMembersGet_PageQueryParameter(t *testing.T) {
+func TestHandleMembersGet_PageQueryParameter(t *testing.T) {
 	const pageSize = 10
 
 	testCases := []struct {

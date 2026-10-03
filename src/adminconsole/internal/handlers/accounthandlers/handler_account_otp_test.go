@@ -106,7 +106,7 @@ func apiError(code string) error {
 
 // Every way the enrolment form can be redrawn must carry a QR code and a seed, fetched from the API
 // rather than read back off the submission. An empty one is a page the user cannot enrol from.
-func TestHandleAccountOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.T) {
+func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.T) {
 	testCases := []struct {
 		name      string
 		form      url.Values
@@ -147,7 +147,7 @@ func TestHandleAccountOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *t
 			client.updateErr = tc.updateErr
 
 			rr := httptest.NewRecorder()
-			HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
 
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, testBase64Image, bind["base64Image"],
@@ -171,14 +171,14 @@ func TestHandleAccountOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *t
 // An enrolment that succeeded elsewhere while this form was open reloads the page instead of
 // redrawing the form. Redrawing it would call the enrolment endpoint, which refuses for the same
 // reason, turning a race that resolved correctly into an error page.
-func TestHandleAccountOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
+func TestHandleOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	client := newStubApiClient(false)
 	client.updateErr = apiError("OTP_ALREADY_ENABLED")
 
 	rr := httptest.NewRecorder()
-	HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)
@@ -191,7 +191,7 @@ func TestHandleAccountOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testin
 
 // The disable form has no QR code and no seed, and must not acquire one: fetching an enrolment for
 // a user who has OTP enabled is refused by the API.
-func TestHandleAccountOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
+func TestHandleOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
@@ -199,7 +199,7 @@ func TestHandleAccountOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 	client.updateErr = apiError("AUTHENTICATION_FAILED")
 
 	rr := httptest.NewRecorder()
-	HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"password": {"wrong"}}))
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -210,13 +210,13 @@ func TestHandleAccountOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 }
 
 // A successful enable redirects, and the request it sent carries only the password and the code.
-func TestHandleAccountOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
+func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	client := newStubApiClient(false)
 
 	rr := httptest.NewRecorder()
-	HandleAccountOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)

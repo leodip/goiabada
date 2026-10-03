@@ -21,7 +21,7 @@ type groupSettingsAPI interface {
 	UpdateGroup(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error)
 }
 
-func HandleAdminGroupSettingsGet(
+func HandleSettingsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient groupSettingsAPI,
@@ -86,7 +86,7 @@ func HandleAdminGroupSettingsGet(
 	}
 }
 
-func HandleAdminGroupSettingsPost(
+func HandleSettingsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient groupSettingsAPI,

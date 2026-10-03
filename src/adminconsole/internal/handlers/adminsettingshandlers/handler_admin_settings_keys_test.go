@@ -41,7 +41,7 @@ func (*stubApiClient) DeleteSettingsKey(context.Context, string, int64) error {
 	panic("unexpected call to DeleteSettingsKey")
 }
 
-// TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser owns the wiring between
+// TestHandleKeysRotatePost_APIErrorReachesTheBrowser owns the wiring between
 // the rotate handler and HandleAPIErrorJSON. The helper's own forwarding is pinned in
 // render's api_error_helper_test.go, but that test cannot see which of the two error paths
 // this handler calls: swapping HandleAPIErrorJSON back to a direct JSONError leaves the
@@ -55,7 +55,7 @@ func (*stubApiClient) DeleteSettingsKey(context.Context, string, int64) error {
 //
 // The rows for the other statuses are what keeps the forwarding narrow: a genuine server
 // fault must stay a generic 500 with its detail in the log rather than on the screen.
-func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.T) {
+func TestHandleKeysRotatePost_APIErrorReachesTheBrowser(t *testing.T) {
 
 	const refusal = "Another key rotation is in progress"
 
@@ -112,7 +112,7 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 
 			rec := httptest.NewRecorder()
 
-			handler := HandleAdminSettingsKeysRotatePost(httpHelper, &stubApiClient{rotateErr: tc.apiErr})
+			handler := HandleKeysRotatePost(httpHelper, &stubApiClient{rotateErr: tc.apiErr})
 			handler.ServeHTTP(rec, req)
 
 			assert.Equal(t, tc.wantStatus, rec.Code)
@@ -133,9 +133,9 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 	}
 }
 
-// TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged is here so that routing the
+// TestHandleKeysRotatePost_SuccessIsUnchanged is here so that routing the
 // failure path through a different helper cannot alter what a successful rotation answers.
-func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
+func TestHandleKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 
 	httpHelper := render.New(nil)
 
@@ -143,7 +143,7 @@ func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 
-	handler := HandleAdminSettingsKeysRotatePost(httpHelper, &stubApiClient{rotateErr: nil})
+	handler := HandleKeysRotatePost(httpHelper, &stubApiClient{rotateErr: nil})
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -156,7 +156,7 @@ func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 	assert.True(t, response.Success)
 }
 
-// TestHandleAdminSettingsKeysGet_RendersTheApiOrder owns the console half of the claim that freed
+// TestHandleKeysGet_RendersTheApiOrder owns the console half of the claim that freed
 // KeyState from core (#385 decision 7). The page used to re-sort the list with a structurally
 // identical copy of the loop GET /api/v1/admin/settings/keys already applies, which is the only
 // reason the console named a signing-key state at all.
@@ -169,7 +169,7 @@ func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 // The producer's own guarantee is pinned where it is produced, in the auth server's
 // handler_api_settings_keys_test.go. Without that half this file would only prove its own stub
 // returned what it was told to.
-func TestHandleAdminSettingsKeysGet_RendersTheApiOrder(t *testing.T) {
+func TestHandleKeysGet_RendersTheApiOrder(t *testing.T) {
 
 	testCases := []struct {
 		name  string
@@ -225,7 +225,7 @@ func TestHandleAdminSettingsKeysGet_RendersTheApiOrder(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, "/admin/settings/keys",
 				handlertest.WithAccessToken())
 
-			handler := HandleAdminSettingsKeysGet(httpHelper, &stubApiClient{keys: apiKeys})
+			handler := HandleKeysGet(httpHelper, &stubApiClient{keys: apiKeys})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			bind := handlertest.Bind(t, httpHelper, "for %v", tc.given)

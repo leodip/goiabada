@@ -17,7 +17,7 @@ type settingsKeysAPI interface {
 	RotateSettingsKeys(ctx context.Context, accessToken string) error
 }
 
-func HandleAdminSettingsKeysGet(
+func HandleKeysGet(
 	httpHelper HttpHelper,
 	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
@@ -72,7 +72,7 @@ func HandleAdminSettingsKeysGet(
 	}
 }
 
-func HandleAdminSettingsKeysRotatePost(
+func HandleKeysRotatePost(
 	httpHelper HttpHelper,
 	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
@@ -105,7 +105,7 @@ func HandleAdminSettingsKeysRotatePost(
 	}
 }
 
-func HandleAdminSettingsKeysRevokePost(
+func HandleKeysRevokePost(
 	httpHelper HttpHelper,
 	apiClient settingsKeysAPI,
 ) http.HandlerFunc {

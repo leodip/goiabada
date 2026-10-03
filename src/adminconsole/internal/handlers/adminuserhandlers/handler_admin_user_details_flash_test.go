@@ -106,13 +106,13 @@ func renderDetails(t *testing.T, store *sessionstore.ServerSideStore,
 	}
 	rec := httptest.NewRecorder()
 
-	HandleAdminUserDetailsGet(httpHelper, store, flashStubApiClient{}).ServeHTTP(rec, req)
+	HandleDetailsGet(httpHelper, store, flashStubApiClient{}).ServeHTTP(rec, req)
 
 	bind := handlertest.Bind(t, httpHelper)
 	return bind, rec
 }
 
-func TestHandleAdminUserDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing.T) {
+func TestHandleDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing.T) {
 	testCases := []struct {
 		name        string
 		flashes     []string

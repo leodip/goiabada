@@ -20,7 +20,7 @@ type settingsTokensAPI interface {
 	UpdateSettingsTokens(ctx context.Context, accessToken string, request *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error)
 }
 
-func HandleAdminSettingsTokensGet(
+func HandleTokensGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTokensAPI,
@@ -78,7 +78,7 @@ func HandleAdminSettingsTokensGet(
 	}
 }
 
-func HandleAdminSettingsTokensPost(
+func HandleTokensPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTokensAPI,

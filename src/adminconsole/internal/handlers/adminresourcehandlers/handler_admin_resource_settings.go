@@ -21,7 +21,7 @@ type resourceSettingsAPI interface {
 	UpdateResource(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error)
 }
 
-func HandleAdminResourceSettingsGet(
+func HandleSettingsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceSettingsAPI,
@@ -84,7 +84,7 @@ func HandleAdminResourceSettingsGet(
 	}
 }
 
-func HandleAdminResourceSettingsPost(
+func HandleSettingsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceSettingsAPI,

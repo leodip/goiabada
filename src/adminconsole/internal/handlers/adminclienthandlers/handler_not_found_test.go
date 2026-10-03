@@ -125,7 +125,7 @@ func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
 			apiClient := &notFoundClientApiClient{entity: testCase.entity, err: testCase.apiErr}
-			handler := HandleAdminClientSettingsGet(httpHelper, nil, apiClient)
+			handler := HandleSettingsGet(httpHelper, nil, apiClient)
 			w := httptest.NewRecorder()
 
 			if testCase.routed {

@@ -127,80 +127,80 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		request *http.Request
 	}{
 		{
-			name: "HandleAdminClientsGet",
+			name: "HandleListGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientsGet(h, c)
+				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients", handlertest.WithAccessToken()),
 		},
 		{
-			name: "HandleAdminClientPermissionsGet",
+			name: "HandlePermissionsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientPermissionsGet(h, newTestSessionStore(), c)
+				return HandlePermissionsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/permissions",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientLogoGet",
+			name: "HandleLogoGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientLogoGet(h, c)
+				return HandleLogoGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/logo",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientDeleteGet",
+			name: "HandleDeleteGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientDeleteGet(h, c)
+				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/delete",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientTokensGet",
+			name: "HandleTokensGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientTokensGet(h, newTestSessionStore(), c)
+				return HandleTokensGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/tokens",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientSettingsGet",
+			name: "HandleSettingsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientSettingsGet(h, newTestSessionStore(), c)
+				return HandleSettingsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/settings",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientOAuth2FlowsGet",
+			name: "HandleOAuth2FlowsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientOAuth2FlowsGet(h, nil, c)
+				return HandleOAuth2FlowsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/oauth2-flows",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientRedirectURIsGet",
+			name: "HandleRedirectURIsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientRedirectURIsGet(h, nil, c)
+				return HandleRedirectURIsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/redirect-uris",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientUserSessionsGet",
+			name: "HandleUserSessionsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientUserSessionsGet(h, c)
+				return HandleUserSessionsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
 		},
 		{
-			name: "HandleAdminClientUserSessionsPost",
+			name: "HandleUserSessionsPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminClientUserSessionsPost(h, c)
+				return HandleUserSessionsPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/user-sessions",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),

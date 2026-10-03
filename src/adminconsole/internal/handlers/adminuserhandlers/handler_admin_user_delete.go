@@ -19,7 +19,7 @@ type userDeleteAPI interface {
 	GetUserGroups(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.GroupResponse, error)
 }
 
-func HandleAdminUserDeleteGet(
+func HandleDeleteGet(
 	httpHelper HttpHelper,
 	apiClient userDeleteAPI,
 ) http.HandlerFunc {
@@ -80,7 +80,7 @@ func HandleAdminUserDeleteGet(
 	}
 }
 
-func HandleAdminUserDeletePost(
+func HandleDeletePost(
 	httpHelper HttpHelper,
 	apiClient userDeleteAPI,
 	baseURL string,

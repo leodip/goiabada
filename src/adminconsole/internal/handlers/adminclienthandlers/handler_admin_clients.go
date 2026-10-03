@@ -14,7 +14,7 @@ type clientsAPI interface {
 	GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error)
 }
 
-func HandleAdminClientsGet(
+func HandleListGet(
 	httpHelper HttpHelper,
 	apiClient clientsAPI,
 ) http.HandlerFunc {

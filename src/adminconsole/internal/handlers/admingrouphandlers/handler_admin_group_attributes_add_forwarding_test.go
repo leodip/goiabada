@@ -108,7 +108,7 @@ func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
 
 			router := chi.NewRouter()
 			router.Post("/admin/groups/{groupId}/attributes/add",
-				HandleAdminGroupAttributesAddPost(httpHelper,
+				HandleAttributesAddPost(httpHelper,
 					&attributesAddApiClient{err: testCase.apiErr}))
 			router.ServeHTTP(httptest.NewRecorder(), req)
 

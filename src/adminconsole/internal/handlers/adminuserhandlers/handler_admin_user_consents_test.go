@@ -48,7 +48,7 @@ func revokeConsent(t *testing.T, apiClient *consentsApiClient, consentId string)
 
 	// The real writer, because what is under test is the answer on the wire and the log it does
 	// or does not leave, and both are the writer's.
-	HandleAdminUserConsentsPost(render.New(fstest.MapFS{}), apiClient).ServeHTTP(recorder, req)
+	HandleConsentsPost(render.New(fstest.MapFS{}), apiClient).ServeHTTP(recorder, req)
 	return recorder
 }
 
@@ -56,7 +56,7 @@ func revokeConsent(t *testing.T, apiClient *consentsApiClient, consentId string)
 // the user, revoked it after this page loaded. It names nothing here, so it is answered as the 404
 // JSONNotFound gives every such id, with nothing logged, rather than a 500 with a stack (#440
 // decision 6).
-func TestHandleAdminUserConsentsPost_AConsentTheUserNoLongerHoldsIs404WithNothingLogged(t *testing.T) {
+func TestHandleConsentsPost_AConsentTheUserNoLongerHoldsIs404WithNothingLogged(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	apiClient := &consentsApiClient{consents: []api.UserConsentResponse{{Id: 7, UserId: 42}}}
 
@@ -71,7 +71,7 @@ func TestHandleAdminUserConsentsPost_AConsentTheUserNoLongerHoldsIs404WithNothin
 }
 
 // The other side of the same check: a consent the user does hold is revoked and answered as before.
-func TestHandleAdminUserConsentsPost_AConsentTheUserHoldsIsRevoked(t *testing.T) {
+func TestHandleConsentsPost_AConsentTheUserHoldsIsRevoked(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	apiClient := &consentsApiClient{consents: []api.UserConsentResponse{{Id: 7, UserId: 42}, {Id: 13, UserId: 42}}}
 

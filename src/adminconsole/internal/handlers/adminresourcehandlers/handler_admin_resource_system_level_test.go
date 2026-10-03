@@ -67,9 +67,9 @@ func bindOfSystemLevelPage(t *testing.T, page string, resource api.ResourceRespo
 	var handler http.HandlerFunc
 	switch page {
 	case "settings":
-		handler = HandleAdminResourceSettingsGet(httpHelper, testStore(), apiClient)
+		handler = HandleSettingsGet(httpHelper, testStore(), apiClient)
 	case "permissions":
-		handler = HandleAdminResourcePermissionsGet(httpHelper, testStore(), apiClient)
+		handler = HandlePermissionsGet(httpHelper, testStore(), apiClient)
 	default:
 		t.Fatalf("no such page: %s", page)
 	}
@@ -124,7 +124,7 @@ func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
 		IsSystemLevelResource: true,
 	}}
 
-	handler := HandleAdminResourceDeletePost(httpHelper, apiClient, consoleBaseURL)
+	handler := HandleDeletePost(httpHelper, apiClient, consoleBaseURL)
 	req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
 		handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"))
 	handler.ServeHTTP(httptest.NewRecorder(), req)

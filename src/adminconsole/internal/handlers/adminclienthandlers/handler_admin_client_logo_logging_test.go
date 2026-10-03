@@ -52,7 +52,7 @@ func (*logoApiClient) UploadClientLogo(context.Context, string, int64, []byte, s
 // the administrator is served, and nobody has to act, which is the definition decision 5 gives
 // Warn rather than the Error a failed call reads like. It also carries the request id from the
 // context, with neither the key nor the value named at the call site.
-func TestHandleAdminClientLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *testing.T) {
+func TestHandleLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
 	httpHelper := &stubHttpHelper{}
@@ -67,7 +67,7 @@ func TestHandleAdminClientLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequ
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
-	router.Get("/admin/clients/{clientId}/logo", HandleAdminClientLogoGet(httpHelper, apiClient))
+	router.Get("/admin/clients/{clientId}/logo", HandleLogoGet(httpHelper, apiClient))
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/clients/42/logo", nil)
 	req.Header.Set("X-Request-Id", "req-client-logo")

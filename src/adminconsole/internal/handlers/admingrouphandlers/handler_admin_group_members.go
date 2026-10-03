@@ -19,7 +19,7 @@ type groupMembersAPI interface {
 	GetGroupMembers(ctx context.Context, accessToken string, groupId int64, page, size int) ([]api.UserResponse, int, error)
 }
 
-func HandleAdminGroupMembersGet(
+func HandleMembersGet(
 	httpHelper HttpHelper,
 	apiClient groupMembersAPI,
 ) http.HandlerFunc {

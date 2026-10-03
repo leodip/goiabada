@@ -117,7 +117,7 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 
 			router := chi.NewRouter()
 			router.Post("/admin/resources/{resourceId}/users-with-permission/{userId}/permissions/{permissionId}/remove",
-				HandleAdminResourceUsersWithPermissionRemovePermissionPost(httpHelper,
+				HandleUsersWithPermissionRemovePermissionPost(httpHelper,
 					&usersWithPermissionApiClient{err: testCase.apiErr}))
 			router.ServeHTTP(httptest.NewRecorder(), req)
 

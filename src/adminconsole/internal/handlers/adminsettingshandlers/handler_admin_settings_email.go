@@ -24,7 +24,7 @@ type settingsEmailAPI interface {
 	UpdateSettingsEmail(ctx context.Context, accessToken string, request *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error)
 }
 
-func HandleAdminSettingsEmailGet(
+func HandleEmailGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
@@ -88,7 +88,7 @@ func HandleAdminSettingsEmailGet(
 	}
 }
 
-func HandleAdminSettingsEmailPost(
+func HandleEmailPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
@@ -179,7 +179,7 @@ func HandleAdminSettingsEmailPost(
 	}
 }
 
-func HandleAdminSettingsEmailSendTestGet(
+func HandleEmailSendTestGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
@@ -228,7 +228,7 @@ func HandleAdminSettingsEmailSendTestGet(
 	}
 }
 
-func HandleAdminSettingsEmailSendTestPost(
+func HandleEmailSendTestPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,

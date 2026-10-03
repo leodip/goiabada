@@ -27,7 +27,7 @@ type resourcePermissionsAPI interface {
 	UpdateResourcePermissions(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
 }
 
-func HandleAdminResourcePermissionsGet(
+func HandlePermissionsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourcePermissionsAPI,
@@ -110,7 +110,7 @@ func HandleAdminResourcePermissionsGet(
 	}
 }
 
-func HandleAdminResourcePermissionsPost(
+func HandlePermissionsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourcePermissionsAPI,
@@ -218,7 +218,7 @@ type IdentifierValidator interface {
 	Validate(identifier string, enforceMinLength bool) error
 }
 
-// HandleAdminResourceValidatePermissionPost answers the permission form's pre-save check, and it
+// HandleValidatePermissionPost answers the permission form's pre-save check, and it
 // has to agree with the API's own refusal at PUT .../permissions: whatever this accepts, the save
 // that follows must accept too.
 //
@@ -228,7 +228,7 @@ type IdentifierValidator interface {
 // sites ask is what makes the two agree (#275). The identifier is checked raw for the same reason:
 // sanitizing it first turned "valid<b" into "valid" and reported a name the API would reject as
 // available.
-func HandleAdminResourceValidatePermissionPost(
+func HandleValidatePermissionPost(
 	httpHelper HttpHelper,
 	identifierValidator IdentifierValidator,
 ) http.HandlerFunc {

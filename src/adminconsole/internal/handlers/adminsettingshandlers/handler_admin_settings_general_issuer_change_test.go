@@ -40,7 +40,7 @@ func (a issuerChangingAPI) UpdateSettingsGeneral(context.Context, string, *api.U
 //
 // Observed through the store's own Get with the cookie the handler answered with, which is what
 // the next request would load; the unrelated value proves the session was edited, not discarded.
-func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAndItsExpiry(t *testing.T) {
+func TestHandleGeneralPost_AnIssuerChangeDeletesTheTokenResponseAndItsExpiry(t *testing.T) {
 	gob.Register(oauth.TokenResponse{})
 	store := newSettingsTestStore()
 
@@ -65,7 +65,7 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	w := httptest.NewRecorder()
-	HandleAdminSettingsGeneralPost(httpHelper, store,
+	HandleGeneralPost(httpHelper, store,
 		issuerChangingAPI{before: "https://old-issuer.example", after: "https://new-issuer.example"},
 		&invalidationRecorder{}, consoleBaseURL,
 	).ServeHTTP(w, req)

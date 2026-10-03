@@ -40,7 +40,7 @@ func validatePermissionResponse(t *testing.T, identifier string, description str
 	req := httptest.NewRequest(http.MethodPost, "/admin/resources/validate-permission", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
-	handler := HandleAdminResourceValidatePermissionPost(
+	handler := HandleValidatePermissionPost(
 		render.New(nil),
 		inputvalidation.NewIdentifierValidator(),
 	)
@@ -144,7 +144,7 @@ func TestValidatePermissionPost_AWrappedRefusalStillReachesTheForm(t *testing.T)
 			req := httptest.NewRequest(http.MethodPost, "/admin/resources/validate-permission", bytes.NewReader(body))
 			rec := httptest.NewRecorder()
 
-			handler := HandleAdminResourceValidatePermissionPost(
+			handler := HandleValidatePermissionPost(
 				render.New(nil),
 				&wrappingIdentifierValidator{err: testCase.err},
 			)

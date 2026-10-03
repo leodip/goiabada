@@ -20,7 +20,7 @@ type settingsSessionsAPI interface {
 	UpdateSettingsSessions(ctx context.Context, accessToken string, request *api.UpdateSettingsSessionsRequest) (*api.SettingsSessionsResponse, error)
 }
 
-func HandleAdminSettingsSessionsGet(
+func HandleSessionsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsSessionsAPI,
@@ -75,7 +75,7 @@ func HandleAdminSettingsSessionsGet(
 	}
 }
 
-func HandleAdminSettingsSessionsPost(
+func HandleSessionsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsSessionsAPI,

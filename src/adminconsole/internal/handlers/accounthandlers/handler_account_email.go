@@ -19,7 +19,7 @@ type accountEmailAPI interface {
 	UpdateAccountEmail(ctx context.Context, accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error)
 }
 
-func HandleAccountEmailGet(
+func HandleEmailGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailAPI,
@@ -77,7 +77,7 @@ func HandleAccountEmailGet(
 	}
 }
 
-func HandleAccountEmailPost(
+func HandleEmailPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailAPI,

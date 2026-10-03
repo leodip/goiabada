@@ -36,13 +36,13 @@ func (c *countingPhoneApiClient) UpdateUserPhone(_ context.Context, _ string, _ 
 // viewer sees nothing different; what the test holds is that no state outlives a request between
 // the page and the API, so a second request is a second call (#440). The handler is built once and
 // serves both, as the router's does, so a copy kept in its closure would be caught as well.
-func TestHandleAdminUserPhoneGet_TwoRequestsAskForTheCountriesTwice(t *testing.T) {
+func TestHandlePhoneGet_TwoRequestsAskForTheCountriesTwice(t *testing.T) {
 	apiClient := &countingPhoneApiClient{}
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_phone.html").Twice()
 
-	handler := HandleAdminUserPhoneGet(httpHelper, newFlashTestStore(), apiClient)
+	handler := HandlePhoneGet(httpHelper, newFlashTestStore(), apiClient)
 	for range 2 {
 		req := handlertest.Request(http.MethodGet, "/admin/users/42/phone",
 			handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "42"))

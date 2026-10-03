@@ -43,7 +43,7 @@ func (*userPermissionsSaveApiClient) GetUserPermissions(context.Context, string,
 // save from an outdated page (#428). The empty and absent rows pin the distinction the API reads:
 // [] is a page that loaded no grants and must reach the wire as [], and a body without the field
 // must reach it as null, which the API refuses, rather than be defaulted to a set that would pass.
-func TestHandleAdminUserPermissionsPost_SendsTheLoadedList(t *testing.T) {
+func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 	testCases := []struct {
 		name         string
 		body         string
@@ -86,7 +86,7 @@ func TestHandleAdminUserPermissionsPost_SendsTheLoadedList(t *testing.T) {
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
 			stub := &userPermissionsSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
-			HandleAdminUserPermissionsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
+			HandlePermissionsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, stub.sent)
 			assert.Equal(t, tc.wantWanted, stub.sent.PermissionIds)
@@ -100,7 +100,7 @@ func TestHandleAdminUserPermissionsPost_SendsTheLoadedList(t *testing.T) {
 
 // A save from an outdated page reaches the administrator as the API's own sentence and status,
 // telling them to reload, rather than the generic error (#428).
-func TestHandleAdminUserPermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
+func TestHandlePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
 	httpHelper := render.New(nil)
 	req := handlertest.Request(http.MethodPost, "/admin/users/5/permissions",
@@ -111,7 +111,7 @@ func TestHandleAdminUserPermissionsPost_AConflictReachesTheBrowser(t *testing.T)
 	rec := httptest.NewRecorder()
 
 	stub := &userPermissionsSaveApiClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
-	HandleAdminUserPermissionsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
+	HandlePermissionsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	var response map[string]string

@@ -17,7 +17,7 @@ type accountPasswordAPI interface {
 	UpdateAccountPassword(ctx context.Context, accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error)
 }
 
-func HandleAccountChangePasswordGet(
+func HandleChangePasswordGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	_ accountPasswordAPI,
@@ -49,7 +49,7 @@ func HandleAccountChangePasswordGet(
 	}
 }
 
-func HandleAccountChangePasswordPost(
+func HandleChangePasswordPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountPasswordAPI,

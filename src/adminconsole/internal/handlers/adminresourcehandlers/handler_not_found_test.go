@@ -129,7 +129,7 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
 			apiClient := &notFoundResourceApiClient{entity: testCase.entity, err: testCase.apiErr}
-			handler := HandleAdminResourcePermissionsGet(httpHelper, nil, apiClient)
+			handler := HandlePermissionsGet(httpHelper, nil, apiClient)
 			w := httptest.NewRecorder()
 
 			if testCase.routed {

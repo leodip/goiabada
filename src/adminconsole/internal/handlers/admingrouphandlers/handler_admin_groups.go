@@ -14,7 +14,7 @@ type groupsAPI interface {
 	GetAllGroups(ctx context.Context, accessToken string) ([]api.GroupResponse, error)
 }
 
-func HandleAdminGroupsGet(
+func HandleListGet(
 	httpHelper HttpHelper,
 	apiClient groupsAPI,
 ) http.HandlerFunc {

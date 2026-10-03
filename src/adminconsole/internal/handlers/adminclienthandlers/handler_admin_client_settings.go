@@ -21,7 +21,7 @@ type clientSettingsAPI interface {
 	UpdateClient(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
 }
 
-func HandleAdminClientSettingsGet(
+func HandleSettingsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSettingsAPI,
@@ -117,7 +117,7 @@ func HandleAdminClientSettingsGet(
 	}
 }
 
-func HandleAdminClientSettingsPost(
+func HandleSettingsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSettingsAPI,

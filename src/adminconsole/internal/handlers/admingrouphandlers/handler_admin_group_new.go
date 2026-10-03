@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-func HandleAdminGroupNewGet(
+func HandleNewGet(
 	httpHelper HttpHelper,
 ) http.HandlerFunc {
 
@@ -32,7 +32,7 @@ type groupNewAPI interface {
 	CreateGroup(ctx context.Context, accessToken string, request *api.CreateGroupRequest) (*api.GroupResponse, error)
 }
 
-func HandleAdminGroupNewPost(
+func HandleNewPost(
 	httpHelper HttpHelper,
 	apiClient groupNewAPI,
 	baseURL string,

@@ -56,21 +56,21 @@ func systemResourcePermissions() []api.PermissionResponse {
 	}
 }
 
-func TestHandleAdminResourceUsersWithPermissionGet_TheSystemResourceListsWhatTheApiReturned(t *testing.T) {
+func TestHandleUsersWithPermissionGet_TheSystemResourceListsWhatTheApiReturned(t *testing.T) {
 	apiClient := &systemResourceApiClient{resourcePagingApiClient{permissions: systemResourcePermissions()}}
 
 	httpHelper := newHelper(t)
-	bind := renderPermissionPage(t, HandleAdminResourceUsersWithPermissionGet(httpHelper, testStore(), apiClient), "users-with-permission", "", httpHelper)
+	bind := renderPermissionPage(t, HandleUsersWithPermissionGet(httpHelper, testStore(), apiClient), "users-with-permission", "", httpHelper)
 
 	assert.Equal(t, systemResourcePermissions(), bind["permissions"])
 	assert.Equal(t, int64(41), bind["selectedPermission"])
 }
 
-func TestHandleAdminResourceGroupsWithPermissionGet_TheSystemResourceListsWhatTheApiReturned(t *testing.T) {
+func TestHandleGroupsWithPermissionGet_TheSystemResourceListsWhatTheApiReturned(t *testing.T) {
 	apiClient := &systemResourceApiClient{resourcePagingApiClient{permissions: systemResourcePermissions()}}
 
 	httpHelper := newHelper(t)
-	bind := renderPermissionPage(t, HandleAdminResourceGroupsWithPermissionGet(httpHelper, testStore(), apiClient), "groups-with-permission", "", httpHelper)
+	bind := renderPermissionPage(t, HandleGroupsWithPermissionGet(httpHelper, testStore(), apiClient), "groups-with-permission", "", httpHelper)
 
 	assert.Equal(t, systemResourcePermissions(), bind["permissions"])
 	assert.Equal(t, int64(41), bind["selectedPermission"])

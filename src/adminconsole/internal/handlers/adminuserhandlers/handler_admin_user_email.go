@@ -21,7 +21,7 @@ type userEmailAPI interface {
 	UpdateUserEmail(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error)
 }
 
-func HandleAdminUserEmailGet(
+func HandleEmailGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userEmailAPI,
@@ -90,7 +90,7 @@ func HandleAdminUserEmailGet(
 	}
 }
 
-func HandleAdminUserEmailPost(
+func HandleEmailPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userEmailAPI,

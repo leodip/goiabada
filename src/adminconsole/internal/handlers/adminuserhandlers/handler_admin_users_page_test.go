@@ -93,13 +93,13 @@ func renderUsers(t *testing.T, rawPage string, total int) (map[string]interface{
 	// A panic here is a failure, not a crash to explain: the sibling
 	// groups-with-permission page panicked on a page number this test also
 	// sends.
-	HandleAdminUsersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleListGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
 	return bind, apiClient.asked
 }
 
-func TestHandleAdminUsersGet_PageQueryParameter(t *testing.T) {
+func TestHandleListGet_PageQueryParameter(t *testing.T) {
 	const pageSize = 10
 
 	testCases := []struct {
@@ -219,11 +219,11 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 	return current
 }
 
-// TestHandleAdminUsersGet_ASearchIsCarriedIntoTheSecondQuery pins the argument
+// TestHandleListGet_ASearchIsCarriedIntoTheSecondQuery pins the argument
 // the clamp is most likely to drop. The re-query repeats the whole call, and a
 // second query that forgot the search box would page through every user while
 // the bar and the search field still said otherwise.
-func TestHandleAdminUsersGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
+func TestHandleListGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
@@ -232,7 +232,7 @@ func TestHandleAdminUsersGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/users?page=99&query=ana", handlertest.WithAccessToken())
 
-	HandleAdminUsersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleListGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Equal(t, 2, len(apiClient.queries), "the clamp should have cost a second query")
 	assert.Equal(t, []string{"ana", "ana"}, apiClient.queries, "the search text was dropped on the way")

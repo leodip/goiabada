@@ -82,7 +82,7 @@ func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {
 
 			router := chi.NewRouter()
 			router.Get("/admin/clients/{clientId}/delete",
-				HandleAdminClientDeleteGet(httpHelper, &deleteClientApiClient{err: testCase.apiErr}))
+				HandleDeleteGet(httpHelper, &deleteClientApiClient{err: testCase.apiErr}))
 			router.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

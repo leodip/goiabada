@@ -72,16 +72,16 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 
 	type build func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc
 	usersAdd := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
-		return HandleAdminResourceUsersWithPermissionAddPermissionPost(h, c)
+		return HandleUsersWithPermissionAddPermissionPost(h, c)
 	}
 	usersRemove := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
-		return HandleAdminResourceUsersWithPermissionRemovePermissionPost(h, c)
+		return HandleUsersWithPermissionRemovePermissionPost(h, c)
 	}
 	groupsAdd := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
-		return HandleAdminResourceGroupsWithPermissionAddPermissionPost(h, c)
+		return HandleGroupsWithPermissionAddPermissionPost(h, c)
 	}
 	groupsRemove := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
-		return HandleAdminResourceGroupsWithPermissionRemovePermissionPost(h, c)
+		return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 	}
 
 	testCases := []struct {
@@ -141,7 +141,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 		{
 			name: "saving permissions with a body naming another resource",
 			build: func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
-				return HandleAdminResourcePermissionsPost(h, testStore(), c)
+				return HandlePermissionsPost(h, testStore(), c)
 			},
 			options: []handlertest.Option{
 				handlertest.WithAccessToken(),

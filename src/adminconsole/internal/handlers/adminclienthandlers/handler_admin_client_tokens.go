@@ -21,7 +21,7 @@ type clientTokensAPI interface {
 	UpdateClientTokens(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
 }
 
-func HandleAdminClientTokensGet(
+func HandleTokensGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientTokensAPI,
@@ -101,7 +101,7 @@ func HandleAdminClientTokensGet(
 	}
 }
 
-func HandleAdminClientTokensPost(
+func HandleTokensPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientTokensAPI,

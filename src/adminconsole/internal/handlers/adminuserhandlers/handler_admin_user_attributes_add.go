@@ -20,7 +20,7 @@ type userAttributesAddAPI interface {
 	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
 }
 
-func HandleAdminUserAttributesAddGet(
+func HandleAttributesAddGet(
 	httpHelper HttpHelper,
 	apiClient userAttributesAddAPI,
 ) http.HandlerFunc {
@@ -72,7 +72,7 @@ func HandleAdminUserAttributesAddGet(
 	}
 }
 
-func HandleAdminUserAttributesAddPost(
+func HandleAttributesAddPost(
 	httpHelper HttpHelper,
 	apiClient userAttributesAddAPI,
 	baseURL string,

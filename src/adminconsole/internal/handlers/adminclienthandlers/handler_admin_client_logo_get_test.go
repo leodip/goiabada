@@ -24,7 +24,7 @@ import (
 // meets the same refusal. It goes to the session-ended route, which signs the administrator out
 // with the notice, as a 401 from the client read would (#427 decision 17, final review round 2).
 // Every other failure keeps the page, drawn without a logo, with the one Warn record.
-func TestHandleAdminClientLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testing.T) {
+func TestHandleLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testing.T) {
 	testCases := []struct {
 		name    string
 		logoErr error
@@ -71,7 +71,7 @@ func TestHandleAdminClientLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testi
 					next.ServeHTTP(w, r.WithContext(ctx))
 				})
 			})
-			router.Get("/admin/clients/{clientId}/logo", HandleAdminClientLogoGet(httpHelper, &logoApiClient{logoErr: tc.logoErr}))
+			router.Get("/admin/clients/{clientId}/logo", HandleLogoGet(httpHelper, &logoApiClient{logoErr: tc.logoErr}))
 
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/clients/42/logo", nil))

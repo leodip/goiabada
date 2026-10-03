@@ -52,7 +52,7 @@ func requireNoPasswordInBind(t *testing.T, httpHelper *mocks_handlers.HttpHelper
 	}
 }
 
-func TestHandleAccountEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testing.T) {
+func TestHandleEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testing.T) {
 	apiClient := &emailRecordingApiClient{}
 	form := url.Values{
 		"email":             {"New@Example.com"},
@@ -63,7 +63,7 @@ func TestHandleAccountEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testin
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleAccountEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
+	HandleEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
@@ -71,10 +71,10 @@ func TestHandleAccountEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testin
 	assert.Equal(t, accountEmailFormPassword, apiClient.sent[0].CurrentPassword)
 }
 
-// TestHandleAccountEmailPost_SendsTheCurrentPasswordAsTyped holds the console to forwarding the
+// TestHandleEmailPost_SendsTheCurrentPasswordAsTyped holds the console to forwarding the
 // password whole: surrounding whitespace is part of a password the auth server accepts and
 // compares intact, so a trimmed one would be refused as wrong and charged to the account's budget.
-func TestHandleAccountEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
+func TestHandleEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 	const password = "  " + accountEmailFormPassword + "  "
 	apiClient := &emailRecordingApiClient{}
 	form := url.Values{
@@ -86,17 +86,17 @@ func TestHandleAccountEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleAccountEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
+	HandleEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
 	assert.Equal(t, password, apiClient.sent[0].CurrentPassword)
 }
 
-// TestHandleAccountEmailPost_IgnoresACurrentPasswordInTheQuery is the credential rule (#202): a
+// TestHandleEmailPost_IgnoresACurrentPasswordInTheQuery is the credential rule (#202): a
 // password in a request target reaches browser history, Referers and proxy logs, so one there is
 // never read. The API then refuses the blank password itself, which is why it is still called.
-func TestHandleAccountEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) {
+func TestHandleEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) {
 	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusBadRequest, Code: "VALIDATION_ERROR", Message: "Current password is required."}}
 	httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -105,14 +105,14 @@ func TestHandleAccountEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) 
 	req := handlertest.Request(http.MethodPost, "/account/email?currentPassword="+accountEmailFormPassword,
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 
-	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+	HandleEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Len(t, apiClient.sent, 1)
 	assert.Empty(t, apiClient.sent[0].CurrentPassword, "a password in the query must not be read")
 	assert.Equal(t, "Current password is required.", handlertest.Bind(t, httpHelper)["error"])
 }
 
-func TestHandleAccountEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
+func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusBadRequest, Code: "AUTHENTICATION_FAILED",
 		Message: "Authentication failed. Check your current password and try again."}}
@@ -126,7 +126,7 @@ func TestHandleAccountEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T)
 	req := handlertest.Request(http.MethodPost, "/account/email",
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 
-	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+	HandleEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, "Authentication failed. Check your current password and try again.", bind["error"])
@@ -134,7 +134,7 @@ func TestHandleAccountEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T)
 	requireNoPasswordInBind(t, httpHelper)
 }
 
-func TestHandleAccountEmailPost_AConfirmationMismatchReRendersWithoutThePassword(t *testing.T) {
+func TestHandleEmailPost_AConfirmationMismatchReRendersWithoutThePassword(t *testing.T) {
 	apiClient := &emailRecordingApiClient{}
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
@@ -146,7 +146,7 @@ func TestHandleAccountEmailPost_AConfirmationMismatchReRendersWithoutThePassword
 	req := handlertest.Request(http.MethodPost, "/account/email",
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 
-	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+	HandleEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 	assert.Empty(t, apiClient.sent, "a mismatch is refused before the API is called")
 	requireNoPasswordInBind(t, httpHelper)

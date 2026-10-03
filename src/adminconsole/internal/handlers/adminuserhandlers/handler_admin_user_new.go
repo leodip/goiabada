@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-func HandleAdminUserNewGet(
+func HandleNewGet(
 	httpHelper HttpHelper,
 ) http.HandlerFunc {
 
@@ -45,7 +45,7 @@ type userNewAPI interface {
 	CreateUserAdmin(ctx context.Context, accessToken string, request *api.CreateUserAdminRequest) (*api.UserResponse, error)
 }
 
-func HandleAdminUserNewPost(
+func HandleNewPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userNewAPI,

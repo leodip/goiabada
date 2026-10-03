@@ -23,7 +23,7 @@ type clientAuthenticationAPI interface {
 	UpdateClientAuthentication(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
 }
 
-func HandleAdminClientAuthenticationGet(
+func HandleAuthenticationGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientAuthenticationAPI,
@@ -100,7 +100,7 @@ func HandleAdminClientAuthenticationGet(
 	}
 }
 
-func HandleAdminClientAuthenticationPost(
+func HandleAuthenticationPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientAuthenticationAPI,
@@ -213,7 +213,7 @@ func HandleAdminClientAuthenticationPost(
 	}
 }
 
-func HandleAdminClientGenerateNewSecretGet(httpHelper HttpHelper) http.HandlerFunc {
+func HandleGenerateNewSecretGet(httpHelper HttpHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		newSecret := securerandom.String(60)
 

@@ -67,7 +67,7 @@ func (c *userProfileRecorder) UpdateUserProfile(_ context.Context, accessToken s
 // A refusal from the API redraws the admin user profile page with what the administrator typed
 // rather than what is stored, the API's sentence, and the list position the page was opened from
 // (#440 decision 7).
-func TestHandleAdminUserProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testing.T) {
+func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_profile.html").Once()
@@ -89,7 +89,7 @@ func TestHandleAdminUserProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues
 	}
 
 	rr := httptest.NewRecorder()
-	HandleAdminUserProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
+	HandleProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 		"/admin/users/7/profile?page=3&query=jane", handlertest.WithAccessToken(),
 		handlertest.WithRouteParam("userId", "7"), handlertest.WithForm(form)))
 
@@ -138,7 +138,7 @@ func TestHandleAdminUserProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues
 // The time-zone select only ever posts a country and a zone joined once by ___. Anything else is a
 // hand-edited request, which keeps today's 500 and neither reads nor updates the user (#440
 // decision 7).
-func TestHandleAdminUserProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.T) {
+func TestHandleProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.T) {
 	for _, zoneInfo := range []string{"America/Sao_Paulo", "Brazil___America___Sao_Paulo"} {
 		t.Run(zoneInfo, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -148,7 +148,7 @@ func TestHandleAdminUserProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t 
 			form := url.Values{"username": {"jane-doe"}, "zoneInfo": {zoneInfo}}
 
 			rr := httptest.NewRecorder()
-			HandleAdminUserProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
+			HandleProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 				"/admin/users/7/profile", handlertest.WithAccessToken(),
 				handlertest.WithRouteParam("userId", "7"), handlertest.WithForm(form)))
 

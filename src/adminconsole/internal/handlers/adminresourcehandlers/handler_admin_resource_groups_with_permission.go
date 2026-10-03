@@ -25,7 +25,7 @@ type resourceGroupsWithPermissionAPI interface {
 	UpdateGroupPermissions(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
 }
 
-func HandleAdminResourceGroupsWithPermissionGet(
+func HandleGroupsWithPermissionGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceGroupsWithPermissionAPI,
@@ -191,7 +191,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 	}
 }
 
-func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
+func HandleGroupsWithPermissionAddPermissionPost(
 	httpHelper HttpHelper,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
@@ -290,7 +290,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 	}
 }
 
-func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
+func HandleGroupsWithPermissionRemovePermissionPost(
 	httpHelper HttpHelper,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {

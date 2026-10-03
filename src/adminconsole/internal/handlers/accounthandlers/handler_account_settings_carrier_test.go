@@ -62,7 +62,7 @@ func publicSettings(smtpEnabled bool) *api.PublicSettingsResponse {
 	}
 }
 
-func TestHandleAccountEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
+func TestHandleEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 	for _, smtpEnabled := range []bool{true, false} {
 		t.Run(map[bool]string{true: "smtp enabled", false: "smtp disabled"}[smtpEnabled], func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -73,7 +73,7 @@ func TestHandleAccountEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing
 				handlertest.WithAccessToken(),
 				handlertest.WithSettings(publicSettings(smtpEnabled)))
 
-			HandleAccountEmailGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
+			HandleEmailGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			assert.Equal(t, smtpEnabled, handlertest.Bind(t, httpHelper)["smtpEnabled"],
@@ -82,7 +82,7 @@ func TestHandleAccountEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing
 	}
 }
 
-func TestHandleAccountEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
+func TestHandleEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
@@ -92,7 +92,7 @@ func TestHandleAccountEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrie
 		handlertest.WithAccessToken(),
 		handlertest.WithSettings(publicSettings(true)))
 
-	HandleAccountEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
+	HandleEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	assert.Equal(t, true, handlertest.Bind(t, httpHelper)["smtpEnabled"])
@@ -101,7 +101,7 @@ func TestHandleAccountEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrie
 // The other arm of the same read: this page refuses outright when the auth server reports SMTP off,
 // because there is nothing to send a verification with. Without this row the case above is
 // satisfied by a handler that read the carrier once and ignored what it said.
-func TestHandleAccountEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t *testing.T) {
+func TestHandleEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var refusedWith error
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
@@ -111,7 +111,7 @@ func TestHandleAccountEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t
 		handlertest.WithAccessToken(),
 		handlertest.WithSettings(publicSettings(false)))
 
-	HandleAccountEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
+	HandleEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Error(t, refusedWith, "the page must refuse rather than render a form it cannot send from")
@@ -147,23 +147,23 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 		request *http.Request
 	}{
 		{
-			name: "HandleAccountEmailGet",
+			name: "HandleEmailGet",
 			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAccountEmailGet(h, newFlashTestStore(), settingsCarrierApiClient{})
+				return HandleEmailGet(h, newFlashTestStore(), settingsCarrierApiClient{})
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email", handlertest.WithAccessToken()),
 		},
 		{
-			name: "HandleAccountEmailVerificationGet",
+			name: "HandleEmailVerificationGet",
 			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAccountEmailVerificationGet(h, newFlashTestStore(), settingsCarrierApiClient{})
+				return HandleEmailVerificationGet(h, newFlashTestStore(), settingsCarrierApiClient{})
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email-verification", handlertest.WithAccessToken()),
 		},
 		{
-			name: "HandleAccountEmailVerificationPost, a code the API calls expired",
+			name: "HandleEmailVerificationPost, a code the API calls expired",
 			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAccountEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
+				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
 					err: &apiclient.APIError{Code: "INVALID_OR_EXPIRED_VERIFICATION_CODE", Message: "Expired.", StatusCode: http.StatusBadRequest},
 				}, consoleBaseURL)
 			},
@@ -171,9 +171,9 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 				handlertest.WithAccessToken(), verificationForm),
 		},
 		{
-			name: "HandleAccountEmailVerificationPost, any other refusal",
+			name: "HandleEmailVerificationPost, any other refusal",
 			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAccountEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
+				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
 					err: &apiclient.APIError{Code: "SOMETHING_ELSE", Message: "No.", StatusCode: http.StatusBadRequest},
 				}, consoleBaseURL)
 			},

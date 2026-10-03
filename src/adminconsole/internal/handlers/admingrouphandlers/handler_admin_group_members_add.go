@@ -20,7 +20,7 @@ type groupMembersAddAPI interface {
 	SearchUsersWithGroupAnnotation(ctx context.Context, accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
 }
 
-func HandleAdminGroupMembersAddGet(
+func HandleMembersAddGet(
 	httpHelper HttpHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
@@ -70,7 +70,7 @@ func HandleAdminGroupMembersAddGet(
 	}
 }
 
-func HandleAdminGroupMembersSearchGet(
+func HandleMembersSearchGet(
 	httpHelper HttpHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
@@ -138,7 +138,7 @@ func HandleAdminGroupMembersSearchGet(
 	}
 }
 
-func HandleAdminGroupMembersAddPost(
+func HandleMembersAddPost(
 	httpHelper HttpHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
