@@ -72,6 +72,28 @@ func TestHandleAccountEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testin
 	assert.Equal(t, accountEmailFormPassword, apiClient.sent[0].CurrentPassword)
 }
 
+// TestHandleAccountEmailPost_SendsTheCurrentPasswordAsTyped holds the console to forwarding the
+// password whole: surrounding whitespace is part of a password the auth server accepts and
+// compares intact, so a trimmed one would be refused as wrong and charged to the account's budget.
+func TestHandleAccountEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
+	const password = "  " + accountEmailFormPassword + "  "
+	apiClient := &emailRecordingApiClient{}
+	form := url.Values{
+		"email":             {"new@example.com"},
+		"emailConfirmation": {"new@example.com"},
+		"currentPassword":   {password},
+	}
+	req := handlertest.Request(http.MethodPost, "/account/email",
+		handlertest.WithAccessToken(), handlertest.WithForm(form))
+	rr := httptest.NewRecorder()
+
+	HandleAccountEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient).ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
+	require.Len(t, apiClient.sent, 1)
+	assert.Equal(t, password, apiClient.sent[0].CurrentPassword)
+}
+
 // TestHandleAccountEmailPost_IgnoresACurrentPasswordInTheQuery is the credential rule (#202): a
 // password in a request target reaches browser history, Referers and proxy logs, so one there is
 // never read. The API then refuses the blank password itself, which is why it is still called.

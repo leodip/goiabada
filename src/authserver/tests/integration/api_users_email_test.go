@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserEmailPut tests the PUT /api/v1/admin/users/{id}/email endpoint
@@ -68,6 +69,36 @@ func TestAPIUserEmailPut_Success(t *testing.T) {
 	// Email verification code should be cleared when verified is true
 	assert.Nil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.False(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
+}
+
+// TestAPIUserEmailPut_SendsNoNoticeWithMailOn is the boundary of #404 decision 11: the notice to
+// the previous address is for a self-service change only, so an administrator changing another
+// user's address, which needs no password, sends nothing to either address even with mail on.
+//
+// The notice would be sent after the response, so its absence is read once a later mail has
+// arrived: a reset requested for the new address after the change answered, whose job starts after
+// any job the change could have started.
+func TestAPIUserEmailPut_SendsNoNoticeWithMailOn(t *testing.T) {
+	useMailpitSMTP(t)
+	accessToken, _ := createAdminClientWithToken(t)
+
+	previous := plusAddress()
+	user, _ := createResetTestUser(t, previous)
+	defer func() {
+		_ = database.DeleteUser(context.Background(), nil, user.Id)
+	}()
+	newEmail := plusAddress()
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserEmailRequest{Email: newEmail, EmailVerified: true})
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "an administrator's change needs no current password")
+
+	requestPasswordReset(t, createHttpClient(t), newEmail)
+	require.Len(t, awaitResetLinks(t, newEmail, 1), 1, "the later mail arrived, so mail was on")
+
+	assert.Empty(t, sentTo(t, previous), "the previous address must be sent no notice")
+	assert.Len(t, sentTo(t, newEmail), 1, "the new address must be sent the reset link and nothing else")
 }
 
 func TestAPIUserEmailPut_EmailNormalization(t *testing.T) {
