@@ -42,6 +42,8 @@ This covers every kind of grant, including offline refresh tokens whose browser 
 
 Each of these writes a `revoked_user_auth_state` entry to the [audit log](/concepts/audit-log/), recording which sessions were terminated and which refresh tokens were revoked.
 
+A user changing their own email address is not on this list, and ends nothing: no session is terminated and no refresh token is revoked. The change already requires the current password, so signing other devices out would protect nothing that person could not do again. Tokens issued before the change carry the old `email` claim until they expire or are refreshed.
+
 <Aside type="note">
 A user changing their own password normally stays signed in on the client they are using. If a token refresh happens at the same moment as the change, that client may still be asked to sign in again.
 </Aside>

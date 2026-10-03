@@ -2858,7 +2858,12 @@ paths:
     put:
       tags: [Account]
       summary: Update own email
-      description: Update the authenticated user's email (marks as unverified)
+      description: |
+        Update the authenticated user's email (marks as unverified). Requires the current
+        password, checked before the address: a blank one is a 400 with error_code
+        VALIDATION_ERROR, a wrong one a 400 with error_code AUTHENTICATION_FAILED that counts
+        against the failure limit shared with the password and OTP changes. Submitting the
+        address the account already has changes nothing and answers 200 with the user as stored.
       operationId: updateAccountEmail
       requestBody:
         required: true
@@ -2891,6 +2896,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -5714,10 +5721,13 @@ components:
       type: object
       required:
         - email
+        - currentPassword
       properties:
         email:
           type: string
           format: email
+        currentPassword:
+          type: string
 
     VerifyAccountEmailRequest:
       type: object

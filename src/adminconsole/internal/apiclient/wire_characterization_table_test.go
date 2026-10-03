@@ -17,7 +17,7 @@ var (
 
 	charUpdateUserProfile   = &api.UpdateUserProfileRequest{Username: "jdoe"}
 	charUpdateUserAddress   = &api.UpdateUserAddressRequest{AddressLine1: "1 Main Street"}
-	charUpdateAccountEmail  = &api.UpdateAccountEmailRequest{Email: "jane@example.com"}
+	charUpdateAccountEmail  = &api.UpdateAccountEmailRequest{Email: "jane@example.com", CurrentPassword: "old"}
 	charUpdateAccountPhone  = &api.UpdateAccountPhoneRequest{PhoneNumber: "5551234"}
 	charUpdateAccountPwd    = &api.UpdateAccountPasswordRequest{CurrentPassword: "old", NewPassword: "new"}
 	charVerifyAccountEmail  = &api.VerifyAccountEmailRequest{VerificationCode: "123456"}

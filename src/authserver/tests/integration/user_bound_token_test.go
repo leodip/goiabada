@@ -138,7 +138,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 	// Account API fixture: a real user whose subject doubles as a valid client identifier.
 	accountSubject := newUserSubjectValidAsClientIdentifier(t)
-	accountUser, _ := createUserWithSubject(t, accountSubject)
+	accountUser, accountPassword := createUserWithSubject(t, accountSubject)
 	originalEmail := accountUser.Email
 
 	// /userinfo fixture: a SECOND colliding pair, and one token shared by both subtests.
@@ -168,7 +168,9 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 
 		attemptedEmail := strings.ToLower(fake.LetterN(9)) + "@attacker.example.com"
 		resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/email",
-			accessToken, api.UpdateAccountEmailRequest{Email: attemptedEmail})
+			// The user's real password, so that with the guard removed the change would
+			// succeed rather than stop at the password check (#404).
+			accessToken, api.UpdateAccountEmailRequest{Email: attemptedEmail, CurrentPassword: accountPassword})
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -239,9 +241,13 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 	assertEmailChangeSucceeds := func(t *testing.T, accessToken string, user *models.User) {
 		t.Helper()
 
+		// The change requires the current password (#404), and how the token was obtained
+		// says nothing about which one the user holds, so give them a known one.
+		givePassword(t, user, accountEmailPassword)
+
 		newEmail := strings.ToLower(fake.LetterN(9)) + "@example.com"
 		resp := makeAPIRequest(t, "PUT", accountEmailUrl, accessToken,
-			api.UpdateAccountEmailRequest{Email: newEmail})
+			api.UpdateAccountEmailRequest{Email: newEmail, CurrentPassword: accountEmailPassword})
 		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {

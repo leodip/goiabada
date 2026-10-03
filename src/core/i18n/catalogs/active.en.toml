@@ -403,6 +403,7 @@
 "adminconsole.account.email.section_title" = "Update your email"
 "adminconsole.account.email.field.email" = "Email"
 "adminconsole.account.email.field.email_confirmation" = "Email confirmation"
+"adminconsole.account.email.field.current_password" = "Current password"
 "adminconsole.account.email.update_button" = "Update email"
 "adminconsole.account.email.saved_successfully" = "Email updated successfully"
 

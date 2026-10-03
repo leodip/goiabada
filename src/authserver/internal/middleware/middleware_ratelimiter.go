@@ -268,13 +268,14 @@ func NewRateLimiterMiddleware(ceremonyStore authContextGetter, renderer errorRen
 		// human lifetime. It needs a bound at all because the chain in front of it is short:
 		// PUT /api/v1/account/email sets any address not already registered and clears the
 		// verified flag, so guessing the code from there buys email_verified: true on an
-		// address the attacker does not control. Failures only, so a user reading the code
+		// address the attacker does not control. That change now needs the account password
+		// too (#404), which shortens the chain without removing it. Failures only, so a user reading the code
 		// out of their inbox spends nothing (#219).
 		emailVerification: newFailureTier("email_verification", 5, 15*time.Minute),
-		// per-subject account password failures, one bucket for the two routes that check
-		// that password: PUT /api/v1/account/password and PUT /api/v1/account/otp. Both
-		// verify the same secret, so separate buckets would hand an attacker ten guesses by
-		// alternating between them.
+		// per-subject account password failures, one bucket for the three routes that check
+		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and
+		// PUT /api/v1/account/email (#404). All three verify the same secret, so separate
+		// buckets would hand an attacker more guesses by alternating between them.
 		//
 		// Five rather than the ten the sign-in gate allows because the consequences are
 		// asymmetric. A lockout here costs a signed-in user a 15 minute wait on a change they
@@ -577,9 +578,10 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 }
 
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
-// access token presented. One middleware over two routes, PUT /api/v1/account/password and
-// PUT /api/v1/account/otp, which is what makes the bucket shared: the sharing is a property
-// of there being one tier rather than of two handlers agreeing on a key.
+// access token presented. One middleware over three routes, PUT /api/v1/account/password,
+// PUT /api/v1/account/otp and PUT /api/v1/account/email (#404), which is what makes the bucket
+// shared: the sharing is a property of there being one tier rather than of three handlers
+// agreeing on a key.
 //
 // Both routes verified the password with an unbounded bcrypt and no failure counter, and the
 // OTP one is the only credential guarding the removal of the account's second factor: its
@@ -591,7 +593,7 @@ func (m *RateLimiterMiddleware) LimitEmailVerification(next http.Handler) http.H
 // and only the password check spends the budget.
 //
 // The subject rather than the client IP, for LimitEmailVerification's reason: the budget has
-// to follow the account being attacked, and reaching either route needs a valid access token
+// to follow the account being attacked, and reaching any of them needs a valid access token
 // for that account. A request with no readable token passes through to the handler, which
 // answers ACCESS_TOKEN_REQUIRED before touching the password.
 func (m *RateLimiterMiddleware) LimitAccountPassword(next http.Handler) http.Handler {

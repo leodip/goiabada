@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -32,6 +33,7 @@ func HandleAPIAccountEmailPut(
 	database accountEmailDatabase,
 	emailValidator accountEmailValidator,
 	auditLogger AuditLogger,
+	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
@@ -54,6 +56,14 @@ func HandleAPIAccountEmailPut(
 			return
 		}
 
+		// The change requires the current password, as the password change beside it does (#404).
+		// A blank one is refused before the account is read and charges nothing: no password was
+		// compared, so charging it would let a caller spend the budget without guessing (#219).
+		if strings.TrimSpace(req.CurrentPassword) == "" {
+			writeJSONError(w, "Current password is required.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// Load user
 		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
@@ -65,8 +75,27 @@ func HandleAPIAccountEmailPut(
 			return
 		}
 
-		// Validate email (server-side rules; confirmation is a UI concern)
+		// Verify the current password before anything is said about the address, so a caller
+		// without it cannot learn whether an address is registered. A wrong one spends the budget
+		// PUT /api/v1/account/password and PUT /api/v1/account/otp share, since all three verify
+		// the same secret.
+		if !passwordhash.Verify(user.PasswordHash, req.CurrentPassword) {
+			credentialFailures.RecordCredentialFailure(r)
+
+			writeJSONError(w, "Authentication failed. Check your current password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			return
+		}
+
+		// The address the account already has changes nothing. Saving it would clear the
+		// verified flag, and with it the account's password recovery, over an idle re-save of
+		// the form (#404).
 		email := strings.ToLower(strings.TrimSpace(req.Email))
+		if email == user.Email {
+			writeJSON(w, r, http.StatusOK, api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)})
+			return
+		}
+
+		// Validate email (server-side rules; confirmation is a UI concern)
 		if err := emailValidator.ValidateEmailChange(r.Context(), email, user.Subject); err != nil {
 			writeValidationError(w, r, err)
 			return

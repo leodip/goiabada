@@ -383,6 +383,7 @@
 "adminconsole.account.email.section_title" = "Atualizar seu e-mail"
 "adminconsole.account.email.field.email" = "E-mail"
 "adminconsole.account.email.field.email_confirmation" = "Confirmação de e-mail"
+"adminconsole.account.email.field.current_password" = "Senha atual"
 "adminconsole.account.email.update_button" = "Atualizar e-mail"
 "adminconsole.account.email.saved_successfully" = "E-mail atualizado com sucesso"
 

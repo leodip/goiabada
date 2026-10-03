@@ -134,9 +134,11 @@ type UpdateUserEmailRequest struct {
 
 // UpdateAccountEmailRequest is used by the account (self-service) API to
 // update the currently authenticated user's email address.
-// Confirmation is handled by the client UI, so only the email is sent.
+// Confirmation is handled by the client UI, so it is not sent. The current
+// password is: the change is refused without it (#404).
 type UpdateAccountEmailRequest struct {
-	Email string `json:"email"`
+	Email           string `json:"email"`
+	CurrentPassword string `json:"currentPassword"`
 }
 
 // VerifyAccountEmailRequest is used by the account (self-service) API to
