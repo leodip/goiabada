@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -157,6 +159,37 @@ func serveIndex(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) 
 	HandleIndexGet(nil, httpHelper, store).ServeHTTP(httptest.NewRecorder(),
 		withCookies(handlertest.Request(http.MethodGet, "/"), cookies))
 	return handlertest.Bind(t, httpHelper)
+}
+
+// The home page is mounted outside RequiresScope, so it reads the token set itself: a signed-in
+// administrator is greeted by the email the ID token carries and offered the logout link, and a
+// visitor without a token set is anonymous rather than a fault. The real AuthHelper decides, so a
+// token set the reader lost on the way would read as anonymous here.
+func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.T) {
+	store := mocks_sessionstore.NewStore(t)
+	store.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).
+		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
+	authHelper := oauthclient.NewAuthHelper(store, coreconstants.AdminConsoleSessionName, "", "")
+
+	serve := func(opts ...handlertest.Option) map[string]interface{} {
+		httpHelper := mocks_handlers.NewHttpHelper(t)
+		handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
+		HandleIndexGet(authHelper, httpHelper, store).ServeHTTP(httptest.NewRecorder(),
+			handlertest.Request(http.MethodGet, "/", opts...))
+		return handlertest.Bind(t, httpHelper)
+	}
+
+	signedIn := serve(handlertest.WithJwtInfo(oauthclient.JwtInfo{
+		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+	}))
+	assert.Equal(t, true, signedIn["IsAuthenticated"])
+	assert.Equal(t, "admin@example.com", signedIn["LoggedInUser"])
+	assert.Equal(t, "/auth/logout", signedIn["LogoutLink"])
+
+	anonymous := serve()
+	assert.Equal(t, false, anonymous["IsAuthenticated"])
+	assert.Equal(t, "", anonymous["LoggedInUser"])
+	assert.Equal(t, "", anonymous["LogoutLink"])
 }
 
 // The notice is shown once: the second request replays the first one's cookie through a real

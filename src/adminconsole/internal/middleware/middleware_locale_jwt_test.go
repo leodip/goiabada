@@ -1,14 +1,13 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -44,8 +43,7 @@ func localeSeenBy(t *testing.T, req *http.Request) string {
 func TestMiddlewareLocaleFromJWT_ReadsLocaleClaim(t *testing.T) {
 	// No explicit intent, locale claim present → the claim applies.
 	req := httptest.NewRequest("GET", "/admin/users", nil)
-	req = req.WithContext(context.WithValue(req.Context(),
-		constants.ContextKeyJwtInfo, newJwtInfoWithLocale("pt-BR")))
+	req = req.WithContext(reqctx.WithJwtInfo(req.Context(), newJwtInfoWithLocale("pt-BR")))
 
 	assert.Equal(t, "Entrar", localeSeenBy(t, req))
 }
@@ -54,8 +52,7 @@ func TestMiddlewareLocaleFromJWT_SkipsWhenExplicitIntent(t *testing.T) {
 	// Explicit ?ui_locales=pt-BR; the user's claim is "en" — the refinement
 	// must not downgrade away from what the request asked for.
 	req := httptest.NewRequest("GET", "/admin/users?ui_locales=pt-BR", nil)
-	req = req.WithContext(context.WithValue(req.Context(),
-		constants.ContextKeyJwtInfo, newJwtInfoWithLocale("en")))
+	req = req.WithContext(reqctx.WithJwtInfo(req.Context(), newJwtInfoWithLocale("en")))
 
 	assert.Equal(t, "Entrar", localeSeenBy(t, req),
 		"explicit pt-BR must not be overridden by claim=en")
@@ -67,7 +64,7 @@ func TestMiddlewareLocaleFromJWT_FallsThroughWhenClaimMissing(t *testing.T) {
 	// must survive.
 	req := httptest.NewRequest("GET", "/admin/users", nil)
 	req.Header.Set("Accept-Language", "pt-BR")
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, oauthclient.JwtInfo{
+	req = req.WithContext(reqctx.WithJwtInfo(req.Context(), oauthclient.JwtInfo{
 		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{}},
 	}))
 
@@ -76,7 +73,7 @@ func TestMiddlewareLocaleFromJWT_FallsThroughWhenClaimMissing(t *testing.T) {
 }
 
 func TestMiddlewareLocaleFromJWT_NoJwtInfoIsANoOp(t *testing.T) {
-	// The unauthenticated shape: nothing wrote ContextKeyJwtInfo, so there is
+	// The unauthenticated shape: nothing wrote a token set, so there is
 	// no claim to read and the baseline stands.
 	req := httptest.NewRequest("GET", "/admin/users", nil)
 	req.Header.Set("Accept-Language", "pt-BR")

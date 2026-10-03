@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/boundedread"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -195,8 +196,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 			}
 
 			// Step 6.
-			ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
-				oauthclient.JwtInfo{TokenResponse: tokenResponse, IdToken: idToken})
+			ctx = reqctx.WithJwtInfo(ctx, oauthclient.JwtInfo{TokenResponse: tokenResponse, IdToken: idToken})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -383,18 +383,9 @@ func (m *MiddlewareJwt) RequiresScope(
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-
-			var jwtInfo oauthclient.JwtInfo
-			var ok bool
-			if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-				jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-				if !ok {
-					m.errorRenderer.InternalServerError(w, r,
-						errs.New("unable to cast the context value to JwtInfo in RequiresScope middleware"))
-					return
-				}
-			}
+			// An absent token set is the anonymous request, and the zero value the accessor answers
+			// with authorizes nothing and authenticates no one, so it takes the sign-in arm below.
+			jwtInfo, _ := reqctx.JwtInfoFrom(r.Context())
 
 			isAuthorized := m.authHelper.IsAuthorizedToAccessResource(jwtInfo, scopesAnyOf)
 			if !isAuthorized {
@@ -425,7 +416,7 @@ func (m *MiddlewareJwt) RequiresScope(
 				return
 			}
 
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r)
 		})
 	}
 }

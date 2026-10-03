@@ -19,7 +19,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -153,7 +152,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			httpHelper := handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{})
+			httpHelper := handlerhelpers.NewHttpHelper(web.TemplateFS())
 			testCase.handler(httpHelper).ServeHTTP(w, handlertest.Request(testCase.method, "/image", opts...))
 
 			assert.Equal(t, http.StatusForbidden, w.Code)

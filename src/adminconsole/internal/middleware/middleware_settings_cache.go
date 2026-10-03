@@ -1,12 +1,11 @@
 package middleware
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -71,8 +70,7 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 			// models.Settings first, a persistence model with 32 fields of which four were ever
 			// filled and the other 28 sat at their zero values, so a reader that reached for one
 			// got a plausible answer that had never come from anywhere (#350).
-			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, publicSettings)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r.WithContext(reqctx.WithSettings(r.Context(), publicSettings)))
 		})
 	}
 }

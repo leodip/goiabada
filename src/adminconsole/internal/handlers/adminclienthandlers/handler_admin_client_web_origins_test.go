@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -195,7 +194,7 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 
 			// The real helper rather than a mock, so the assertions are on the bytes the
 			// browser receives. templateFS is nil because JsonError renders no template.
-			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+			httpHelper := handlerhelpers.NewHttpHelper(nil)
 
 			body := `{"clientId":1,"webOrigins":["https://[2001:db8::1]"]}`
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
@@ -260,7 +259,7 @@ func TestHandleAdminClientWebOriginsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+			httpHelper := handlerhelpers.NewHttpHelper(nil)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
 				handlertest.WithAccessToken(),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),

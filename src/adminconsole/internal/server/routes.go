@@ -35,7 +35,7 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	identifierValidator := validators.NewIdentifierValidator()
 
-	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, middleware.SettingsReader{})
+	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
 	authHelper := oauthclient.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
 
 	// Initialize middleware

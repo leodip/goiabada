@@ -12,7 +12,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -59,8 +59,8 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 
 	var seen *api.PublicSettingsResponse
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		settings, ok := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
-		require.True(t, ok, "the middleware must put *api.PublicSettingsResponse on the context")
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		require.True(t, ok, "the middleware must put the settings on the context")
 		seen = settings
 		w.WriteHeader(http.StatusOK)
 	})

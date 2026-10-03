@@ -15,10 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -54,13 +53,13 @@ func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (
 
 	capture := logtest.CaptureSlog(t)
 
-	httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{}, adminmiddleware.SettingsReader{})
+	httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{})
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), constants.ContextKeyJwtInfo,
+			ctx := reqctx.WithJwtInfo(r.Context(),
 				oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -175,4 +174,31 @@ func TestAdminGetPermissions_TheCallCarriesTheRequestsContext(t *testing.T) {
 	require.NotNil(t, client.seen, "the handler must consult its API client")
 	assert.NotEmpty(t, middleware.GetReqID(client.seen),
 		"the call carried the request's own context, which is where the request id lives")
+}
+
+// Without a token set on the request the endpoint answers the JSON 500 and logs the one sentinel,
+// rather than a message of its own: every route reaching it is mounted under RequiresScope, so the
+// absence is a wiring defect an operator has to find (#440).
+func TestAdminGetPermissions_WithoutATokenSetAnswersTheSentinel(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	client := &permissionsByResourceClient{}
+
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Get("/admin/permissions", HandleAdminGetPermissionsGet(handlerhelpers.NewHttpHelper(fstest.MapFS{}), client))
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/permissions?resourceId=7", nil))
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Nil(t, client.seen, "nothing is asked of the API without a bearer to send")
+	var body map[string]string
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.Equal(t, "server_error", body["error"])
+
+	records := capture.Records()
+	require.Len(t, records, 1)
+	logged, isError := records[0].Attrs["error"].(error)
+	require.True(t, isError, "the error attribute carries the error value")
+	assert.ErrorIs(t, logged, reqctx.ErrNoJwtInfo)
 }

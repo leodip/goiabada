@@ -13,10 +13,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -26,10 +28,10 @@ import (
 func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/users")
 
-	assert.Nil(t, req.Context().Value(constants.ContextKeyJwtInfo),
-		"a request built without WithAccessToken must carry no JwtInfo at all")
-	assert.Nil(t, req.Context().Value(constants.ContextKeySettings),
-		"a request built without WithSettings must carry no settings at all")
+	_, hasJwtInfo := reqctx.JwtInfoFrom(req.Context())
+	assert.False(t, hasJwtInfo, "a request built without WithAccessToken must carry no JwtInfo at all")
+	_, hasSettings := reqctx.SettingsFrom(req.Context())
+	assert.False(t, hasSettings, "a request built without WithSettings must carry no settings at all")
 	assert.Nil(t, req.Context().Value(chi.RouteCtxKey),
 		"a request built without WithRouteParam must carry no route context at all")
 	assert.Empty(t, req.Header.Get("Content-Type"))
@@ -38,7 +40,7 @@ func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 func TestRequest_WithAccessTokenCarriesTheBearerTheHandlersRead(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/users", WithAccessToken())
 
-	jwtInfo, ok := req.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+	jwtInfo, ok := reqctx.JwtInfoFrom(req.Context())
 	require.True(t, ok, "the context carries no oauthclient.JwtInfo")
 	assert.Equal(t, AccessToken, jwtInfo.TokenResponse.AccessToken)
 }
@@ -55,11 +57,28 @@ func TestRequest_WithRouteParamIsReadableThroughChi(t *testing.T) {
 }
 
 func TestRequest_WithSettingsPutsTheValueWhereTheMiddlewarePutsOne(t *testing.T) {
-	settings := struct{ AppName string }{AppName: "Goiabada"}
+	settings := &api.PublicSettingsResponse{AppName: "Goiabada"}
 
 	req := Request(http.MethodGet, "/account/profile", WithSettings(settings))
 
-	assert.Equal(t, settings, req.Context().Value(constants.ContextKeySettings))
+	got, ok := reqctx.SettingsFrom(req.Context())
+	require.True(t, ok, "the context carries no settings")
+	assert.Same(t, settings, got)
+}
+
+// WithJwtInfo hands over the whole token set, the ID token included, where WithAccessToken carries
+// the bearer alone.
+func TestRequest_WithJwtInfoCarriesTheWholeTokenSet(t *testing.T) {
+	want := oauthclient.JwtInfo{
+		TokenResponse: oauth.TokenResponse{AccessToken: "a", Scope: "openid"},
+		IdToken:       &oauth.JwtToken{TokenBase64: "i"},
+	}
+
+	req := Request(http.MethodGet, "/account/logout", WithJwtInfo(want))
+
+	got, ok := reqctx.JwtInfoFrom(req.Context())
+	require.True(t, ok, "the context carries no oauthclient.JwtInfo")
+	assert.Equal(t, want, got)
 }
 
 // PostFormValue rather than FormValue, because that is the accessor the handlers are held to and

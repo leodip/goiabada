@@ -4,8 +4,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -41,16 +40,13 @@ func HandleIndexGet(
 		loggedInUser := ""
 		logoutLink := ""
 
-		var jwtInfo oauthclient.JwtInfo
-		var ok bool
-		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-			if ok {
-				isAuthenticated = authHelper.IsAuthenticated(jwtInfo)
-				if isAuthenticated {
-					loggedInUser = jwtInfo.IdToken.GetStringClaim("email")
-					logoutLink = "/auth/logout"
-				}
+		// The index is the one page mounted outside RequiresScope, so an absent token set is the
+		// anonymous visitor rather than a fault.
+		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
+			isAuthenticated = authHelper.IsAuthenticated(jwtInfo)
+			if isAuthenticated {
+				loggedInUser = jwtInfo.IdToken.GetStringClaim("email")
+				logoutLink = "/auth/logout"
 			}
 		}
 

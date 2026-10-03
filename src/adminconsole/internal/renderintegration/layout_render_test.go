@@ -1,7 +1,6 @@
 package renderintegration
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,9 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -29,11 +27,11 @@ import (
 func TestRender_NotFoundPage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/clients/not-a-number/settings", nil)
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 	w := httptest.NewRecorder()
-	handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{}).NotFound(w, req)
+	handlerhelpers.NewHttpHelper(web.TemplateFS()).NotFound(w, req)
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()

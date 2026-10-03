@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -119,7 +118,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+			httpHelper := handlerhelpers.NewHttpHelper(nil)
 			apiClient := &grantOneApiClient{current: tc.current}
 			router := chi.NewRouter()
 			router.Post(tc.route, tc.build(httpHelper, apiClient))
