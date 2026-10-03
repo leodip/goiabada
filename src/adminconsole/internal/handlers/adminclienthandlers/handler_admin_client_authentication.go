@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -105,6 +104,7 @@ func HandleAdminClientAuthenticationPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientAuthenticationAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +209,7 @@ func HandleAdminClientAuthenticationPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/authentication", baseURL, client.Id), http.StatusFound)
 	}
 }
 

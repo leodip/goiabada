@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -94,6 +93,7 @@ func HandleAdminSettingsEmailPost(
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
 	settingsCache SettingsInvalidator,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +175,7 @@ func HandleAdminSettingsEmailPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email", baseURL), http.StatusFound)
 	}
 }
 
@@ -232,6 +232,7 @@ func HandleAdminSettingsEmailSendTestPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -293,6 +294,6 @@ func HandleAdminSettingsEmailSendTestPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email/send-test-email", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email/send-test-email", baseURL), http.StatusFound)
 	}
 }

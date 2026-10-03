@@ -34,17 +34,6 @@ const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 // tell "the token was redacted" apart from "nothing was logged at all".
 const loggerTestTarget = "/admin/clients?page=2&size=10&id_token_hint=" + jwtLike
 
-// withLogHttpRequests sets the flag for the duration of the test and restores it. It has to run
-// before initMiddleware, which is when the value is read.
-func withLogHttpRequests(t *testing.T, enabled bool) {
-	t.Helper()
-	previous := config.GetAdminConsole().LogHttpRequests
-	config.GetAdminConsole().LogHttpRequests = enabled
-	t.Cleanup(func() {
-		config.GetAdminConsole().LogHttpRequests = previous
-	})
-}
-
 // newLoggerTestServer builds a Server by hand, runs the real initMiddleware, and registers one
 // handler that answers 200 and records that it ran.
 //
@@ -55,7 +44,6 @@ func withLogHttpRequests(t *testing.T, enabled bool) {
 // that says the logger did not swallow it.
 func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {
 	t.Helper()
-	withLogHttpRequests(t, logHttpRequests)
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -63,10 +51,12 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	}))
 	t.Cleanup(authServer.Close)
 
+	// The flag is read from the configuration the server was built with, when initMiddleware runs.
 	s := &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  newTestSessionStore(),
 		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL), publicsettings.DefaultTTL),
+		cfg:           &config.Config{AdminConsole: config.AdminConsoleConfig{LogHttpRequests: logHttpRequests}},
 	}
 	s.initMiddleware()
 	s.router.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {

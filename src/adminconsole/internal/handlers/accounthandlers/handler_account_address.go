@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -98,6 +97,7 @@ func HandleAccountAddressPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountAddressAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	countries := countries.All()
@@ -173,6 +173,6 @@ func HandleAccountAddressPost(
 			return
 		}
 
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/address", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/account/address", http.StatusFound)
 	}
 }

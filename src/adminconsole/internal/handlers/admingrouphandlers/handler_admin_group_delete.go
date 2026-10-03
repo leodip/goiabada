@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -72,6 +71,7 @@ func HandleAdminGroupDeleteGet(
 func HandleAdminGroupDeletePost(
 	httpHelper HttpHelper,
 	apiClient groupDeleteAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -138,6 +138,6 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", baseURL), http.StatusFound)
 	}
 }

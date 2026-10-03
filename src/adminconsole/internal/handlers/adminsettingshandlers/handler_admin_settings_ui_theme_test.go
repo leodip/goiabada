@@ -113,7 +113,7 @@ func TestHandleAdminSettingsUIThemePost_OnlyASessionEndedListReadStopsTheRedraw(
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{"themeSelection": {"purple"}}))
 			w := httptest.NewRecorder()
 			HandleAdminSettingsUIThemePost(httpHelper, newSettingsTestStore(), apiClient,
-				&invalidationRecorder{}).ServeHTTP(w, req)
+				&invalidationRecorder{}, consoleBaseURL).ServeHTTP(w, req)
 
 			assert.Equal(t, tc.listReads, apiClient.listReads)
 			if tc.ended {

@@ -114,7 +114,7 @@ func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	postRec := httptest.NewRecorder()
 
-	HandleAccountChangePasswordPost(postHelper, store, flashStubApiClient{}).
+	HandleAccountChangePasswordPost(postHelper, store, flashStubApiClient{}, consoleBaseURL).
 		ServeHTTP(postRec, postReq)
 
 	require.Equal(t, http.StatusFound, postRec.Code,

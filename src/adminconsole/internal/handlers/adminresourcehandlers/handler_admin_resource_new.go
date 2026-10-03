@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -35,6 +34,7 @@ type resourceNewAPI interface {
 func HandleAdminResourceNewPost(
 	httpHelper HttpHelper,
 	apiClient resourceNewAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +75,6 @@ func HandleAdminResourceNewPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", baseURL), http.StatusFound)
 	}
 }

@@ -63,7 +63,7 @@ func TestHandleAccountEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testin
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleAccountEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient).ServeHTTP(rr, req)
+	HandleAccountEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
@@ -86,7 +86,7 @@ func TestHandleAccountEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleAccountEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient).ServeHTTP(rr, req)
+	HandleAccountEmailPost(mocks_handlers.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
@@ -105,7 +105,7 @@ func TestHandleAccountEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) 
 	req := handlertest.Request(http.MethodPost, "/account/email?currentPassword="+accountEmailFormPassword,
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 
-	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Len(t, apiClient.sent, 1)
 	assert.Empty(t, apiClient.sent[0].CurrentPassword, "a password in the query must not be read")
@@ -126,7 +126,7 @@ func TestHandleAccountEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T)
 	req := handlertest.Request(http.MethodPost, "/account/email",
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 
-	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, "Authentication failed. Check your current password and try again.", bind["error"])
@@ -146,7 +146,7 @@ func TestHandleAccountEmailPost_AConfirmationMismatchReRendersWithoutThePassword
 	req := handlertest.Request(http.MethodPost, "/account/email",
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 
-	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAccountEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 	assert.Empty(t, apiClient.sent, "a mismatch is refused before the API is called")
 	requireNoPasswordInBind(t, httpHelper)

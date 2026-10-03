@@ -141,7 +141,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		{
 			name: "HandleAccountAddressPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAccountAddressPost(h, nil, c)
+				return HandleAccountAddressPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/address",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{})),
@@ -149,7 +149,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		{
 			name: "HandleAccountChangePasswordPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAccountChangePasswordPost(h, nil, c)
+				return HandleAccountChangePasswordPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/change-password",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
@@ -168,7 +168,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		{
 			name: "HandleAccountEmailPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAccountEmailPost(h, nil, c)
+				return HandleAccountEmailPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/email",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{"email": {"jane@example.com"}})),
@@ -192,7 +192,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		{
 			name: "HandleAccountEmailVerificationPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAccountEmailVerificationPost(h, nil, c)
+				return HandleAccountEmailVerificationPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/email/verification",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{"verificationCode": {"123456"}})),
@@ -202,7 +202,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				// The one row needing a real store: this handler clears the console's own
 				// session before it asks the auth server to end the upstream one.
-				return HandleAccountLogoutGet(h, newFlashTestStore(), c)
+				return HandleAccountLogoutGet(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			// The logout page reads the verified ID token beside the bearer string, and takes its
 			// unauthenticated arm without both of them.
@@ -239,7 +239,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		{
 			name: "HandleAccountOtpPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAccountOtpPost(h, c)
+				return HandleAccountOtpPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/otp",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
@@ -256,7 +256,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		{
 			name: "HandleAccountPhonePost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAccountPhonePost(h, nil, c)
+				return HandleAccountPhonePost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/phone",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{})),
@@ -278,7 +278,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		{
 			name: "HandleAccountProfilePost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAccountProfilePost(h, nil, c)
+				return HandleAccountProfilePost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/profile",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{})),

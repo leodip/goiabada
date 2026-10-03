@@ -32,6 +32,11 @@ import (
 // request sees: TakeFlash edits the session in memory only, and a handler that forgot to save would
 // pass any test that read the same object back.
 
+// indexAuthServerBaseURL is the auth server base URL the home page is built with here. It is not
+// the configuration's default, http://localhost:9090, so a page reading anything but the value it
+// was given cannot pass (#441).
+const indexAuthServerBaseURL = "https://auth.example.test"
+
 // newMemoryStore is the production store over an in-memory backend.
 func newMemoryStore(t *testing.T) *sessionstore.ServerSideStore {
 	t.Helper()
@@ -156,7 +161,7 @@ func serveIndex(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) 
 	t.Helper()
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
-	HandleIndexGet(nil, httpHelper, store).ServeHTTP(httptest.NewRecorder(),
+	HandleIndexGet(nil, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 		withCookies(handlertest.Request(http.MethodGet, "/"), cookies))
 	return handlertest.Bind(t, httpHelper)
 }
@@ -174,7 +179,7 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 	serve := func(opts ...handlertest.Option) map[string]interface{} {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
-		HandleIndexGet(authHelper, httpHelper, store).ServeHTTP(httptest.NewRecorder(),
+		HandleIndexGet(authHelper, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 			handlertest.Request(http.MethodGet, "/", opts...))
 		return handlertest.Bind(t, httpHelper)
 	}
@@ -190,6 +195,11 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 	assert.Equal(t, false, anonymous["IsAuthenticated"])
 	assert.Equal(t, "", anonymous["LoggedInUser"])
 	assert.Equal(t, "", anonymous["LogoutLink"])
+
+	// The page links to the auth server's public base URL it was built with, signed in or not.
+	for name, bind := range map[string]map[string]interface{}{"signed in": signedIn, "anonymous": anonymous} {
+		assert.Equal(t, "https://auth.example.test", bind["AuthServerBaseUrl"], name)
+	}
 }
 
 // The notice is shown once: the second request replays the first one's cookie through a real
@@ -242,7 +252,7 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-			HandleIndexGet(nil, httpHelper, store).ServeHTTP(httptest.NewRecorder(),
+			HandleIndexGet(nil, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodGet, "/"))
 
 			httpHelper.AssertExpectations(t)

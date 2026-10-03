@@ -1,24 +1,10 @@
 package adminclienthandlers
 
 import (
-	"fmt"
-	"os"
-	"testing"
-
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
-
-func TestMain(m *testing.M) {
-	if err := config.Init(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	code := m.Run()
-	os.Exit(code)
-}
 
 // newTestSessionStore is the real store over an in-memory backend, which is what these
 // tests drive now that the browser session is a row rather than a cookie (#266). It

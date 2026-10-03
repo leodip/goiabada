@@ -36,21 +36,21 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 			return HandleAdminClientsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients")},
 		{"HandleAdminClientNewPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminClientNewPost(h, c)
+			return HandleAdminClientNewPost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/new",
 			handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}}))},
 		{"HandleAdminClientAuthenticationGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientAuthenticationGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/authentication", routed)},
 		{"HandleAdminClientAuthenticationPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminClientAuthenticationPost(h, nil, c)
+			return HandleAdminClientAuthenticationPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/authentication", routed,
 			handlertest.WithForm(url.Values{}))},
 		{"HandleAdminClientDeleteGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientDeleteGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/delete", routed)},
 		{"HandleAdminClientDeletePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminClientDeletePost(h, c)
+			return HandleAdminClientDeletePost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/delete", routed,
 			handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}}))},
 		{"HandleAdminClientLogoGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
@@ -66,7 +66,7 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 			return HandleAdminClientOAuth2FlowsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/oauth2-flows", routed)},
 		{"HandleAdminClientOAuth2FlowsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminClientOAuth2FlowsPost(h, nil, c)
+			return HandleAdminClientOAuth2FlowsPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/oauth2-flows", routed,
 			handlertest.WithForm(url.Values{}))},
 		{"HandleAdminClientPermissionsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
@@ -93,14 +93,14 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 			return HandleAdminClientSettingsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/settings", routed)},
 		{"HandleAdminClientSettingsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminClientSettingsPost(h, nil, c)
+			return HandleAdminClientSettingsPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/settings", routed,
 			handlertest.WithForm(url.Values{}))},
 		{"HandleAdminClientTokensGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminClientTokensGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/tokens", routed)},
 		{"HandleAdminClientTokensPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminClientTokensPost(h, nil, c)
+			return HandleAdminClientTokensPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/tokens", routed,
 			handlertest.WithForm(url.Values{}))},
 		{"HandleAdminClientWebOriginsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {

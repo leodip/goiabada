@@ -45,7 +45,7 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 			return HandleAdminUsersGet(h, c)
 		}, request(http.MethodGet, "/admin/users")},
 		{"HandleAdminUserNewPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserNewPost(h, nil, c)
+			return HandleAdminUserNewPost(h, nil, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/new",
 			handlertest.WithSettings(&api.PublicSettingsResponse{}),
 			handlertest.WithForm(url.Values{"email": {"jane@example.com"}, "password": {"N3w!word"}}))},
@@ -53,41 +53,41 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 			return HandleAdminUserDetailsGet(h, nil, c)
 		}, request(http.MethodGet, "/admin/users/42/details", routed)},
 		{"HandleAdminUserDetailsPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserDetailsPost(h, nil, c)
+			return HandleAdminUserDetailsPost(h, nil, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/details", routed,
 			handlertest.WithForm(url.Values{"enabled": {"on"}}))},
 		{"HandleAdminUserProfileGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminUserProfileGet(h, nil, c)
 		}, request(http.MethodGet, "/admin/users/42/profile", routed)},
 		{"HandleAdminUserProfilePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserProfilePost(h, nil, c)
+			return HandleAdminUserProfilePost(h, nil, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/profile", routed,
 			handlertest.WithForm(url.Values{"username": {"jdoe"}}))},
 		{"HandleAdminUserEmailGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminUserEmailGet(h, nil, c)
 		}, request(http.MethodGet, "/admin/users/42/email", routed)},
 		{"HandleAdminUserEmailPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserEmailPost(h, nil, c)
+			return HandleAdminUserEmailPost(h, nil, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/email", routed,
 			handlertest.WithForm(url.Values{"email": {"jane@example.com"}}))},
 		{"HandleAdminUserAddressGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminUserAddressGet(h, nil, c)
 		}, request(http.MethodGet, "/admin/users/42/address", routed)},
 		{"HandleAdminUserAddressPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserAddressPost(h, nil, c)
+			return HandleAdminUserAddressPost(h, nil, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/address", routed, handlertest.WithForm(url.Values{}))},
 		{"HandleAdminUserPhoneGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminUserPhoneGet(h, nil, c)
 		}, request(http.MethodGet, "/admin/users/42/phone", routed)},
 		{"HandleAdminUserPhonePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserPhonePost(h, nil, c)
+			return HandleAdminUserPhonePost(h, nil, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/phone", routed,
 			handlertest.WithForm(url.Values{"phoneCountryUniqueId": {"BRA_0"}, "phoneNumber": {"5551234"}}))},
 		{"HandleAdminUserAuthenticationGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminUserAuthenticationGet(h, nil, c)
 		}, request(http.MethodGet, "/admin/users/42/authentication", routed)},
 		{"HandleAdminUserAuthenticationPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserAuthenticationPost(h, nil, c)
+			return HandleAdminUserAuthenticationPost(h, nil, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/authentication", routed, handlertest.WithForm(url.Values{}))},
 		{"HandleAdminUserPictureGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminUserPictureGet(h, c)
@@ -122,14 +122,14 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 			return HandleAdminUserAttributesAddGet(h, c)
 		}, request(http.MethodGet, "/admin/users/42/attributes/add", routed)},
 		{"HandleAdminUserAttributesAddPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserAttributesAddPost(h, c)
+			return HandleAdminUserAttributesAddPost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/attributes/add", routed,
 			handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}}))},
 		{"HandleAdminUserAttributesEditGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAdminUserAttributesEditGet(h, c)
 		}, request(http.MethodGet, "/admin/users/42/attributes/21/edit", routed, attribute)},
 		{"HandleAdminUserAttributesEditPost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserAttributesEditPost(h, c)
+			return HandleAdminUserAttributesEditPost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/attributes/21/edit", routed, attribute,
 			handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}}))},
 		{"HandleAdminUserConsentsGet", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
@@ -150,7 +150,7 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 			return HandleAdminUserDeleteGet(h, c)
 		}, request(http.MethodGet, "/admin/users/42/delete", routed)},
 		{"HandleAdminUserDeletePost", func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleAdminUserDeletePost(h, c)
+			return HandleAdminUserDeletePost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/delete", routed, handlertest.WithForm(url.Values{}))},
 	}
 
@@ -191,7 +191,7 @@ func TestAdminUserNewPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 		{
 			name: "HandleAdminUserNewPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserNewPost(h, nil, c)
+				return HandleAdminUserNewPost(h, nil, c, consoleBaseURL)
 			},
 			// An empty email is refused before the API, so the settings the refusal page draws
 			// from are the first thing the handler needs.

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -122,6 +121,7 @@ func HandleAdminClientSettingsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSettingsAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -243,6 +243,6 @@ func HandleAdminClientSettingsPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", config.GetAdminConsole().BaseURL, id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/settings", baseURL, id), http.StatusFound)
 	}
 }

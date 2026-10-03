@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -13,6 +12,7 @@ func HandleIndexGet(
 	authHelper AuthHelper,
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
+	authServerBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bind := map[string]interface{}{}
@@ -34,7 +34,7 @@ func HandleIndexGet(
 		}
 		bind["SessionEnded"] = sessionEnded
 
-		bind["AuthServerBaseUrl"] = config.GetAuthServer().BaseURL
+		bind["AuthServerBaseUrl"] = authServerBaseURL
 
 		isAuthenticated := false
 		loggedInUser := ""

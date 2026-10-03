@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -106,6 +105,7 @@ func HandleAdminClientTokensPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientTokensAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -215,6 +215,6 @@ func HandleAdminClientTokensPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/tokens", config.GetAdminConsole().BaseURL, client.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/clients/%v/tokens", baseURL, client.Id), http.StatusFound)
 	}
 }

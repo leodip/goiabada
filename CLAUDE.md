@@ -340,6 +340,7 @@ All via environment variables with `GOIABADA_` prefix. Key ones:
 - `GOIABADA_ADMIN_EMAIL` / `GOIABADA_ADMIN_PASSWORD` - Initial admin
 
 See `src/authserver/internal/config/config.go` and `src/adminconsole/internal/config/config.go` for all options; each binary loads only its own.
+Each `main` loads it once, through its own `config.Load(fs, args)`, refusing a malformed numeric or boolean variable on one stderr line with exit 2, and hands the result to `server.NewServer`; the route table gives each handler the values it uses (the base URL it redirects to, the auth server's) when it builds it. Neither binary keeps a configuration global, and nothing reads one at request time (#434, #441).
 
 ## Testing
 

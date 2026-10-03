@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/gob"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -47,11 +48,15 @@ func main() {
 	// A numeric or boolean variable that does not parse stops the server here, all of them named
 	// at once. It goes to stderr as one line and exits 2, which is what a bad flag already gets
 	// from flag.CommandLine, because no log handler exists yet to write it through (#434).
-	if err := config.Init(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	//
+	// It is loaded once, here, and handed on: the server and every handler receive the values
+	// they use when they are built (#441).
+	cfg, loadErr := config.Load(flag.CommandLine, os.Args[1:])
+	if loadErr != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", loadErr)
 		os.Exit(2)
 	}
-	if err := logging.Install(config.GetAdminConsole().LogLevel, config.GetAdminConsole().LogFormat); err != nil {
+	if err := logging.Install(cfg.AdminConsole.LogLevel, cfg.AdminConsole.LogFormat); err != nil {
 		slog.Error("unable to install the log handler", "error", err)
 		os.Exit(1)
 	}
@@ -60,7 +65,7 @@ func main() {
 	// TRUST_PROXY_HEADERS says. Skipping it would leave a list of typos empty, which the real-IP
 	// middleware reads as trusting any single hop, and a typo in a list trust is off for today
 	// would otherwise surface only on the day trust is switched on (#425).
-	trustedProxies, proxyErr := config.GetAdminConsole().TrustedProxyRanges()
+	trustedProxies, proxyErr := cfg.AdminConsole.TrustedProxyRanges()
 	if proxyErr != nil {
 		slog.Error("the trusted proxy list is malformed, so the admin console cannot start", "error", proxyErr)
 		os.Exit(1)
@@ -88,7 +93,7 @@ func main() {
 	// with the current pair and opens with the current pair and then this one, so a rotation
 	// signs nobody out; the operator removes the two _PREVIOUS variables once the maximum
 	// session lifetime has passed (#269, #270, #434).
-	currentKeys, previousKeys, err := config.GetAdminConsole().SessionKeys()
+	currentKeys, previousKeys, err := cfg.AdminConsole.SessionKeys()
 	if err != nil {
 		logSessionKeysNotConfigured(err)
 		os.Exit(1)
@@ -96,21 +101,20 @@ func main() {
 	slog.Info("session keys validated")
 
 	// Validate OAuth credentials EARLY - fail fast if missing
-	adminConsoleConfig := config.GetAdminConsole()
 	// One block, keyed on the secret: the client id is no longer configuration, so the only
 	// half of the credential a deployment supplies is the secret (#285). The only check, too:
 	// Start used to repeat it with TrimSpace, so a secret of blanks passed here and stopped the
 	// console there (#426).
-	if strings.TrimSpace(adminConsoleConfig.OAuthClientSecret) == "" {
+	if strings.TrimSpace(cfg.AdminConsole.OAuthClientSecret) == "" {
 		logBootstrapCredentialsNotConfigured()
 		os.Exit(1)
 	}
 	slog.Info("oauth credentials validated")
 
 	slog.Info("using configuration",
-		"auth_server_base_url", config.GetAuthServer().BaseURL,
-		"auth_server_internal_base_url", config.GetAuthServer().InternalBaseURL,
-		"admin_console_base_url", config.GetAdminConsole().BaseURL)
+		"auth_server_base_url", cfg.AuthServer.BaseURL,
+		"auth_server_internal_base_url", cfg.AuthServer.InternalBaseURL,
+		"admin_console_base_url", cfg.AdminConsole.BaseURL)
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -121,7 +125,7 @@ func main() {
 
 	// Merge the overrides directory the configuration read from GOIABADA_I18N_OVERRIDES_DIR over
 	// the embedded message catalogs. Fail-fast: a malformed catalog is a config bug.
-	if loadBundleErr := i18n.LoadBundle(config.GetAdminConsole().I18nOverridesDir); loadBundleErr != nil {
+	if loadBundleErr := i18n.LoadBundle(cfg.AdminConsole.I18nOverridesDir); loadBundleErr != nil {
 		slog.Error("unable to load the i18n message catalogs", "error", loadBundleErr)
 		os.Exit(1)
 	}
@@ -143,7 +147,7 @@ func main() {
 		"utc_time", now.UTC())
 
 	slog.Info("cookie security derived from the base URL",
-		"cookie_secure", config.GetAdminConsole().IsCookieSecure())
+		"cookie_secure", cfg.AdminConsole.IsCookieSecure())
 
 	if previousKeys != nil {
 		slog.Info("previous session keys configured: a session sealed under them still opens")
@@ -165,17 +169,17 @@ func main() {
 	//
 	// The bearer is a client_credentials token from the one token client, cached by
 	// SessionTokenSource; the backend asks it for one and knows nothing of the grant (#441).
-	authServerBaseURL := config.GetAuthServer().GetEffectiveBaseURL()
+	authServerBaseURL := cfg.AuthServer.GetEffectiveBaseURL()
 	tokenSource := oauthclient.NewSessionTokenSource(oauthclient.NewTokenClient(
 		oauthclient.TokenEndpointURL(authServerBaseURL),
 		coreconstants.AdminConsoleClientIdentifier,
-		adminConsoleConfig.OAuthClientSecret,
+		cfg.AdminConsole.OAuthClientSecret,
 		oauthclient.NewAuthServerHTTPClient(),
 	))
 
 	sessionStore, err := newSessionStore(
 		sessionbackend.New(authServerBaseURL, tokenSource),
-		config.GetAdminConsole().IsCookieSecure(),
+		cfg.AdminConsole.IsCookieSecure(),
 		currentKeys,
 		previousKeys,
 	)
@@ -189,11 +193,11 @@ func main() {
 	// Initialize settings cache (fetches from authserver public API)
 	// Prefer internal base URL for server-to-server communication
 	settingsCache := publicsettings.NewCache(
-		publicsettings.NewClient(config.GetAuthServer().GetEffectiveBaseURL()), publicsettings.DefaultTTL)
+		publicsettings.NewClient(cfg.AuthServer.GetEffectiveBaseURL()), publicsettings.DefaultTTL)
 	slog.Info("initialized settings cache with 30s TTL")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies)
+	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg)
 
 	// The process owns the signals, as the auth server's does; the console just gets told when to
 	// stop. On SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and Start

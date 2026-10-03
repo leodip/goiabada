@@ -9,6 +9,7 @@ import (
 	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -90,6 +91,7 @@ func newStaticBranchTestServer(authServerBaseURL string, store *sessionstore.Ser
 		router:        chi.NewRouter(),
 		sessionStore:  store,
 		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL), publicsettings.DefaultTTL),
+		cfg:           &config.Config{},
 		staticFS:      fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},
 	}
 }

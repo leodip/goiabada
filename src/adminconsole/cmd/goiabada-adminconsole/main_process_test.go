@@ -25,7 +25,7 @@ const runMainMarker = "GOIABADA_TEST_RUN_MAIN"
 const mainProcessBound = 30 * time.Second
 
 // TestMain hands a marked child process to main before any test flag is parsed, so the child's
-// command line is exactly the one the case gave it, parsed by config.Init on a fresh
+// command line is exactly the one the case gave it, parsed by config.Load on a fresh
 // flag.CommandLine. Every other run is the test run.
 func TestMain(m *testing.M) {
 	if os.Getenv(runMainMarker) == "1" {
@@ -96,7 +96,7 @@ func TestMain_HandsTheOverridesDirectoryToTheCatalogs(t *testing.T) {
 	assert.Contains(t, stderr, "active.en.toml")
 }
 
-// TestMain_RefusesAMalformedVariable is the wiring between config.Init's refusal and the process:
+// TestMain_RefusesAMalformedVariable is the wiring between config.Load's refusal and the process:
 // that main stops on it with exit 2, the code a bad flag gets, and writes it to stderr as the one
 // line an operator reads, before the log handler is installed (#434). Two variables are malformed,
 // so a main that printed only the first would fail.

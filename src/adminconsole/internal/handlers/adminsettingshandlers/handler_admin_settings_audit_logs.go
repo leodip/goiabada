@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -85,6 +84,7 @@ func HandleAdminSettingsAuditLogsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsAuditLogsAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +150,7 @@ func HandleAdminSettingsAuditLogsPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/audit-logs", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/audit-logs", baseURL), http.StatusFound)
 	}
 }
 

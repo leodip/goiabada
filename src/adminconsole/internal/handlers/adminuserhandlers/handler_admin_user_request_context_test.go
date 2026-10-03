@@ -176,7 +176,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserNewPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserNewPost(h, nil, c)
+				return HandleAdminUserNewPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/new",
 				handlertest.WithAccessToken(),
@@ -202,7 +202,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserDetailsPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserDetailsPost(h, nil, c)
+				return HandleAdminUserDetailsPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/details",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -219,7 +219,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserProfilePost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserProfilePost(h, nil, c)
+				return HandleAdminUserProfilePost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/profile",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -236,7 +236,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserEmailPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserEmailPost(h, nil, c)
+				return HandleAdminUserEmailPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/email",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -253,7 +253,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserAddressPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserAddressPost(h, nil, c)
+				return HandleAdminUserAddressPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/address",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -278,7 +278,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserAuthenticationPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserAuthenticationPost(h, nil, c)
+				return HandleAdminUserAuthenticationPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/authentication",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -353,7 +353,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserAttributesAddPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserAttributesAddPost(h, c)
+				return HandleAdminUserAttributesAddPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/add",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -371,7 +371,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserAttributesEditPost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserAttributesEditPost(h, c)
+				return HandleAdminUserAttributesEditPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/21/edit",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -425,7 +425,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleAdminUserDeletePost",
 			build: func(h *mocks_handlers.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminUserDeletePost(h, c)
+				return HandleAdminUserDeletePost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/delete",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
@@ -478,7 +478,7 @@ func TestAdminUserHandlers_ThePhoneWriteCarriesTheRequestsContext(t *testing.T) 
 		handlertest.WithForm(url.Values{"phoneCountryUniqueId": {"BRA_0"}, "phoneNumber": {"5551234"}}))
 	marked := request.WithContext(context.WithValue(request.Context(), userCtxMarkerKey{}, "phone"))
 
-	HandleAdminUserPhonePost(httpHelper, nil, apiClient).ServeHTTP(httptest.NewRecorder(), marked)
+	HandleAdminUserPhonePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), marked)
 
 	require.NotEmpty(t, apiClient.seen, "the handler must consult its API client")
 	for i, seen := range apiClient.seen {

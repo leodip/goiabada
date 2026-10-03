@@ -85,7 +85,7 @@ func TestHandleAdminUserEmailPost_AnswersAFailedWrite(t *testing.T) {
 			router := chi.NewRouter()
 			// The session store is nil: every row fails before the success path reaches it.
 			router.Post("/admin/users/{userId}/email", HandleAdminUserEmailPost(httpHelper, nil,
-				&userEmailApiClient{updateErr: testCase.err}))
+				&userEmailApiClient{updateErr: testCase.err}, consoleBaseURL))
 			router.ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodPost,
 				"/admin/users/42/email?page=2&query=bob", handlertest.WithAccessToken(),
 				handlertest.WithForm(url.Values{"email": {" Taken@Example.com "}, "emailVerified": {"on"}})))

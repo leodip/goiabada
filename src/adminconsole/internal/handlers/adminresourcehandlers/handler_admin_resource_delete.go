@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -74,6 +73,7 @@ func HandleAdminResourceDeleteGet(
 func HandleAdminResourceDeletePost(
 	httpHelper HttpHelper,
 	apiClient resourceDeleteAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +146,6 @@ func HandleAdminResourceDeletePost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/resources", baseURL), http.StatusFound)
 	}
 }

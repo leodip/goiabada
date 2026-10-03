@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -38,7 +37,7 @@ func TestWithListPosition_EscapesThePageAndTheSearch(t *testing.T) {
 				"page": {testCase.page}, "query": {testCase.query},
 			}.Encode(), nil)
 
-			returnURL := withListPosition("/admin/users/7/email", from)
+			returnURL := withListPosition(consoleBaseURL, "/admin/users/7/email", from)
 
 			parsed, err := url.Parse(returnURL)
 			require.NoError(t, err)
@@ -66,8 +65,8 @@ func TestWithListPosition_RendersPlainValuesAsBefore(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			from := httptest.NewRequest(http.MethodPost, testCase.target, nil)
 
-			assert.Equal(t, config.GetAdminConsole().BaseURL+"/admin/users/7/email?"+testCase.want,
-				withListPosition("/admin/users/7/email", from))
+			assert.Equal(t, "https://console.example.test/admin/users/7/email?"+testCase.want,
+				withListPosition(consoleBaseURL, "/admin/users/7/email", from))
 		})
 	}
 }
@@ -163,14 +162,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "address",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAddressPost(helper, store, stub)
+				return HandleAdminUserAddressPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/address",
 		},
 		{
 			name: "attributes add",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAttributesAddPost(helper, stub)
+				return HandleAdminUserAttributesAddPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
 			wantPath: "/admin/users/7/attributes",
@@ -178,7 +177,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "attributes edit",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAttributesEditPost(helper, stub)
+				return HandleAdminUserAttributesEditPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
 			options:  []handlertest.Option{handlertest.WithRouteParam("attributeId", "3")},
@@ -187,28 +186,28 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "authentication",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAuthenticationPost(helper, store, stub)
+				return HandleAdminUserAuthenticationPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/authentication",
 		},
 		{
 			name: "delete",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserDeletePost(helper, stub)
+				return HandleAdminUserDeletePost(helper, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/",
 		},
 		{
 			name: "details",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserDetailsPost(helper, store, stub)
+				return HandleAdminUserDetailsPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/details",
 		},
 		{
 			name: "email",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserEmailPost(helper, store, stub)
+				return HandleAdminUserEmailPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}},
 			wantPath: "/admin/users/7/email",
@@ -216,7 +215,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "new",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserNewPost(helper, store, stub)
+				return HandleAdminUserNewPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}, "password": {"a password"}},
 			options:  []handlertest.Option{handlertest.WithSettings(&api.PublicSettingsResponse{})},
@@ -225,14 +224,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "phone",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserPhonePost(helper, store, stub)
+				return HandleAdminUserPhonePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/phone",
 		},
 		{
 			name: "profile",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserProfilePost(helper, store, stub)
+				return HandleAdminUserProfilePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/profile",
 		},
@@ -259,7 +258,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 			location := rec.Header().Get("Location")
 			parsed, err := url.Parse(location)
 			require.NoError(t, err)
-			assert.Equal(t, config.GetAdminConsole().BaseURL+testCase.wantPath,
+			assert.Equal(t, "https://console.example.test"+testCase.wantPath,
 				(&url.URL{Scheme: parsed.Scheme, Host: parsed.Host, Path: parsed.Path}).String())
 			assert.Empty(t, parsed.Fragment, "part of the search became a fragment")
 			assert.Equal(t, url.Values{"page": {"3"}, "query": {hostileSearch}}, parsed.Query(), "Location: %s", location)

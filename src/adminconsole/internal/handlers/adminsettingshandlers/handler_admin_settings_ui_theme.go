@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 )
@@ -81,6 +80,7 @@ func HandleAdminSettingsUIThemePost(
 	httpSession sessionstore.Store,
 	apiClient settingsUIThemeAPI,
 	settingsCache SettingsInvalidator,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +151,6 @@ func HandleAdminSettingsUIThemePost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/ui-theme", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/ui-theme", baseURL), http.StatusFound)
 	}
 }

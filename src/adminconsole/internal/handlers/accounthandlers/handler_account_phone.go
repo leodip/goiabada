@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -79,6 +78,7 @@ func HandleAccountPhonePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountPhoneAPI,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get access token and current data for re-rendering errors
@@ -133,6 +133,6 @@ func HandleAccountPhonePost(
 			return
 		}
 
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/phone", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/account/phone", http.StatusFound)
 	}
 }

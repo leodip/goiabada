@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -68,6 +67,7 @@ func HandleAccountOtpGet(
 func HandleAccountOtpPost(
 	httpHelper HttpHelper,
 	apiClient accountOTPAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -181,7 +181,7 @@ func HandleAccountOtpPost(
 					// would call the enrolment endpoint, which refuses for this same reason,
 					// and turn a race that resolved correctly into an error page.
 					if apiErr.Code == "OTP_ALREADY_ENABLED" {
-						http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/otp", http.StatusFound)
+						http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
 						return
 					}
 					if isHandledAccountOTPError(apiErr.Code) {
@@ -194,7 +194,7 @@ func HandleAccountOtpPost(
 			}
 		}
 
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/otp", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
 	}
 }
 

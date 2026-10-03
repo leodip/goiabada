@@ -97,6 +97,7 @@ func HandleAdminUserProfilePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userProfileAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	timezones := timezones.All()
@@ -178,6 +179,6 @@ func HandleAdminUserProfilePost(
 
 		// Redirect to the profile page
 		//nolint:gosec // G710: the configured base URL, a fixed path around the user's numeric id, and an encoded query
-		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/profile", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/profile", user.Id), r), http.StatusFound)
 	}
 }

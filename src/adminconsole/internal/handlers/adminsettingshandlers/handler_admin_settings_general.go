@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -88,6 +87,7 @@ func HandleAdminSettingsGeneralPost(
 	httpSession sessionstore.Store,
 	apiClient settingsGeneralAPI,
 	settingsCache SettingsInvalidator,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -172,7 +172,7 @@ func HandleAdminSettingsGeneralPost(
 			}
 
 			// Redirect to the login page
-			http.Redirect(w, r, fmt.Sprintf("%v/auth/logout", config.GetAdminConsole().BaseURL), http.StatusFound)
+			http.Redirect(w, r, fmt.Sprintf("%v/auth/logout", baseURL), http.StatusFound)
 			return
 		}
 
@@ -190,6 +190,6 @@ func HandleAdminSettingsGeneralPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/general", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/general", baseURL), http.StatusFound)
 	}
 }

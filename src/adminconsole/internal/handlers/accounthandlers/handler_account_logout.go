@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -23,6 +22,7 @@ func HandleAccountLogoutGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountLogoutAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +45,7 @@ func HandleAccountLogoutGet(
 
 		// If we don't have a valid ID token, just go back to the console home
 		if jwtInfo.IdToken == nil || jwtInfo.TokenResponse.AccessToken == "" {
-			http.Redirect(w, r, config.GetAdminConsole().BaseURL, http.StatusFound)
+			http.Redirect(w, r, baseURL, http.StatusFound)
 			return
 		}
 
@@ -56,7 +56,7 @@ func HandleAccountLogoutGet(
 		// and has to follow the advice the integration docs give everyone else (#350 decision 2).
 		accessToken := jwtInfo.TokenResponse.AccessToken
 		req := &api.AccountLogoutRequest{
-			PostLogoutRedirectUri: config.GetAdminConsole().BaseURL,
+			PostLogoutRedirectUri: baseURL,
 			State:                 stringutil.GenerateSecurityRandomString(32),
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
 		}

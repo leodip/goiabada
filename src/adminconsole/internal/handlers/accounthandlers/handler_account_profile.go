@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -79,6 +78,7 @@ func HandleAccountProfilePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountProfileAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	timezones := timezones.All()
@@ -143,6 +143,6 @@ func HandleAccountProfilePost(
 
 		_ = updatedUser // we don't need it here besides success confirmation
 
-		http.Redirect(w, r, config.GetAdminConsole().BaseURL+"/account/profile", http.StatusFound)
+		http.Redirect(w, r, baseURL+"/account/profile", http.StatusFound)
 	}
 }

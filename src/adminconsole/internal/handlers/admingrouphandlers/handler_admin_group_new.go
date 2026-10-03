@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -36,6 +35,7 @@ type groupNewAPI interface {
 func HandleAdminGroupNewPost(
 	httpHelper HttpHelper,
 	apiClient groupNewAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -82,6 +82,6 @@ func HandleAdminGroupNewPost(
 		}
 
 		// Redirect on success
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/groups", baseURL), http.StatusFound)
 	}
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 )
@@ -83,6 +82,7 @@ func HandleAdminSettingsTokensPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTokensAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +161,6 @@ func HandleAdminSettingsTokensPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/tokens", config.GetAdminConsole().BaseURL), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/tokens", baseURL), http.StatusFound)
 	}
 }

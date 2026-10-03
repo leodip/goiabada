@@ -165,7 +165,7 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
 				return HandleAccountEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
 					err: &apiclient.APIError{Code: "INVALID_OR_EXPIRED_VERIFICATION_CODE", Message: "Expired.", StatusCode: http.StatusBadRequest},
-				})
+				}, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/email-verification",
 				handlertest.WithAccessToken(), verificationForm),
@@ -175,7 +175,7 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
 				return HandleAccountEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
 					err: &apiclient.APIError{Code: "SOMETHING_ELSE", Message: "No.", StatusCode: http.StatusBadRequest},
-				})
+				}, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/email-verification",
 				handlertest.WithAccessToken(), verificationForm),

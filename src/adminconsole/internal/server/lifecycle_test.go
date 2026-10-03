@@ -201,12 +201,11 @@ func TestServeAndDrain_AFailedListenerDrainsTheOtherFirst(t *testing.T) {
 func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	cfg := config.GetAdminConsole()
-	previousHTTPS, previousHTTP := cfg.ListenHostHttps, cfg.ListenHostHttp
-	t.Cleanup(func() { cfg.ListenHostHttps, cfg.ListenHostHttp = previousHTTPS, previousHTTP })
-	cfg.ListenHostHttps, cfg.ListenHostHttp = "", ""
-
-	s := &Server{}
+	// Both ports are set, so it is the empty hosts that disable the two listeners.
+	s := &Server{cfg: &config.Config{AdminConsole: config.AdminConsoleConfig{
+		ListenPortHttps: 9444,
+		ListenPortHttp:  9091,
+	}}}
 	err := s.Start(context.Background())
 
 	require.Error(t, err)
