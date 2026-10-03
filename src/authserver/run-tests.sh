@@ -24,7 +24,8 @@
 #                             all           - everything (default), lint and setup included
 #   -d, --db     <db>       Database to use for `data` and `integration` tests.
 #                           One of: mysql | postgres | mssql | sqlite | all (default: all)
-#   -r, --run    <pattern>  go test -run regex passed to data/integration runs
+#   -r, --run    <pattern>  go test -run regex for every tier that runs go test: the
+#                           module tiers, setup, data and integration
 #                           (e.g. TestTemp_AccessTokenHasSidClaim or 'TestToken_.*Reuse')
 #   -n, --no-build          Skip the build step at the top of the run. Useful in
 #                           CI, where one job invokes this script several times
@@ -57,6 +58,9 @@
 #   # Just the internal authserver unit tests
 #   ./run-tests.sh --type internal
 #
+#   # One core test (the fast loop for a unit test)
+#   ./run-tests.sh --type core --no-build --run TestReleaseBuilds
+#
 #   # The three module tiers under the race detector, as CI's Unit / race job runs them
 #   ./run-tests.sh --type modules --race
 #
@@ -64,8 +68,8 @@
 #   ./run-tests.sh --type lint
 #
 # Notes:
-#   * --run only affects `data` and `integration` runs (where go test is invoked
-#     against ./tests/<type>/...). It is ignored for module-level test runs.
+#   * --run narrows every go test this script runs. A pattern that matches no test
+#     anywhere in the run fails it, rather than passing a tier that ran nothing.
 #   * `integration` requires a running authserver; this script starts/stops it
 #     automatically per DB.
 #   * --race covers the module tiers only. The integration tier exercises the
@@ -169,6 +173,20 @@ else
     module_go_test=(go test -v -count=1)
     race_label=""
 fi
+# --run narrows the module legs as it does data and integration. It once applied to
+# those two alone, while the banner below showed it for every run (#463).
+if [ -n "$RUN_PATTERN" ]; then
+    module_go_test+=(-run "$RUN_PATTERN")
+fi
+
+# Tests started under --run, across every leg: a pattern that matches nothing makes
+# go test pass with "no tests to run", so the end of the run checks this instead.
+TESTS_RUN=0
+TEST_LEGS=0
+count_tests() {
+    TEST_LEGS=$((TEST_LEGS + 1))
+    TESTS_RUN=$((TESTS_RUN + $(grep -c '^=== RUN' "$1" || true)))
+}
 
 # Helpers to decide whether a section should run for the chosen --type.
 should_run_internal()     { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ "$TYPE" = "internal" ]; }
@@ -350,6 +368,7 @@ run_tests() {
         gha_summary_row "$tier" "$db" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "$test_type tests ($db)" "$log"
     fi
+    count_tests "$log"
     gha_endgroup
     gha_summary_row "$tier" "$db" "pass" "$(fmt_duration $((SECONDS - start)))"
 }
@@ -704,6 +723,7 @@ if should_run_internal; then
         gha_summary_row "Internal$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Authserver internal tests" "$log"
     fi
+    count_tests "$log"
     gha_endgroup
     gha_summary_row "Internal$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
@@ -717,6 +737,7 @@ if should_run_core; then
         gha_summary_row "Core$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Core module tests" "$log"
     fi
+    count_tests "$log"
     gha_endgroup
     gha_summary_row "Core$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
@@ -730,6 +751,7 @@ if should_run_adminconsole; then
         gha_summary_row "Adminconsole$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Admin console module tests" "$log"
     fi
+    count_tests "$log"
     gha_endgroup
     gha_summary_row "Adminconsole$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
@@ -743,6 +765,7 @@ if should_run_setup; then
         gha_summary_row "Setup$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Setup wizard module tests" "$log"
     fi
+    count_tests "$log"
     gha_endgroup
     gha_summary_row "Setup$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
@@ -782,6 +805,13 @@ if should_run_integration; then
         echo "=== Completed integration tests with $db ==="
         echo
     done
+fi
+
+if [ -n "$RUN_PATTERN" ] && [ "$TEST_LEGS" -gt 0 ] && [ "$TESTS_RUN" -eq 0 ]; then
+    echo
+    echo "No test matched --run '$RUN_PATTERN' in this run (type=$TYPE), so nothing was tested."
+    echo "Logs in: $LOG_DIR"
+    exit 1
 fi
 
 echo
