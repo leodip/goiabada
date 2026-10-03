@@ -22,7 +22,7 @@ type userProfileAPI interface {
 	UpdateUserProfile(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
 }
 
-func HandleAdminUserProfileGet(
+func HandleProfileGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userProfileAPI,
@@ -93,7 +93,7 @@ func HandleAdminUserProfileGet(
 	}
 }
 
-func HandleAdminUserProfilePost(
+func HandleProfilePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userProfileAPI,

@@ -23,7 +23,7 @@ type userAddressAPI interface {
 	UpdateUserAddress(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
 }
 
-func HandleAdminUserAddressGet(
+func HandleAddressGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userAddressAPI,
@@ -105,7 +105,7 @@ func HandleAdminUserAddressGet(
 	}
 }
 
-func HandleAdminUserAddressPost(
+func HandleAddressPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userAddressAPI,

@@ -22,7 +22,7 @@ type userAuthenticationAPI interface {
 	UpdateUserPassword(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error)
 }
 
-func HandleAdminUserAuthenticationGet(
+func HandleAuthenticationGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userAuthenticationAPI,
@@ -91,7 +91,7 @@ func HandleAdminUserAuthenticationGet(
 	}
 }
 
-func HandleAdminUserAuthenticationPost(
+func HandleAuthenticationPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userAuthenticationAPI,

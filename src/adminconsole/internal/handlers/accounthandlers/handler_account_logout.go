@@ -18,7 +18,7 @@ type accountLogoutAPI interface {
 	CreateAccountLogoutRequest(ctx context.Context, accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
 }
 
-func HandleAccountLogoutGet(
+func HandleLogoutGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountLogoutAPI,

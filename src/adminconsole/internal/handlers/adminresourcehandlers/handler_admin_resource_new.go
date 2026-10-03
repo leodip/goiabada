@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-func HandleAdminResourceNewGet(
+func HandleNewGet(
 	httpHelper HttpHelper,
 ) http.HandlerFunc {
 
@@ -31,7 +31,7 @@ type resourceNewAPI interface {
 	CreateResource(ctx context.Context, accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error)
 }
 
-func HandleAdminResourceNewPost(
+func HandleNewPost(
 	httpHelper HttpHelper,
 	apiClient resourceNewAPI,
 	baseURL string,

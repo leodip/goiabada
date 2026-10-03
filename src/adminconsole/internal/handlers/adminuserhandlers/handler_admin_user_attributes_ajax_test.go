@@ -163,7 +163,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 				userErr:    testCase.userErr,
 				attributes: testCase.attributes,
 			}
-			handler := HandleAdminUserAttributesRemovePost(httpHelper, apiClient)
+			handler := HandleAttributesRemovePost(httpHelper, apiClient)
 			w := httptest.NewRecorder()
 
 			if testCase.routed {
@@ -222,7 +222,7 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 
 			router := chi.NewRouter()
 			router.Post("/admin/users/{userId}/consents",
-				HandleAdminUserConsentsPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}))
+				HandleConsentsPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}))
 			router.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

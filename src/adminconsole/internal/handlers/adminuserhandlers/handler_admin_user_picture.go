@@ -22,7 +22,7 @@ type userPictureAPI interface {
 	GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error)
 }
 
-func HandleAdminUserPictureGet(
+func HandlePictureGet(
 	httpHelper HttpHelper,
 	apiClient userPictureAPI,
 ) http.HandlerFunc {
@@ -98,8 +98,8 @@ type userProfilePictureAPI interface {
 // internal message on the wire at 500 with nothing in the log, answered 401 for the middleware
 // invariant the other 100 sites answer 500 for, and rendered the HTML 500 page into a fetch() that
 // was about to call response.json(). The success bodies are unchanged.
-// HandleAdminUserProfilePicturePost handles uploading a profile picture for a user (admin)
-func HandleAdminUserProfilePicturePost(
+// HandleProfilePicturePost handles uploading a profile picture for a user (admin)
+func HandleProfilePicturePost(
 	httpHelper HttpHelper,
 	apiClient userProfilePictureAPI,
 ) http.HandlerFunc {
@@ -158,8 +158,8 @@ func HandleAdminUserProfilePicturePost(
 	}
 }
 
-// HandleAdminUserProfilePictureDelete handles deleting a user's profile picture (admin)
-func HandleAdminUserProfilePictureDelete(
+// HandleProfilePictureDelete handles deleting a user's profile picture (admin)
+func HandleProfilePictureDelete(
 	httpHelper HttpHelper,
 	apiClient userProfilePictureAPI,
 ) http.HandlerFunc {

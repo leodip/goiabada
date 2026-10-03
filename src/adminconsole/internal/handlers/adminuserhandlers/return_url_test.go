@@ -162,14 +162,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "address",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAddressPost(helper, store, stub, consoleBaseURL)
+				return HandleAddressPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/address",
 		},
 		{
 			name: "attributes add",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAttributesAddPost(helper, stub, consoleBaseURL)
+				return HandleAttributesAddPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
 			wantPath: "/admin/users/7/attributes",
@@ -177,7 +177,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "attributes edit",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAttributesEditPost(helper, stub, consoleBaseURL)
+				return HandleAttributesEditPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
 			options:  []handlertest.Option{handlertest.WithRouteParam("attributeId", "3")},
@@ -186,28 +186,28 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "authentication",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserAuthenticationPost(helper, store, stub, consoleBaseURL)
+				return HandleAuthenticationPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/authentication",
 		},
 		{
 			name: "delete",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserDeletePost(helper, stub, consoleBaseURL)
+				return HandleDeletePost(helper, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/",
 		},
 		{
 			name: "details",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserDetailsPost(helper, store, stub, consoleBaseURL)
+				return HandleDetailsPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/details",
 		},
 		{
 			name: "email",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserEmailPost(helper, store, stub, consoleBaseURL)
+				return HandleEmailPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}},
 			wantPath: "/admin/users/7/email",
@@ -215,7 +215,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "new",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserNewPost(helper, store, stub, consoleBaseURL)
+				return HandleNewPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}, "password": {"a password"}},
 			options:  []handlertest.Option{handlertest.WithSettings(&api.PublicSettingsResponse{})},
@@ -224,14 +224,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		{
 			name: "phone",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserPhonePost(helper, store, stub, consoleBaseURL)
+				return HandlePhonePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/phone",
 		},
 		{
 			name: "profile",
 			handler: func(helper *mocks_handlers.HttpHelper) http.HandlerFunc {
-				return HandleAdminUserProfilePost(helper, store, stub, consoleBaseURL)
+				return HandleProfilePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/profile",
 		},

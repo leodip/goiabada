@@ -20,7 +20,7 @@ type settingsGeneralAPI interface {
 	UpdateSettingsGeneral(ctx context.Context, accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
 }
 
-func HandleAdminSettingsGeneralGet(
+func HandleGeneralGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsGeneralAPI,
@@ -82,7 +82,7 @@ func HandleAdminSettingsGeneralGet(
 	}
 }
 
-func HandleAdminSettingsGeneralPost(
+func HandleGeneralPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsGeneralAPI,

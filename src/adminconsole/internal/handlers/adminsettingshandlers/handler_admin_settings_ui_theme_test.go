@@ -46,7 +46,7 @@ func apiStatus(status int, message string) error {
 // the session ended between the save and the read, and a resubmission would meet the same refusal.
 // It goes to the session-ended route, as a 401 from the save does (#427 decision 17, final review
 // round 2). Any other failure redraws the form without the list, as it did before.
-func TestHandleAdminSettingsUIThemePost_OnlyASessionEndedListReadStopsTheRedraw(t *testing.T) {
+func TestHandleUIThemePost_OnlyASessionEndedListReadStopsTheRedraw(t *testing.T) {
 	testCases := []struct {
 		name      string
 		updateErr error
@@ -112,7 +112,7 @@ func TestHandleAdminSettingsUIThemePost_OnlyASessionEndedListReadStopsTheRedraw(
 			req := handlertest.Request(http.MethodPost, "/admin/settings/ui-theme",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{"themeSelection": {"purple"}}))
 			w := httptest.NewRecorder()
-			HandleAdminSettingsUIThemePost(httpHelper, newSettingsTestStore(), apiClient,
+			HandleUIThemePost(httpHelper, newSettingsTestStore(), apiClient,
 				&invalidationRecorder{}, consoleBaseURL).ServeHTTP(w, req)
 
 			assert.Equal(t, tc.listReads, apiClient.listReads)

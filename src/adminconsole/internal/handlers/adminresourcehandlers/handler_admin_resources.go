@@ -14,7 +14,7 @@ type resourcesAPI interface {
 	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
 }
 
-func HandleAdminResourcesGet(
+func HandleListGet(
 	httpHelper HttpHelper,
 	apiClient resourcesAPI,
 ) http.HandlerFunc {

@@ -20,7 +20,7 @@ type userSessionsAPI interface {
 	GetUserSessionsByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserSessionDetailResponse, error)
 }
 
-func HandleAdminUserSessionsGet(
+func HandleSessionsGet(
 	httpHelper HttpHelper,
 	apiClient userSessionsAPI,
 ) http.HandlerFunc {
@@ -80,7 +80,7 @@ func HandleAdminUserSessionsGet(
 	}
 }
 
-func HandleAdminUserSessionsPost(
+func HandleSessionsPost(
 	httpHelper HttpHelper,
 	apiClient userSessionsAPI,
 ) http.HandlerFunc {

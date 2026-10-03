@@ -20,7 +20,7 @@ type userAttributesEditAPI interface {
 	UpdateUserAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error)
 }
 
-func HandleAdminUserAttributesEditGet(
+func HandleAttributesEditGet(
 	httpHelper HttpHelper,
 	apiClient userAttributesEditAPI,
 ) http.HandlerFunc {
@@ -93,7 +93,7 @@ func HandleAdminUserAttributesEditGet(
 	}
 }
 
-func HandleAdminUserAttributesEditPost(
+func HandleAttributesEditPost(
 	httpHelper HttpHelper,
 	apiClient userAttributesEditAPI,
 	baseURL string,

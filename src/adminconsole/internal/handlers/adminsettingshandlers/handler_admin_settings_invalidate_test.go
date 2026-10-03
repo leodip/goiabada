@@ -82,27 +82,27 @@ func TestAdminSettingsSaves_InvalidateTheCacheOnlyWhenTheSaveIsAccepted(t *testi
 		build    func(h *mocks_handlers.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc
 	}{
 		{
-			name:     "HandleAdminSettingsGeneralPost",
+			name:     "HandleGeneralPost",
 			template: "/admin_settings_general.html",
 			form:     url.Values{"appName": {"Goiabada"}, "issuer": {"https://issuer.example"}},
 			build: func(h *mocks_handlers.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
-				return HandleAdminSettingsGeneralPost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
+				return HandleGeneralPost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
 			},
 		},
 		{
-			name:     "HandleAdminSettingsEmailPost",
+			name:     "HandleEmailPost",
 			template: "/admin_settings_email.html",
 			form:     url.Values{"hostOrIP": {"smtp.example.com"}, "port": {"587"}},
 			build: func(h *mocks_handlers.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
-				return HandleAdminSettingsEmailPost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
+				return HandleEmailPost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
 			},
 		},
 		{
-			name:     "HandleAdminSettingsUIThemePost",
+			name:     "HandleUIThemePost",
 			template: "/admin_settings_ui_theme.html",
 			form:     url.Values{"themeSelection": {"dark"}},
 			build: func(h *mocks_handlers.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
-				return HandleAdminSettingsUIThemePost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
+				return HandleUIThemePost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
 			},
 		},
 	}

@@ -35,7 +35,7 @@ func (c *userEmailApiClient) UpdateUserEmail(_ context.Context, accessToken stri
 	return nil, c.updateErr
 }
 
-func TestHandleAdminUserEmailPost_AnswersAFailedWrite(t *testing.T) {
+func TestHandleEmailPost_AnswersAFailedWrite(t *testing.T) {
 	testCases := []struct {
 		name         string
 		err          error
@@ -84,7 +84,7 @@ func TestHandleAdminUserEmailPost_AnswersAFailedWrite(t *testing.T) {
 
 			router := chi.NewRouter()
 			// The session store is nil: every row fails before the success path reaches it.
-			router.Post("/admin/users/{userId}/email", HandleAdminUserEmailPost(httpHelper, nil,
+			router.Post("/admin/users/{userId}/email", HandleEmailPost(httpHelper, nil,
 				&userEmailApiClient{updateErr: testCase.err}, consoleBaseURL))
 			router.ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodPost,
 				"/admin/users/42/email?page=2&query=bob", handlertest.WithAccessToken(),

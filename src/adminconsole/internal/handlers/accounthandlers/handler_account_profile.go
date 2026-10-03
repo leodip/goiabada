@@ -20,7 +20,7 @@ type accountProfileAPI interface {
 	UpdateAccountProfile(ctx context.Context, accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
 }
 
-func HandleAccountProfileGet(
+func HandleProfileGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountProfileAPI,
@@ -74,7 +74,7 @@ func HandleAccountProfileGet(
 	}
 }
 
-func HandleAccountProfilePost(
+func HandleProfilePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountProfileAPI,

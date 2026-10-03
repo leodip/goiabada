@@ -51,7 +51,7 @@ func (c *userSessionsApiClient) DeleteUserSessionById(_ context.Context, accessT
 // shared with the account page and tested there (#440); this case pins that this page's rows still
 // come through it. A guard added at one call site and absent from its sibling is exactly the shape
 // a change like this ships with (#281 decision 6).
-func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
+func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15`
 
 	httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -70,7 +70,7 @@ func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 		handlertest.WithRouteParam("userId", "7"),
 	)
 
-	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
 
@@ -83,7 +83,7 @@ func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 // The admin-side twin of the account page's instants case, for the same reason the user-agent case
 // is written on every session page: an instant dropped on the way to the bind is invisible to
 // every render case (#373).
-func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
+func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
@@ -103,7 +103,7 @@ func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 		handlertest.WithRouteParam("userId", "7"),
 	)
 
-	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -119,7 +119,7 @@ func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 // context. The auth server reads that same claim now, so the page must believe the response and
 // nothing else: a page still recomputing would answer false here, because this request carries no
 // session identifier on its context at all (#373 decision 1).
-func TestHandleAdminUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
+func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
@@ -137,7 +137,7 @@ func TestHandleAdminUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) 
 		handlertest.WithRouteParam("userId", "7"),
 	)
 
-	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -153,7 +153,7 @@ func TestHandleAdminUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) 
 // trio is written three times: the comparison is made by hand in three files, and a case in two of
 // them cannot see the third going wrong. An administrator viewing their own user row can delete
 // their own session from this page, which is the outcome the answer below turns on (#373).
-func TestHandleAdminUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
+func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 	const deleting = 5
 
 	testCases := []struct {
@@ -230,7 +230,7 @@ func TestHandleAdminUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testin
 
 			req := handlertest.Request(http.MethodPost, "/admin/users/7/sessions", opts...)
 
-			HandleAdminUserSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+			HandleSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 			answer := handlertest.Encoded(t, httpHelper)
 			assert.Equal(t, true, answer["Success"])
@@ -252,7 +252,7 @@ func TestHandleAdminUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testin
 // The list read is what the answer above turns on, so a list this handler cannot read is answered
 // rather than swallowed. It swallowed the failure until #373, because the read was made only to
 // compare against a claim rather than to decide the answer.
-func TestHandleAdminUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
+func TestHandleSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
@@ -274,7 +274,7 @@ func TestHandleAdminUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *test
 		handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 	)
 
-	HandleAdminUserSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)
 	require.NotNil(t, captured, "the handler answered nothing")

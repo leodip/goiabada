@@ -24,7 +24,7 @@ type clientRedirectURIsAPI interface {
 	UpdateClientRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
 }
 
-func HandleAdminClientRedirectURIsGet(
+func HandleRedirectURIsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientRedirectURIsAPI,
@@ -127,7 +127,7 @@ func HandleAdminClientRedirectURIsGet(
 	}
 }
 
-func HandleAdminClientRedirectURIsPost(
+func HandleRedirectURIsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientRedirectURIsAPI,

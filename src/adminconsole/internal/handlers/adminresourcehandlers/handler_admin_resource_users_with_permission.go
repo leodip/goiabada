@@ -26,7 +26,7 @@ type resourceUsersWithPermissionAPI interface {
 	UpdateUserPermissions(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
 }
 
-func HandleAdminResourceUsersWithPermissionGet(
+func HandleUsersWithPermissionGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceUsersWithPermissionAPI,
@@ -146,7 +146,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 	}
 }
 
-func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
+func HandleUsersWithPermissionRemovePermissionPost(
 	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
@@ -235,7 +235,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 	}
 }
 
-func HandleAdminResourceUsersWithPermissionAddGet(
+func HandleUsersWithPermissionAddGet(
 	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
@@ -303,7 +303,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 	}
 }
 
-func HandleAdminResourceUsersWithPermissionSearchGet(
+func HandleUsersWithPermissionSearchGet(
 	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
@@ -375,7 +375,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 	}
 }
 
-func HandleAdminResourceUsersWithPermissionAddPermissionPost(
+func HandleUsersWithPermissionAddPermissionPost(
 	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {

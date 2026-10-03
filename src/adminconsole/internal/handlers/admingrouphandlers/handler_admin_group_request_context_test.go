@@ -124,116 +124,116 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		request *http.Request
 	}{
 		{
-			name: "HandleAdminGroupsGet",
+			name: "HandleListGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupsGet(h, c)
+				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups", handlertest.WithAccessToken()),
 		},
 		{
-			name: "HandleAdminGroupNewPost",
+			name: "HandleNewPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupNewPost(h, c, consoleBaseURL)
+				return HandleNewPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/new",
 				handlertest.WithAccessToken(),
 				handlertest.WithForm(url.Values{"groupIdentifier": {"support"}})),
 		},
 		{
-			name: "HandleAdminGroupPermissionsGet",
+			name: "HandlePermissionsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupPermissionsGet(h, nil, c)
+				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupSettingsGet",
+			name: "HandleSettingsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupSettingsGet(h, nil, c)
+				return HandleSettingsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/settings",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupSettingsPost",
+			name: "HandleSettingsPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupSettingsPost(h, nil, c, consoleBaseURL)
+				return HandleSettingsPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/settings",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),
 				handlertest.WithForm(url.Values{"groupIdentifier": {"support"}})),
 		},
 		{
-			name: "HandleAdminGroupDeleteGet",
+			name: "HandleDeleteGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupDeleteGet(h, c)
+				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/delete",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupDeletePost",
+			name: "HandleDeletePost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupDeletePost(h, c, consoleBaseURL)
+				return HandleDeletePost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/delete",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),
 				handlertest.WithForm(url.Values{"groupIdentifier": {"support"}})),
 		},
 		{
-			name: "HandleAdminGroupMembersGet",
+			name: "HandleMembersGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupMembersGet(h, c)
+				return HandleMembersGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupMembersAddGet",
+			name: "HandleMembersAddGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupMembersAddGet(h, c)
+				return HandleMembersAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/add",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupMembersSearchGet",
+			name: "HandleMembersSearchGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupMembersSearchGet(h, c)
+				return HandleMembersSearchGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/search?query=jane",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupMembersAddPost",
+			name: "HandleMembersAddPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupMembersAddPost(h, c)
+				return HandleMembersAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/add?userId=42",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupMembersRemoveUserPost",
+			name: "HandleMembersRemoveUserPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupMembersRemoveUserPost(h, c)
+				return HandleMembersRemoveUserPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/42/remove",
 				handlertest.WithAccessToken(),
 				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("userId", "42")),
 		},
 		{
-			name: "HandleAdminGroupPermissionsGet",
+			name: "HandlePermissionsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupPermissionsGet(h, nil, c)
+				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupPermissionsPost",
+			name: "HandlePermissionsPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupPermissionsPost(h, nil, c)
+				return HandlePermissionsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/permissions",
 				handlertest.WithAccessToken(),
@@ -241,52 +241,52 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				handlertest.WithContentType("application/json")),
 		},
 		{
-			name: "HandleAdminGroupAttributesGet",
+			name: "HandleAttributesGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupAttributesGet(h, c)
+				return HandleAttributesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupAttributesRemovePost",
+			name: "HandleAttributesRemovePost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupAttributesRemovePost(h, c)
+				return HandleAttributesRemovePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/remove",
 				handlertest.WithAccessToken(),
 				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("attributeId", "11")),
 		},
 		{
-			name: "HandleAdminGroupAttributesAddGet",
+			name: "HandleAttributesAddGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupAttributesAddGet(h, c)
+				return HandleAttributesAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/add",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
-			name: "HandleAdminGroupAttributesAddPost",
+			name: "HandleAttributesAddPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupAttributesAddPost(h, c)
+				return HandleAttributesAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/add",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),
 				handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}})),
 		},
 		{
-			name: "HandleAdminGroupAttributesEditGet",
+			name: "HandleAttributesEditGet",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupAttributesEditGet(h, c)
+				return HandleAttributesEditGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/11/edit",
 				handlertest.WithAccessToken(),
 				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("attributeId", "11")),
 		},
 		{
-			name: "HandleAdminGroupAttributesEditPost",
+			name: "HandleAttributesEditPost",
 			build: func(h *mocks_handlers.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminGroupAttributesEditPost(h, c)
+				return HandleAttributesEditPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/edit",
 				handlertest.WithAccessToken(),

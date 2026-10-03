@@ -91,50 +91,50 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 		routeParam [2]string
 	}{
 		{
-			name: "HandleAccountProfilePicturePost",
+			name: "HandleProfilePicturePost",
 			handler: func(h handlers.HttpHelper) http.HandlerFunc {
-				return accounthandlers.HandleAccountProfilePicturePost(h, refusingImageAPI{})
+				return accounthandlers.HandleProfilePicturePost(h, refusingImageAPI{})
 			},
 			method: http.MethodPost,
 			upload: true,
 		},
 		{
-			name: "HandleAccountProfilePictureDelete",
+			name: "HandleProfilePictureDelete",
 			handler: func(h handlers.HttpHelper) http.HandlerFunc {
-				return accounthandlers.HandleAccountProfilePictureDelete(h, refusingImageAPI{})
+				return accounthandlers.HandleProfilePictureDelete(h, refusingImageAPI{})
 			},
 			method: http.MethodDelete,
 		},
 		{
-			name: "HandleAdminUserProfilePicturePost",
+			name: "HandleProfilePicturePost",
 			handler: func(h handlers.HttpHelper) http.HandlerFunc {
-				return adminuserhandlers.HandleAdminUserProfilePicturePost(h, refusingImageAPI{})
+				return adminuserhandlers.HandleProfilePicturePost(h, refusingImageAPI{})
 			},
 			method:     http.MethodPost,
 			upload:     true,
 			routeParam: [2]string{"userId", "7"},
 		},
 		{
-			name: "HandleAdminUserProfilePictureDelete",
+			name: "HandleProfilePictureDelete",
 			handler: func(h handlers.HttpHelper) http.HandlerFunc {
-				return adminuserhandlers.HandleAdminUserProfilePictureDelete(h, refusingImageAPI{})
+				return adminuserhandlers.HandleProfilePictureDelete(h, refusingImageAPI{})
 			},
 			method:     http.MethodDelete,
 			routeParam: [2]string{"userId", "7"},
 		},
 		{
-			name: "HandleAdminClientLogoPost",
+			name: "HandleLogoPost",
 			handler: func(h handlers.HttpHelper) http.HandlerFunc {
-				return adminclienthandlers.HandleAdminClientLogoPost(h, refusingImageAPI{})
+				return adminclienthandlers.HandleLogoPost(h, refusingImageAPI{})
 			},
 			method:     http.MethodPost,
 			upload:     true,
 			routeParam: [2]string{"clientId", "3"},
 		},
 		{
-			name: "HandleAdminClientLogoDelete",
+			name: "HandleLogoDelete",
 			handler: func(h handlers.HttpHelper) http.HandlerFunc {
-				return adminclienthandlers.HandleAdminClientLogoDelete(h, refusingImageAPI{})
+				return adminclienthandlers.HandleLogoDelete(h, refusingImageAPI{})
 			},
 			method:     http.MethodDelete,
 			routeParam: [2]string{"clientId", "3"},

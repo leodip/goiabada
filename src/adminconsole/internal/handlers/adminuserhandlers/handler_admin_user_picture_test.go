@@ -35,7 +35,7 @@ func (c *userPictureApiClient) GetUserProfilePicture(_ context.Context, accessTo
 	return c.picture, c.err
 }
 
-func TestHandleAdminUserPictureGet_AnswersAFailedPictureRead(t *testing.T) {
+func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 	testCases := []struct {
 		name         string
 		picture      *api.ProfilePictureInfoResponse
@@ -85,7 +85,7 @@ func TestHandleAdminUserPictureGet_AnswersAFailedPictureRead(t *testing.T) {
 			}
 
 			router := chi.NewRouter()
-			router.Get("/admin/users/{userId}/picture", HandleAdminUserPictureGet(httpHelper,
+			router.Get("/admin/users/{userId}/picture", HandlePictureGet(httpHelper,
 				&userPictureApiClient{picture: testCase.picture, err: testCase.err}))
 			router.ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodGet, "/admin/users/42/picture", handlertest.WithAccessToken()))

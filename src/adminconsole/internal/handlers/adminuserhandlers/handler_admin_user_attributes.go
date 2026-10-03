@@ -19,7 +19,7 @@ type userAttributesAPI interface {
 	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
 }
 
-func HandleAdminUserAttributesGet(
+func HandleAttributesGet(
 	httpHelper HttpHelper,
 	apiClient userAttributesAPI,
 ) http.HandlerFunc {
@@ -76,7 +76,7 @@ func HandleAdminUserAttributesGet(
 	}
 }
 
-func HandleAdminUserAttributesRemovePost(
+func HandleAttributesRemovePost(
 	httpHelper HttpHelper,
 	apiClient userAttributesAPI,
 ) http.HandlerFunc {

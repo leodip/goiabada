@@ -15,7 +15,7 @@ type usersAPI interface {
 	SearchUsersPaginated(ctx context.Context, accessToken, query string, page, pageSize int) ([]api.UserResponse, int, error)
 }
 
-func HandleAdminUsersGet(
+func HandleListGet(
 	httpHelper HttpHelper,
 	apiClient usersAPI,
 ) http.HandlerFunc {

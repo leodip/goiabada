@@ -61,7 +61,7 @@ func (c *clientSessionsApiClient) GetUserById(_ context.Context, accessToken str
 
 // The third of the three session pages, and the third hand-written SessionInfo literal, so the
 // copy is pinned here for the same reason it is pinned on the other two (#281 decision 6).
-func TestHandleAdminClientUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
+func TestHandleUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `goiabada-d2-second-device`
 
 	httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -82,7 +82,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 		handlertest.WithRouteParam("clientId", "3"),
 	)
 
-	HandleAdminClientUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
 
@@ -95,7 +95,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 // The third of the three session pages, whose SessionInfo is its own because its rows also name
 // the session's user, so the two instants the page formats are pinned here for the reason they
 // are pinned on the other two (#373, #440).
-func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
+func TestHandleUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
@@ -117,7 +117,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) 
 		handlertest.WithRouteParam("clientId", "3"),
 	)
 
-	HandleAdminClientUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -131,7 +131,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) 
 // The client page's twin of the admin user page's case, and written separately for the reason
 // every case in this trio is: this is the second of the two recomputations #373 deleted, and one
 // of them left behind would be invisible to the other's test.
-func TestHandleAdminClientUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
+func TestHandleUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
@@ -150,7 +150,7 @@ func TestHandleAdminClientUserSessionsGet_BindsIsCurrentFromTheResponse(t *testi
 		handlertest.WithRouteParam("clientId", "3"),
 	)
 
-	HandleAdminClientUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -165,7 +165,7 @@ func TestHandleAdminClientUserSessionsGet_BindsIsCurrentFromTheResponse(t *testi
 // time. This page fetched a user per session before #373 decision 9, up to 50 HTTP round trips
 // to fill the two columns below, so the read count is asserted rather than the columns alone:
 // filling them correctly while still making the calls would be the same page it was.
-func TestHandleAdminClientUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T) {
+func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
@@ -187,7 +187,7 @@ func TestHandleAdminClientUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t 
 		handlertest.WithRouteParam("clientId", "3"),
 	)
 
-	HandleAdminClientUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -208,7 +208,7 @@ func TestHandleAdminClientUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t 
 // Two sessions of the same person, which is what the normalized array looks like from this end:
 // one record answers both rows. A page indexing users by position rather than by id would put
 // the wrong name on the second row, or none.
-func TestHandleAdminClientUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *testing.T) {
+func TestHandleUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
@@ -227,7 +227,7 @@ func TestHandleAdminClientUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *tes
 		handlertest.WithRouteParam("clientId", "3"),
 	)
 
-	HandleAdminClientUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -242,7 +242,7 @@ func TestHandleAdminClientUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *tes
 // the row. The auth server refuses to build such a response, so this is the console being told
 // something it did not expect rather than a case the endpoint produces; the page showing the
 // device and the timestamps with a blank name beats the page not showing at all.
-func TestHandleAdminClientUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *testing.T) {
+func TestHandleUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
@@ -260,7 +260,7 @@ func TestHandleAdminClientUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *
 		handlertest.WithRouteParam("clientId", "3"),
 	)
 
-	HandleAdminClientUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -274,7 +274,7 @@ func TestHandleAdminClientUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *
 // symmetric here for the reason it is symmetric on the page cases above. This one lists other
 // people's sessions, and the administrator's own is among them whenever they hold a session on
 // the client they are looking at (#373).
-func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
+func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 	const deleting = 5
 
 	testCases := []struct {
@@ -351,7 +351,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 
 			req := handlertest.Request(http.MethodPost, "/admin/clients/3/user-sessions", opts...)
 
-			HandleAdminClientUserSessionsPost(httpHelper, apiClient).
+			HandleUserSessionsPost(httpHelper, apiClient).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			answer := handlertest.Encoded(t, httpHelper)
@@ -374,7 +374,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 // The list read is what the answer above turns on, so a list this handler cannot read is answered
 // rather than swallowed. It swallowed the failure until #373, because the read was made only to
 // compare against a claim rather than to decide the answer.
-func TestHandleAdminClientUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
+func TestHandleUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
@@ -396,7 +396,7 @@ func TestHandleAdminClientUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t
 		handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 	)
 
-	HandleAdminClientUserSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleUserSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)
 	require.NotNil(t, captured, "the handler answered nothing")

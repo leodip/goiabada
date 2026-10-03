@@ -46,7 +46,7 @@ func (c *accountSessionsApiClient) DeleteAccountSession(_ context.Context, acces
 // the view type. renderintegration proves the template renders a UserAgent it is handed; it is
 // handed a bind the test wrote, so deleting the copy here would leave that case green with every
 // tooltip empty (#281 decision 6).
-func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
+func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0`
 
 	httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -63,7 +63,7 @@ func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken())
 
-	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
 
@@ -83,7 +83,7 @@ func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 // instants. renderintegration renders a bind the test wrote, so without this case a handler that
 // dropped the copy would leave both cells empty on a live page with every render case still green
 // (#373).
-func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
+func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
@@ -99,7 +99,7 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken())
 
-	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -113,7 +113,7 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 // This page always believed the field; the other two do now. Written here as well so the trio is
 // symmetric: the mapping is shared with the admin user page since #440 but the client page keeps
 // its own, and a case in two of them cannot see the third going wrong (#373 decision 1).
-func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
+func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
@@ -127,7 +127,7 @@ func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken())
 
-	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
@@ -152,7 +152,7 @@ func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 // current unless the field says so, and a row the field marks current is current even when the
 // claim names another. A handler that went back to reading the claim answers both backwards
 // (#373).
-func TestHandleAccountSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
+func TestHandleSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 	const deleting = 5
 
 	testCases := []struct {
@@ -226,7 +226,7 @@ func TestHandleAccountSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t
 
 			req := handlertest.Request(http.MethodPost, "/account/sessions", opts...)
 
-			HandleAccountSessionsEndSessionPost(httpHelper, apiClient).
+			HandleSessionsEndSessionPost(httpHelper, apiClient).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			answer := handlertest.Encoded(t, httpHelper)
@@ -251,7 +251,7 @@ func TestHandleAccountSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t
 // the browser it had deleted somebody else's: no logout, and a console holding a session the auth
 // server has already forgotten. It swallowed the failure until #373, because the read was made
 // only to compare against a claim rather than to decide the answer.
-func TestHandleAccountSessionsEndSessionPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
+func TestHandleSessionsEndSessionPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
@@ -271,7 +271,7 @@ func TestHandleAccountSessionsEndSessionPost_AListTheApiCannotReadStopsTheDelete
 		handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 	)
 
-	HandleAccountSessionsEndSessionPost(httpHelper, apiClient).
+	HandleSessionsEndSessionPost(httpHelper, apiClient).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)

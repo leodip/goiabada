@@ -50,7 +50,7 @@ func serveResourcePermissionsSave(stub *resourcePermissionsSaveApiClient, body s
 	rec := httptest.NewRecorder()
 	router := chi.NewRouter()
 	router.Post("/admin/resources/{resourceId}/permissions",
-		HandleAdminResourcePermissionsPost(render.New(nil), nil, stub))
+		HandlePermissionsPost(render.New(nil), nil, stub))
 	router.ServeHTTP(rec, req)
 	return rec
 }
@@ -61,7 +61,7 @@ func serveResourcePermissionsSave(stub *resourcePermissionsSaveApiClient, body s
 // rows pin the distinction the API reads: [] is a page that loaded no permissions and must reach
 // the wire as [], and a body without the field must reach it as null, which the API refuses,
 // rather than be defaulted to a list that would pass.
-func TestHandleAdminResourcePermissionsPost_SendsTheLoadedList(t *testing.T) {
+func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 	testCases := []struct {
 		name         string
 		body         string
@@ -115,7 +115,7 @@ func TestHandleAdminResourcePermissionsPost_SendsTheLoadedList(t *testing.T) {
 
 // A save from an outdated page reaches the administrator as the API's own sentence and status,
 // telling them to reload, rather than the generic error (#428).
-func TestHandleAdminResourcePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
+func TestHandlePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
 	stub := &resourcePermissionsSaveApiClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
 

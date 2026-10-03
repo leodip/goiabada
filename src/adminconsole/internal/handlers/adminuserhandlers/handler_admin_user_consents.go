@@ -22,7 +22,7 @@ type userConsentsAPI interface {
 	GetUserConsents(ctx context.Context, accessToken string, userId int64) ([]api.UserConsentResponse, error)
 }
 
-func HandleAdminUserConsentsGet(
+func HandleConsentsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userConsentsAPI,
@@ -98,7 +98,7 @@ func HandleAdminUserConsentsGet(
 	}
 }
 
-func HandleAdminUserConsentsPost(
+func HandleConsentsPost(
 	httpHelper HttpHelper,
 	apiClient userConsentsAPI,
 ) http.HandlerFunc {

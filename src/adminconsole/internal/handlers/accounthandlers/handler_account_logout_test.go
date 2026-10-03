@@ -52,7 +52,7 @@ func logoutRequest() *http.Request {
 		}))
 }
 
-func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) {
+func TestHandleLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
@@ -69,7 +69,7 @@ func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testi
 	}}
 
 	rec := httptest.NewRecorder()
-	HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, logoutRequest())
+	HandleLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, logoutRequest())
 
 	require.NotNil(t, apiClient.got, "the handler must reach the API")
 	assert.Equal(t, api.AccountLogoutResponseModeFormPost, apiClient.got.ResponseMode,
@@ -95,7 +95,7 @@ func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testi
 // The other arm, and not a dead one: an auth server older than this change answers the redirect
 // shape whatever the request asked for. Before decision 2 the handler dereferenced the redirect
 // return unconditionally, so this is also the case that pins the nil check the form arm needed.
-func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
+func TestHandleLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
@@ -104,7 +104,7 @@ func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
 	}}
 
 	rec := httptest.NewRecorder()
-	HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, logoutRequest())
+	HandleLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, logoutRequest())
 
 	assert.Equal(t, http.StatusFound, rec.Code)
 	assert.Equal(t, "https://auth.example.com/auth/logout?id_token_hint=the.id.token",
@@ -113,7 +113,7 @@ func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
 
 // A visitor missing either the verified ID token or the access token string never reaches the API
 // at all.
-func TestHandleAccountLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T) {
+func TestHandleLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T) {
 	testCases := []struct {
 		name string
 		req  *http.Request
@@ -133,7 +133,7 @@ func TestHandleAccountLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *tes
 			apiClient := &logoutApiClient{}
 			rec := httptest.NewRecorder()
 
-			HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, tc.req)
+			HandleLogoutGet(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, tc.req)
 
 			assert.Equal(t, http.StatusFound, rec.Code)
 			assert.Equal(t, "https://console.example.test", rec.Header().Get("Location"),

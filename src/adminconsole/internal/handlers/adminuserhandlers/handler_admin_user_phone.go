@@ -23,7 +23,7 @@ type userPhoneAPI interface {
 	UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
 }
 
-func HandleAdminUserPhoneGet(
+func HandlePhoneGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,
@@ -102,7 +102,7 @@ func HandleAdminUserPhoneGet(
 	}
 }
 
-func HandleAdminUserPhonePost(
+func HandlePhonePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,

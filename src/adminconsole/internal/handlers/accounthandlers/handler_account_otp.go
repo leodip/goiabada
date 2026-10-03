@@ -19,7 +19,7 @@ type accountOTPAPI interface {
 	UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error)
 }
 
-func HandleAccountOtpGet(
+func HandleOtpGet(
 	httpHelper HttpHelper,
 	apiClient accountOTPAPI,
 ) http.HandlerFunc {
@@ -64,7 +64,7 @@ func HandleAccountOtpGet(
 	}
 }
 
-func HandleAccountOtpPost(
+func HandleOtpPost(
 	httpHelper HttpHelper,
 	apiClient accountOTPAPI,
 	baseURL string,

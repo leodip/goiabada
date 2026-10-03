@@ -16,7 +16,7 @@ type accountConsentsAPI interface {
 	RevokeAccountConsent(ctx context.Context, accessToken string, consentId int64) error
 }
 
-func HandleAccountManageConsentsGet(
+func HandleManageConsentsGet(
 	httpHelper HttpHelper,
 	apiClient accountConsentsAPI,
 ) http.HandlerFunc {
@@ -50,7 +50,7 @@ func HandleAccountManageConsentsGet(
 	}
 }
 
-func HandleAccountManageConsentsRevokePost(
+func HandleManageConsentsRevokePost(
 	httpHelper HttpHelper,
 	apiClient accountConsentsAPI,
 ) http.HandlerFunc {

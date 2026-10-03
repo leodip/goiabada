@@ -194,7 +194,7 @@ func newHelper(t *testing.T) *mocks_handlers.HttpHelper {
 	return httpHelper
 }
 
-func TestHandleAdminResourceGroupsWithPermissionGet_PageQueryParameter(t *testing.T) {
+func TestHandleGroupsWithPermissionGet_PageQueryParameter(t *testing.T) {
 	const pageSize = 10
 
 	testCases := []struct {
@@ -240,7 +240,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_PageQueryParameter(t *testin
 			}
 
 			httpHelper := newHelper(t)
-			handler := HandleAdminResourceGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
+			handler := HandleGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
 			bind := renderPermissionPage(t, handler, "groups-with-permission", tc.raw, httpHelper)
 
 			assertAsked(t, tc.wantAsked, apiClient.asked, tc.why)
@@ -273,7 +273,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_PageQueryParameter(t *testin
 	}
 }
 
-// TestHandleAdminResourceGroupsWithPermissionGet_TheOverflowingPageDoesNotPanic
+// TestHandleGroupsWithPermissionGet_TheOverflowingPageDoesNotPanic
 // is the reported bug itself, run as the report describes it: a resource with
 // no permissions, and a page number large enough that "(page-1)*pageSize" wraps
 // negative. That slice expression panicked, so this test fails by panicking
@@ -282,7 +282,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_PageQueryParameter(t *testin
 // The whole int64 top end is swept, not just math.MaxInt, because the wrap
 // starts well before the largest int: at pageSize 10 any page above MaxInt/10
 // overflows, and every one of those is a page a browser can send.
-func TestHandleAdminResourceGroupsWithPermissionGet_TheOverflowingPageDoesNotPanic(t *testing.T) {
+func TestHandleGroupsWithPermissionGet_TheOverflowingPageDoesNotPanic(t *testing.T) {
 	const pageSize = 10
 
 	raws := []string{
@@ -304,7 +304,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_TheOverflowingPageDoesNotPan
 			t.Run(raw+"_over_"+strconv.Itoa(total), func(t *testing.T) {
 				apiClient := &resourcePagingApiClient{total: total} // no permissions
 				httpHelper := newHelper(t)
-				handler := HandleAdminResourceGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
+				handler := HandleGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
 
 				bind := renderPermissionPage(t, handler, "groups-with-permission", raw, httpHelper)
 
@@ -327,7 +327,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_TheOverflowingPageDoesNotPan
 	}
 }
 
-func TestHandleAdminResourceUsersWithPermissionGet_PageQueryParameter(t *testing.T) {
+func TestHandleUsersWithPermissionGet_PageQueryParameter(t *testing.T) {
 	const pageSize = 10
 
 	testCases := []struct {
@@ -368,7 +368,7 @@ func TestHandleAdminResourceUsersWithPermissionGet_PageQueryParameter(t *testing
 			}
 
 			httpHelper := newHelper(t)
-			handler := HandleAdminResourceUsersWithPermissionGet(httpHelper, testStore(), apiClient)
+			handler := HandleUsersWithPermissionGet(httpHelper, testStore(), apiClient)
 			bind := renderPermissionPage(t, handler, "users-with-permission", tc.raw, httpHelper)
 
 			assertAsked(t, tc.wantAsked, apiClient.asked, tc.why)
@@ -399,12 +399,12 @@ func TestHandleAdminResourceUsersWithPermissionGet_PageQueryParameter(t *testing
 	}
 }
 
-// TestHandleAdminResourceUsersWithPermissionAddGet_PageIsCarriedNotRefused
+// TestHandleUsersWithPermissionAddGet_PageIsCarriedNotRefused
 // covers the sixth reader of "?page=" in the admin console. It does not
 // paginate -- it carries the page forward into the link back to the list -- but
 // it parsed the value the same strict way, so a page the list beside it
 // rendered happily ended this page in a 500 (#305).
-func TestHandleAdminResourceUsersWithPermissionAddGet_PageIsCarriedNotRefused(t *testing.T) {
+func TestHandleUsersWithPermissionAddGet_PageIsCarriedNotRefused(t *testing.T) {
 	testCases := []struct {
 		raw  string
 		want int
@@ -422,7 +422,7 @@ func TestHandleAdminResourceUsersWithPermissionAddGet_PageIsCarriedNotRefused(t 
 		t.Run(tc.raw, func(t *testing.T) {
 			apiClient := &resourcePagingApiClient{permissions: aPermission()}
 			httpHelper := newHelper(t)
-			handler := HandleAdminResourceUsersWithPermissionAddGet(httpHelper, apiClient)
+			handler := HandleUsersWithPermissionAddGet(httpHelper, apiClient)
 			bind := renderPermissionPage(t, handler, "users-with-permission/add", tc.raw, httpHelper)
 
 			assert.Equal(t, tc.want, bind["page"], "the page carried into the return link")

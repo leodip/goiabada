@@ -77,7 +77,7 @@ var submittedAccountProfile = url.Values{
 
 // A refusal from the API redraws the account profile page with what the user typed rather than what
 // is stored, and the API's sentence, so nothing the user entered is lost (#440 decision 7).
-func TestHandleAccountProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testing.T) {
+func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_profile.html").Once()
@@ -87,7 +87,7 @@ func TestHandleAccountProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t
 	}}
 
 	rr := httptest.NewRecorder()
-	HandleAccountProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
+	HandleProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 		"/account/profile", handlertest.WithAccessToken(), handlertest.WithForm(submittedAccountProfile)))
 
 	require.Len(t, apiClient.updates, 1)
@@ -130,7 +130,7 @@ func TestHandleAccountProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t
 
 // The time-zone select only ever posts a country and a zone joined once by ___. Anything else is a
 // hand-edited request, which keeps today's 500 and forwards nothing (#440 decision 7).
-func TestHandleAccountProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.T) {
+func TestHandleProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.T) {
 	for _, zoneInfo := range []string{"America/Sao_Paulo", "Brazil___America___Sao_Paulo"} {
 		t.Run(zoneInfo, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -140,7 +140,7 @@ func TestHandleAccountProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *t
 			form := url.Values{"username": {"jane-doe"}, "zoneInfo": {zoneInfo}}
 
 			rr := httptest.NewRecorder()
-			HandleAccountProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
+			HandleProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 				"/account/profile", handlertest.WithAccessToken(), handlertest.WithForm(form)))
 
 			assert.Empty(t, apiClient.updates, "a malformed zone reached the API")

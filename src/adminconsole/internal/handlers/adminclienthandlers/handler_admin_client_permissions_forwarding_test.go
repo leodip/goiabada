@@ -112,7 +112,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 				handlertest.WithBody(strings.NewReader("{\"clientId\": 1, \"assignedPermissionsIds\": [7]}")),
 			)
 
-			handler := HandleAdminClientPermissionsPost(httpHelper, nil,
+			handler := HandlePermissionsPost(httpHelper, nil,
 				&permissionsApiClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
@@ -154,7 +154,7 @@ func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
 		handlertest.WithBody(strings.NewReader("{this is not json")),
 	)
 
-	handler := HandleAdminClientPermissionsPost(httpHelper, nil, &permissionsApiClient{})
+	handler := HandlePermissionsPost(httpHelper, nil, &permissionsApiClient{})
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)

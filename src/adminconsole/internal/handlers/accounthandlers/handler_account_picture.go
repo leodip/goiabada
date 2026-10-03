@@ -19,7 +19,7 @@ type accountPictureAPI interface {
 	GetAccountProfilePicture(ctx context.Context, accessToken string) (*api.ProfilePictureInfoResponse, error)
 }
 
-func HandleAccountPictureGet(
+func HandlePictureGet(
 	httpHelper HttpHelper,
 	apiClient accountPictureAPI,
 ) http.HandlerFunc {
@@ -83,8 +83,8 @@ type accountProfilePictureAPI interface {
 	UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error)
 }
 
-// HandleAccountProfilePicturePost handles uploading a profile picture for the current user
-func HandleAccountProfilePicturePost(
+// HandleProfilePicturePost handles uploading a profile picture for the current user
+func HandleProfilePicturePost(
 	httpHelper HttpHelper,
 	apiClient accountProfilePictureAPI,
 ) http.HandlerFunc {
@@ -135,8 +135,8 @@ func HandleAccountProfilePicturePost(
 	}
 }
 
-// HandleAccountProfilePictureDelete handles deleting the current user's profile picture
-func HandleAccountProfilePictureDelete(
+// HandleProfilePictureDelete handles deleting the current user's profile picture
+func HandleProfilePictureDelete(
 	httpHelper HttpHelper,
 	apiClient accountProfilePictureAPI,
 ) http.HandlerFunc {

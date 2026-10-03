@@ -18,7 +18,7 @@ type groupDeleteAPI interface {
 	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
 }
 
-func HandleAdminGroupDeleteGet(
+func HandleDeleteGet(
 	httpHelper HttpHelper,
 	apiClient groupDeleteAPI,
 ) http.HandlerFunc {
@@ -68,7 +68,7 @@ func HandleAdminGroupDeleteGet(
 	}
 }
 
-func HandleAdminGroupDeletePost(
+func HandleDeletePost(
 	httpHelper HttpHelper,
 	apiClient groupDeleteAPI,
 	baseURL string,

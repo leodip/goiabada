@@ -109,13 +109,13 @@ func renderAuditLogs(t *testing.T, rawPage string, total int) (map[string]interf
 	req := handlertest.Request(http.MethodGet, target, handlertest.WithAccessToken())
 
 	apiClient := &auditPagingApiClient{total: total}
-	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
 	return bind, apiClient
 }
 
-func TestHandleAdminSettingsAuditLogViewerGet_PageQueryParameter(t *testing.T) {
+func TestHandleAuditLogViewerGet_PageQueryParameter(t *testing.T) {
 	// Twenty, not ten. Every "want" below is counted at this size.
 	const pageSize = 20
 
@@ -189,11 +189,11 @@ func TestHandleAdminSettingsAuditLogViewerGet_PageQueryParameter(t *testing.T) {
 	}
 }
 
-// TestHandleAdminSettingsAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery
+// TestHandleAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery
 // pins the argument the clamp is most likely to drop. The re-query repeats the
 // whole call, and one that forgot the event filter would page through the
 // unfiltered log while the filter dropdown still named an event.
-func TestHandleAdminSettingsAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
@@ -204,19 +204,19 @@ func TestHandleAdminSettingsAuditLogViewerGet_TheEventFilterSurvivesTheSecondQue
 		handlertest.WithAccessToken(),
 	)
 
-	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Equal(t, 2, len(apiClient.asked), "the clamp should have cost a second query")
 	assert.Equal(t, []string{"UserAuthSuccess", "UserAuthSuccess"}, apiClient.events,
 		"the event filter was dropped on the way")
 }
 
-// TestHandleAdminSettingsAuditLogViewerGet_EveryTotalLandsOnAPageWithRows sweeps
+// TestHandleAuditLogViewerGet_EveryTotalLandsOnAPageWithRows sweeps
 // the page size boundary rather than picking totals by hand: for every log size
 // around a page of twenty, a page far past the end must render the last page,
 // and that page must have rows on it. An off-by-one in the page count shows up
 // here as an empty table on an exact multiple.
-func TestHandleAdminSettingsAuditLogViewerGet_EveryTotalLandsOnAPageWithRows(t *testing.T) {
+func TestHandleAuditLogViewerGet_EveryTotalLandsOnAPageWithRows(t *testing.T) {
 	const pageSize = 20
 
 	for total := 0; total <= 61; total++ {
@@ -255,17 +255,17 @@ func renderAuditLogsWithQuery(t *testing.T, rawQuery string, total int) (map[str
 	)
 
 	apiClient := &auditPagingApiClient{total: total}
-	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper, "for ?%s", rawQuery)
 	return bind, apiClient
 }
 
-// TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage
+// TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage
 // is seam 8's handler half: the query parameter added in stage 3 has to be read here
 // and handed back to the page, or the input the operator typed into empties itself on
 // every render and the filter looks broken while the rows are right (#328).
-func TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *testing.T) {
 	testCases := []struct {
 		name      string
 		rawQuery  string
@@ -329,11 +329,11 @@ func TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterReachesTheApiAnd
 	}
 }
 
-// TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery is
+// TestHandleAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery is
 // the event filter's case from #305 for the second filter: the clamp repeats the whole
 // call, and one that forgot the id would page through the unfiltered log while the input
 // still showed an id.
-func TestHandleAdminSettingsAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery(t *testing.T) {
 	_, apiClient := renderAuditLogsWithQuery(t, "page=99&auditEvent=user_login&requestId=an-id", 50)
 
 	require.Equal(t, 2, len(apiClient.asked), "the clamp should have cost a second query")
@@ -401,7 +401,7 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 // compiled into this binary; it is now whatever the auth server answered. The catalog below is
 // deliberately not a real one, so a handler that fell back on a compiled-in list would render
 // the wrong options rather than coincidentally the right ones.
-func TestHandleAdminSettingsAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
@@ -412,7 +412,7 @@ func TestHandleAdminSettingsAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t 
 
 	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-log-viewer",
 		handlertest.WithAccessToken())
-	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, catalog, bind["auditEventTypes"],
@@ -422,7 +422,7 @@ func TestHandleAdminSettingsAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t 
 // A catalog the auth server refuses is an error, not an empty dropdown. Rendering the page
 // anyway would show a filter with no options and nothing saying why, which reads as "this
 // deployment has no audit events" rather than as a failed call.
-func TestHandleAdminSettingsAuditLogViewerGet_ACatalogFailureIsNotAnEmptyDropdown(t *testing.T) {
+func TestHandleAuditLogViewerGet_ACatalogFailureIsNotAnEmptyDropdown(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	var answered error
@@ -441,7 +441,7 @@ func TestHandleAdminSettingsAuditLogViewerGet_ACatalogFailureIsNotAnEmptyDropdow
 
 	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-log-viewer",
 		handlertest.WithAccessToken())
-	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Error(t, answered, "the handler did not answer the catalog failure")
 	assert.Contains(t, answered.Error(), "Insufficient scope.")

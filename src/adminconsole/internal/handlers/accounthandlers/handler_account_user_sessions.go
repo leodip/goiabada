@@ -16,7 +16,7 @@ type accountSessionsAPI interface {
 	GetAccountSessions(ctx context.Context, accessToken string) ([]api.UserSessionDetailResponse, error)
 }
 
-func HandleAccountSessionsGet(
+func HandleSessionsGet(
 	httpHelper HttpHelper,
 	apiClient accountSessionsAPI,
 ) http.HandlerFunc {
@@ -51,7 +51,7 @@ func HandleAccountSessionsGet(
 	}
 }
 
-func HandleAccountSessionsEndSessionPost(
+func HandleSessionsEndSessionPost(
 	httpHelper HttpHelper,
 	apiClient accountSessionsAPI,
 ) http.HandlerFunc {

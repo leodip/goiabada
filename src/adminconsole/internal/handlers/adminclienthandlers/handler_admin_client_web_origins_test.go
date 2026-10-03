@@ -50,7 +50,7 @@ func (s *stubAllClientsApiClient) UpdateClientWebOrigins(_ context.Context, acce
 // This is the half a renderintegration case cannot see. renderintegration hands the template a
 // bind the test wrote, so deleting the GetAllClients call here would leave every renderintegration
 // case green with the page showing nothing but this client's rows (plan review round 1, finding 3).
-func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
+func TestHandleWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
 
 	httpHelper := &stubHttpHelper{}
 	apiClient := &stubAllClientsApiClient{
@@ -91,7 +91,7 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 
 	httpSession := newTestSessionStore()
 
-	handler := HandleAdminClientWebOriginsGet(httpHelper, httpSession, apiClient)
+	handler := HandleWebOriginsGet(httpHelper, httpSession, apiClient)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	assert.NoError(t, httpHelper.err)
@@ -151,7 +151,7 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 //
 // The 500 row is what keeps the forwarding narrow: a genuine server fault must not be reported to
 // the administrator as their own mistake.
-func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.T) {
+func TestHandleWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.T) {
 
 	const refusal = "Invalid web origin: https://[2001:db8::1]. A web origin is a scheme, a host " +
 		"and an optional port, with nothing after the host"
@@ -204,7 +204,7 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 			rec := httptest.NewRecorder()
 
 			// httpSession is nil: both cases return before the session is touched.
-			handler := HandleAdminClientWebOriginsPost(httpHelper, nil,
+			handler := HandleWebOriginsPost(httpHelper, nil,
 				&stubAllClientsApiClient{stubApiClient: stubApiClient{updateErr: tc.apiErr}})
 			handler.ServeHTTP(rec, req)
 
@@ -228,7 +228,7 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 // [] is a page that loaded an empty list and must reach the wire as [], and a body without the
 // field must reach it as null, which the API refuses, rather than be defaulted to a list that
 // would pass the check.
-func TestHandleAdminClientWebOriginsPost_SendsTheLoadedList(t *testing.T) {
+func TestHandleWebOriginsPost_SendsTheLoadedList(t *testing.T) {
 
 	testCases := []struct {
 		name         string
@@ -269,7 +269,7 @@ func TestHandleAdminClientWebOriginsPost_SendsTheLoadedList(t *testing.T) {
 			// request it sent is what is under test.
 			stub := &stubAllClientsApiClient{stubApiClient: stubApiClient{
 				updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}}
-			HandleAdminClientWebOriginsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
+			HandleWebOriginsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 			if !assert.NotNil(t, stub.sentWebOrigins) {
 				return

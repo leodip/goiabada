@@ -32,7 +32,7 @@ type clientLogoAPI interface {
 // internal message on the wire at 500 with nothing in the log, answered 401 for the middleware
 // invariant the other 100 sites answer 500 for, and rendered the HTML 500 page into a fetch() that
 // was about to call response.json(). The success bodies are unchanged.
-func HandleAdminClientLogoGet(
+func HandleLogoGet(
 	httpHelper HttpHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
@@ -94,7 +94,7 @@ func HandleAdminClientLogoGet(
 	}
 }
 
-func HandleAdminClientLogoPost(
+func HandleLogoPost(
 	httpHelper HttpHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
@@ -148,7 +148,7 @@ func HandleAdminClientLogoPost(
 	}
 }
 
-func HandleAdminClientLogoDelete(
+func HandleLogoDelete(
 	httpHelper HttpHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {

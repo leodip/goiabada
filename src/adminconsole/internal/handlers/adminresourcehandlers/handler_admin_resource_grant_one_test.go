@@ -89,7 +89,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			route:  "/admin/resources/{resourceId}/users-with-permission/remove/{userId}/{permissionId}",
 			target: "/admin/resources/2/users-with-permission/remove/5/7",
 			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
-				return HandleAdminResourceUsersWithPermissionRemovePermissionPost(h, c)
+				return HandleUsersWithPermissionRemovePermissionPost(h, c)
 			},
 			current:      []api.PermissionResponse{{Id: 3}, {Id: 7}},
 			wantWanted:   []int64{3},
@@ -100,7 +100,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			route:  "/admin/resources/{resourceId}/users-with-permission/add/{userId}/{permissionId}",
 			target: "/admin/resources/2/users-with-permission/add/5/7",
 			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
-				return HandleAdminResourceUsersWithPermissionAddPermissionPost(h, c)
+				return HandleUsersWithPermissionAddPermissionPost(h, c)
 			},
 			current:      nil,
 			wantWanted:   []int64{7},
@@ -111,7 +111,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			route:  "/admin/resources/{resourceId}/groups-with-permission/remove/{groupId}/{permissionId}",
 			target: "/admin/resources/2/groups-with-permission/remove/5/7",
 			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
-				return HandleAdminResourceGroupsWithPermissionRemovePermissionPost(h, c)
+				return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 			},
 			current:      []api.PermissionResponse{{Id: 7}, {Id: 3}},
 			group:        true,
@@ -123,7 +123,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			route:  "/admin/resources/{resourceId}/groups-with-permission/add/{groupId}/{permissionId}",
 			target: "/admin/resources/2/groups-with-permission/add/5/7",
 			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
-				return HandleAdminResourceGroupsWithPermissionAddPermissionPost(h, c)
+				return HandleGroupsWithPermissionAddPermissionPost(h, c)
 			},
 			current:      nil,
 			group:        true,

@@ -24,7 +24,7 @@ type settingsAuditLogsAPI interface {
 	UpdateSettingsAuditLogs(ctx context.Context, accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
 }
 
-func HandleAdminSettingsAuditLogsGet(
+func HandleAuditLogsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsAuditLogsAPI,
@@ -80,7 +80,7 @@ func HandleAdminSettingsAuditLogsGet(
 	}
 }
 
-func HandleAdminSettingsAuditLogsPost(
+func HandleAuditLogsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsAuditLogsAPI,
@@ -154,7 +154,7 @@ func HandleAdminSettingsAuditLogsPost(
 	}
 }
 
-func HandleAdminSettingsAuditLogViewerGet(
+func HandleAuditLogViewerGet(
 	httpHelper HttpHelper,
 	apiClient settingsAuditLogsAPI,
 ) http.HandlerFunc {

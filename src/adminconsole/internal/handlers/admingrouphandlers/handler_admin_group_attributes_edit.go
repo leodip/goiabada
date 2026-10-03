@@ -20,7 +20,7 @@ type groupAttributesEditAPI interface {
 	UpdateGroupAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
 }
 
-func HandleAdminGroupAttributesEditGet(
+func HandleAttributesEditGet(
 	httpHelper HttpHelper,
 	apiClient groupAttributesEditAPI,
 ) http.HandlerFunc {
@@ -93,7 +93,7 @@ func HandleAdminGroupAttributesEditGet(
 	}
 }
 
-func HandleAdminGroupAttributesEditPost(
+func HandleAttributesEditPost(
 	httpHelper HttpHelper,
 	apiClient groupAttributesEditAPI,
 ) http.HandlerFunc {

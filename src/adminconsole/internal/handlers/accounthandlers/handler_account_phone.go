@@ -20,7 +20,7 @@ type accountPhoneAPI interface {
 	UpdateAccountPhone(ctx context.Context, accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error)
 }
 
-func HandleAccountPhoneGet(
+func HandlePhoneGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountPhoneAPI,
@@ -74,7 +74,7 @@ func HandleAccountPhoneGet(
 	}
 }
 
-func HandleAccountPhonePost(
+func HandlePhonePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountPhoneAPI,

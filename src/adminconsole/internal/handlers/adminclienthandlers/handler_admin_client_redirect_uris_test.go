@@ -75,7 +75,7 @@ func (s *stubHttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
 // The rows for the other statuses are what keeps the forwarding narrow: a genuine server
 // fault must stay a generic 500 with its detail in the log, not be reported to the
 // administrator as their own mistake.
-func TestHandleAdminClientRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.T) {
+func TestHandleRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.T) {
 
 	const refusal = "Redirect URI must be an absolute URI (a scheme is required, a fragment " +
 		"is not permitted, percent-escapes must be well formed, and an http or https URI must " +
@@ -146,7 +146,7 @@ func TestHandleAdminClientRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.
 			rec := httptest.NewRecorder()
 
 			// httpSession is nil: every case here returns before the session is touched.
-			handler := HandleAdminClientRedirectURIsPost(httpHelper, nil, &stubApiClient{updateErr: tc.apiErr})
+			handler := HandleRedirectURIsPost(httpHelper, nil, &stubApiClient{updateErr: tc.apiErr})
 			handler.ServeHTTP(rec, req)
 
 			assert.Equal(t, tc.wantStatus, rec.Code)
@@ -173,7 +173,7 @@ func TestHandleAdminClientRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.
 // [] is a page that loaded an empty list and must reach the wire as [], and a body without the
 // field must reach it as null, which the API refuses, rather than be defaulted to a list that
 // would pass the check.
-func TestHandleAdminClientRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
+func TestHandleRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 
 	testCases := []struct {
 		name         string
@@ -213,7 +213,7 @@ func TestHandleAdminClientRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
 			stub := &stubApiClient{updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
-			HandleAdminClientRedirectURIsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
+			HandleRedirectURIsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 			if !assert.NotNil(t, stub.sent) {
 				return
@@ -241,7 +241,7 @@ func boolPtr(b bool) *bool { return &b }
 //
 // AuthorizationCodeEnabled is false on every row deliberately. Varying it as well would let a
 // case pass with the implicit half of the condition deleted.
-func TestHandleAdminClientRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
+func TestHandleRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 
 	testCases := []struct {
 		name           string
@@ -296,7 +296,7 @@ func TestHandleAdminClientRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 
 			httpSession := newTestSessionStore()
 
-			handler := HandleAdminClientRedirectURIsGet(httpHelper, httpSession, apiClient)
+			handler := HandleRedirectURIsGet(httpHelper, httpSession, apiClient)
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			assert.NoError(t, httpHelper.err)

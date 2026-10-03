@@ -108,75 +108,75 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		request     *http.Request
 	}{
 		{
-			name: "HandleAdminResourcesGet",
+			name: "HandleListGet",
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourcesGet(h, c)
+				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources", handlertest.WithAccessToken()),
 		},
 		{
-			name: "HandleAdminResourceSettingsGet",
+			name: "HandleSettingsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourceSettingsGet(h, testStore(), c)
+				return HandleSettingsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/settings",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
 		},
 		{
-			name: "HandleAdminResourceDeleteGet",
+			name: "HandleDeleteGet",
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourceDeleteGet(h, c)
+				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/delete",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
 		},
 		{
-			name: "HandleAdminResourcePermissionsGet",
+			name: "HandlePermissionsGet",
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourcePermissionsGet(h, testStore(), c)
+				return HandlePermissionsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/permissions",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
 		},
 		{
-			name:        "HandleAdminResourceUsersWithPermissionGet",
+			name:        "HandleUsersWithPermissionGet",
 			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourceUsersWithPermissionGet(h, testStore(), c)
+				return HandleUsersWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/users-with-permission",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
 		},
 		{
-			name: "HandleAdminResourceGroupsWithPermissionGet, no permission to annotate",
+			name: "HandleGroupsWithPermissionGet, no permission to annotate",
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourceGroupsWithPermissionGet(h, testStore(), c)
+				return HandleGroupsWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
 		},
 		{
-			name:        "HandleAdminResourceGroupsWithPermissionGet, one to annotate",
+			name:        "HandleGroupsWithPermissionGet, one to annotate",
 			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourceGroupsWithPermissionGet(h, testStore(), c)
+				return HandleGroupsWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
 		},
 		{
-			name: "HandleAdminResourceGroupsWithPermissionAddPermissionPost",
+			name: "HandleGroupsWithPermissionAddPermissionPost",
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourceGroupsWithPermissionAddPermissionPost(h, c)
+				return HandleGroupsWithPermissionAddPermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/add/8",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3"),
 				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("permissionId", "8")),
 		},
 		{
-			name: "HandleAdminResourceGroupsWithPermissionRemovePermissionPost",
+			name: "HandleGroupsWithPermissionRemovePermissionPost",
 			build: func(h *mocks_handlers.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleAdminResourceGroupsWithPermissionRemovePermissionPost(h, c)
+				return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/remove/8",
 				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3"),

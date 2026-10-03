@@ -20,7 +20,7 @@ import (
 //
 // Both values of the flag, because the page draws a different password control for each and a
 // handler that stopped reading the carrier would otherwise pass on one of them.
-func TestHandleAdminUserNewGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
+func TestHandleNewGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 	for _, smtpEnabled := range []bool{true, false} {
 		t.Run(map[bool]string{true: "smtp enabled", false: "smtp disabled"}[smtpEnabled], func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -35,7 +35,7 @@ func TestHandleAdminUserNewGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing
 					Issuer:      "https://issuer.example",
 				}))
 
-			HandleAdminUserNewGet(httpHelper).ServeHTTP(httptest.NewRecorder(), req)
+			HandleNewGet(httpHelper).ServeHTTP(httptest.NewRecorder(), req)
 
 			assert.Equal(t, smtpEnabled, handlertest.Bind(t, httpHelper)["smtpEnabled"],
 				"the page's smtpEnabled comes from the carrier the middleware wrote")

@@ -15,7 +15,7 @@ type groupMembersRemoveAPI interface {
 	RemoveUserFromGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error
 }
 
-func HandleAdminGroupMembersRemoveUserPost(
+func HandleMembersRemoveUserPost(
 	httpHelper HttpHelper,
 	apiClient groupMembersRemoveAPI,
 ) http.HandlerFunc {

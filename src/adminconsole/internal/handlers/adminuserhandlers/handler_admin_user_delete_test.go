@@ -51,7 +51,7 @@ func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]inte
 		handlertest.WithRouteParam("userId", "7"),
 	)
 
-	HandleAdminUserDeleteGet(httpHelper, client).ServeHTTP(httptest.NewRecorder(), req)
+	HandleDeleteGet(httpHelper, client).ServeHTTP(httptest.NewRecorder(), req)
 
 	return handlertest.Bind(t, httpHelper)
 }
@@ -59,7 +59,7 @@ func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]inte
 // The memberships row on this page read .user.Groups, which GET /api/v1/admin/users/{id} has never
 // populated, so a confirmation screen for a destructive action told every administrator the user
 // belonged to no groups. The handler loads them now, from the endpoint that serves them (#350).
-func TestHandleAdminUserDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *testing.T) {
+func TestHandleDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *testing.T) {
 	client := &deleteUserApiClient{
 		user: &api.UserResponse{Id: 7, Email: "someone@example.com"},
 		groups: []api.GroupResponse{
@@ -82,7 +82,7 @@ func TestHandleAdminUserDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *t
 
 // A user in no groups still renders, and the row's "none" arm is what it renders. This is the case
 // that was indistinguishable from the defect above before the fix.
-func TestHandleAdminUserDeleteGet_AUserInNoGroupsBindsNone(t *testing.T) {
+func TestHandleDeleteGet_AUserInNoGroupsBindsNone(t *testing.T) {
 	bind := renderUserDelete(t, &deleteUserApiClient{user: &api.UserResponse{Id: 7}})
 
 	groups, ok := bind["groups"].([]api.GroupResponse)
@@ -93,7 +93,7 @@ func TestHandleAdminUserDeleteGet_AUserInNoGroupsBindsNone(t *testing.T) {
 // The full name is assembled beside the user rather than read off it: the response is a DTO with
 // no methods, and a template cannot reach a package function. A bind that stopped carrying it
 // leaves the page's "full name" row silently empty rather than failing (#350 decision 10).
-func TestHandleAdminUserDeleteGet_BindsTheAssembledFullName(t *testing.T) {
+func TestHandleDeleteGet_BindsTheAssembledFullName(t *testing.T) {
 	testCases := []struct {
 		name  string
 		user  *api.UserResponse

@@ -24,7 +24,7 @@ type groupPermissionsAPI interface {
 	UpdateGroupPermissions(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
 }
 
-func HandleAdminGroupPermissionsGet(
+func HandlePermissionsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient groupPermissionsAPI,
@@ -116,7 +116,7 @@ func HandleAdminGroupPermissionsGet(
 	}
 }
 
-func HandleAdminGroupPermissionsPost(
+func HandlePermissionsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient groupPermissionsAPI,

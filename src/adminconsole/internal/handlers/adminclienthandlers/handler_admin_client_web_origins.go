@@ -32,7 +32,7 @@ type clientWebOriginsAPI interface {
 	UpdateClientWebOrigins(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
 }
 
-func HandleAdminClientWebOriginsGet(
+func HandleWebOriginsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientWebOriginsAPI,
@@ -154,7 +154,7 @@ func HandleAdminClientWebOriginsGet(
 	}
 }
 
-func HandleAdminClientWebOriginsPost(
+func HandleWebOriginsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientWebOriginsAPI,

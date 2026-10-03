@@ -24,7 +24,7 @@ type clientPermissionsAPI interface {
 	UpdateClientPermissions(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
 }
 
-func HandleAdminClientPermissionsGet(
+func HandlePermissionsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientPermissionsAPI,
@@ -116,7 +116,7 @@ func HandleAdminClientPermissionsGet(
 	}
 }
 
-func HandleAdminClientPermissionsPost(
+func HandlePermissionsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientPermissionsAPI,

@@ -44,7 +44,7 @@ func (*userGroupsSaveApiClient) GetUserGroups(context.Context, string, int64) (*
 // API reads: [] is a page that loaded no groups and must reach the wire as [], and a body without
 // the field must reach it as null, which the API refuses, rather than be defaulted to a set that
 // would pass.
-func TestHandleAdminUserGroupsPost_SendsTheLoadedList(t *testing.T) {
+func TestHandleGroupsPost_SendsTheLoadedList(t *testing.T) {
 	testCases := []struct {
 		name         string
 		body         string
@@ -87,7 +87,7 @@ func TestHandleAdminUserGroupsPost_SendsTheLoadedList(t *testing.T) {
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
 			stub := &userGroupsSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
-			HandleAdminUserGroupsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
+			HandleGroupsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, stub.sent)
 			assert.Equal(t, tc.wantWanted, stub.sent.GroupIds)
@@ -101,7 +101,7 @@ func TestHandleAdminUserGroupsPost_SendsTheLoadedList(t *testing.T) {
 
 // A save from an outdated page reaches the administrator as the API's own sentence and status,
 // telling them to reload, rather than the generic error (#428).
-func TestHandleAdminUserGroupsPost_AConflictReachesTheBrowser(t *testing.T) {
+func TestHandleGroupsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
 	httpHelper := render.New(nil)
 	req := handlertest.Request(http.MethodPost, "/admin/users/5/groups",
@@ -112,7 +112,7 @@ func TestHandleAdminUserGroupsPost_AConflictReachesTheBrowser(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	stub := &userGroupsSaveApiClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
-	HandleAdminUserGroupsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
+	HandleGroupsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	var response map[string]string

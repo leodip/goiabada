@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-func HandleAdminClientNewGet(
+func HandleNewGet(
 	httpHelper HttpHelper,
 ) http.HandlerFunc {
 
@@ -34,7 +34,7 @@ type clientNewAPI interface {
 	CreateClient(ctx context.Context, accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error)
 }
 
-func HandleAdminClientNewPost(
+func HandleNewPost(
 	httpHelper HttpHelper,
 	apiClient clientNewAPI,
 	baseURL string,

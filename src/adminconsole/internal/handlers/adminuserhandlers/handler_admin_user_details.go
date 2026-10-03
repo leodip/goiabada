@@ -20,7 +20,7 @@ type userDetailsAPI interface {
 	UpdateUserEnabled(ctx context.Context, accessToken string, userId int64, enabled bool) (*api.UserResponse, error)
 }
 
-func HandleAdminUserDetailsGet(
+func HandleDetailsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userDetailsAPI,
@@ -90,7 +90,7 @@ func HandleAdminUserDetailsGet(
 	}
 }
 
-func HandleAdminUserDetailsPost(
+func HandleDetailsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient userDetailsAPI,

@@ -20,7 +20,7 @@ type resourceDeleteAPI interface {
 	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
 }
 
-func HandleAdminResourceDeleteGet(
+func HandleDeleteGet(
 	httpHelper HttpHelper,
 	apiClient resourceDeleteAPI,
 ) http.HandlerFunc {
@@ -70,7 +70,7 @@ func HandleAdminResourceDeleteGet(
 	}
 }
 
-func HandleAdminResourceDeletePost(
+func HandleDeletePost(
 	httpHelper HttpHelper,
 	apiClient resourceDeleteAPI,
 	baseURL string,

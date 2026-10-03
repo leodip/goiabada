@@ -78,7 +78,7 @@ func renderGroupPage(t *testing.T, client *groupBindApiClient, target, page stri
 // The attributes page names the group in its heading and lists the attributes below it. Both come
 // off responses now, and the group's three scalars are three separate keys on the bind rather than
 // one object, so a field lost between the two is lost silently.
-func TestHandleAdminGroupAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
+func TestHandleAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
 	client := &groupBindApiClient{
 		group: &api.GroupResponse{Id: 4, GroupIdentifier: "admins", Description: "Administrators"},
 		attributes: []api.GroupAttributeResponse{
@@ -89,7 +89,7 @@ func TestHandleAdminGroupAttributesGet_BindsTheGroupAndItsAttributes(t *testing.
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/attributes", "/admin_groups_attributes.html",
 		func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
-			return HandleAdminGroupAttributesGet(h, client)
+			return HandleAttributesGet(h, client)
 		})
 
 	assert.Equal(t, int64(4), bind["groupId"])
@@ -107,7 +107,7 @@ func TestHandleAdminGroupAttributesGet_BindsTheGroupAndItsAttributes(t *testing.
 // The member count reaches this page off the response's own field, where it used to arrive as a
 // second return value beside the group. The page is a confirmation screen for a destructive
 // action, so a count that silently became zero tells the administrator the group is empty.
-func TestHandleAdminGroupDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.T) {
+func TestHandleDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.T) {
 	client := &groupBindApiClient{
 		group: &api.GroupResponse{Id: 4, GroupIdentifier: "admins", Description: "Administrators",
 			MemberCount: 17},
@@ -115,7 +115,7 @@ func TestHandleAdminGroupDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/delete", "/admin_groups_delete.html",
 		func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
-			return HandleAdminGroupDeleteGet(h, client)
+			return HandleDeleteGet(h, client)
 		})
 
 	assert.Equal(t, 17, bind["countOfUsers"],
@@ -129,7 +129,7 @@ func TestHandleAdminGroupDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.
 
 // The settings page's two checkboxes. They are booleans, so a bind that lost one renders it
 // unchecked, which is a valid-looking page asserting the opposite of the truth.
-func TestHandleAdminGroupSettingsGet_BindsBothTokenFlags(t *testing.T) {
+func TestHandleSettingsGet_BindsBothTokenFlags(t *testing.T) {
 	client := &groupBindApiClient{
 		group: &api.GroupResponse{Id: 4, GroupIdentifier: "admins", Description: "Administrators",
 			IncludeInIdToken: true, IncludeInAccessToken: false},
@@ -141,7 +141,7 @@ func TestHandleAdminGroupSettingsGet_BindsBothTokenFlags(t *testing.T) {
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/settings", "/admin_groups_settings.html",
 		func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
-			return HandleAdminGroupSettingsGet(h, httpSession, client)
+			return HandleSettingsGet(h, httpSession, client)
 		})
 
 	assert.Equal(t, int64(4), bind["groupId"])

@@ -133,7 +133,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
 			apiClient := &notFoundGroupApiClient{entity: testCase.entity, err: testCase.apiErr}
-			handler := HandleAdminGroupAttributesGet(httpHelper, apiClient)
+			handler := HandleAttributesGet(httpHelper, apiClient)
 			w := httptest.NewRecorder()
 
 			if testCase.routed {
@@ -181,7 +181,7 @@ func TestGroupSettings_AGoneGroupAnswers404AndAFaultAnswers500(t *testing.T) {
 			apiClient := &notFoundGroupApiClient{err: testCase.apiErr}
 
 			// The session store is nil: neither answer reaches it.
-			HandleAdminGroupSettingsGet(httpHelper, nil, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+			HandleSettingsGet(httpHelper, nil, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
 		})

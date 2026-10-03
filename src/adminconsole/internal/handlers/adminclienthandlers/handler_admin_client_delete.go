@@ -20,7 +20,7 @@ type clientDeleteAPI interface {
 	GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
 }
 
-func HandleAdminClientDeleteGet(
+func HandleDeleteGet(
 	httpHelper HttpHelper,
 	apiClient clientDeleteAPI,
 ) http.HandlerFunc {
@@ -93,7 +93,7 @@ func HandleAdminClientDeleteGet(
 	}
 }
 
-func HandleAdminClientDeletePost(
+func HandleDeletePost(
 	httpHelper HttpHelper,
 	apiClient clientDeleteAPI,
 	baseURL string,

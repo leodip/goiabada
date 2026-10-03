@@ -97,10 +97,10 @@ func (j *cookieJar) send(req *http.Request) *http.Request {
 	return req
 }
 
-// TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops drives the POST and two
+// TestHandleChangePassword_TheNoticeShowsOnceAndThenStops drives the POST and two
 // GETs on one cookie jar, which is the sequence a user performs: submit the form, read the
 // notice, reload the page.
-func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
+func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 	store := newFlashTestStore()
 
 	// The POST: the API accepts the change, the handler flashes and redirects.
@@ -114,7 +114,7 @@ func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	postRec := httptest.NewRecorder()
 
-	HandleAccountChangePasswordPost(postHelper, store, flashStubApiClient{}, consoleBaseURL).
+	HandleChangePasswordPost(postHelper, store, flashStubApiClient{}, consoleBaseURL).
 		ServeHTTP(postRec, postReq)
 
 	require.Equal(t, http.StatusFound, postRec.Code,
@@ -131,7 +131,7 @@ func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T
 	firstReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
 		handlertest.WithAccessToken()))
 
-	HandleAccountChangePasswordGet(firstHelper, store, nil).ServeHTTP(firstRec, firstReq)
+	HandleChangePasswordGet(firstHelper, store, nil).ServeHTTP(firstRec, firstReq)
 	jar.keep(firstRec)
 
 	assert.Equal(t, true, handlertest.Bind(t, firstHelper)["savedSuccessfully"],
@@ -144,22 +144,22 @@ func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T
 	secondReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
 		handlertest.WithAccessToken()))
 
-	HandleAccountChangePasswordGet(secondHelper, store, nil).
+	HandleChangePasswordGet(secondHelper, store, nil).
 		ServeHTTP(httptest.NewRecorder(), secondReq)
 
 	assert.Equal(t, false, handlertest.Bind(t, secondHelper)["savedSuccessfully"],
 		"a reload must not show the notice again")
 }
 
-// TestHandleAccountChangePasswordGet_NoFlashIsNoNotice is the negative half: without it the
+// TestHandleChangePasswordGet_NoFlashIsNoNotice is the negative half: without it the
 // case above is satisfied by a handler that binds true unconditionally.
-func TestHandleAccountChangePasswordGet_NoFlashIsNoNotice(t *testing.T) {
+func TestHandleChangePasswordGet_NoFlashIsNoNotice(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_change_password.html").Once()
 
 	req := handlertest.Request(http.MethodGet, "/account/change-password", handlertest.WithAccessToken())
 
-	HandleAccountChangePasswordGet(httpHelper, newFlashTestStore(), nil).
+	HandleChangePasswordGet(httpHelper, newFlashTestStore(), nil).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	assert.Equal(t, false, handlertest.Bind(t, httpHelper)["savedSuccessfully"])
