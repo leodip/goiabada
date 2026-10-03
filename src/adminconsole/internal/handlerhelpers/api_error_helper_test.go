@@ -358,6 +358,23 @@ func TestJsonBadRequestBody_Answers400WithoutLogging(t *testing.T) {
 	assert.NotEmpty(t, detail.GetDescription())
 }
 
+// JsonConflict is the third: a page loaded before another administrator's change, acted on after
+// it. It answers 409 under the code the auth server's own list saves answer the same race with,
+// and logs nothing, because nothing is at fault (#440 decision 6).
+func TestJsonConflict_Answers409WithoutLogging(t *testing.T) {
+	httpHelper := mocks_handlers.NewHttpHelper(t)
+	captured := captureJsonError(httpHelper)
+
+	JsonConflict(httpHelper, httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/admin/resources/2/users-with-permission/add/5/7", nil))
+
+	detail, ok := (*captured).(*customerrors.ErrorDetail)
+	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusConflict, detail.GetHttpStatusCode())
+	assert.Equal(t, "concurrent_update", detail.GetCode())
+	assert.NotEmpty(t, detail.GetDescription())
+}
+
 // TestHandleAPIErrorJson_AnswersNotFound is decision 11's AJAX half. Until it existed, an
 // administrator clicking a row another administrator had just deleted was told the server had
 // broken: a 404 from the API fell past the forwarded set into the generic arm, so it answered 500

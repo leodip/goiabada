@@ -181,6 +181,18 @@ func JsonNotFound(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request
 		http.StatusNotFound))
 }
 
+// JsonConflict answers a click on a page loaded before another administrator's change: granting
+// what the page showed as not held when it is held now, or revoking what the page showed as held
+// when it is not. Another change won between the load and the click, which is what the auth
+// server's own list saves answer 409 CONCURRENT_UPDATE for (#428), and RFC 9110 section 15.5.10
+// uses 409 where "the user might be able to resolve the conflict and resubmit the request" --
+// here, by reloading. Neither side is at fault, so nothing is logged (#440 decision 6).
+func JsonConflict(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
+	httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("concurrent_update",
+		"This item was changed after the page was loaded. Reload the page and try again.",
+		http.StatusConflict))
+}
+
 // JsonBadRequestBody answers a request whose body did not arrive, did not decode, or decoded
 // without something the endpoint requires.
 //

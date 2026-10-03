@@ -2,18 +2,15 @@ package adminresourcehandlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -29,47 +26,23 @@ type resourceGroupsWithPermissionAPI interface {
 }
 
 func HandleAdminResourceGroupsWithPermissionGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			httpHelper.NotFound(w, r)
 			return
 		}
-
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.NotFound(w, r)
-			return
-		}
-		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			httpHelper.NotFound(w, r)
-			return
-		}
-
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
-			return
-		}
+		resource, permissions, accessToken := loaded.resource, loaded.permissions, loaded.accessToken
 
 		selectedPermissionStr := r.URL.Query().Get("permission")
 		if len(selectedPermissionStr) == 0 {
@@ -219,40 +192,22 @@ func HandleAdminResourceGroupsWithPermissionGet(
 }
 
 func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
-
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
-		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
+		permissions, accessToken := loaded.permissions, loaded.accessToken
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
@@ -288,12 +243,6 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
-			return
-		}
-
 		found := false
 		for _, permission := range permissions {
 			if permission.Id == permissionId {
@@ -303,7 +252,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -316,7 +265,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 
 		if found {
-			httpHelper.JsonError(w, r, errs.Errorf("group %v already has permission %v", group.Id, permissionId))
+			handlerhelpers.JsonConflict(httpHelper, w, r)
 			return
 		}
 		// Build the new set and update via API
@@ -342,40 +291,22 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 }
 
 func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
-
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
-		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
+		permissions, accessToken := loaded.permissions, loaded.accessToken
 
 		groupIdStr := chi.URLParam(r, "groupId")
 		if len(groupIdStr) == 0 {
@@ -411,12 +342,6 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
-			return
-		}
-
 		found := false
 		for _, permission := range permissions {
 			if permission.Id == permissionId {
@@ -426,7 +351,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -439,7 +364,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 
 		if !found {
-			httpHelper.JsonError(w, r, errs.Errorf("group %v does not have permission %v", group.Id, permissionId))
+			handlerhelpers.JsonConflict(httpHelper, w, r)
 			return
 		}
 		// Build reduced set and update via API
