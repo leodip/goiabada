@@ -128,7 +128,7 @@ func HandleUserInfoGetPost(
 // guards in front of it challenge theirs: through middleware.BearerChallenge, so the realm and the
 // conformed description are on every bearer challenge this endpoint writes (#435).
 func invalidTokenRefusal(description string) error {
-	return protocolvalidation.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+	return protocolvalidation.NewErrorDetailWithHTTPStatusAndWWWAuthenticate(
 		"invalid_token", description, http.StatusUnauthorized,
 		middleware.BearerChallenge("invalid_token", description))
 }

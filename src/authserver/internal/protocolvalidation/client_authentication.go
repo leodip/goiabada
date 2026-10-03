@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 const clientSecretRequiredErrorMsg = "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed."
@@ -38,7 +38,7 @@ const (
 func (val *TokenValidator) authenticateClient(client *models.Client, presentedSecret string) error {
 	if client.IsPublic {
 		if len(presentedSecret) > 0 {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				clientSecretNotRequiredErrorMsg, http.StatusBadRequest)
 		}
 		return nil
@@ -68,7 +68,7 @@ func (val *TokenValidator) authenticateClient(client *models.Client, presentedSe
 // handle. What it costs: a browser app calling this endpoint with a mistyped or disabled client_id
 // now gets a 401 with a Basic challenge, which some browsers answer with their login prompt in a
 // same-origin setup.
-func invalidClientError(description string) *customerrors.ErrorDetail {
-	return NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+func invalidClientError(description string) *oauth.ErrorDetail {
+	return NewErrorDetailWithHTTPStatusAndWWWAuthenticate("invalid_client",
 		description, http.StatusUnauthorized, BasicChallenge)
 }

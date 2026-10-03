@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,11 +65,11 @@ func TestValidateRequest_ImplicitFlow_ResponseModeQueryRefused(t *testing.T) {
 			err := validator.ValidateRequest(implicitRequest(responseType, "query"))
 
 			require.Error(t, err)
-			detail, ok := err.(*customerrors.ErrorDetail)
+			detail, ok := err.(*oauth.ErrorDetail)
 			require.True(t, ok, "the refusal is a protocol error, not a localized page")
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Equal(t, implicitQueryRefusal, detail.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Equal(t, implicitQueryRefusal, detail.Description())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 		})
 	}
 }
@@ -103,11 +103,11 @@ func TestValidateRequest_ImplicitFlow_UnsupportedResponseModeIsTheGeneralRefusal
 			err := validator.ValidateRequest(implicitRequest("token", mode))
 
 			require.Error(t, err)
-			detail, ok := err.(*customerrors.ErrorDetail)
+			detail, ok := err.(*oauth.ErrorDetail)
 			require.True(t, ok)
-			assert.Equal(t, "invalid_request", detail.GetCode())
+			assert.Equal(t, "invalid_request", detail.Code())
 			assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.",
-				detail.GetDescription())
+				detail.Description())
 		})
 	}
 }

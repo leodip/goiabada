@@ -2,10 +2,8 @@ package protocolvalidation
 
 import (
 	"fmt"
-	"net/http"
-
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
+	"net/http"
 )
 
 // ValidateSpaceDelimited refuses a space-delimited parameter whose value is not well formed
@@ -23,7 +21,7 @@ func ValidateSpaceDelimited(parameter, errorCode, value string) error {
 	if oauth.IsWellFormedSpaceDelimited(value) {
 		return nil
 	}
-	return customerrors.NewErrorDetailWithHttpStatusCode(errorCode,
+	return oauth.NewErrorDetailWithHTTPStatus(errorCode,
 		fmt.Sprintf("The '%v' parameter is malformed. Separate its values with a single space, with no space before the first value or after the last.", parameter),
 		http.StatusBadRequest)
 }

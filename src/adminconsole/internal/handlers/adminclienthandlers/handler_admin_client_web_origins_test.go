@@ -142,7 +142,7 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 // The API's refusal has to reach the administrator's screen.
 //
 // This handler passed the error to httpHelper.JsonError directly, which preserves a status and a
-// description only for a *customerrors.ErrorDetail. An *apiclient.APIError took the generic branch,
+// description only for a *oauth.ErrorDetail. An *apiclient.APIError took the generic branch,
 // so a 400 became "An unexpected server error has occurred" and the sentence naming the offending
 // value went to the log. That is #122's defect, fixed there for the Redirect URIs page and missed
 // here, and #250 is what makes it bite: the API now refuses shapes this page's own

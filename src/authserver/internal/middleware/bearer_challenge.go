@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // BearerRealm is the realm every bearer challenge this server writes carries. One value, because
@@ -24,7 +24,7 @@ const BearerRealm = protocolvalidation.ChallengeRealm
 //
 // Every attribute value is written as a quoted-string, which RFC 9110 section 11.5 requires of the
 // realm ("a sender MUST only generate the quoted-string syntax"). The description passes through
-// customerrors.ConformErrorDescription, which is RFC 6750 section 3's own set for error_description
+// oauth.ConformErrorDescription, which is RFC 6750 section 3's own set for error_description
 // (%x20-21 / %x23-5B / %x5D-7E) and excludes both the double quote and the backslash, so no value
 // can end the quoted-string early or smuggle an escape into the header. errorCode is always one of
 // RFC 6750 section 3.1's three codes, chosen by this server.
@@ -35,7 +35,7 @@ func BearerChallenge(errorCode, description string) string {
 	}
 	challenge += `, error="` + errorCode + `"`
 	if description != "" {
-		challenge += `, error_description="` + customerrors.ConformErrorDescription(description) + `"`
+		challenge += `, error_description="` + oauth.ConformErrorDescription(description) + `"`
 	}
 	return challenge
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -85,7 +84,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 	scopes := oidc.SplitScope(scope)
 
 	if len(scopes) == 0 {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 			"The 'scope' parameter is missing. Ensure to include one or more scopes, separated by spaces. Scopes can be an OpenID Connect scope, a resource:permission scope, or a combination of both.",
 			http.StatusBadRequest)
 	}
@@ -103,7 +102,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 	// after it had claimed the code (#244). It is refused as an invalid scope, which RFC 6749
 	// 4.1.2.1 names for a scope that is "invalid, unknown, or malformed".
 	if !slices.ContainsFunc(scopes, func(s string) bool { return !oidc.IsOfflineAccessScope(s) }) {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 			"The 'scope' parameter holds only 'offline_access', which grants nothing by itself. Include at least one other scope, such as 'openid' or a resource:permission scope.",
 			http.StatusBadRequest)
 	}
@@ -125,15 +124,15 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 
 		switch resolution.Outcome {
 		case permissions.ScopeMalformed:
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr),
 				http.StatusBadRequest)
 		case permissions.ScopeResourceUnknown:
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resolution.ResourceIdentifier),
 				http.StatusBadRequest)
 		case permissions.ScopePermissionUnknown:
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Scope '%v' is invalid. The resource identified by '%v' does not have a permission with identifier '%v'.", scopeStr, resolution.ResourceIdentifier, resolution.PermissionIdentifier),
 				http.StatusBadRequest)
 		}
@@ -146,7 +145,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 // user-agent to the invalid redirection URI". Every rejection here therefore reaches a rendered
 // page and never an error_description, which is why these seven are *i18n.LocalizedError and
 // render in the visitor's locale, while the validations that run after this one return
-// customerrors.ErrorDetail and stay English (#213).
+// oauth.ErrorDetail and stay English (#213).
 //
 // The declared return type stays error rather than *i18n.LocalizedError: a database failure is
 // returned unwrapped from here, and the handler tells the two apart by type assertion.
@@ -240,14 +239,14 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 
 func (val *AuthorizeValidator) ValidateUnsupportedRequestParameters(input *ValidateUnsupportedRequestParametersInput) error {
 	if input.HasRequest {
-		return customerrors.NewErrorDetailWithHttpStatusCode(
+		return oauth.NewErrorDetailWithHTTPStatus(
 			"request_not_supported",
 			"The request parameter is not supported.",
 			http.StatusBadRequest,
 		)
 	}
 	if input.HasRequestURI {
-		return customerrors.NewErrorDetailWithHttpStatusCode(
+		return oauth.NewErrorDetailWithHTTPStatus(
 			"request_uri_not_supported",
 			"The request_uri parameter is not supported.",
 			http.StatusBadRequest,
@@ -304,7 +303,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	// Check for empty/missing response_type first
 	if input.ResponseType == "" {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The response_type parameter is missing.", http.StatusBadRequest)
 	}
 
@@ -351,7 +350,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	}
 
 	if !validResponseType {
-		return customerrors.NewErrorDetailWithHttpStatusCode("unsupported_response_type",
+		return oauth.NewErrorDetailWithHTTPStatus("unsupported_response_type",
 			"The authorization server does not support this response_type. Supported values: "+
 				strings.Join(supportedResponseTypes, ", ")+".",
 			http.StatusBadRequest)
@@ -359,14 +358,14 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	// Check if implicit flow is authorized for this client
 	if isImplicitFlow && !input.ImplicitGrantEnabled {
-		return customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+		return oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			ImplicitNotAuthorizedErrorMsg, http.StatusBadRequest)
 	}
 
 	// OIDC: id_token requires openid scope
 	if rtInfo.HasIdToken {
 		if !slices.Contains(oidc.SplitScope(input.Scope), "openid") {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				"The 'openid' scope is required when requesting an id_token.",
 				http.StatusBadRequest)
 		}
@@ -374,7 +373,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	// OIDC: nonce is REQUIRED for implicit flow with id_token (OIDC Core 3.2.2.1)
 	if rtInfo.HasIdToken && isImplicitFlow && input.Nonce == "" {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The 'nonce' parameter is required for implicit flow when requesting an id_token.",
 			http.StatusBadRequest)
 	}
@@ -400,12 +399,12 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		if input.PKCERequired {
 			// PKCE is required - validate that it's provided and correct
 			if input.CodeChallengeMethod != "S256" {
-				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 					"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
 			}
 
 			if !hasPKCELength(input.CodeChallenge) {
-				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 					"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
 					http.StatusBadRequest)
 			}
@@ -415,12 +414,12 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		} else if pkceProvided {
 			// PKCE is optional but was provided - validate format (strict mode)
 			if input.CodeChallengeMethod != "S256" {
-				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 					"Invalid code_challenge_method. Only 'S256' is supported.", http.StatusBadRequest)
 			}
 
 			if !hasPKCELength(input.CodeChallenge) {
-				return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 					"The code_challenge parameter is incorrect. It should be 43 to 128 characters long.",
 					http.StatusBadRequest)
 			}
@@ -440,7 +439,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	// belongs to the validator rather than to one caller, and a second caller of ValidateRequest
 	// would not inherit the handler's branch.
 	if !IsSupportedResponseMode(input.ResponseMode) {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Invalid response_mode parameter. Supported values are: query, fragment, form_post.",
 			http.StatusBadRequest)
 	}
@@ -453,7 +452,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	// whose default Response Modes are the query encoding or the fragment encoding using the
 	// form_post Response Mode", so the request may name it, or the fragment, or nothing (#231).
 	if isImplicitFlow && input.ResponseMode == "query" {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Implicit flow does not support response_mode=query. Use response_mode=fragment (the default for implicit flow) or response_mode=form_post.",
 			http.StatusBadRequest)
 	}
@@ -462,7 +461,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	// 4.1.2.1 answers with invalid_request. It used to be parsed with strconv.Atoi at every hop and
 	// a failure dropped, so "abc" constrained nothing and "-1" forced a login (#243).
 	if _, err := oidc.ParseMaxAge(input.MaxAge); err != nil {
-		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The max_age parameter must be a non-negative integer.", http.StatusBadRequest)
 	}
 
@@ -508,7 +507,7 @@ func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
 	hasNone := false
 	for _, v := range values {
 		if !validValues[v] {
-			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			return "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				fmt.Sprintf("Invalid prompt value: %s", v), http.StatusBadRequest)
 		}
 		if v == "none" {
@@ -518,14 +517,14 @@ func (val *AuthorizeValidator) ValidatePrompt(prompt string) (string, error) {
 
 	// Check for conflicts: none cannot be combined with other values
 	if hasNone && len(values) > 1 {
-		return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"prompt=none cannot be combined with other values", http.StatusBadRequest)
 	}
 
 	// After the two refusals above, so that "none select_account" is still the combination error
 	// and an unknown value still names itself.
 	if slices.Contains(values, "select_account") {
-		return "", customerrors.NewErrorDetailWithHttpStatusCode("account_selection_required",
+		return "", oauth.NewErrorDetailWithHTTPStatus("account_selection_required",
 			"prompt=select_account is not supported: the authorization server cannot ask the end user to select an account.",
 			http.StatusBadRequest)
 	}

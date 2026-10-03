@@ -547,7 +547,7 @@ func writeJSONError(w http.ResponseWriter, message, code string, statusCode int)
 			src: `package p
 func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 	writeJSONError(w, localizedErr.Localize(r.Context()), localizedErr.Code, http.StatusBadRequest)
-	writeJSONError(w, errorDetail.GetDescription(), "VALIDATION_ERROR", http.StatusBadRequest)
+	writeJSONError(w, errorDetail.Description(), "VALIDATION_ERROR", http.StatusBadRequest)
 }`,
 			codes: []string{"VALIDATION_ERROR"},
 		},

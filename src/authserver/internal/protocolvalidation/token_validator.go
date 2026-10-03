@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -94,7 +93,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 	input *ValidateTokenRequestInput) (TokenGrant, error) {
 
 	if len(input.ClientId) == 0 {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required client_id parameter.", http.StatusBadRequest)
 	}
 
@@ -115,7 +114,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 	// Whether the grant is redeemed here at all is the grant table's answer, read after the
 	// client checks above so an unknown client is still answered first, as it always was (#437).
 	if !input.GrantType.AcceptedAtTokenEndpoint() {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unsupported_grant_type", "Unsupported grant_type.",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("unsupported_grant_type", "Unsupported grant_type.",
 			http.StatusBadRequest)
 	}
 

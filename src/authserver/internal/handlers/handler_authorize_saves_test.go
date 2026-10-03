@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -201,7 +200,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 			if tc.scopeInvalid {
 				authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(
-					customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", "Invalid scope.", http.StatusBadRequest))
+					oauth.NewErrorDetailWithHTTPStatus("invalid_scope", "Invalid scope.", http.StatusBadRequest))
 			} else {
 				authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 				authorizeValidator.On("ValidatePrompt", tc.prompt).Return(tc.prompt, nil)

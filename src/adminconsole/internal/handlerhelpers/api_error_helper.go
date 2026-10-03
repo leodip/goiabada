@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // sessionEndedPath is the console route an admin API 401 sends the browser to, which clears the
@@ -122,7 +122,7 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 // the detail in the server log, and a request id on screen.
 //
 // This exists because JsonError preserves a status and a description only for
-// *customerrors.ErrorDetail. An *apiclient.APIError handed to it directly takes the generic
+// *oauth.ErrorDetail. An *apiclient.APIError handed to it directly takes the generic
 // branch, so an administrator who typed a value the API refused is told "An unexpected
 // server error has occurred", and the sentence naming the offending value goes to the log
 // instead of to the screen (#122).
@@ -143,7 +143,7 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 // different credentials", section 15.5.4, which is what signing in again is (#427 decision 18).
 func HandleAPIErrorJson(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error) {
 	if IsSessionEnded(err) {
-		httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(sessionEndedCode,
+		httpHelper.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus(sessionEndedCode,
 			i18n.T(r.Context(), "adminconsole.session_ended.message"), http.StatusForbidden))
 		return
 	}
@@ -154,7 +154,7 @@ func HandleAPIErrorJson(httpHelper ErrorWriter, w http.ResponseWriter, r *http.R
 			return
 		}
 		if apiErr.StatusCode == http.StatusBadRequest || apiErr.StatusCode == http.StatusConflict {
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(
+			httpHelper.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus(
 				apiErr.Code, apiErr.Message, apiErr.StatusCode))
 			return
 		}
@@ -176,7 +176,7 @@ func HandleAPIErrorJson(httpHelper ErrorWriter, w http.ResponseWriter, r *http.R
 // It is silent because JsonError does not log an *ErrorDetail, which is the property that makes it
 // the counterpart of NotFound rather than a differently spelled 500.
 func JsonNotFound(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
-	httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("not_found",
+	httpHelper.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("not_found",
 		"Sorry, the item you are looking for could not be found. It may have been deleted, or the address may be incorrect.",
 		http.StatusNotFound))
 }
@@ -188,7 +188,7 @@ func JsonNotFound(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request
 // uses 409 where "the user might be able to resolve the conflict and resubmit the request" --
 // here, by reloading. Neither side is at fault, so nothing is logged (#440 decision 6).
 func JsonConflict(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
-	httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("concurrent_update",
+	httpHelper.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("concurrent_update",
 		"This item was changed after the page was loaded. Reload the page and try again.",
 		http.StatusConflict))
 }
@@ -204,7 +204,7 @@ func JsonConflict(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request
 // script should never have sent. None is a server fault, and answering 500 logged a stack for each
 // of them (#279 decision 12).
 func JsonBadRequestBody(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request) {
-	httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request_body",
+	httpHelper.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_request_body",
 		"The request body is not valid JSON, or is missing information this endpoint requires.",
 		http.StatusBadRequest))
 }

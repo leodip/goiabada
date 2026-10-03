@@ -11,7 +11,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -95,11 +94,11 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 					return
 				}
 				assert.Nil(t, result)
-				var detail *customerrors.ErrorDetail
+				var detail *oauth.ErrorDetail
 				require.ErrorAs(t, err, &detail)
-				assert.Equal(t, tc.wantCode, detail.GetCode())
-				assert.Equal(t, tc.wantDesc, detail.GetDescription())
-				assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+				assert.Equal(t, tc.wantCode, detail.Code())
+				assert.Equal(t, tc.wantDesc, detail.Description())
+				assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 			})
 		}
 	})

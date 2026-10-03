@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +40,7 @@ func TestWriteValidationError(t *testing.T) {
 	localized := i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil)
 	const localizedText = "Please enter a valid email address."
 
-	detail := customerrors.NewErrorDetail("some_code", "The value is not acceptable.")
+	detail := oauth.NewErrorDetail("some_code", "The value is not acceptable.")
 
 	tests := []struct {
 		name            string

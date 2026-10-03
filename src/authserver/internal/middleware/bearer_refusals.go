@@ -118,6 +118,6 @@ func (u userinfoBearerRefusals) internalError(w http.ResponseWriter, r *http.Req
 }
 
 func (u userinfoBearerRefusals) refuse(w http.ResponseWriter, r *http.Request, errorCode, description string, status int) {
-	u.jsonWriter.JsonError(w, r, protocolvalidation.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+	u.jsonWriter.JsonError(w, r, protocolvalidation.NewErrorDetailWithHTTPStatusAndWWWAuthenticate(
 		errorCode, description, status, BearerChallenge(errorCode, description)))
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // authCodeNotAuthorizedErrorMsg refuses a refresh token that an authorization code minted, for a
@@ -42,7 +42,7 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 	switch {
 	case errors.As(err, &replayed):
 		tr.auditRefreshTokenReplay(r.Context(), grant, replayed.FamilyRevokedCount, replayed.FamilyRecorded)
-		tr.jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			revokedRefreshTokenMessage, http.StatusBadRequest))
 		return
 	case errors.Is(err, issuance.ErrRefreshFlowDisabled):
@@ -50,14 +50,14 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		if grant.IsROPC {
 			description = protocolvalidation.ROPCNotAuthorizedErrorMsg
 		}
-		tr.jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			description, http.StatusBadRequest))
 		return
 	case errors.Is(err, issuance.ErrRefreshTokenNotClaimed), errors.Is(err, issuance.ErrRefreshFamilyRevoked):
 		// A family revoked between the validator's read and the rotation gets the lost claim's
 		// answer: the client can act on neither differently, and the record says nothing about
 		// why (#132, #259).
-		tr.jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			revokedRefreshTokenMessage, http.StatusBadRequest))
 		return
 	case err != nil:

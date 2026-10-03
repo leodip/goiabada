@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -128,7 +128,7 @@ func TestValidatePermissionPost_AWrappedRefusalStillReachesTheForm(t *testing.T)
 		},
 		{
 			name: "a wrapped ErrorDetail",
-			err:  errs.Wrap(customerrors.NewErrorDetail("invalid", "That identifier is taken."), "validating"),
+			err:  errs.Wrap(oauth.NewErrorDetail("invalid", "That identifier is taken."), "validating"),
 			want: "That identifier is taken.",
 		},
 	}

@@ -17,8 +17,8 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -146,7 +146,7 @@ func TestHandleConsentGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
-		expectedError := &customerrors.ErrorDetail{}
+		expectedError := &oauth.ErrorDetail{}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -479,7 +479,7 @@ func TestHandleConsentPost(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/auth/consent", nil)
 		rr := httptest.NewRecorder()
 
-		expectedError := &customerrors.ErrorDetail{}
+		expectedError := &oauth.ErrorDetail{}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {

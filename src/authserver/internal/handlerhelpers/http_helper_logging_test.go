@@ -13,9 +13,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -273,7 +273,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
-		httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The operation failed."))
+		httpHelper.JsonError(w, r, oauth.NewErrorDetail("server_error", "The operation failed."))
 	})
 
 	w := httptest.NewRecorder()
@@ -312,7 +312,7 @@ func TestJsonError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "The operation failed.",
+	detail := oauth.NewErrorDetailWithHTTPStatus("server_error", "The operation failed.",
 		http.StatusInternalServerError)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -390,7 +390,7 @@ func TestJsonError_ConformsTheFinalDescription(t *testing.T) {
 		{
 			name:      "a chosen 400 detail's description is conformed",
 			requestId: "goiabada/abc123-000042",
-			err: customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			err: oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				"Scope \"café\\x\" is not recognised.", http.StatusBadRequest),
 			wantStatus:      http.StatusBadRequest,
 			wantCode:        "invalid_scope",
@@ -399,7 +399,7 @@ func TestJsonError_ConformsTheFinalDescription(t *testing.T) {
 		{
 			name:            "a status-less detail is conformed after the request id is appended",
 			requestId:       "id\"1",
-			err:             customerrors.NewErrorDetail("server_error", "The operation failed."),
+			err:             oauth.NewErrorDetail("server_error", "The operation failed."),
 			wantStatus:      http.StatusInternalServerError,
 			wantCode:        "server_error",
 			wantDescription: "The operation failed. Request Id: id?1",
@@ -407,7 +407,7 @@ func TestJsonError_ConformsTheFinalDescription(t *testing.T) {
 		{
 			name:      "a description over 512 bytes is cut to 512",
 			requestId: "goiabada/abc123-000042",
-			err: customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			err: oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				strings.Repeat("a", 600), http.StatusBadRequest),
 			wantStatus:      http.StatusBadRequest,
 			wantCode:        "invalid_request",
@@ -454,14 +454,14 @@ func TestJsonError_ConformsTheFinalDescription(t *testing.T) {
 // The token endpoint's half of RFC 6749 section 5.2: a confidential client that presented Basic
 // credentials and failed must be answered 401 with a WWW-Authenticate header, and the token
 // validator's authenticateClient, which builds that refusal, reaches the wire through this
-// writer. Built with customerrors directly, byte for byte what the validator returns, and wrapped
+// writer. Built with core/oauth's constructors directly, byte for byte what the validator returns, and wrapped
 // the way the token
 // endpoint's validator error arrives. A chosen 401 is a client's mistake, so nothing is logged.
 func TestJsonError_CarriesTheBasicChallengeThrough(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+	refusal := oauth.NewErrorDetailWithHTTPStatus("invalid_client",
 		"Client authentication failed. Please review your client_secret.",
 		http.StatusUnauthorized).WithWWWAuthenticate("Basic")
 
@@ -495,7 +495,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 		"The redirect URI is not registered.", http.StatusBadRequest)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -522,7 +522,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 func TestJsonError_ReadsAWrappedErrorDetailsWWWAuthenticate(t *testing.T) {
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_token",
+	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_token",
 		"The access token is invalid.", http.StatusUnauthorized).
 		WithWWWAuthenticate("Bearer error=\"invalid_token\"")
 

@@ -13,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/validators"
 )
@@ -268,13 +268,13 @@ func HandleAdminResourceValidatePermissionPost(
 			// to default and answer a 500 with the sentence in the log rather than in the form
 			// (#279 decision 6).
 			var localizedErr *i18n.LocalizedError
-			var errorDetail *customerrors.ErrorDetail
+			var errorDetail *oauth.ErrorDetail
 			switch {
 			case errors.As(err, &localizedErr):
 				result.Error = localizedErr.Localize(r.Context())
 				httpHelper.EncodeJson(w, r, result)
 			case errors.As(err, &errorDetail):
-				result.Error = errorDetail.GetDescription()
+				result.Error = errorDetail.Description()
 				httpHelper.EncodeJson(w, r, result)
 			default:
 				httpHelper.JsonError(w, r, err)

@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // ROPCNotAuthorizedErrorMsg is the refusal for a client that may not use the resource owner
@@ -44,17 +44,17 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	// Check if ROPC is enabled for this client
 	ropcEnabled := client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled)
 	if !ropcEnabled {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			ROPCNotAuthorizedErrorMsg, http.StatusBadRequest)
 	}
 
 	// Validate required parameters (RFC 6749 Section 4.3.2)
 	if len(input.Username) == 0 {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required username parameter.", http.StatusBadRequest)
 	}
 	if len(input.Password) == 0 {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required password parameter.", http.StatusBadRequest)
 	}
 
@@ -80,12 +80,12 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 		return nil, err
 	}
 	if user == nil {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Invalid resource owner credentials.", http.StatusBadRequest)
 	}
 
 	if !passwordhash.Verify(user.PasswordHash, input.Password) {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Invalid resource owner credentials.", http.StatusBadRequest)
 	}
 
@@ -98,7 +98,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	// Block ROPC for users with 2FA enabled
 	// ROPC cannot securely support a second factor, so allowing it would bypass 2FA security
 	if user.OTPEnabled {
-		return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Resource owner password credentials grant is not available for accounts with "+
 				"two-factor authentication enabled. Please use the authorization code flow instead.",
 			http.StatusBadRequest)
@@ -167,15 +167,15 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 
 		switch resolution.Outcome {
 		case permissions.ScopeMalformed:
-			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return "", oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Invalid scope format: '%v'. Scopes must be either OIDC scopes (openid, profile, email, address, phone, groups, attributes) or resource-identifier:permission-identifier format.", scopeStr),
 				http.StatusBadRequest)
 		case permissions.ScopeResourceUnknown:
-			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return "", oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resolution.ResourceIdentifier),
 				http.StatusBadRequest)
 		case permissions.ScopePermissionUnknown:
-			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return "", oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, resolution.ResourceIdentifier, resolution.PermissionIdentifier),
 				http.StatusBadRequest)
 		}
@@ -186,7 +186,7 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 			return "", err
 		}
 		if !userHasPermission {
-			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			return "", oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				fmt.Sprintf("The user does not have permission for scope '%v'.", scopeStr),
 				http.StatusBadRequest)
 		}

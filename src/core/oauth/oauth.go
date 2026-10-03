@@ -1,7 +1,12 @@
 // Package oauth is the OAuth2/OIDC surface both processes share: the value types that
-// cross the wire or a session (TokenResponse, JwtToken, Jwk, Jwks) and the PKCE
-// challenge helper. It reaches no database and no persistence type, which is what lets
-// the admin console link it without linking a driver.
+// cross the wire or a session (TokenResponse, JwtToken, Jwk, Jwks), the PKCE challenge
+// helper, and the error response of RFC 6749 section 5.2 (ErrorDetail, with
+// ConformErrorDescription, the Appendix A.8 rule its description is held to). It reaches no
+// database and no persistence type, which is what lets the admin console link it without
+// linking a driver.
+//
+// The error response was core/customerrors until #442. It belongs to the same specification
+// as the token types, and every binary that links it already linked this package.
 //
 // The client side of the protocol is no longer here. The JWKS token parser, the
 // code-for-token exchanger and the two bounds they share went to

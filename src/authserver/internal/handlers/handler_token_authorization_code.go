@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // respondAuthorizationCode redeems a validated code (RFC 6749 section 4.1.3) and answers with its
@@ -19,7 +19,7 @@ func (tr tokenResponder) respondAuthorizationCode(w http.ResponseWriter, r *http
 
 	tokenResponse, err := tr.issuer.IssueAuthorizationCodeGrant(r.Context(), settings, grant.Code)
 	if errors.Is(err, issuance.ErrCodeNotClaimed) {
-		tr.jsonWriter.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		tr.jsonWriter.JsonError(w, r, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest))
 		return
 	}

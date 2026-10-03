@@ -15,7 +15,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -142,31 +141,31 @@ func TestValidateRequest_CodeChallengeGrammar(t *testing.T) {
 			t.Run(branch+", refuses "+name, func(t *testing.T) {
 				err := validator.ValidateRequest(request(challenge))
 
-				var detail *customerrors.ErrorDetail
+				var detail *oauth.ErrorDetail
 				require.ErrorAs(t, err, &detail)
-				assert.Equal(t, "invalid_request", detail.GetCode())
-				assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+				assert.Equal(t, "invalid_request", detail.Code())
+				assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 				assert.Equal(t, "The code_challenge parameter is incorrect. It may only contain A-Z, a-z, 0-9, '-', '.', '_' and '~'.",
-					detail.GetDescription())
+					detail.Description())
 			})
 		}
 
 		t.Run(branch+", a challenge too short keeps the length text", func(t *testing.T) {
 			err := validator.ValidateRequest(request(pkceValueOf(42)))
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Contains(t, detail.GetDescription(), "It should be 43 to 128 characters long.")
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Contains(t, detail.Description(), "It should be 43 to 128 characters long.")
 		})
 
 		t.Run(branch+", a challenge too long keeps the length text", func(t *testing.T) {
 			err := validator.ValidateRequest(request(pkceValueOf(129)))
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.GetCode())
-			assert.Contains(t, detail.GetDescription(), "It should be 43 to 128 characters long.")
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Contains(t, detail.Description(), "It should be 43 to 128 characters long.")
 		})
 	}
 

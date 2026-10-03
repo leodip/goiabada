@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -37,7 +37,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		expectedError := &customerrors.ErrorDetail{}
+		expectedError := &oauth.ErrorDetail{}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -253,7 +253,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/auth/pwd", nil)
 		rr := httptest.NewRecorder()
 
-		expectedError := &customerrors.ErrorDetail{}
+		expectedError := &oauth.ErrorDetail{}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {

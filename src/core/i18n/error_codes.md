@@ -18,7 +18,7 @@ and add the same key to every `active.*.toml` catalog.
 
 Used outside the OAuth protocol path (account self-service, admin user CRUD,
 SMTP settings, registration). Protocol token/authorize email errors stay in
-`customerrors.ErrorDetail`.
+`oauth.ErrorDetail`.
 
 | Code | Args | English message |
 |---|---|---|

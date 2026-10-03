@@ -12,7 +12,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -138,12 +137,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for missing client credentials
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.GetDescription())
-		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.", customErr.Description())
+		assert.Equal(t, http.StatusUnauthorized, customErr.HTTPStatus())
 	})
 
 	t.Run("Incorrect client secret for confidential client", func(t *testing.T) {
@@ -180,12 +179,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
 		// RFC 6749 Section 5.2: invalid_client for failed client authentication
-		assert.Equal(t, "invalid_client", customErr.GetCode())
-		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.GetDescription())
-		assert.Equal(t, http.StatusUnauthorized, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "Client authentication failed. Please review your client_secret.", customErr.Description())
+		assert.Equal(t, http.StatusUnauthorized, customErr.HTTPStatus())
 	})
 
 	t.Run("Missing refresh token", func(t *testing.T) {
@@ -217,11 +216,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, "Missing required refresh_token parameter.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required refresh_token parameter.", customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Invalid refresh token", func(t *testing.T) {
@@ -255,11 +254,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "The refresh token is invalid (token is expired).", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "The refresh token is invalid (token is expired).", customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Refresh token without JTI claim", func(t *testing.T) {
@@ -341,15 +340,15 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// UPDATED DELIBERATELY, not a stale assertion: this used to be a plain error,
 		// which JsonError maps to a 500. A validly signed refresh token with no row is
 		// an invalid grant, not a server fault (RFC 6749 Section 5.2, #128).
-		detail, ok := err.(*customerrors.ErrorDetail)
+		detail, ok := err.(*oauth.ErrorDetail)
 		require.Truef(t, ok, "a missing refresh token row must be an ErrorDetail, got %T", err)
-		assert.Equal(t, "invalid_grant", detail.GetCode())
-		assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", detail.Code())
+		assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 
 		// The message must NOT reveal that the row was missing, since that would
 		// distinguish a never-issued JTI from a revoked one.
-		assert.Equal(t, "The refresh token is invalid.", detail.GetDescription())
-		assert.NotContains(t, detail.GetDescription(), "database")
+		assert.Equal(t, "The refresh token is invalid.", detail.Description())
+		assert.NotContains(t, detail.Description(), "database")
 	})
 
 	t.Run("Refresh token with mismatched client", func(t *testing.T) {
@@ -409,10 +408,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "The refresh token is invalid because it does not belong to the client")
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Contains(t, customErr.Description(), "The refresh token is invalid because it does not belong to the client")
 	})
 
 	t.Run("Refresh token for disabled user", func(t *testing.T) {
@@ -475,11 +474,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// type is what the handler writes AuditUserDisabled from.
 		var disabled *UserDisabledError
 		require.ErrorAs(t, err, &disabled)
-		var customErr *customerrors.ErrorDetail
+		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, invalidRefreshTokenMessage, customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, invalidRefreshTokenMessage, customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Refresh token with nil session", func(t *testing.T) {
@@ -546,11 +545,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "The refresh token is invalid because the associated session has expired or been terminated.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "The refresh token is invalid because the associated session has expired or been terminated.", customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Refresh token with invalid session", func(t *testing.T) {
@@ -624,11 +623,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "The refresh token is invalid because the associated session has expired or been terminated.", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "The refresh token is invalid because the associated session has expired or been terminated.", customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Expired offline refresh token", func(t *testing.T) {
@@ -692,11 +691,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, "The refresh token is invalid because it has expired (offline_access_max_lifetime).", customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, "The refresh token is invalid because it has expired (offline_access_max_lifetime).", customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Offline refresh token without max lifetime claim", func(t *testing.T) {
@@ -900,12 +899,12 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// section 5.2 names invalid_scope for. It answered invalid_grant before.
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_scope", customErr.GetCode())
+		assert.Equal(t, "invalid_scope", customErr.Code())
 		assert.Equal(t, "Scope 'address' is not recognized. The original access token does not grant the 'address' permission.",
-			customErr.GetDescription())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+			customErr.Description())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Valid offline refresh token", func(t *testing.T) {
@@ -1222,11 +1221,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "The user has either not given consent to this client or the previously granted consent has been revoked")
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Contains(t, customErr.Description(), "The user has either not given consent to this client or the previously granted consent has been revoked")
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Refresh token with a scope missing from the consent", func(t *testing.T) {
@@ -1313,11 +1312,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "The user has not consented to the 'email' permission")
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Contains(t, customErr.Description(), "The user has not consented to the 'email' permission")
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
 	t.Run("Refresh token with revoked user permission", func(t *testing.T) {
@@ -1396,11 +1395,11 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "The user does not have the 'resource:read' permission")
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Contains(t, customErr.Description(), "The user does not have the 'resource:read' permission")
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 }
 
@@ -1490,11 +1489,11 @@ func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_PublicClient_Fails(t *test
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
-		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	customErr, ok := err.(*oauth.ErrorDetail)
+	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
+		assert.Contains(t, customErr.Description(), "public clients are required to use PKCE")
 	}
 }
 
@@ -1507,10 +1506,10 @@ func TestValidateTokenRequest_RefreshToken_EmptyStringCodeChallenge_PublicClient
 	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "public clients are required to use PKCE")
+	customErr, ok := err.(*oauth.ErrorDetail)
+	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Contains(t, customErr.Description(), "public clients are required to use PKCE")
 	}
 }
 
@@ -1554,11 +1553,11 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	})
 
 	assert.Nil(t, result)
-	customErr, ok := err.(*customerrors.ErrorDetail)
-	if assert.True(t, ok, "expected *customerrors.ErrorDetail, got %T: %v", err, err) {
-		assert.Equal(t, "invalid_request", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
-		assert.Contains(t, customErr.GetDescription(), "remove the client_secret from your request")
+	customErr, ok := err.(*oauth.ErrorDetail)
+	if assert.True(t, ok, "expected *oauth.ErrorDetail, got %T: %v", err, err) {
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
+		assert.Contains(t, customErr.Description(), "remove the client_secret from your request")
 	}
 	// The strict mock is the second assertion: the refusal answers before the refresh token
 	// is ever parsed or looked up.
@@ -1782,11 +1781,11 @@ func TestValidateTokenRequest_RefreshToken_StoredScopeThisServerDoesNotIssue(t *
 			}
 
 			assert.Nil(t, result)
-			var customErr *customerrors.ErrorDetail
+			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)
-			assert.Equal(t, "invalid_grant", customErr.GetCode())
-			assert.Equal(t, tc.wantDesc, customErr.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+			assert.Equal(t, "invalid_grant", customErr.Code())
+			assert.Equal(t, tc.wantDesc, customErr.Description())
+			assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 			mockPermissionChecker.AssertNotCalled(t, "UserHasScopePermission", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -1834,14 +1833,14 @@ func TestValidateTokenRequest_RefreshToken_RequestedScopeBeyondTheGrant(t *testi
 			result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 			assert.Nil(t, result)
-			var customErr *customerrors.ErrorDetail
+			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)
-			assert.Equal(t, "invalid_scope", customErr.GetCode())
+			assert.Equal(t, "invalid_scope", customErr.Code())
 			assert.Equal(t,
 				fmt.Sprintf("Scope '%v' is not recognized. The original access token does not grant the '%v' permission.",
 					tc.beyond, tc.beyond),
-				customErr.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+				customErr.Description())
+			assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 			mockPermissionChecker.AssertNotCalled(t, "UserHasScopePermission", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -1973,13 +1972,13 @@ func TestValidateTokenRequest_RefreshToken_StoredGrantNamingUserinfo(t *testing.
 			}
 
 			assert.Nil(t, result)
-			var customErr *customerrors.ErrorDetail
+			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)
-			assert.Equal(t, "invalid_grant", customErr.GetCode())
+			assert.Equal(t, "invalid_grant", customErr.Code())
 			assert.Equal(t,
 				"Scope 'authserver:userinfo' is not recognized. The user does not have the 'authserver:userinfo' permission.",
-				customErr.GetDescription())
-			assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+				customErr.Description())
+			assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 		})
 	}
 }
@@ -2040,10 +2039,10 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	assert.Nil(t, result)
 	require.Error(t, err)
 
-	detail, ok := err.(*customerrors.ErrorDetail)
+	detail, ok := err.(*oauth.ErrorDetail)
 	require.Truef(t, ok, "an expired refresh token must be an ErrorDetail, got %T", err)
-	assert.Equal(t, "invalid_grant", detail.GetCode())
-	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+	assert.Equal(t, "invalid_grant", detail.Code())
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 
 	// Structurally redundant today, kept as a guard. See the doc comment.
 	mockDB.AssertNotCalled(t, "GetRefreshTokenByJti", mock.Anything, mock.Anything, mock.Anything)
@@ -2165,13 +2164,13 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 		// The same wording an expired or terminated session gets. A distinct message here
 		// would tell the presenter that the session exists and belongs to someone else.
-		assert.Contains(t, customErr.GetDescription(),
+		assert.Contains(t, customErr.Description(),
 			"the associated session has expired or been terminated")
 	})
 }
@@ -2318,7 +2317,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, lookupErr)
-		_, isErrorDetail := err.(*customerrors.ErrorDetail)
+		_, isErrorDetail := err.(*oauth.ErrorDetail)
 		assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 	})
 
@@ -2333,10 +2332,10 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "offline_access_max_lifetime")
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Contains(t, customErr.Description(), "offline_access_max_lifetime")
 	})
 
 	t.Run("a session belonging to another user is refused", func(t *testing.T) {
@@ -2346,12 +2345,12 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		customErr, ok := err.(*customerrors.ErrorDetail)
+		customErr, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+		assert.Equal(t, "invalid_grant", customErr.Code())
+		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 		// The shared session message, the same one a revoked code gets on this arm.
-		assert.Contains(t, customErr.GetDescription(),
+		assert.Contains(t, customErr.Description(),
 			"the associated session has expired or been terminated")
 	})
 }
@@ -2366,7 +2365,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 // refresh would be accepted, minting a fresh access token for a subject that resolves to nothing.
 // Only a check above the loop satisfies both.
 //
-// Both rows assert a plain error rather than a *customerrors.ErrorDetail, which is the 500 of
+// Both rows assert a plain error rather than a *oauth.ErrorDetail, which is the 500 of
 // decision 8a. No supported operation can produce such a token (DeleteUser removes the user's
 // refresh tokens in the same transaction, and the authorization-code ones go by CASCADE), so this
 // is an internal inconsistency rather than anything the client did, and this arm already answers
@@ -2458,7 +2457,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 
 			// A 500, not a 400: an ErrorDetail here would mean the server told the client its
 			// request was bad when the tokens and the users table disagree.
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			assert.False(t, errors.As(err, &detail),
 				"expected a plain error carrying a 500, got a client-facing ErrorDetail: %v", err)
 		})

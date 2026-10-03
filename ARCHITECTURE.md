@@ -98,7 +98,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/builtin` | kernel | — |
 | `core/cmd` | kernel | — |
 | `core/countries` | kernel | — |
-| `core/customerrors` | kernel | — |
 | `core/errs` | kernel | — |
 | `core/gender` | kernel | — |
 | `core/hashutil` | kernel | — |

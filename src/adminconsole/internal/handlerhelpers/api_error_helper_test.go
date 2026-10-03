@@ -8,9 +8,9 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -53,11 +53,11 @@ func TestHandleAPIErrorJson_ForwardsConflict(t *testing.T) {
 			StatusCode: http.StatusConflict,
 		})
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, "ROTATION_IN_PROGRESS", detail.GetCode())
-	assert.Equal(t, "Another key rotation is in progress", detail.GetDescription())
-	assert.Equal(t, http.StatusConflict, detail.GetHttpStatusCode())
+	detail, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+	assert.Equal(t, "ROTATION_IN_PROGRESS", detail.Code())
+	assert.Equal(t, "Another key rotation is in progress", detail.Description())
+	assert.Equal(t, http.StatusConflict, detail.HTTPStatus())
 }
 
 // TestHandleAPIErrorJson_ForwardsBadRequest pins the behaviour #122 established. It is here so that
@@ -74,11 +74,11 @@ func TestHandleAPIErrorJson_ForwardsBadRequest(t *testing.T) {
 			StatusCode: http.StatusBadRequest,
 		})
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, "VALIDATION_ERROR", detail.GetCode())
-	assert.Equal(t, "Invalid redirect URI", detail.GetDescription())
-	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+	detail, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+	assert.Equal(t, "VALIDATION_ERROR", detail.Code())
+	assert.Equal(t, "Invalid redirect URI", detail.Description())
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 }
 
 // TestHandleAPIErrorJson_GenericBranchForOtherStatuses is the other side of the boundary. A 500 from
@@ -118,11 +118,11 @@ func TestHandleAPIErrorJson_ForwardsAWrappedAPIError(t *testing.T) {
 			StatusCode: http.StatusConflict,
 		}, "unable to rotate the signing keys"))
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, "ROTATION_IN_PROGRESS", detail.GetCode())
-	assert.Equal(t, "Another key rotation is in progress", detail.GetDescription())
-	assert.Equal(t, http.StatusConflict, detail.GetHttpStatusCode())
+	detail, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+	assert.Equal(t, "ROTATION_IN_PROGRESS", detail.Code())
+	assert.Equal(t, "Another key rotation is in progress", detail.Description())
+	assert.Equal(t, http.StatusConflict, detail.HTTPStatus())
 }
 
 // TestHandleAPIErrorWithCallback_RendersAWrappedBadRequest is the same guard on the form path, which
@@ -337,11 +337,11 @@ func TestJsonNotFound_Answers404WithoutLogging(t *testing.T) {
 	JsonNotFound(httpHelper, httptest.NewRecorder(),
 		httptest.NewRequest(http.MethodPost, "/admin/users/42/attributes/7/remove", nil))
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, http.StatusNotFound, detail.GetHttpStatusCode())
-	assert.Equal(t, "not_found", detail.GetCode())
-	assert.NotEmpty(t, detail.GetDescription())
+	detail, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusNotFound, detail.HTTPStatus())
+	assert.Equal(t, "not_found", detail.Code())
+	assert.NotEmpty(t, detail.Description())
 }
 
 func TestJsonBadRequestBody_Answers400WithoutLogging(t *testing.T) {
@@ -351,11 +351,11 @@ func TestJsonBadRequestBody_Answers400WithoutLogging(t *testing.T) {
 	JsonBadRequestBody(httpHelper, httptest.NewRecorder(),
 		httptest.NewRequest(http.MethodPost, "/admin/users/42/consents", nil))
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
-	assert.Equal(t, "invalid_request_body", detail.GetCode())
-	assert.NotEmpty(t, detail.GetDescription())
+	detail, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+	assert.Equal(t, "invalid_request_body", detail.Code())
+	assert.NotEmpty(t, detail.Description())
 }
 
 // JsonConflict is the third: a page loaded before another administrator's change, acted on after
@@ -368,11 +368,11 @@ func TestJsonConflict_Answers409WithoutLogging(t *testing.T) {
 	JsonConflict(httpHelper, httptest.NewRecorder(),
 		httptest.NewRequest(http.MethodPost, "/admin/resources/2/users-with-permission/add/5/7", nil))
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, http.StatusConflict, detail.GetHttpStatusCode())
-	assert.Equal(t, "concurrent_update", detail.GetCode())
-	assert.NotEmpty(t, detail.GetDescription())
+	detail, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusConflict, detail.HTTPStatus())
+	assert.Equal(t, "concurrent_update", detail.Code())
+	assert.NotEmpty(t, detail.Description())
 }
 
 // TestHandleAPIErrorJson_AnswersNotFound is decision 11's AJAX half. Until it existed, an
@@ -392,11 +392,11 @@ func TestHandleAPIErrorJson_AnswersNotFound(t *testing.T) {
 			StatusCode: http.StatusNotFound,
 		})
 
-	detail, ok := (*captured).(*customerrors.ErrorDetail)
-	require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-	assert.Equal(t, http.StatusNotFound, detail.GetHttpStatusCode())
-	assert.Equal(t, "not_found", detail.GetCode())
-	assert.NotContains(t, detail.GetDescription(), "User not found",
+	detail, ok := (*captured).(*oauth.ErrorDetail)
+	require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+	assert.Equal(t, http.StatusNotFound, detail.HTTPStatus())
+	assert.Equal(t, "not_found", detail.Code())
+	assert.NotContains(t, detail.Description(), "User not found",
 		"the API's own sentence is not forwarded; the console shows the sentence its 404 page shows")
 }
 
@@ -434,11 +434,11 @@ func TestHandleAPIErrorJson_AnswersA401AsTheSessionEnded(t *testing.T) {
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, testCase.locale))
 			HandleAPIErrorJson(httpHelper, httptest.NewRecorder(), req, testCase.err)
 
-			detail, ok := (*captured).(*customerrors.ErrorDetail)
-			require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
-			assert.Equal(t, http.StatusForbidden, detail.GetHttpStatusCode())
-			assert.Equal(t, "session_ended", detail.GetCode())
-			assert.Equal(t, testCase.wantText, detail.GetDescription())
+			detail, ok := (*captured).(*oauth.ErrorDetail)
+			require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+			assert.Equal(t, http.StatusForbidden, detail.HTTPStatus())
+			assert.Equal(t, "session_ended", detail.Code())
+			assert.Equal(t, testCase.wantText, detail.Description())
 		})
 	}
 }
@@ -458,9 +458,9 @@ func TestHandleAPIErrorJson_NoOtherStatusCarriesTheSessionEndedCode(t *testing.T
 				httptest.NewRequest(http.MethodPost, "/account/picture", nil),
 				&apiclient.APIError{Code: "SOME_CODE", Message: "a sentence", StatusCode: status})
 
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			if errors.As(*captured, &detail) {
-				assert.NotEqual(t, "session_ended", detail.GetCode())
+				assert.NotEqual(t, "session_ended", detail.Code())
 			}
 		})
 	}

@@ -13,9 +13,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -273,7 +273,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
-		httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The operation failed."))
+		httpHelper.JsonError(w, r, oauth.NewErrorDetail("server_error", "The operation failed."))
 	})
 
 	w := httptest.NewRecorder()
@@ -312,7 +312,7 @@ func TestJsonError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "The operation failed.",
+	detail := oauth.NewErrorDetailWithHTTPStatus("server_error", "The operation failed.",
 		http.StatusInternalServerError)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -351,7 +351,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 		"The redirect URI is not registered.", http.StatusBadRequest)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -381,7 +381,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 func TestJsonError_SendsNoWWWAuthenticateChallenge(t *testing.T) {
 	httpHelper := NewHttpHelper(fstest.MapFS{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_token",
+	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_token",
 		"The access token is invalid.", http.StatusUnauthorized).
 		WithWWWAuthenticate("Bearer error=\"invalid_token\"")
 

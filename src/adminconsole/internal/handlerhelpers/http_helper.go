@@ -16,10 +16,10 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // This renderer is one of two. The auth server has its own copy in
@@ -271,17 +271,17 @@ func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error
 	// anything on the way up has wrapped it. The assertion this replaces was correct only while the
 	// unwritten rule "never wrap a wire error" held, and a wrap turned a validator's 400 into a 500
 	// with the sentence in the log instead of on the wire (#279 decision 6).
-	var errorDetail *customerrors.ErrorDetail
+	var errorDetail *oauth.ErrorDetail
 	if errors.As(err, &errorDetail) {
 		// error detail
-		statusCode := errorDetail.GetHttpStatusCode()
+		statusCode := errorDetail.HTTPStatus()
 		if statusCode == 0 {
 			statusCode = http.StatusInternalServerError
 		}
 
 		w.WriteHeader(statusCode)
-		errorStr = errorDetail.GetCode()
-		errorDescriptionStr = errorDetail.GetDescription()
+		errorStr = errorDetail.Code()
+		errorDescriptionStr = errorDetail.Description()
 		// A detail answered 500 is a server fault whichever branch of this writer produced it, and
 		// whether its status was chosen or defaulted from none above. It therefore owes the same
 		// single record and the same request id as the generic branch below, or it is a 500 nobody

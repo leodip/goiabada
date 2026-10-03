@@ -23,7 +23,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -62,10 +61,10 @@ func TestHandleTokenPost(t *testing.T) {
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 				jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-					detail, ok := err.(*customerrors.ErrorDetail)
-					return ok && detail.GetCode() == "invalid_request" &&
-						detail.GetHttpStatusCode() == http.StatusBadRequest &&
-						detail.GetDescription() == "The request body could not be parsed."
+					detail, ok := err.(*oauth.ErrorDetail)
+					return ok && detail.Code() == "invalid_request" &&
+						detail.HTTPStatus() == http.StatusBadRequest &&
+						detail.Description() == "The request body could not be parsed."
 				})).Return().Once()
 
 				handler.ServeHTTP(rr, req)
@@ -78,7 +77,7 @@ func TestHandleTokenPost(t *testing.T) {
 		// The accept side of the limit: the same form under a limit equal to its length is read
 		// whole, and every field of it reaches the validator.
 		t.Run("the same body at exactly the limit", func(t *testing.T) {
-			refused := customerrors.NewErrorDetailWithHttpStatusCode("invalid_client", "Client authentication failed.", http.StatusUnauthorized)
+			refused := oauth.NewErrorDetailWithHTTPStatus("invalid_client", "Client authentication failed.", http.StatusUnauthorized)
 			tokenValidator := mocks_handlers.NewTokenValidator(t)
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 				return input.GrantType == "client_credentials" && input.ClientId == "a-client" && input.ClientSecret == "a-secret"
@@ -95,8 +94,8 @@ func TestHandleTokenPost(t *testing.T) {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "invalid_client"
+				detail, ok := err.(*oauth.ErrorDetail)
+				return ok && detail.Code() == "invalid_client"
 			})).Return().Once()
 
 			handler.ServeHTTP(rr, req)
@@ -123,10 +122,10 @@ func TestHandleTokenPost(t *testing.T) {
 			require.Error(t, req.ParseForm(), "the limiter's parse fails")
 
 			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "invalid_request" &&
-					detail.GetHttpStatusCode() == http.StatusBadRequest &&
-					detail.GetDescription() == "Missing required client_id parameter."
+				detail, ok := err.(*oauth.ErrorDetail)
+				return ok && detail.Code() == "invalid_request" &&
+					detail.HTTPStatus() == http.StatusBadRequest &&
+					detail.Description() == "Missing required client_id parameter."
 			})).Return().Once()
 
 			handler.ServeHTTP(rr, req)
@@ -141,10 +140,10 @@ func TestHandleTokenPost(t *testing.T) {
 	t.Run("two client authentication methods are refused before the validator", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			detail, ok := err.(*customerrors.ErrorDetail)
-			return ok && detail.GetCode() == "invalid_request" &&
-				detail.GetHttpStatusCode() == http.StatusBadRequest &&
-				strings.Contains(detail.GetDescription(), "multiple authentication methods provided")
+			detail, ok := err.(*oauth.ErrorDetail)
+			return ok && detail.Code() == "invalid_request" &&
+				detail.HTTPStatus() == http.StatusBadRequest &&
+				strings.Contains(detail.Description(), "multiple authentication methods provided")
 		})).Return().Once()
 
 		req, _ := http.NewRequest("POST", "/token",
@@ -173,7 +172,7 @@ func TestHandleTokenPost(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		validationError := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", "Validation error", http.StatusBadRequest)
+		validationError := oauth.NewErrorDetailWithHTTPStatus("invalid_request", "Validation error", http.StatusBadRequest)
 
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(nil, validationError)
@@ -191,7 +190,7 @@ func TestHandleTokenPost(t *testing.T) {
 		code := &models.Code{Id: 1}
 		endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
 
-		failure := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError)
+		failure := oauth.NewErrorDetailWithHTTPStatus("server_error", "Failed to generate token", http.StatusInternalServerError)
 		endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code).Return(nil, failure).Once()
 		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
 
@@ -313,7 +312,7 @@ func TestHandleTokenPost(t *testing.T) {
 		grant := codeRefreshGrant(false)
 		endpoint.validates(grant)
 
-		failure := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError)
+		failure := oauth.NewErrorDetailWithHTTPStatus("server_error", "Failed to generate token", http.StatusInternalServerError)
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil, failure).Once()
 		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
 
@@ -431,10 +430,10 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil, &issuance.RefreshTokenReplayedError{FamilyRevokedCount: 0}).Once()
 		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			detail, ok := err.(*customerrors.ErrorDetail)
-			return ok && detail.GetCode() == "invalid_grant" &&
-				detail.GetDescription() == "This refresh token has been revoked." &&
-				detail.GetHttpStatusCode() == http.StatusBadRequest
+			detail, ok := err.(*oauth.ErrorDetail)
+			return ok && detail.Code() == "invalid_grant" &&
+				detail.Description() == "This refresh token has been revoked." &&
+				detail.HTTPStatus() == http.StatusBadRequest
 		})).Return().Once()
 
 		endpoint.post(t, "grant_type=refresh_token&refresh_token=test_refresh_token")
@@ -451,7 +450,7 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.validates(unansweredGrant{})
 
 		endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-			var detail *customerrors.ErrorDetail
+			var detail *oauth.ErrorDetail
 			return !errors.As(err, &detail) && strings.Contains(err.Error(), "does not answer")
 		})).Return().Once()
 
@@ -715,10 +714,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
 
-		errDetail, ok := err.(*customerrors.ErrorDetail)
+		errDetail, ok := err.(*oauth.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_request", errDetail.GetCode())
-		assert.Contains(t, errDetail.GetDescription(), "multiple authentication methods")
+		assert.Equal(t, "invalid_request", errDetail.Code())
+		assert.Contains(t, errDetail.Description(), "multiple authentication methods")
 	})
 
 	t.Run("No credentials provided - returns empty values", func(t *testing.T) {
@@ -838,7 +837,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 		SessionIdentifier: "sid-reused",
 	}
 	reuseErr := &protocolvalidation.AuthCodeReusedError{
-		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.", http.StatusBadRequest),
+		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest),
 		Code:   reusedCode,
 	}
 
@@ -897,7 +896,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	rr := httptest.NewRecorder()
 
 	reuseErr := &protocolvalidation.AuthCodeReusedError{
-		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.", http.StatusBadRequest),
+		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest),
 		Code: &models.Code{
 			Id:                7,
 			SessionIdentifier: "sid-reused",
@@ -945,7 +944,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	reuseErr := &protocolvalidation.AuthCodeReusedError{
-		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.", http.StatusBadRequest),
+		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest),
 		Code:   &models.Code{Id: 42, ClientId: 7, UserId: 13, SessionIdentifier: "sid-reused"},
 	}
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
@@ -997,9 +996,9 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, racedCode).
 		Return(nil, issuance.ErrCodeNotClaimed).Once()
 	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-		detail, ok := err.(*customerrors.ErrorDetail)
-		return ok && detail.GetCode() == "invalid_grant" && detail.GetDescription() == "Code is invalid." &&
-			detail.GetHttpStatusCode() == http.StatusBadRequest
+		detail, ok := err.(*oauth.ErrorDetail)
+		return ok && detail.Code() == "invalid_grant" && detail.Description() == "Code is invalid." &&
+			detail.HTTPStatus() == http.StatusBadRequest
 	})).Return().Once()
 
 	endpoint.post(t, "grant_type=authorization_code&code=raced&redirect_uri=http://example.com&client_id=test_client")
@@ -1026,10 +1025,10 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil, issuance.ErrRefreshTokenNotClaimed).Once()
 	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-		detail, ok := err.(*customerrors.ErrorDetail)
-		return ok && detail.GetCode() == "invalid_grant" &&
-			detail.GetDescription() == "This refresh token has been revoked." &&
-			detail.GetHttpStatusCode() == http.StatusBadRequest
+		detail, ok := err.(*oauth.ErrorDetail)
+		return ok && detail.Code() == "invalid_grant" &&
+			detail.Description() == "This refresh token has been revoked." &&
+			detail.HTTPStatus() == http.StatusBadRequest
 	})).Return().Once()
 
 	endpoint.post(t, "grant_type=refresh_token&refresh_token=raced")
@@ -1089,9 +1088,9 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 				}).Return()
 
 			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "invalid_grant" &&
-					detail.GetDescription() == "This refresh token has been revoked."
+				detail, ok := err.(*oauth.ErrorDetail)
+				return ok && detail.Code() == "invalid_grant" &&
+					detail.Description() == "This refresh token has been revoked."
 			})).Return().Once()
 
 			endpoint.post(t, "grant_type=refresh_token&refresh_token=replayed")
@@ -1122,7 +1121,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	endpoint := newTokenEndpoint(t)
 	endpoint.validates(codeRefreshGrant(true))
 
-	failure := customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to contain family", http.StatusInternalServerError)
+	failure := oauth.NewErrorDetailWithHTTPStatus("server_error", "Failed to contain family", http.StatusInternalServerError)
 	endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil, failure).Once()
 	endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, failure).Return().Once()
@@ -1296,7 +1295,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			if tc.wantValidatorCalled {
 				// Capture what the handler passed. Returning an error keeps the test focused on
 				// the input rather than on downstream token issuance.
-				validationError := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				validationError := oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 					"stop here", http.StatusBadRequest)
 				tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.MatchedBy(
 					func(input *protocolvalidation.ValidateTokenRequestInput) bool {
@@ -1316,9 +1315,9 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			// Rejected before the validator runs. mocks_handlers.NewTokenValidator(t) fails the
 			// test if ValidateTokenRequest is called with no expectation registered, so registering
 			// none is the assertion that it was not reached.
-			var rejection *customerrors.ErrorDetail
+			var rejection *oauth.ErrorDetail
 			jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*customerrors.ErrorDetail)
+				detail, ok := err.(*oauth.ErrorDetail)
 				if !ok {
 					return false
 				}
@@ -1330,10 +1329,10 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 
 			jsonWriter.AssertExpectations(t)
 			if assert.NotNil(t, rejection, "the handler should have rejected the request") {
-				assert.Equal(t, "invalid_scope", rejection.GetCode())
-				assert.Equal(t, http.StatusBadRequest, rejection.GetHttpStatusCode())
+				assert.Equal(t, "invalid_scope", rejection.Code())
+				assert.Equal(t, http.StatusBadRequest, rejection.HTTPStatus())
 				assert.Equal(t, "The 'scope' parameter is malformed. Separate its values with a single space, with no space before the first value or after the last.",
-					rejection.GetDescription())
+					rejection.Description())
 			}
 		})
 	}
@@ -1403,7 +1402,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
-			denial := customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", tc.description,
+			denial := oauth.NewErrorDetailWithHTTPStatus("invalid_scope", tc.description,
 				http.StatusBadRequest)
 			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, denial)
@@ -1441,9 +1440,9 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		var rejection *customerrors.ErrorDetail
+		var rejection *oauth.ErrorDetail
 		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			detail, ok := err.(*customerrors.ErrorDetail)
+			detail, ok := err.(*oauth.ErrorDetail)
 			if !ok {
 				return false
 			}
@@ -1460,7 +1459,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything)
 		if assert.NotNil(t, rejection) {
-			assert.Equal(t, "invalid_scope", rejection.GetCode())
+			assert.Equal(t, "invalid_scope", rejection.Code())
 		}
 	})
 
@@ -1586,7 +1585,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// The exact error the validator's refresh grant returns on a generation mismatch.
-	supersededErr := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+	supersededErr := oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 		"The refresh token is invalid because it was superseded.", http.StatusBadRequest)
 
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
@@ -1682,7 +1681,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		return post(handler) == http.StatusTooManyRequests
 	}
 
-	invalidGrant := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+	invalidGrant := oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 		"Invalid resource owner credentials.", http.StatusBadRequest)
 
 	t.Run("invalid_grant fills the budget and the next attempt gets the oauth 429", func(t *testing.T) {
@@ -1727,7 +1726,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	// invalid_grant the predicate charges: the password was compared, so this is a guess against
 	// the account, and the wrapper must not hide the detail from it (#137).
 	t.Run("a disabled user spends the budget and emits both user_disabled and ropc_auth_failed", func(t *testing.T) {
-		disabled := &protocolvalidation.UserDisabledError{Detail: customerrors.NewErrorDetailWithHttpStatusCode(
+		disabled := &protocolvalidation.UserDisabledError{Detail: oauth.NewErrorDetailWithHTTPStatus(
 			"invalid_grant", "The user account is disabled.", http.StatusBadRequest)}
 		assert.True(t, spends(t, disabled), "a disabled user's refusal compared the password, so it is charged")
 
@@ -1749,18 +1748,18 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		err  error
 	}{
 		{"unauthorized_client, the grant is switched off for this client",
-			customerrors.NewErrorDetailWithHttpStatusCode("unauthorized_client",
+			oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 				"The client is not authorized to use the resource owner password credentials grant type.",
 				http.StatusBadRequest)},
 		{"invalid_request, a parameter is missing",
-			customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				"Missing required password parameter.", http.StatusBadRequest)},
 		{"invalid_client, the client failed to authenticate",
-			customerrors.NewErrorDetailWithHttpStatusCode("invalid_client",
+			oauth.NewErrorDetailWithHTTPStatus("invalid_client",
 				"Client authentication failed.", http.StatusUnauthorized)},
 		// Before #437 this was invalid_grant and needed an exclusion by value of its own (#219).
 		{"invalid_client, the client is disabled and no credential was read",
-			protocolvalidation.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+			protocolvalidation.NewErrorDetailWithHTTPStatusAndWWWAuthenticate("invalid_client",
 				"Client is disabled.", http.StatusUnauthorized, protocolvalidation.BasicChallenge)},
 	}
 	for _, tc := range notCharged {
@@ -1821,10 +1820,10 @@ func TestHandleTokenPost_Refresh_FlowDisabledAnswer(t *testing.T) {
 			endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, nil, issuance.ErrRefreshFlowDisabled).Once()
 			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
-				detail, ok := err.(*customerrors.ErrorDetail)
-				return ok && detail.GetCode() == "unauthorized_client" &&
-					detail.GetDescription() == tc.wantRefusal &&
-					detail.GetHttpStatusCode() == http.StatusBadRequest
+				detail, ok := err.(*oauth.ErrorDetail)
+				return ok && detail.Code() == "unauthorized_client" &&
+					detail.Description() == tc.wantRefusal &&
+					detail.HTTPStatus() == http.StatusBadRequest
 			})).Return().Once()
 
 			endpoint.post(t, "grant_type=refresh_token&refresh_token=live")
@@ -1901,7 +1900,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+		refusal := oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest)
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, refusal)

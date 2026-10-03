@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -27,7 +27,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
 
-		expectedError := &customerrors.ErrorDetail{}
+		expectedError := &oauth.ErrorDetail{}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, expectedError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {

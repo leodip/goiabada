@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -491,7 +490,7 @@ func TestJsonError(t *testing.T) {
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 
-	err := customerrors.NewErrorDetail("test_error", "Test error description")
+	err := oauth.NewErrorDetail("test_error", "Test error description")
 	httpHelper.JsonError(w, req, err)
 
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // parameterBound is the longest a free-form request parameter may be, in bytes, and the refusal
@@ -40,7 +40,7 @@ func (b parameterBound) check(value string) error {
 	if len(value) <= b.maxBytes {
 		return nil
 	}
-	return customerrors.NewErrorDetailWithHttpStatusCode(b.errorCode,
+	return oauth.NewErrorDetailWithHTTPStatus(b.errorCode,
 		fmt.Sprintf("The '%s' parameter is too long (%d bytes, the maximum is %d).", b.name, len(value), b.maxBytes),
 		http.StatusBadRequest)
 }

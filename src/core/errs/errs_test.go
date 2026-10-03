@@ -70,7 +70,7 @@ func branchB() error { return New("branch b") }
 // "TestX.funcN", which pins the position of the literal in the file instead of the rule.
 func errorfOverBare() error { return Errorf("outer: %w", errors.New("bare")) }
 
-// detail stands in for the wire-meaning types (customerrors.ErrorDetail and friends) that the
+// detail stands in for the wire-meaning types (oauth.ErrorDetail and friends) that the
 // tree matches on.
 type detail struct{ code string }
 
