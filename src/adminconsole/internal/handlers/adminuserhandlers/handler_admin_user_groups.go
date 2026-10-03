@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -53,7 +53,7 @@ func HandleAdminUserGroupsGet(
 		// Get user and their groups
 		user, userGroups, err := apiClient.GetUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -66,7 +66,7 @@ func HandleAdminUserGroupsGet(
 		// Get all available groups
 		allGroups, err := apiClient.GetAllGroups(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -112,33 +112,33 @@ func HandleAdminUserGroupsPost(
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data GroupsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -151,20 +151,20 @@ func HandleAdminUserGroupsPost(
 		// Call API to update user groups (this handles all the business logic including audit logging)
 		_, _, err = apiClient.UpdateUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
 		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
@@ -173,6 +173,6 @@ func HandleAdminUserGroupsPost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

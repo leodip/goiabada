@@ -33,7 +33,7 @@ import "net/http"
 //     stored response, which cannot arise when nothing may be stored.
 //
 //   - A middleware rather than a header written inside the JSON encoder. The
-//     API writes bodies two ways, and 47 of its EncodeJson call sites commit
+//     API writes bodies two ways, and 47 of its EncodeJSON call sites commit
 //     the status with w.WriteHeader before encoding. A header set after the
 //     status is committed is silently dropped, so an encoder-level write would
 //     be lost in those 47 places while every test still passed. Running before

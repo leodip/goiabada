@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -24,12 +24,12 @@ import (
 )
 
 // This handler carried the console's only caller-side error log: a slog.Error on every apiClient
-// failure, written before HandleAPIErrorJson had classified it. An upstream 500 was therefore
-// recorded twice, once here and once in JsonError, and a 400, 404 or 409 that the classifier
+// failure, written before HandleAPIErrorJSON had classified it. An upstream 500 was therefore
+// recorded twice, once here and once in JSONError, and a 400, 404 or 409 that the classifier
 // forwards silently on purpose was still announced at ERROR with a stack. Counting records is the
 // only way to see either: the status and the body are identical with the extra line and without it.
 //
-// The real HttpHelper rather than the mock, for the same reason: the mock's JsonError logs nothing,
+// The real HttpHelper rather than the mock, for the same reason: the mock's JSONError logs nothing,
 // so a handler that logged once would look correct against it (#279).
 
 type permissionsByResourceClient struct {
@@ -52,7 +52,7 @@ func permissionRecords(t *testing.T, client *permissionsByResourceClient, query 
 
 	capture := logtest.CaptureSlog(t)
 
-	httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{})
+	httpHelper := render.New(fstest.MapFS{})
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
@@ -90,7 +90,7 @@ func TestAdminGetPermissions_AnUpstreamServerFaultIsLoggedOnce(t *testing.T) {
 	recorder, errorLines := permissionRecords(t, client, "resourceId=7")
 
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-	require.Len(t, errorLines, 1, "one record per 500, and JsonError is the one that writes it")
+	require.Len(t, errorLines, 1, "one record per 500, and JSONError is the one that writes it")
 	assert.Contains(t, errorLines[0], "unable to get the permissions of resource 7",
 		"the id the caller-side line carried survives, in the message the one record logs")
 
@@ -184,7 +184,7 @@ func TestAdminGetPermissions_WithoutATokenSetAnswersTheSentinel(t *testing.T) {
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
-	router.Get("/admin/permissions", HandleAdminGetPermissionsGet(handlerhelpers.NewHttpHelper(fstest.MapFS{}), client))
+	router.Get("/admin/permissions", HandleAdminGetPermissionsGet(render.New(fstest.MapFS{}), client))
 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/permissions?resourceId=7", nil))

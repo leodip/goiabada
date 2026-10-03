@@ -335,7 +335,7 @@ func TestHandleTokenPost_ARepeatedParameterIsInvalidRequest(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			endpoint := newTokenEndpoint(t)
-			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(refused(tc.parameter))).Return().Once()
+			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(refused(tc.parameter))).Return().Once()
 			endpoint.post(t, tc.form)
 			endpoint.assertExpectations(t)
 		})
@@ -353,7 +353,7 @@ func TestHandleTokenPost_ARepeatedParameterIsInvalidRequest(t *testing.T) {
 				mock.MatchedBy(func(in *protocolvalidation.ValidateTokenRequestInput) bool {
 					return in.ClientId == "c" && in.ClientSecret == "s"
 				})).Return(nil, oauth.NewErrorDetail("invalid_client", "stop")).Once()
-			endpoint.jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			req := httptest.NewRequest("POST", "/token"+tc.query,
 				strings.NewReader("grant_type=client_credentials&client_id=c&client_secret=s"))

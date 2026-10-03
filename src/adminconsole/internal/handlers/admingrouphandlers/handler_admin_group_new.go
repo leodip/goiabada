@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -77,7 +77,7 @@ func HandleAdminGroupNewPost(
 		// Call API to create group
 		_, err := apiClient.CreateGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

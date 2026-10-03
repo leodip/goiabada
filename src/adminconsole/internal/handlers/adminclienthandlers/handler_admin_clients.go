@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -30,7 +30,7 @@ func HandleAdminClientsGet(
 
 		clients, err := apiClient.GetAllClients(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

@@ -28,7 +28,7 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 
 	database.On("GetAllSigningKeys", theRequestsContext(), mock.Anything).
 		Return([]models.KeyPair{}, nil).Once()
-	jsonWriter.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleCertsGet(jsonWriter, database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/certs"))

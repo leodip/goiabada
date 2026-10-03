@@ -397,7 +397,7 @@ func T(ctx context.Context, key string, args ...any) string {
 // LocaleTag returns the BCP 47 language tag attached to ctx by the locale
 // middleware (or refinement helpers). Returns "en" when none is attached.
 // Used by the admin console's CLDR-backed, locale-sensitive reference labels
-// (refCountry/refPhoneCountry/refTimezone in its handlerhelpers) to pick the
+// (refCountry/refPhoneCountry/refTimezone in its render package) to pick the
 // active locale.
 func LocaleTag(ctx context.Context) string {
 	if ctx != nil {

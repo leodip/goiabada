@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -46,13 +46,13 @@ func HandleAdminResourceDeleteGet(
 
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -98,13 +98,13 @@ func HandleAdminResourceDeletePost(
 
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
 		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -142,7 +142,7 @@ func HandleAdminResourceDeletePost(
 		// Call API to delete the resource
 		err = apiClient.DeleteResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

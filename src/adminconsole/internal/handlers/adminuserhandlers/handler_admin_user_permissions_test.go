@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -76,7 +76,7 @@ func TestHandleAdminUserPermissionsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := render.New(nil)
 			req := handlertest.Request(http.MethodPost, "/admin/users/5/permissions",
 				handlertest.WithAccessToken(),
 				handlertest.WithRouteParam("userId", "5"),
@@ -102,7 +102,7 @@ func TestHandleAdminUserPermissionsPost_SendsTheLoadedList(t *testing.T) {
 // telling them to reload, rather than the generic error (#428).
 func TestHandleAdminUserPermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
-	httpHelper := handlerhelpers.NewHttpHelper(nil)
+	httpHelper := render.New(nil)
 	req := handlertest.Request(http.MethodPost, "/admin/users/5/permissions",
 		handlertest.WithAccessToken(),
 		handlertest.WithRouteParam("userId", "5"),

@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -50,7 +50,7 @@ func HandleAdminClientAuthenticationGet(
 		}
 		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if client == nil {
@@ -129,7 +129,7 @@ func HandleAdminClientAuthenticationPost(
 		}
 		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if client == nil {
@@ -192,7 +192,7 @@ func HandleAdminClientAuthenticationPost(
 
 		_, err = apiClient.UpdateClientAuthentication(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
@@ -221,6 +221,6 @@ func HandleAdminClientGenerateNewSecretGet(httpHelper HttpHelper) http.HandlerFu
 			"NewSecret": newSecret,
 		}
 
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

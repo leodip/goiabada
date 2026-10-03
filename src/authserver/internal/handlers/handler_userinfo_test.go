@@ -15,8 +15,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,7 +34,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		rr := httptest.NewRecorder()
 
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "unable to get validated token from context"
 		})).Return()
 
@@ -62,7 +62,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
-		jsonWriter.On("JsonError",
+		jsonWriter.On("JSONError",
 			mock.Anything,
 			mock.Anything,
 			mock.MatchedBy(func(err error) bool {
@@ -95,7 +95,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(nil, nil)
 
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			return isUserInfoInvalidToken(err, "The user could not be found.")
 		})).Return()
 
@@ -132,7 +132,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			return details["userId"] == user.Id
 		})).Return()
 
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			return isUserInfoInvalidToken(err, "The user account is disabled.")
 		})).Return()
 
@@ -208,7 +208,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 
-		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, sub, claims["sub"])
 			assert.Equal(t, user.Username, claims["preferred_username"])
 			assert.Equal(t, user.Email, claims["email"])
@@ -298,7 +298,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		// Not registered, so a profile-picture lookup on this scope would fail the case as
 		// an unexpected call: the picture read lives inside the profile arm.
-		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, sub, claims["sub"])
 			assert.Equal(t, user.Email, claims["email"])
 			assert.Equal(t, user.EmailVerified, claims["email_verified"])
@@ -348,7 +348,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 
-		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, updatedAt.UTC().Unix(), claims["updated_at"])
 			assert.Equal(t, user.FullName(), claims["name"])
 			assert.NotContains(t, claims, "email")
@@ -413,7 +413,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 
-		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, []string{"id-token-group"}, claims["groups"])
 			assert.Equal(t, map[string]string{
 				"idTokenAttr":      "idTokenValue",
@@ -457,7 +457,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
 
-		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, "https://auth.test/account/profile", claims["profile"])
 			assert.Equal(t, "https://auth.test/userinfo/picture/"+sub, claims["picture"])
 			return true
@@ -496,7 +496,7 @@ func userInfoRequestForScopes(t *testing.T, sub string, oidcScopes string) *http
 // 3.1's invalid_token, 401, and the challenge that tells the client which error it is, with the
 // realm every bearer challenge on this server carries (#435).
 //
-// errors.As rather than the bare assertion these cases used, so a wrap on the way to JsonError
+// errors.As rather than the bare assertion these cases used, so a wrap on the way to JSONError
 // could not turn the whole expectation into a panic in a mock matcher (#279 decision 6).
 func isUserInfoInvalidToken(err error, description string) bool {
 	var detail *oauth.ErrorDetail
@@ -511,7 +511,7 @@ func isUserInfoInvalidToken(err error, description string) bool {
 }
 
 // The two cases above assert on the value handed to a mocked writer, which cannot say what a
-// client receives. This drives the real HttpHelper, so the status line and the challenge header
+// client receives. This drives the real render.Renderer, so the status line and the challenge header
 // are asserted where the client reads them.
 //
 // It is the seam decision 14 actually moved: before it, both branches answered 500 server_error
@@ -540,9 +540,9 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_handlers.NewAuditLogger(t)
 
-			// templateFS is nil because JsonError renders no template; a 500 through the
+			// templateFS is nil because JSONError renders no template; a 500 through the
 			// page writer would panic here, which is the fail-loud direction.
-			handler := HandleUserInfoGetPost(handlerhelpers.NewHttpHelper(nil), database, auditLogger, testBaseURL)
+			handler := HandleUserInfoGetPost(render.New(nil), database, auditLogger, testBaseURL)
 
 			req, _ := http.NewRequest("GET", "/userinfo", nil)
 			jwtToken := oauth.JwtToken{

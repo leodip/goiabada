@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -32,11 +32,11 @@ func HandleAccountManageConsentsGet(
 
 		userConsents, err := apiClient.GetAccountConsents(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
-		consentInfoArr := handlerhelpers.ConsentInfos(userConsents)
+		consentInfoArr := render.ConsentInfos(userConsents)
 
 		bind := map[string]interface{}{
 			"consents": consentInfoArr,
@@ -60,26 +60,26 @@ func HandleAccountManageConsentsRevokePost(
 		// Get JWT info to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		consentId, ok := data["consentId"].(float64)
 		if !ok || consentId == 0 {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Call API to revoke
 		if err := apiClient.RevokeAccountConsent(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(consentId)); err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -88,6 +88,6 @@ func HandleAccountManageConsentsRevokePost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

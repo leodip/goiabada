@@ -25,8 +25,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
@@ -429,7 +429,7 @@ func (s *Server) initMiddleware() appBranches {
 
 	branches := appBranches{
 		pages:    s.applicationBranch(middleware.PageFaults(), i18nCeremonyStore),
-		protocol: s.applicationBranch(middleware.ProtocolFaults(handlerhelpers.NewHttpHelper(s.templateFS)), i18nCeremonyStore),
+		protocol: s.applicationBranch(middleware.ProtocolFaults(render.New(s.templateFS)), i18nCeremonyStore),
 		api:      s.applicationBranch(middleware.APIFaults(), i18nCeremonyStore),
 	}
 

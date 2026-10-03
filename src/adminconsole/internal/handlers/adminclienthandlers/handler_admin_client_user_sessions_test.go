@@ -329,7 +329,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
-			handlertest.ExpectEncodeJson(httpHelper).Once()
+			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
 			apiClient := &clientSessionsApiClient{
 				client:   &api.ClientResponse{Id: 3},
@@ -377,7 +377,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 func TestHandleAdminClientUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
-	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()

@@ -65,7 +65,7 @@ func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
-	jsonWriter.On("JsonError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+	jsonWriter.On("JSONError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
 	HandleTokenPost(jsonWriter, mocks_data.NewDatabase(t),
 		mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t),

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -95,7 +95,7 @@ func HandleAccountChangePasswordPost(
 
 		_, err := apiClient.UpdateAccountPassword(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				renderError(errorMessage)
 			})
 			return

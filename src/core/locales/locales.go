@@ -14,7 +14,7 @@ type Locale struct {
 	// Id is the BCP 47 tag stored on the user and emitted as the locale claim, e.g. "pt-BR".
 	Id string
 	// Name is the English display name, e.g. "Portuguese (Brazil)". The picker's label puts the
-	// native name in front of it (localeLabel in the admin console's handlerhelpers).
+	// native name in front of it (localeLabel in the admin console's render package).
 	Name string
 }
 

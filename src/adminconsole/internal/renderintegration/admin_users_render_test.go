@@ -15,7 +15,7 @@ import (
 
 // The user permissions page keeps the set of grants it loaded and sends it with every save (#428).
 func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
-	out := render(t, "/admin_users_permissions.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_users_permissions.html", map[string]interface{}{
 		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
 		"userPermissions":   map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
 		"resources":         []api.ResourceResponse{},
@@ -31,7 +31,7 @@ func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
 // administrator's change. The copy is taken after every loaded membership is pushed and never
 // edited, or the page would send its edited set as the loaded one and every save would pass (#428).
 func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
-	out := render(t, "/admin_users_groups.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_users_groups.html", map[string]interface{}{
 		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
 		"userGroups":        map[int64]string{3: "admins", 4: "auditors"},
 		"allGroups":         []api.GroupResponse{},
@@ -64,7 +64,7 @@ func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
 // "1 2 3 [4] 5 6 ...". The lone "1" is decision 3's rule, the one place this change departs from
 // the library, which would have put dots there and left page 1 reachable only by walking back.
 func TestRender_AdminUsersPaginator(t *testing.T) {
-	out := render(t, "/admin_users.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_users.html", map[string]interface{}{
 		"pageResult": adminuserhandlers.PageResult{
 			// Subject is left empty: the row only has to render.
 			Users:    []api.UserResponse{{Id: 1, Username: "alice", Email: "alice@example.com"}},
@@ -113,7 +113,7 @@ func TestRender_AdminUserDetails(t *testing.T) {
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
 
-	out := render(t, "/admin_users_details.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
 		"user": &api.UserResponse{
 			Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
 			Email: "jane@example.com", Enabled: true,
@@ -140,7 +140,7 @@ func TestRender_AdminUserDetails(t *testing.T) {
 // A user whose timestamps are absent renders an empty cell rather than the year 1: the guard in
 // front of each Format call is what stops a nil pointer ending the page in a 500.
 func TestRender_AdminUserDetailsWithNoTimestamps(t *testing.T) {
-	out := render(t, "/admin_users_details.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
 		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com"},
 		"userFullName":      "",
 		"page":              "1",
@@ -158,7 +158,7 @@ func TestRender_AdminUserDetailsWithNoTimestamps(t *testing.T) {
 func TestRender_AdminUserDelete(t *testing.T) {
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
-	out := render(t, "/admin_users_delete.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_users_delete.html", map[string]interface{}{
 		"user": &api.UserResponse{
 			Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
 			Email: "jane@example.com", CreatedAt: &createdAt,
@@ -182,7 +182,7 @@ func TestRender_AdminUserDelete(t *testing.T) {
 
 // The none arm, which is what every user saw before the fix and what a user in no groups sees now.
 func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
-	out := render(t, "/admin_users_delete.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_users_delete.html", map[string]interface{}{
 		"user":         &api.UserResponse{Id: 7, Email: "jane@example.com"},
 		"userFullName": "",
 		"groups":       []api.GroupResponse{},

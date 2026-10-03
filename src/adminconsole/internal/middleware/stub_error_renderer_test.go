@@ -6,7 +6,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// stubErrorRenderer stands in for *handlerhelpers.HttpHelper, whose real
+// stubErrorRenderer stands in for *render.Renderer, whose real
 // InternalServerError needs a template FS this package has no business carrying.
 // It answers the way the real one does on a failed render: 500 with a body, so a
 // test that only asserts the status still means what it did before the middleware

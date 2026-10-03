@@ -35,19 +35,19 @@ func HandleTokenPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		input, err := parseTokenRequest(r)
 		if err != nil {
-			jsonWriter.JsonError(w, r, err)
+			jsonWriter.JSONError(w, r, err)
 			return
 		}
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
-			jsonWriter.JsonError(w, r, reqctx.ErrNoSettings)
+			jsonWriter.JSONError(w, r, reqctx.ErrNoSettings)
 			return
 		}
 
 		grant, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, input)
 		if err != nil {
-			jsonWriter.JsonError(w, r, auditTokenRefusal(r, database, auditLogger, credentialFailures, input, err))
+			jsonWriter.JSONError(w, r, auditTokenRefusal(r, database, auditLogger, credentialFailures, input, err))
 			return
 		}
 
@@ -62,7 +62,7 @@ func HandleTokenPost(
 			responder.respondPassword(w, r, settings, grant)
 		default:
 			// Reachable only if the validator returns a grant this endpoint has no responder for.
-			jsonWriter.JsonError(w, r, errs.Errorf("the token validator returned a grant (%T) the token endpoint does not answer", grant))
+			jsonWriter.JSONError(w, r, errs.Errorf("the token validator returned a grant (%T) the token endpoint does not answer", grant))
 		}
 	}
 }
@@ -316,7 +316,7 @@ type tokenResponder struct {
 func (tr tokenResponder) writeTokenResponse(w http.ResponseWriter, r *http.Request, tokenResponse *oauth.TokenResponse) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
-	tr.jsonWriter.EncodeJson(w, r, tokenResponse)
+	tr.jsonWriter.EncodeJSON(w, r, tokenResponse)
 }
 
 // extractClientCredentials extracts client_id and client_secret from the request.

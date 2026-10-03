@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -42,7 +42,7 @@ func HandleAdminSettingsAuditLogsGet(
 		// Fetch settings
 		settingsResp, err := apiClient.GetSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -133,7 +133,7 @@ func HandleAdminSettingsAuditLogsPost(
 
 		_, err := apiClient.UpdateSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 
@@ -180,7 +180,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// Fetch audit logs
 		auditLogsResp, err := apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -191,7 +191,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 			pageInt = clamped
 			auditLogsResp, err = apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 			if err != nil {
-				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+				render.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		}
@@ -202,7 +202,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// never writes or omitting one it does (#351).
 		eventTypesResp, err := apiClient.GetAuditEventTypes(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

@@ -154,7 +154,7 @@ func TestOpenAPI_DeclaresEveryStatusTheHandlersEmit(t *testing.T) {
 // never looks its resource up at all, so an unknown id comes back as an empty list.
 //
 // Only failures are checked, because a success status can be implicit: a handler that calls
-// httpHelper.EncodeJson and never touches WriteHeader answers 200 without naming it, so
+// httpHelper.EncodeJSON and never touches WriteHeader answers 200 without naming it, so
 // absence from the source would not be absence from the wire.
 //
 // Three failures can come from somewhere other than the handler, and none is merely waved
@@ -600,7 +600,7 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
-				case "InternalServerError", "JsonError":
+				case "InternalServerError", "JSONError":
 					// httpHelper's two error renderers. Both write 500 for a bare error,
 					// which is the only kind these handlers hand them.
 					out[500] = true

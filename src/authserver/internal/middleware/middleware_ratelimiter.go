@@ -843,7 +843,7 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		// then reached the password check with neither tier below consulted, and a parameter whose
 		// second copy was malformed passed as sent once (#228, #437).
 		if err := r.ParseForm(); err != nil {
-			m.jsonWriter.JsonError(w, r, protocolvalidation.UnparseableRequest())
+			m.jsonWriter.JSONError(w, r, protocolvalidation.UnparseableRequest())
 			return
 		}
 

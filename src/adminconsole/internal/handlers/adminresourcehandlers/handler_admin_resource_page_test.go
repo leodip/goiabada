@@ -162,10 +162,10 @@ func testStore() *sessionstore.ServerSideStore {
 	return store
 }
 
-// render runs one of the two GETs and returns what it bound and the pages it
+// renderPermissionPage runs one of the two GETs and returns what it bound and the pages it
 // asked the API for. A 500 fails the test with the error it carried, since
 // answering 500 to a typed page is half of what is being fixed.
-func render(t *testing.T, handler http.HandlerFunc, template, rawPage string,
+func renderPermissionPage(t *testing.T, handler http.HandlerFunc, template, rawPage string,
 	httpHelper *mocks_handlers.HttpHelper) map[string]interface{} {
 
 	t.Helper()
@@ -241,7 +241,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_PageQueryParameter(t *testin
 
 			httpHelper := newHelper(t)
 			handler := HandleAdminResourceGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
-			bind := render(t, handler, "groups-with-permission", tc.raw, httpHelper)
+			bind := renderPermissionPage(t, handler, "groups-with-permission", tc.raw, httpHelper)
 
 			assertAsked(t, tc.wantAsked, apiClient.asked, tc.why)
 			for i, page := range apiClient.asked {
@@ -306,7 +306,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_TheOverflowingPageDoesNotPan
 				httpHelper := newHelper(t)
 				handler := HandleAdminResourceGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
 
-				bind := render(t, handler, "groups-with-permission", raw, httpHelper)
+				bind := renderPermissionPage(t, handler, "groups-with-permission", raw, httpHelper)
 
 				// It renders, and it renders the last page rather than nothing:
 				// a bound that answered page 1 would be safe but wrong, since
@@ -369,7 +369,7 @@ func TestHandleAdminResourceUsersWithPermissionGet_PageQueryParameter(t *testing
 
 			httpHelper := newHelper(t)
 			handler := HandleAdminResourceUsersWithPermissionGet(httpHelper, testStore(), apiClient)
-			bind := render(t, handler, "users-with-permission", tc.raw, httpHelper)
+			bind := renderPermissionPage(t, handler, "users-with-permission", tc.raw, httpHelper)
 
 			assertAsked(t, tc.wantAsked, apiClient.asked, tc.why)
 			for i, page := range apiClient.asked {
@@ -423,7 +423,7 @@ func TestHandleAdminResourceUsersWithPermissionAddGet_PageIsCarriedNotRefused(t 
 			apiClient := &resourcePagingApiClient{permissions: aPermission()}
 			httpHelper := newHelper(t)
 			handler := HandleAdminResourceUsersWithPermissionAddGet(httpHelper, apiClient)
-			bind := render(t, handler, "users-with-permission/add", tc.raw, httpHelper)
+			bind := renderPermissionPage(t, handler, "users-with-permission/add", tc.raw, httpHelper)
 
 			assert.Equal(t, tc.want, bind["page"], "the page carried into the return link")
 		})

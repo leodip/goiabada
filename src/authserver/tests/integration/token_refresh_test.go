@@ -761,7 +761,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 // TestToken_Refresh_MissingRowIsInvalidGrant pins that a validly signed, unexpired
 // refresh token whose row is gone returns 400 invalid_grant, not 500 (#128).
 //
-// It used to return a plain error, which JsonError maps to server_error with a 500.
+// It used to return a plain error, which JSONError maps to server_error with a 500.
 // RFC 6749 Section 5.2 classifies an invalid, expired or revoked refresh token as
 // invalid_grant, and a client cannot act on a 500 the way it can act on invalid_grant:
 // one says "retry later, the server is broken", the other says "reauthorize".

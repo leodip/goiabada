@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/render"
 )
 
 // TestHandleTokenPost_InvalidClientOnTheWire is the token endpoint's invalid_client as a client
@@ -61,7 +61,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 				validatorDB := mocks_data.NewDatabase(t)
 				validatorDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
 					Return(r.client, nil).Once()
-				handler := HandleTokenPost(handlerhelpers.NewHttpHelper(nil), mocks_data.NewDatabase(t),
+				handler := HandleTokenPost(render.New(nil), mocks_data.NewDatabase(t),
 					mocks_handlers.NewTokenIssuer(t),
 					protocolvalidation.NewTokenValidator(validatorDB, nil, nil, testDataCipher),
 					mocks_handlers.NewAuditLogger(t), noCredentialFailures{})
@@ -96,7 +96,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 	// The control: a request naming no client stays invalid_request, 400, with no challenge, since
 	// no client failed to authenticate.
 	t.Run("missing client_id", func(t *testing.T) {
-		handler := HandleTokenPost(handlerhelpers.NewHttpHelper(nil), mocks_data.NewDatabase(t),
+		handler := HandleTokenPost(render.New(nil), mocks_data.NewDatabase(t),
 			mocks_handlers.NewTokenIssuer(t),
 			protocolvalidation.NewTokenValidator(mocks_data.NewDatabase(t), nil, nil, testDataCipher),
 			mocks_handlers.NewAuditLogger(t), noCredentialFailures{})

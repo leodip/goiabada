@@ -51,26 +51,26 @@ func (_m *HttpHelper) EXPECT() *HttpHelper_Expecter {
 	return &HttpHelper_Expecter{mock: &_m.Mock}
 }
 
-// EncodeJson provides a mock function for the type HttpHelper
-func (_mock *HttpHelper) EncodeJson(w http.ResponseWriter, r *http.Request, data interface{}) {
+// EncodeJSON provides a mock function for the type HttpHelper
+func (_mock *HttpHelper) EncodeJSON(w http.ResponseWriter, r *http.Request, data interface{}) {
 	_mock.Called(w, r, data)
 	return
 }
 
-// HttpHelper_EncodeJson_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EncodeJson'
-type HttpHelper_EncodeJson_Call struct {
+// HttpHelper_EncodeJSON_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EncodeJSON'
+type HttpHelper_EncodeJSON_Call struct {
 	*mock.Call
 }
 
-// EncodeJson is a helper method to define mock.On call
+// EncodeJSON is a helper method to define mock.On call
 //   - w http.ResponseWriter
 //   - r *http.Request
 //   - data interface{}
-func (_e *HttpHelper_Expecter) EncodeJson(w any, r any, data any) *HttpHelper_EncodeJson_Call {
-	return &HttpHelper_EncodeJson_Call{Call: _e.mock.On("EncodeJson", w, r, data)}
+func (_e *HttpHelper_Expecter) EncodeJSON(w any, r any, data any) *HttpHelper_EncodeJSON_Call {
+	return &HttpHelper_EncodeJSON_Call{Call: _e.mock.On("EncodeJSON", w, r, data)}
 }
 
-func (_c *HttpHelper_EncodeJson_Call) Run(run func(w http.ResponseWriter, r *http.Request, data interface{})) *HttpHelper_EncodeJson_Call {
+func (_c *HttpHelper_EncodeJSON_Call) Run(run func(w http.ResponseWriter, r *http.Request, data interface{})) *HttpHelper_EncodeJSON_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -93,12 +93,12 @@ func (_c *HttpHelper_EncodeJson_Call) Run(run func(w http.ResponseWriter, r *htt
 	return _c
 }
 
-func (_c *HttpHelper_EncodeJson_Call) Return() *HttpHelper_EncodeJson_Call {
+func (_c *HttpHelper_EncodeJSON_Call) Return() *HttpHelper_EncodeJSON_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *HttpHelper_EncodeJson_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, data interface{})) *HttpHelper_EncodeJson_Call {
+func (_c *HttpHelper_EncodeJSON_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, data interface{})) *HttpHelper_EncodeJSON_Call {
 	_c.Run(run)
 	return _c
 }
@@ -155,26 +155,26 @@ func (_c *HttpHelper_InternalServerError_Call) RunAndReturn(run func(w http.Resp
 	return _c
 }
 
-// JsonError provides a mock function for the type HttpHelper
-func (_mock *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error) {
+// JSONError provides a mock function for the type HttpHelper
+func (_mock *HttpHelper) JSONError(w http.ResponseWriter, r *http.Request, err error) {
 	_mock.Called(w, r, err)
 	return
 }
 
-// HttpHelper_JsonError_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'JsonError'
-type HttpHelper_JsonError_Call struct {
+// HttpHelper_JSONError_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'JSONError'
+type HttpHelper_JSONError_Call struct {
 	*mock.Call
 }
 
-// JsonError is a helper method to define mock.On call
+// JSONError is a helper method to define mock.On call
 //   - w http.ResponseWriter
 //   - r *http.Request
 //   - err error
-func (_e *HttpHelper_Expecter) JsonError(w any, r any, err any) *HttpHelper_JsonError_Call {
-	return &HttpHelper_JsonError_Call{Call: _e.mock.On("JsonError", w, r, err)}
+func (_e *HttpHelper_Expecter) JSONError(w any, r any, err any) *HttpHelper_JSONError_Call {
+	return &HttpHelper_JSONError_Call{Call: _e.mock.On("JSONError", w, r, err)}
 }
 
-func (_c *HttpHelper_JsonError_Call) Run(run func(w http.ResponseWriter, r *http.Request, err error)) *HttpHelper_JsonError_Call {
+func (_c *HttpHelper_JSONError_Call) Run(run func(w http.ResponseWriter, r *http.Request, err error)) *HttpHelper_JSONError_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -197,12 +197,12 @@ func (_c *HttpHelper_JsonError_Call) Run(run func(w http.ResponseWriter, r *http
 	return _c
 }
 
-func (_c *HttpHelper_JsonError_Call) Return() *HttpHelper_JsonError_Call {
+func (_c *HttpHelper_JSONError_Call) Return() *HttpHelper_JSONError_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *HttpHelper_JsonError_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, err error)) *HttpHelper_JsonError_Call {
+func (_c *HttpHelper_JSONError_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, err error)) *HttpHelper_JSONError_Call {
 	_c.Run(run)
 	return _c
 }

@@ -27,7 +27,7 @@ import (
 // reference-data layer: country and phone-country names come from CLDR, and
 // timezone labels are assembled from the CLDR-localized country name, IANA
 // zone ID, and optional English comment (see the admin console's
-// handlerhelpers/reference_labels.go).
+// render/reference_labels.go).
 func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
 	info, err := os.Stat(catalogsDir)

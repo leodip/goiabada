@@ -12,7 +12,7 @@ import (
 // wrapper (#279 decision 6).
 //
 // The sentinels themselves are authserver/internal/protocolvalidation's and
-// authserver/internal/handlerhelpers' since #385, and core cannot import either, so they are
+// authserver/internal/render' since #385, and core cannot import either, so they are
 // rebuilt here from the same constructor arguments. That costs nothing: the property under test is
 // that an equal value built separately matches, so a fixture built separately is the subject
 // rather than a stand-in for it.

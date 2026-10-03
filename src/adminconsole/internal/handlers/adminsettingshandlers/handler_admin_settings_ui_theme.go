@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 
@@ -38,7 +38,7 @@ func HandleAdminSettingsUIThemeGet(
 		// Fetch from API
 		apiResp, err := apiClient.GetSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -97,8 +97,8 @@ func HandleAdminSettingsUIThemePost(
 			if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 				apiResp, err := apiClient.GetSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken)
 				if err != nil {
-					if handlerhelpers.IsSessionEnded(err) {
-						handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+					if render.IsSessionEnded(err) {
+						render.HandleAPIError(httpHelper, w, r, err)
 						return
 					}
 				} else {
@@ -131,7 +131,7 @@ func HandleAdminSettingsUIThemePost(
 			UITheme: settingsInfo.UITheme,
 		})
 		if err != nil {
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

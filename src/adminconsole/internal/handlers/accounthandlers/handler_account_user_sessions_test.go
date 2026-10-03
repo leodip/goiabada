@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -67,7 +67,7 @@ func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	bind := handlertest.Bind(t, httpHelper)
 
-	sessions, ok := bind["sessions"].([]handlerhelpers.SessionInfo)
+	sessions, ok := bind["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 
@@ -101,7 +101,7 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
 	require.NotNil(t, sessions[0].Started)
@@ -129,7 +129,7 @@ func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 
 	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]handlerhelpers.SessionInfo)
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]render.SessionInfo)
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 
@@ -208,7 +208,7 @@ func TestHandleAccountSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
-			handlertest.ExpectEncodeJson(httpHelper).Once()
+			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
 			apiClient := &accountSessionsApiClient{sessions: testCase.sessions}
 
@@ -254,7 +254,7 @@ func TestHandleAccountSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t
 func TestHandleAccountSessionsEndSessionPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
-	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()

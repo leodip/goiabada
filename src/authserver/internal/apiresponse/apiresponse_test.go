@@ -143,7 +143,7 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 	assert.ErrorContains(t, loggedError(t, records[0]), "failed to load the client: connection refused")
 }
 
-// The sentence is HttpHelper.JsonError's own, so the API and the web surface read alike. If either
+// The sentence is render.Renderer.JSONError's own, so the API and the web surface read alike. If either
 // moves, this fails rather than the two drifting apart unnoticed.
 func TestWriteInternalServerError_RepeatsTheWebSurfaceSentence(t *testing.T) {
 	rr := httptest.NewRecorder()

@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 )
 
@@ -24,38 +24,38 @@ func HandleAdminGroupMembersRemoveUserPost(
 
 		idStr := chi.URLParam(r, "groupId")
 		if len(idStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		err = apiClient.RemoveUserFromGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, userId)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -64,6 +64,6 @@ func HandleAdminGroupMembersRemoveUserPost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

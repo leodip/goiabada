@@ -213,8 +213,8 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-			httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Maybe()
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
+			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()

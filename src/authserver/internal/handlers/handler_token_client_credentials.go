@@ -15,7 +15,7 @@ func (tr tokenResponder) respondClientCredentials(w http.ResponseWriter, r *http
 
 	tokenResponse, err := tr.issuer.IssueClientCredentialsGrant(r.Context(), settings, grant.Client, grant.Scope)
 	if err != nil {
-		tr.jsonWriter.JsonError(w, r, err)
+		tr.jsonWriter.JSONError(w, r, err)
 		return
 	}
 

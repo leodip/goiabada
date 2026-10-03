@@ -338,7 +338,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		assert.Error(t, err)
 
 		// UPDATED DELIBERATELY, not a stale assertion: this used to be a plain error,
-		// which JsonError maps to a 500. A validly signed refresh token with no row is
+		// which JSONError maps to a 500. A validly signed refresh token with no row is
 		// an invalid grant, not a server fault (RFC 6749 Section 5.2, #128).
 		detail, ok := err.(*oauth.ErrorDetail)
 		require.Truef(t, ok, "a missing refresh token row must be an ErrorDetail, got %T", err)

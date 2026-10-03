@@ -309,8 +309,8 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 			// held by TestHandlers_AjaxHandlersDoNotUsePageWriters and the classifier guard, not
 			// here. What this case needs is only that the handler answered rather than carrying on.
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-			httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Maybe()
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
+			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -335,9 +335,9 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 func TestAccountHandlers_ThePictureHandlersCarryTheRequestsContext(t *testing.T) {
 	t.Run("HandleAccountProfilePictureDelete", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
-		httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
-		httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
 
 		apiClient := &ctxRecordingApiClient{}
 		request := handlertest.Request(http.MethodDelete, "/account/profile-picture",

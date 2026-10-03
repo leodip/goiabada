@@ -60,7 +60,7 @@ func TestHandleAdminResourceUsersWithPermissionGet_TheSystemResourceListsWhatThe
 	apiClient := &systemResourceApiClient{resourcePagingApiClient{permissions: systemResourcePermissions()}}
 
 	httpHelper := newHelper(t)
-	bind := render(t, HandleAdminResourceUsersWithPermissionGet(httpHelper, testStore(), apiClient), "users-with-permission", "", httpHelper)
+	bind := renderPermissionPage(t, HandleAdminResourceUsersWithPermissionGet(httpHelper, testStore(), apiClient), "users-with-permission", "", httpHelper)
 
 	assert.Equal(t, systemResourcePermissions(), bind["permissions"])
 	assert.Equal(t, int64(41), bind["selectedPermission"])
@@ -70,7 +70,7 @@ func TestHandleAdminResourceGroupsWithPermissionGet_TheSystemResourceListsWhatTh
 	apiClient := &systemResourceApiClient{resourcePagingApiClient{permissions: systemResourcePermissions()}}
 
 	httpHelper := newHelper(t)
-	bind := render(t, HandleAdminResourceGroupsWithPermissionGet(httpHelper, testStore(), apiClient), "groups-with-permission", "", httpHelper)
+	bind := renderPermissionPage(t, HandleAdminResourceGroupsWithPermissionGet(httpHelper, testStore(), apiClient), "groups-with-permission", "", httpHelper)
 
 	assert.Equal(t, systemResourcePermissions(), bind["permissions"])
 	assert.Equal(t, int64(41), bind["selectedPermission"])

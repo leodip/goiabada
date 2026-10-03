@@ -12,15 +12,15 @@ import (
 	"github.com/leodip/goiabada/core/guard"
 )
 
-// ExpectEncodeJson admits EncodeJson and hands the call back so the caller can bound it. It is the
+// ExpectEncodeJSON admits EncodeJSON and hands the call back so the caller can bound it. It is the
 // AJAX half of ExpectRender and chooses neither Maybe() nor Once() for the same reason: a handler
 // that may or may not answer says so itself.
-func ExpectEncodeJson(httpHelper *mocks_handlers.HttpHelper) *mock.Call {
-	return httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
+func ExpectEncodeJSON(httpHelper *mocks_handlers.HttpHelper) *mock.Call {
+	return httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Return()
 }
 
 // Encoded is the answer an AJAX handler wrote, read back off the mock's call log as the browser
-// reads it: marshalled, and then decoded into a map. EncodeJson is mocked, so the call log is the
+// reads it: marshalled, and then decoded into a map. EncodeJSON is mocked, so the call log is the
 // only place the value exists.
 //
 // It goes through encoding/json rather than returning the value the handler passed, because these
@@ -30,7 +30,7 @@ func ExpectEncodeJson(httpHelper *mocks_handlers.HttpHelper) *mock.Call {
 // about the names on the wire. Absence is part of the answer too: a handler that answers Success
 // alone leaves IsCurrentSession out of the object rather than sending it false.
 //
-// It is the last EncodeJson call, for the reason Bind takes the last render.
+// It is the last EncodeJSON call, for the reason Bind takes the last render.
 //
 // context is an optional printf-style clause appended to the failure, for the table helpers whose
 // rows a bare message could not tell apart.
@@ -41,7 +41,7 @@ func Encoded(reporter guard.Reporter, httpHelper *mocks_handlers.HttpHelper,
 	var answered bool
 	var value any
 	for _, call := range httpHelper.Calls {
-		if call.Method == "EncodeJson" {
+		if call.Method == "EncodeJSON" {
 			answered = true
 			value = call.Arguments.Get(2)
 		}

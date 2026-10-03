@@ -23,7 +23,7 @@ import (
 // difference (#279 decision 7).
 const internalServerErrorCode = "INTERNAL_SERVER_ERROR"
 
-// internalServerErrorDescription repeats HttpHelper.JsonError's sentence, so a request that fails
+// internalServerErrorDescription repeats render.Renderer.JSONError's sentence, so a request that fails
 // on the API reads the same as one that fails on the web surface and carries the same request id.
 // Until now the API's 500 body named no request id at all, which left an operator no way to join a
 // caller's report to a log line (#279 decision 7).
@@ -84,7 +84,7 @@ func write(w http.ResponseWriter, status int, body []byte) {
 // friends beside the error, and folding them into a message string to fit a fixed signature would
 // have traded structure for brevity at 140 sites (#279 decisions 7 and 9).
 //
-// errs.WithStack is applied here rather than at the call sites, exactly as HttpHelper.JsonError
+// errs.WithStack is applied here rather than at the call sites, exactly as render.Renderer.JSONError
 // does it: it is the identity on anything this tree constructed, so the only value it changes is a
 // bare error from the standard library or a dependency, which would otherwise log with no frames.
 func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {

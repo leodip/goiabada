@@ -7,7 +7,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -54,7 +54,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
-	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS)
+	httpHelper := render.New(s.templateFS)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
 	// Two bearer guard sets, one per surface, because the two surfaces promise different refusal

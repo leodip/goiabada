@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -50,7 +50,7 @@ func serveResourcePermissionsSave(stub *resourcePermissionsSaveApiClient, body s
 	rec := httptest.NewRecorder()
 	router := chi.NewRouter()
 	router.Post("/admin/resources/{resourceId}/permissions",
-		HandleAdminResourcePermissionsPost(handlerhelpers.NewHttpHelper(nil), nil, stub))
+		HandleAdminResourcePermissionsPost(render.New(nil), nil, stub))
 	router.ServeHTTP(rec, req)
 	return rec
 }

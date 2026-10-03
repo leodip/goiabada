@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -36,7 +36,7 @@ func HandleAccountEmailGet(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -94,7 +94,7 @@ func HandleAccountEmailPost(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -130,7 +130,7 @@ func HandleAccountEmailPost(
 		}
 		_, err = apiClient.UpdateAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				bind := map[string]interface{}{
 					"user":              user,
 					"email":             email,

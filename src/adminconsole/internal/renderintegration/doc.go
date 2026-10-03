@@ -1,5 +1,5 @@
 // Package renderintegration executes the admin console's pages through the real renderer: the
-// production HttpHelper over the embedded template FS, its funcmap and the full layout, in pt-BR,
+// production render.Renderer over the embedded template FS, its funcmap and the full layout, in pt-BR,
 // with the runtime data types the handlers bind. It is the regression guard for the class of bug
 // where a template references a field its data does not carry (the phone dropdown reading .Alpha2
 // off a DTO that lacked it, which answered 500 in production and was invisible to handler tests,

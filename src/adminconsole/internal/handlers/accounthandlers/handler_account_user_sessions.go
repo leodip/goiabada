@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -33,11 +33,11 @@ func HandleAccountSessionsGet(
 		// Fetch sessions via API
 		sessions, err := apiClient.GetAccountSessions(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
-		sessionInfoArr := handlerhelpers.SessionInfos(sessions)
+		sessionInfoArr := render.SessionInfos(sessions)
 
 		bind := map[string]interface{}{
 			"sessions": sessionInfoArr,
@@ -61,20 +61,20 @@ func HandleAccountSessionsEndSessionPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&data); err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		userSessionId, ok := data["userSessionId"].(float64)
 		if !ok || userSessionId == 0 {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -84,7 +84,7 @@ func HandleAccountSessionsEndSessionPost(
 		// in one place (#373).
 		sessions, err := apiClient.GetAccountSessions(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -104,17 +104,17 @@ func HandleAccountSessionsEndSessionPost(
 				Success          bool
 				IsCurrentSession bool
 			}{Success: true, IsCurrentSession: true}
-			httpHelper.EncodeJson(w, r, result)
+			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
 
 		// Delete session via API (server validates ownership and audits)
 		if err = apiClient.DeleteAccountSession(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
 		result := struct{ Success bool }{Success: true}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

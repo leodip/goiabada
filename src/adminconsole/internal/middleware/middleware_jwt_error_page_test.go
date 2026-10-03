@@ -24,7 +24,7 @@ import (
 )
 
 // recordingErrorRenderer captures what the middleware handed the error page. It
-// answers the way *handlerhelpers.HttpHelper does once the page is rendered: 500,
+// answers the way *render.Renderer does once the page is rendered: 500,
 // with a body that carries the generic localized message and nothing about the
 // cause.
 type recordingErrorRenderer struct {

@@ -79,7 +79,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 		user       *api.UserResponse
 		userErr    error
 		attributes []api.UserAttributeResponse
-		// wantStatus is the HTTP status the handler must choose; 0 means it must take JsonError's
+		// wantStatus is the HTTP status the handler must choose; 0 means it must take JSONError's
 		// generic 500 arm instead, with a bare error rather than an *ErrorDetail.
 		wantStatus int
 	}{
@@ -147,7 +147,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			var captured error
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
@@ -180,7 +180,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			var detail *oauth.ErrorDetail
 			if testCase.wantStatus == 0 {
 				assert.False(t, errors.As(captured, &detail),
-					"expected JsonError's generic 500 arm, got a status-carrying %v", captured)
+					"expected JSONError's generic 500 arm, got a status-carrying %v", captured)
 				return
 			}
 			require.True(t, errors.As(captured, &detail),
@@ -210,7 +210,7 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			var captured error
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()

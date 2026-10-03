@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -60,7 +60,7 @@ func HandleAdminClientWebOriginsGet(
 
 		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if clientResp == nil {
@@ -81,7 +81,7 @@ func HandleAdminClientWebOriginsGet(
 		// displays a list it is handed and holds no rule.
 		allClients, err := apiClient.GetAllClients(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -164,21 +164,21 @@ func HandleAdminClientWebOriginsPost(
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data WebOriginsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -189,27 +189,27 @@ func HandleAdminClientWebOriginsPost(
 		}
 		_, err = apiClient.UpdateClientWebOrigins(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {
-			// Not JsonError directly: the API refuses a web origin with a 400 whose description
+			// Not JSONError directly: the API refuses a web origin with a 400 whose description
 			// names the offending value and says what an origin should look like, and that
 			// sentence is the only thing telling the administrator what to type instead. Handed
-			// to JsonError as a plain error it becomes a generic 500 and the sentence goes to
+			// to JSONError as a plain error it becomes a generic 500 and the sentence goes to
 			// the log. This is the same defect #122 fixed on the Redirect URIs page, and it
 			// bites here now that the API refuses shapes this page's own new URL().origin
 			// happily produces, such as a non-ASCII host or an IPv6 literal (#250).
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
 		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
@@ -218,6 +218,6 @@ func HandleAdminClientWebOriginsPost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

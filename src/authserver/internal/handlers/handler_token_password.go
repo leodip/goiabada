@@ -27,7 +27,7 @@ func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
 		Scope:  grant.Scope,
 	})
 	if err != nil {
-		tr.jsonWriter.JsonError(w, r, err)
+		tr.jsonWriter.JSONError(w, r, err)
 		return
 	}
 

@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -49,7 +49,7 @@ func HandleAdminUserDetailsGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -75,7 +75,7 @@ func HandleAdminUserDetailsGet(
 
 		bind := map[string]interface{}{
 			"user":              user,
-			"userFullName":      handlerhelpers.UserFullName(user),
+			"userFullName":      render.UserFullName(user),
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": savedSuccessfully,
@@ -121,7 +121,7 @@ func HandleAdminUserDetailsPost(
 		enabled := r.FormValue("enabled") == "on"
 		_, err = apiClient.UpdateUserEnabled(r.Context(), jwtInfo.TokenResponse.AccessToken, id, enabled)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 

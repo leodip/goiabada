@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -43,7 +43,7 @@ func HandleAccountAddressGet(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -115,7 +115,7 @@ func HandleAccountAddressPost(
 
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -130,7 +130,7 @@ func HandleAccountAddressPost(
 
 		_, err = apiClient.UpdateAccountAddress(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Re-render with submitted values
 				address := struct {
 					AddressLine1      string

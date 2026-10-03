@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -50,7 +50,7 @@ func HandleAdminUserPictureGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -64,7 +64,7 @@ func HandleAdminUserPictureGet(
 		// real failure and is answered as one rather than drawn as an empty picture (#425).
 		pictureInfo, err := apiClient.GetUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if pictureInfo != nil && pictureInfo.HasPicture {
@@ -107,7 +107,7 @@ func HandleAdminUserProfilePicturePost(
 		// Get JWT info to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -115,7 +115,7 @@ func HandleAdminUserProfilePicturePost(
 		userIdStr := chi.URLParam(r, "userId")
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -124,14 +124,14 @@ func HandleAdminUserProfilePicturePost(
 		// held in memory before the rest spills to temporary files.
 		//nolint:gosec // G120: bounded by uploadBodyLimit, as above; G120 flags every multipart parse
 		if parseFormErr := r.ParseMultipartForm(10 << 20); parseFormErr != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		// Get file from form
 		file, header, err := r.FormFile("picture")
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 		defer func() { _ = file.Close() }()
@@ -139,14 +139,14 @@ func HandleAdminUserProfilePicturePost(
 		// Read file data
 		pictureData, err := io.ReadAll(file)
 		if err != nil {
-			httpHelper.JsonError(w, r, errs.Wrap(err, "failed to read picture data"))
+			httpHelper.JSONError(w, r, errs.Wrap(err, "failed to read picture data"))
 			return
 		}
 
 		// Call API client to upload
 		response, err := apiClient.UploadUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId, pictureData, header.Filename)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
@@ -167,7 +167,7 @@ func HandleAdminUserProfilePictureDelete(
 		// Get JWT info to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -175,14 +175,14 @@ func HandleAdminUserProfilePictureDelete(
 		userIdStr := chi.URLParam(r, "userId")
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Call API client to delete
 		err = apiClient.DeleteUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 

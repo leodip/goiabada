@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -53,7 +53,7 @@ func HandleAdminUserProfileGet(
 
 		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -124,7 +124,7 @@ func HandleAdminUserProfilePost(
 			return
 		}
 
-		request, err := handlerhelpers.ParseProfileForm(r)
+		request, err := render.ParseProfileForm(r)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -134,16 +134,16 @@ func HandleAdminUserProfilePost(
 		user, err := apiClient.UpdateUserProfile(r.Context(), jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
 			// Handle validation errors by showing them in the form
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Get formUser data for form display
 				formUser, userErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {
-					handlerhelpers.HandleAPIError(httpHelper, w, r, userErr)
+					render.HandleAPIError(httpHelper, w, r, userErr)
 					return
 				}
 
 				// Update user fields with form values for display
-				handlerhelpers.EchoProfileForm(formUser, request)
+				render.EchoProfileForm(formUser, request)
 
 				bind := map[string]interface{}{
 					"user":      formUser,

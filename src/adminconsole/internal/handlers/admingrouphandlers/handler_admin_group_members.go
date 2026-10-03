@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 
@@ -48,7 +48,7 @@ func HandleAdminGroupMembersGet(
 		// Get group details
 		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if group == nil {
@@ -61,7 +61,7 @@ func HandleAdminGroupMembersGet(
 		const pageSize = 10
 		users, total, err := apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -72,7 +72,7 @@ func HandleAdminGroupMembersGet(
 			pageInt = clamped
 			users, total, err = apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
 			if err != nil {
-				handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+				render.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		}

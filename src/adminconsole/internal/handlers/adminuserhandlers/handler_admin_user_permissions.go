@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -53,7 +53,7 @@ func HandleAdminUserPermissionsGet(
 		// Get user permissions via API
 		user, userPermissions, err := apiClient.GetUserPermissions(r.Context(), accessToken, id)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 		if user == nil {
@@ -70,7 +70,7 @@ func HandleAdminUserPermissionsGet(
 		// Get all resources via API
 		resources, err := apiClient.GetAllResources(r.Context(), accessToken)
 		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
+			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
@@ -118,33 +118,33 @@ func HandleAdminUserPermissionsPost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
 		idStr := chi.URLParam(r, "userId")
 		if len(idStr) == 0 {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
+			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
 		var data PermissionsPostInput
 		err = json.Unmarshal(body, &data)
 		if err != nil {
-			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
+			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -157,20 +157,20 @@ func HandleAdminUserPermissionsPost(
 		// Update user permissions via API (includes validation and audit logging)
 		err = apiClient.UpdateUserPermissions(r.Context(), accessToken, id, request)
 		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
+			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
 		sess.SetFlash("savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
-			httpHelper.JsonError(w, r, err)
+			httpHelper.JSONError(w, r, err)
 			return
 		}
 
@@ -179,6 +179,6 @@ func HandleAdminUserPermissionsPost(
 		}{
 			Success: true,
 		}
-		httpHelper.EncodeJson(w, r, result)
+		httpHelper.EncodeJSON(w, r, result)
 	}
 }

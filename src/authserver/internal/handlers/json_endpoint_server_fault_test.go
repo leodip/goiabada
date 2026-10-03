@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -23,7 +23,7 @@ import (
 
 // The four JSON endpoints answer a server fault as JSON, which is the claim #435 exists for and
 // the one a mock writer cannot carry: a mock proves a call was made, not the bytes on the wire.
-// Each row builds its endpoint with the real writer, handlerhelpers.NewHttpHelper(nil), and one
+// Each row builds its endpoint with the real writer, render.New(nil), and one
 // fault. A regression to the page writer fails each for its stated reason: the nil template FS
 // either panics in the render or answers the text/plain fallback, and neither is a JSON body
 // decoding to server_error. Every other handler test keeps the generated mocks.
@@ -45,7 +45,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	tokenValidator := mocks_handlers.NewTokenValidator(t)
 
-	handler := HandleTokenPost(handlerhelpers.NewHttpHelper(nil),
+	handler := HandleTokenPost(render.New(nil),
 		database, mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_handlers.NewAuditLogger(t),
 		noCredentialFailures{})
 
@@ -72,7 +72,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 // The userinfo endpoint: the user read fails.
 func TestHandleUserInfoGetPost_AServerFaultAnswersJSON(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := HandleUserInfoGetPost(handlerhelpers.NewHttpHelper(nil), database,
+	handler := HandleUserInfoGetPost(render.New(nil), database,
 		mocks_handlers.NewAuditLogger(t), testBaseURL)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").
@@ -92,7 +92,7 @@ func TestHandleUserInfoGetPost_AServerFaultAnswersJSON(t *testing.T) {
 // The JWKS endpoint: the key read fails.
 func TestHandleCertsGet_AServerFaultAnswersJSON(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	handler := HandleCertsGet(handlerhelpers.NewHttpHelper(nil), database)
+	handler := HandleCertsGet(render.New(nil), database)
 
 	database.On("GetAllSigningKeys", mock.Anything, (*sql.Tx)(nil)).
 		Return(nil, errs.New("the database went away")).Once()
@@ -106,7 +106,7 @@ func TestHandleCertsGet_AServerFaultAnswersJSON(t *testing.T) {
 // The discovery endpoint reads no database, so its one fault is a request reaching it without
 // settings.
 func TestHandleWellKnownOIDCConfigGet_AServerFaultAnswersJSON(t *testing.T) {
-	handler := HandleWellKnownOIDCConfigGet(handlerhelpers.NewHttpHelper(nil), testBaseURL)
+	handler := HandleWellKnownOIDCConfigGet(render.New(nil), testBaseURL)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/.well-known/openid-configuration", nil))

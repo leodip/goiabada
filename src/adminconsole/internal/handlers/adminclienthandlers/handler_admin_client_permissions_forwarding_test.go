@@ -19,13 +19,13 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// #225 at a handler's seam, rather than at HandleAPIErrorJson's. handlerhelpers'
+// #225 at a handler's seam, rather than at HandleAPIErrorJSON's. render's
 // api_error_helper_test.go owns what the helper decides; this owns that this handler reaches it
 // at all, which is the half a reader cannot check by looking at the helper.
 //
 // The block it replaced did the routing itself and did it wrong: it matched *apiclient.APIError,
 // took the message, and threw the status and the code away, so a 400 the API had explained arrived
-// at JsonError as a bare error and came back as "An unexpected server error has occurred" with the
+// at JSONError as a bare error and came back as "An unexpected server error has occurred" with the
 // explanation in the log. Eight handlers carried that block. The 500 row is what stops a fix from
 // forwarding everything: a server fault still belongs in the log.
 type permissionsApiClient struct {
@@ -50,7 +50,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 	testCases := []struct {
 		name   string
 		apiErr error
-		// wantStatus is what must reach the browser; 0 means JsonError's generic 500 arm, with the
+		// wantStatus is what must reach the browser; 0 means JSONError's generic 500 arm, with the
 		// detail going to the log instead.
 		wantStatus  int
 		wantCode    string
@@ -102,7 +102,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			var captured error
-			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
@@ -144,7 +144,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
-	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()

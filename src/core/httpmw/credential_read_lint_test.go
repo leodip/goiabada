@@ -34,7 +34,7 @@ import (
 //
 // The list is one name. The other form read under core is deliberately absent for its own reason:
 //
-//   - handlerhelpers/http_helper.go reads a key its caller supplies, for the query-or-body lookup
+//   - render/http_helper.go reads a key its caller supplies, for the query-or-body lookup
 //     RP-initiated logout needs (#109). It owns no credential policy, so a name listed here would
 //     be enforced there by accident rather than by decision.
 //

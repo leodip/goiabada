@@ -13,8 +13,8 @@ type HttpHelper interface {
 	NotFound(w http.ResponseWriter, r *http.Request)
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
-	JsonError(w http.ResponseWriter, r *http.Request, err error)
-	EncodeJson(w http.ResponseWriter, r *http.Request, data interface{})
+	JSONError(w http.ResponseWriter, r *http.Request, err error)
+	EncodeJSON(w http.ResponseWriter, r *http.Request, data interface{})
 }
 
 type AuthHelper interface {

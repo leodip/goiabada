@@ -57,10 +57,10 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	return jsonWriter, auditLogger, database, rr, req, handler
 }
 
-// expectJsonErrorWithDetail registers the one JsonError call and captures what it was handed.
-func expectJsonErrorWithDetail(jsonWriter *mocks_handlers.JSONWriter) *error {
+// expectJSONErrorWithDetail registers the one JSONError call and captures what it was handed.
+func expectJSONErrorWithDetail(jsonWriter *mocks_handlers.JSONWriter) *error {
 	var captured error
-	jsonWriter.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+	jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()
@@ -87,7 +87,7 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 			auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 				"clientId": "test_client",
 			}).Return().Once()
-			captured := expectJsonErrorWithDetail(jsonWriter)
+			captured := expectJSONErrorWithDetail(jsonWriter)
 
 			handler.ServeHTTP(rr, req)
 
@@ -115,7 +115,7 @@ func TestHandleTokenPost_GenericRefusalWritesNoUserDisabledRow(t *testing.T) {
 				http.StatusBadRequest)
 
 			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t, refusal)
-			captured := expectJsonErrorWithDetail(jsonWriter)
+			captured := expectJSONErrorWithDetail(jsonWriter)
 
 			handler.ServeHTTP(rr, req)
 
@@ -138,7 +138,7 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 		errs.Wrap(refusal, "unable to validate the token request"))
 
 	auditLogger.On("Log", mock.Anything, audit.EventRedemptionRefusedRedirectURI, mock.Anything).Return().Once()
-	captured := expectJsonErrorWithDetail(jsonWriter)
+	captured := expectJSONErrorWithDetail(jsonWriter)
 
 	handler.ServeHTTP(rr, req)
 
@@ -172,7 +172,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 			details, _ := args.Get(2).(map[string]interface{})
 			auditedCodeId, _ = details["codeId"].(int64)
 		}).Return().Once()
-	captured := expectJsonErrorWithDetail(jsonWriter)
+	captured := expectJSONErrorWithDetail(jsonWriter)
 
 	handler.ServeHTTP(rr, req)
 

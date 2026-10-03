@@ -12,7 +12,7 @@ import (
 
 // The group permissions page does the same (#428).
 func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
-	out := render(t, "/admin_groups_permissions.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_groups_permissions.html", map[string]interface{}{
 		"group": struct {
 			GroupId         int64
 			GroupIdentifier string
@@ -35,7 +35,7 @@ func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 // The list is the page that reads the most of the response: five columns, of which two are the
 // booleans that decide which token a membership reaches and one is the member count.
 func TestRender_AdminGroups(t *testing.T) {
-	out := render(t, "/admin_groups.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_groups.html", map[string]interface{}{
 		"groups": []api.GroupResponse{
 			{Id: 2, GroupIdentifier: "admins", Description: "Administradores",
 				IncludeInIdToken: true, IncludeInAccessToken: false, MemberCount: 17},
@@ -60,7 +60,7 @@ func TestRender_AdminGroups(t *testing.T) {
 // The delete confirmation, whose member count comes off the response now rather than from a second
 // return value the apiclient answered beside the group.
 func TestRender_AdminGroupDelete(t *testing.T) {
-	out := render(t, "/admin_groups_delete.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_groups_delete.html", map[string]interface{}{
 		"group":        &api.GroupResponse{Id: 2, GroupIdentifier: "admins", Description: "Administradores"},
 		"countOfUsers": 17,
 	})
@@ -76,7 +76,7 @@ func TestRender_AdminGroupDelete(t *testing.T) {
 // the one a decode that answered an empty slice for a populated group would land on silently.
 func TestRender_AdminGroupAttributes(t *testing.T) {
 	t.Run("with attributes", func(t *testing.T) {
-		out := render(t, "/admin_groups_attributes.html", map[string]interface{}{
+		out := renderMenuPage(t, "/admin_groups_attributes.html", map[string]interface{}{
 			"groupId":         int64(2),
 			"groupIdentifier": "admins",
 			"description":     "Administradores",
@@ -95,7 +95,7 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 	})
 
 	t.Run("with none", func(t *testing.T) {
-		out := render(t, "/admin_groups_attributes.html", map[string]interface{}{
+		out := renderMenuPage(t, "/admin_groups_attributes.html", map[string]interface{}{
 			"groupId":         int64(2),
 			"groupIdentifier": "admins",
 			"description":     "Administradores",
@@ -121,7 +121,7 @@ func TestRender_AdminResourcesList(t *testing.T) {
 		},
 	}
 
-	out := render(t, "/admin_resources.html", bind)
+	out := renderMenuPage(t, "/admin_resources.html", bind)
 
 	assert.Contains(t, out, "authserver")
 	assert.Contains(t, out, "Servidor de autenticação")
@@ -143,7 +143,7 @@ func TestRender_AdminResourcePermissions(t *testing.T) {
 		},
 	}
 
-	out := render(t, "/admin_resources_permissions.html", bind)
+	out := renderMenuPage(t, "/admin_resources_permissions.html", bind)
 
 	// The page bootstraps its editor from a JavaScript array built out of the DTO's fields, so a
 	// renamed or missing field arrives as an empty string rather than as a template error.
@@ -160,7 +160,7 @@ func TestRender_AdminResourcePermissions(t *testing.T) {
 // entry is pushed, since the editor changes the loaded objects in place, and it is never edited,
 // or the page would send its edited list as the loaded one and every save would pass (#428).
 func TestRender_AdminResourcePermissions_SendsTheLoadedList(t *testing.T) {
-	out := render(t, "/admin_resources_permissions.html", map[string]interface{}{
+	out := renderMenuPage(t, "/admin_resources_permissions.html", map[string]interface{}{
 		"resourceId":                   2,
 		"resourceIdentifier":           "faturamento",
 		"resourceDescription":          "Faturamento",

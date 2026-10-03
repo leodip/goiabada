@@ -14,7 +14,7 @@ import (
 //
 // The console has two families of writer for the same three conditions. NotFound renders
 // not_found.html, InternalServerError renders error.html, and HandleAPIError routes to both;
-// JsonNotFound, JsonError and HandleAPIErrorJson answer the same statuses as JSON. Mixing them
+// JSONNotFound, JSONError and HandleAPIErrorJSON answer the same statuses as JSON. Mixing them
 // inside one handler is invisible in Go and invisible in a passing test suite, and it breaks at
 // exactly the moment the branch fires: the browser has already committed to response.json(), so an
 // HTML body makes the fetch throw, the modal shows a generic failure, and the status and sentence
@@ -39,15 +39,15 @@ import (
 // which is a branch written from the page handler beside it.
 //
 // The markers match a call however it is qualified, which reads the classifiers where they live,
-// in handlerhelpers since #440, and are outside this walk: they are writers, not handlers.
+// in render since #440, and are outside this walk: they are writers, not handlers.
 func TestHandlers_AjaxHandlersDoNotUsePageWriters(t *testing.T) {
 	// go test runs with the package directory as the working directory, so ".." is
 	// src/adminconsole/internal.
 	const root = "../handlers"
 
 	funcStart := regexp.MustCompile(`(?m)^func ([A-Za-z0-9_]+)\(`)
-	jsonWriter := regexp.MustCompile(`EncodeJson\(|JsonError\(|JsonNotFound\(|JsonBadRequestBody\(|HandleAPIErrorJson\(`)
-	// HandleAPIErrorJson contains HandleAPIError as a substring, so the page-writer pattern has to
+	jsonWriter := regexp.MustCompile(`EncodeJSON\(|JSONError\(|JSONNotFound\(|JSONBadRequestBody\(|HandleAPIErrorJSON\(`)
+	// HandleAPIErrorJSON contains HandleAPIError as a substring, so the page-writer pattern has to
 	// exclude it explicitly rather than by matching the shorter name.
 	pageWriter := regexp.MustCompile(`httpHelper\.NotFound\(|httpHelper\.InternalServerError\(|HandleAPIError\((?:[^)]*)\)`)
 
@@ -79,11 +79,11 @@ func TestHandlers_AjaxHandlersDoNotUsePageWriters(t *testing.T) {
 				continue
 			}
 			for _, hit := range pageWriter.FindAllString(body, -1) {
-				if strings.HasPrefix(hit, "HandleAPIErrorJson(") {
+				if strings.HasPrefix(hit, "HandleAPIErrorJSON(") {
 					continue
 				}
 				t.Errorf("%s: %s answers with JSON but reaches %s on one branch; "+
-					"use handlerhelpers.JsonNotFound, JsonError or handlerhelpers.HandleAPIErrorJson "+
+					"use render.JSONNotFound, JSONError or render.HandleAPIErrorJSON "+
 					"instead, so every branch "+
 					"of an AJAX handler answers JSON (#279)",
 					filepath.ToSlash(path), name, strings.TrimSuffix(hit, "("))

@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -132,10 +132,10 @@ func TestHandleAdminClientRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			// templateFS is nil because JsonError renders no template. This is the real
+			// templateFS is nil because JSONError renders no template. This is the real
 			// helper rather than a mock so the assertions below are on the bytes the
 			// browser receives.
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := render.New(nil)
 
 			body := `{"clientId":1,"redirectURIs":["https:///evil.example/cb"]}`
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/redirect-uris",
@@ -203,7 +203,7 @@ func TestHandleAdminClientRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := render.New(nil)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/redirect-uris",
 				handlertest.WithAccessToken(),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),

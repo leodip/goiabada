@@ -10,8 +10,8 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -61,7 +61,7 @@ func chainSurfaces() []chainSurface {
 		{name: "api", build: func() *BearerToken { return NewBearerTokenForAPI(chainParser{}) }},
 		{name: "userinfo", build: func() *BearerToken {
 			// The real writer, so the /userinfo body is the bytes on the wire and not a recorded call.
-			return NewBearerTokenForUserInfo(chainParser{}, handlerhelpers.NewHttpHelper(nil))
+			return NewBearerTokenForUserInfo(chainParser{}, render.New(nil))
 		}},
 	}
 }

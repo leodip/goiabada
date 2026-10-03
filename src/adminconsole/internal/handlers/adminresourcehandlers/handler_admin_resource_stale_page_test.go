@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
@@ -51,7 +51,7 @@ func (*stalePageApiClient) SearchUsersWithPermissionAnnotation(context.Context, 
 // A click on a page loaded before another administrator's change is not a server fault, and is
 // no longer answered as one with a stack in the log (#440 decision 6):
 //
-//   - a permission the resource no longer holds names nothing here: 404, as JsonNotFound answers
+//   - a permission the resource no longer holds names nothing here: 404, as JSONNotFound answers
 //     every such id;
 //   - granting what the user or group already holds, or revoking what it no longer holds, is
 //     another administrator's change winning between the load and the click: 409, the answer the
@@ -70,17 +70,17 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 		}
 	}
 
-	type build func(h *handlerhelpers.HttpHelper, c *stalePageApiClient) http.HandlerFunc
-	usersAdd := func(h *handlerhelpers.HttpHelper, c *stalePageApiClient) http.HandlerFunc {
+	type build func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc
+	usersAdd := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
 		return HandleAdminResourceUsersWithPermissionAddPermissionPost(h, c)
 	}
-	usersRemove := func(h *handlerhelpers.HttpHelper, c *stalePageApiClient) http.HandlerFunc {
+	usersRemove := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
 		return HandleAdminResourceUsersWithPermissionRemovePermissionPost(h, c)
 	}
-	groupsAdd := func(h *handlerhelpers.HttpHelper, c *stalePageApiClient) http.HandlerFunc {
+	groupsAdd := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
 		return HandleAdminResourceGroupsWithPermissionAddPermissionPost(h, c)
 	}
-	groupsRemove := func(h *handlerhelpers.HttpHelper, c *stalePageApiClient) http.HandlerFunc {
+	groupsRemove := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
 		return HandleAdminResourceGroupsWithPermissionRemovePermissionPost(h, c)
 	}
 
@@ -140,7 +140,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 		},
 		{
 			name: "saving permissions with a body naming another resource",
-			build: func(h *handlerhelpers.HttpHelper, c *stalePageApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
 				return HandleAdminResourcePermissionsPost(h, testStore(), c)
 			},
 			options: []handlertest.Option{
@@ -160,7 +160,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 			apiClient := &stalePageApiClient{grantOneApiClient: grantOneApiClient{current: tc.current}}
 
 			recorder := httptest.NewRecorder()
-			tc.build(handlerhelpers.NewHttpHelper(fstest.MapFS{}), apiClient).ServeHTTP(recorder,
+			tc.build(render.New(fstest.MapFS{}), apiClient).ServeHTTP(recorder,
 				handlertest.Request(http.MethodPost, "/admin/resources/2", tc.options...))
 
 			assert.Equal(t, tc.wantStatus, recorder.Code, recorder.Body.String())

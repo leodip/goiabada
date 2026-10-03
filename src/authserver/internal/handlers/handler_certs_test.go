@@ -44,7 +44,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		jsonWriter.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
+		jsonWriter.On("EncodeJSON", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
 			jwks := args.Get(2).(oauth.Jwks)
 			assert.Len(t, jwks.Keys, 3)
 			assert.Equal(t, "next-kid", jwks.Keys[0].Kid)
@@ -79,7 +79,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		jsonWriter.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
+		jsonWriter.On("EncodeJSON", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
 			jwks := args.Get(2).(oauth.Jwks)
 			assert.Len(t, jwks.Keys, 1)
 			assert.Equal(t, "current-kid", jwks.Keys[0].Kid)
@@ -105,7 +105,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(nil, errors.New("database error"))
 
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "database error"
 		})).Return()
 
@@ -135,7 +135,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid key state invalid"
 		})).Return()
 
@@ -165,7 +165,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		jsonWriter.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid character 'i' looking for beginning of value"
 		})).Return()
 
@@ -188,7 +188,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
 
-		jsonWriter.On("EncodeJson", rr, req, mock.MatchedBy(func(jwks oauth.Jwks) bool {
+		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(jwks oauth.Jwks) bool {
 			return len(jwks.Keys) == 0
 		})).Return()
 
