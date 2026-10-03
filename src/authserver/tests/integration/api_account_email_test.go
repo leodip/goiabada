@@ -309,6 +309,7 @@ func TestAPIAccountEmailPut_TellsThePreviousAddress(t *testing.T) {
 			stored, err := database.GetUserById(context.Background(), nil, u.Id)
 			require.NoError(t, err)
 			stored.Locale = tc.locale
+			stored.EmailVerified = true
 			require.NoError(t, database.UpdateUser(context.Background(), nil, stored))
 			previous := stored.Email
 			newEmail := strings.ToLower(fake.LetterN(12)) + "@example.com"
@@ -331,6 +332,40 @@ func TestAPIAccountEmailPut_TellsThePreviousAddress(t *testing.T) {
 			assert.Empty(t, sentTo(t, newEmail), "the new address is not sent the notice")
 		})
 	}
+}
+
+// TestAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress is the notice's bound over real
+// SMTP: a caller who sets an address they do not hold and then changes away from it must not be
+// able to mail that address, so a previous address never verified is told nothing.
+//
+// The first change's notice, to the verified address the account started with, shows only that
+// mail was on; it is no barrier for the second change's job, which runs on its own goroutine. The
+// absence check below therefore catches a notice that has already arrived and nothing slower. The
+// proof ordered on completion is TestHandleAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress,
+// whose runner holds every job the request hands off.
+func TestAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
+	useMailpitSMTP(t)
+
+	accessToken, u := accountEmailUserWithPassword(t)
+	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	require.NoError(t, err)
+	stored.EmailVerified = true
+	require.NoError(t, database.UpdateUser(context.Background(), nil, stored))
+	verified := stored.Email
+	unverified := strings.ToLower(fake.LetterN(12)) + "@example.com"
+	final := strings.ToLower(fake.LetterN(12)) + "@example.com"
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
+	for _, email := range []string{unverified, final} {
+		resp := makeAPIRequest(t, "PUT", url, accessToken,
+			api.UpdateAccountEmailRequest{Email: email, CurrentPassword: accountEmailPassword})
+		_ = resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	require.Len(t, awaitMailTo(t, verified), 1, "the verified address the account started with is told, so mail was on")
+	assert.Empty(t, sentTo(t, unverified), "an address the account never verified is sent nothing")
+	assert.Empty(t, sentTo(t, final), "the new address is sent nothing")
 }
 
 // sentTo returns what Mailpit holds for an address now, without waiting.

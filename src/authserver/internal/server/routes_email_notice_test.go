@@ -78,11 +78,12 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 
 		database := mocks_data.NewDatabase(t)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&models.User{
-			Id:           1,
-			Enabled:      true,
-			Subject:      routesTestSubject,
-			Email:        previousEmail,
-			PasswordHash: passwordHash,
+			Id:            1,
+			Enabled:       true,
+			Subject:       routesTestSubject,
+			Email:         previousEmail,
+			EmailVerified: true,
+			PasswordHash:  passwordHash,
 		}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*models.User)(nil), nil)
 		database.On("SetUserEmail", mock.Anything, mock.Anything, int64(1), newEmail).Return(nil).Once()
