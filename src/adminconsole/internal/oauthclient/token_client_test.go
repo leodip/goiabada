@@ -2,6 +2,7 @@ package oauthclient
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -631,5 +632,54 @@ func TestClientCredentials_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "a-client-of-my-own")
+	})
+}
+
+// errTransportStops is what the failing transport below answers, so a case can ask whether the
+// error the grant returns still carries it.
+var errTransportStops = errors.New("the transport stops here")
+
+// A failure before the answer is read, or of decoding it, keeps its cause in the error tree,
+// so a caller can classify it with errors.Is and errors.As rather than by its text (pattern 7).
+// The shared transport formatted these with %v, which kept the words and dropped the cause:
+// a cancelled client-credentials caller was not errors.Is context.Canceled, where the
+// transport it replaced had wrapped it (#441).
+func TestTokenClient_KeepsTheCauseOfAFailure(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name+"/a request that cannot be built", func(t *testing.T) {
+			_, err := g.send(context.Background(), NewTokenClient("://no-scheme", "ci", "cs", nil))
+
+			var urlErr *url.Error
+			require.ErrorAs(t, err, &urlErr)
+		})
+
+		t.Run(g.name+"/a transport failure", func(t *testing.T) {
+			failing := &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+				return nil, errTransportStops
+			})}
+
+			_, err := g.send(context.Background(), NewTokenClient(testTokenURL, "ci", "cs", failing))
+
+			require.ErrorIs(t, err, errTransportStops)
+		})
+
+		t.Run(g.name+"/an answer that is not JSON", func(t *testing.T) {
+			tokenURL, _ := newTokenEndpoint(t, http.StatusOK, `{"access_token":`)
+
+			_, err := g.sendAgainst(tokenURL)
+
+			var syntaxErr *json.SyntaxError
+			require.ErrorAs(t, err, &syntaxErr)
+		})
+	}
+
+	// The one grant that keeps its caller's cancellation, so the one a cancelled caller fails.
+	t.Run("client_credentials/a cancelled caller", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err := NewTokenClient(testTokenURL, "ci", "cs", nil).ClientCredentials(ctx, "s")
+
+		require.ErrorIs(t, err, context.Canceled)
 	})
 }

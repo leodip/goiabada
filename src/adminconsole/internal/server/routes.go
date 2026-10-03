@@ -31,13 +31,11 @@ func (s *Server) initRoutes(root chi.Router) {
 	// Initialize all the service dependencies
 	apiClient := apiclient.NewAuthServerClient(authBase)
 
-	authServerClient := oauthclient.NewAuthServerHTTPClient()
-
-	tokenParser := oauthclient.NewJWKSTokenParser(authBase, authServerClient, constants.AdminConsoleClientIdentifier, middleware.SettingsReader{})
-	// The admin console is always the client the seeder provisions, so the identifier is the
-	// constant and only the secret is per deployment (#285).
-	tokenClient := oauthclient.NewTokenClient(authBase+"/auth/token", constants.AdminConsoleClientIdentifier,
-		s.cfg.AdminConsole.OAuthClientSecret, authServerClient)
+	// The HTTP client and the token client are main's, the same pair the session token source
+	// was built on, so the sign-in's exchange, the refresh and the client-credentials grant are one
+	// client with one token URL, and the JWKS fetch shares its HTTP client (#441).
+	tokenParser := oauthclient.NewJWKSTokenParser(authBase, s.authServerHTTPClient, constants.AdminConsoleClientIdentifier, middleware.SettingsReader{})
+	tokenClient := s.tokenClient
 
 	identifierValidator := validators.NewIdentifierValidator()
 

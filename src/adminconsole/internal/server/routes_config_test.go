@@ -35,7 +35,7 @@ func TestInitRoutes_TheHomePageLinksToTheConfiguredPublicAuthServerURL(t *testin
 		},
 	}
 	s := NewServer(chi.NewRouter(), newTestSessionStore(),
-		publicsettings.NewCache(publicsettings.NewClient(authServer.URL), publicsettings.DefaultTTL), nil, cfg)
+		publicsettings.NewCache(publicsettings.NewClient(authServer.URL), publicsettings.DefaultTTL), nil, cfg, nil, nil)
 	s.initRoutes(s.initMiddleware())
 
 	recorder := httptest.NewRecorder()

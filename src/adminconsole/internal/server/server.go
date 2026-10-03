@@ -22,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	adminconsole_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/constants"
@@ -47,10 +48,17 @@ type Server struct {
 	// The configuration main loaded, read here and in the route table, which hands each handler
 	// the values it uses as it builds it (#441).
 	cfg *config.Config
+
+	// Built once by main, which hands the token client to the session token source as well, so
+	// every grant the console makes goes through one client with one token URL; the JWKS fetch
+	// shares the HTTP client (#441).
+	authServerHTTPClient *http.Client
+	tokenClient          *oauthclient.TokenClient
 }
 
 func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache,
-	trustedProxies []*net.IPNet, cfg *config.Config) *Server {
+	trustedProxies []*net.IPNet, cfg *config.Config, authServerHTTPClient *http.Client,
+	tokenClient *oauthclient.TokenClient) *Server {
 
 	s := Server{
 		router:        router,
@@ -60,6 +68,9 @@ func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, sett
 		trustedProxies: trustedProxies,
 
 		cfg: cfg,
+
+		authServerHTTPClient: authServerHTTPClient,
+		tokenClient:          tokenClient,
 	}
 
 	if envVar := cfg.AdminConsole.StaticDir; len(envVar) == 0 {
