@@ -1349,7 +1349,7 @@ PUT /api/v1/account/email
 ```
 
 <Aside type="note">
-Requires the current password, which is checked before anything else about the request: a blank one is refused with `400 VALIDATION_ERROR`, and a wrong one with `400 AUTHENTICATION_FAILED`. A wrong password counts against the same failure limit as [Change password](#change-password) and the OTP change. Changing email marks it as unverified. Use the verification endpoints to verify the new email. Submitting the address the account already has changes nothing and keeps it verified. When SMTP is enabled and the previous address was verified, it is sent a notice that the address was changed, in the user's language; it does not name the new address, and a notice that cannot be sent does not fail the change.
+Requires the current password, which is checked before anything else about the request: a blank one is refused with `400 VALIDATION_ERROR`, and a wrong one with `400 AUTHENTICATION_FAILED`. A wrong password counts against the same failure limit as [Change password](#change-password) and the OTP change. Changing email marks it as unverified. Use the verification endpoints to verify the new email. Submitting the address the account already has changes nothing and keeps it verified. If another request changed the account's address or its verification after this one read it, nothing is saved and the answer is `409 CONCURRENT_UPDATE`: read the account again and retry. When SMTP is enabled and the previous address was verified, it is sent a notice that the address was changed, in the user's language; it does not name the new address, and a notice that cannot be sent does not fail the change.
 </Aside>
 
 #### Send verification email
@@ -1371,7 +1371,7 @@ No request body required. Returns:
 ```
 
 <Aside type="caution">
-Limited to one code per 5 minutes per account, which is how long a code is valid, so an account has at most one live code at a time. If a code was issued less than 5 minutes ago, `tooManyRequests` will be `true` and `waitInSeconds` indicates the remaining cooldown. Changing the email address or verifying it does not reset this cooldown. When the built-in [rate limiter](/reference/environment-variables/) is enabled, the endpoint is also limited to 5 requests per hour per account, answered with `429 TOO_MANY_REQUESTS`.
+Limited to one code per 5 minutes per account, which is how long a code is valid, so an account has at most one live code at a time. If a code was issued less than 5 minutes ago, `tooManyRequests` will be `true` and `waitInSeconds` indicates the remaining cooldown. Changing the email address or verifying it does not reset this cooldown, and requests sent at the same moment cannot get past it: exactly one sends a code. If the address changes while a code is being issued, nothing is sent and the answer is `409 CONCURRENT_UPDATE`. When the built-in [rate limiter](/reference/environment-variables/) is enabled, the endpoint is also limited to 5 requests per hour per account, answered with `429 TOO_MANY_REQUESTS`.
 </Aside>
 
 #### Verify email

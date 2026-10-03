@@ -822,11 +822,11 @@ func TestTrySetUserEnabled(t *testing.T) {
 	}
 }
 
-// TestSetUserEmail pins the self-service email change's write: the address is set, the
+// TestTrySetUserEmail pins the self-service email change's write: the address is set, the
 // verified flag and the pending verification code are cleared, and no other column moves
 // (#404 decision 4). The code's issued-at is one of those that do not: the resend cooldown
 // reads it, and clearing it with the address let any address be mailed a code on demand.
-func TestSetUserEmail(t *testing.T) {
+func TestTrySetUserEmail(t *testing.T) {
 	user := createTestUser(t)
 	user.EmailVerified = true
 	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
@@ -842,8 +842,9 @@ func TestSetUserEmail(t *testing.T) {
 	}
 
 	newEmail := "changed_" + fake.Email()
-	if setErr := database.SetUserEmail(context.Background(), nil, user.Id, newEmail); setErr != nil {
-		t.Fatalf("SetUserEmail failed: %v", setErr)
+	changed, setErr := database.TrySetUserEmail(context.Background(), nil, user.Id, before.Email, true, newEmail)
+	if setErr != nil || !changed {
+		t.Fatalf("TrySetUserEmail: changed=%v err=%v, want true and no error", changed, setErr)
 	}
 
 	after, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -872,18 +873,21 @@ func TestSetUserEmail(t *testing.T) {
 	expected.EmailVerificationCodeEncrypted = nil
 	compareUsers(t, &expected, after)
 
-	if err := database.SetUserEmail(context.Background(), nil, 0, "x@example.com"); err == nil {
+	if _, err := database.TrySetUserEmail(context.Background(), nil, 0, "a@example.com", true, "x@example.com"); err == nil {
 		t.Error("expected an error setting the email of user id 0")
+	}
+	if _, err := database.TrySetUserEmail(context.Background(), nil, user.Id, newEmail, false, newEmail); err == nil {
+		t.Error("expected an error moving an email to the address it already has")
 	}
 }
 
-// TestSetUserEmail_AConcurrentDisableAndPasswordChangeSurvive is the hazard the narrow write
+// TestTrySetUserEmail_AConcurrentDisableAndPasswordChangeSurvive is the hazard the narrow write
 // exists for. The email change loads the user at the start of the request; an administrator
 // disables the account and a password change lands before the change saves. The full-row
 // UpdateUser of the request-start snapshot wrote enabled and password_hash back as they were
 // loaded, re-enabling the account and putting the old password back after the revocation had
 // run (#404 decision 4, the hazard #106 removed from the credential writes).
-func TestSetUserEmail_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T) {
+func TestTrySetUserEmail_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T) {
 	user := createTestUser(t)
 	user.Enabled = true
 	user.PasswordHash = "hash-at-request-start"
@@ -907,8 +911,11 @@ func TestSetUserEmail_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T) {
 	}
 
 	newEmail := "changed_" + fake.Email()
-	if setEmailErr := database.SetUserEmail(context.Background(), nil, snapshot.Id, newEmail); setEmailErr != nil {
-		t.Fatalf("SetUserEmail failed: %v", setEmailErr)
+	// Neither the disable nor the password change touches the address or its verified flag, so
+	// the conditional write still matches: those are not what it guards against.
+	changed, setEmailErr := database.TrySetUserEmail(context.Background(), nil, snapshot.Id, snapshot.Email, snapshot.EmailVerified, newEmail)
+	if setEmailErr != nil || !changed {
+		t.Fatalf("TrySetUserEmail: changed=%v err=%v, want true and no error", changed, setEmailErr)
 	}
 
 	after, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -1943,7 +1950,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			},
 		},
 		{
-			// SetUserEmail clears the verified flag, which is the route by which an address
+			// TrySetUserEmail clears the verified flag, which is the route by which an address
 			// stops being verified; it is the email change landing under the request.
 			name: "an address no longer verified",
 			mutate: func(t *testing.T, user *models.User) string {
@@ -1964,8 +1971,13 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			name: "an account re-addressed and verified again",
 			mutate: func(t *testing.T, user *models.User) string {
 				looked := user.Email
-				if err := database.SetUserEmail(context.Background(), nil, user.Id, "moved_"+fake.Email()); err != nil {
-					t.Fatalf("SetUserEmail failed: %v", err)
+				current, err := database.GetUserById(context.Background(), nil, user.Id)
+				if err != nil {
+					t.Fatalf("Failed to reload user: %v", err)
+				}
+				changed, err := database.TrySetUserEmail(context.Background(), nil, user.Id, current.Email, current.EmailVerified, "moved_"+fake.Email())
+				if err != nil || !changed {
+					t.Fatalf("TrySetUserEmail: changed=%v err=%v, want true and no error", changed, err)
 				}
 				fresh, err := database.GetUserById(context.Background(), nil, user.Id)
 				if err != nil {

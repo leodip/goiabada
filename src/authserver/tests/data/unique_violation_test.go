@@ -73,21 +73,21 @@ func TestUpdateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	}
 }
 
-// TestSetUserEmail_DuplicateEmailIsErrUniqueViolation is the same refusal through the narrow
+// TestTrySetUserEmail_DuplicateEmailIsErrUniqueViolation is the same refusal through the narrow
 // write the self-service email PUT saves with since #404, which answers a lost race 409 only if
 // it arrives tagged here too.
-func TestSetUserEmail_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
+func TestTrySetUserEmail_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	first := createTestUser(t)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
 	second := createTestUser(t)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, second.Id) }()
 
-	err := database.SetUserEmail(context.Background(), nil, second.Id, first.Email)
+	_, err := database.TrySetUserEmail(context.Background(), nil, second.Id, second.Email, second.EmailVerified, first.Email)
 	if err == nil {
 		t.Fatal("a user was moved onto a taken email; users.email is supposed to be unique")
 	}
 	if !errors.Is(err, data.ErrUniqueViolation) {
-		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false for SetUserEmail on this engine, "+
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false for TrySetUserEmail on this engine, "+
 			"so the account email PUT cannot answer 409 here; err = %v", err)
 	}
 }
