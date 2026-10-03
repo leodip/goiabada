@@ -822,6 +822,110 @@ func TestTrySetUserEnabled(t *testing.T) {
 	}
 }
 
+// TestSetUserEmail pins the self-service email change's write: the address is set, the
+// verified flag and the pending verification code are cleared, and no other column moves
+// (#404 decision 4).
+func TestSetUserEmail(t *testing.T) {
+	user := createTestUser(t)
+	user.EmailVerified = true
+	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
+		t.Fatalf("Failed to mark the test user's address verified: %v", err)
+	}
+
+	before, err := database.GetUserById(context.Background(), nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if !before.EmailVerified || len(before.EmailVerificationCodeEncrypted) == 0 || !before.EmailVerificationCodeIssuedAt.Valid {
+		t.Fatal("the fixture must start verified and with a pending verification code, or the clears prove nothing")
+	}
+
+	newEmail := "changed_" + fake.Email()
+	if setErr := database.SetUserEmail(context.Background(), nil, user.Id, newEmail); setErr != nil {
+		t.Fatalf("SetUserEmail failed: %v", setErr)
+	}
+
+	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+
+	if after.Email != newEmail {
+		t.Errorf("Email = %q, want %q", after.Email, newEmail)
+	}
+	if after.EmailVerified {
+		t.Error("the verified flag must be cleared: the new address has not been verified")
+	}
+	if len(after.EmailVerificationCodeEncrypted) != 0 {
+		t.Error("a pending verification code must be cleared: it was issued for the previous address")
+	}
+	if after.EmailVerificationCodeIssuedAt.Valid {
+		t.Error("the verification code's issued-at must be cleared with the code")
+	}
+
+	// Every other column is as it was.
+	expected := *before
+	expected.Email = newEmail
+	expected.EmailVerified = false
+	expected.EmailVerificationCodeEncrypted = nil
+	expected.EmailVerificationCodeIssuedAt = sql.NullTime{}
+	compareUsers(t, &expected, after)
+
+	if err := database.SetUserEmail(context.Background(), nil, 0, "x@example.com"); err == nil {
+		t.Error("expected an error setting the email of user id 0")
+	}
+}
+
+// TestSetUserEmail_AConcurrentDisableAndPasswordChangeSurvive is the hazard the narrow write
+// exists for. The email change loads the user at the start of the request; an administrator
+// disables the account and a password change lands before the change saves. The full-row
+// UpdateUser of the request-start snapshot wrote enabled and password_hash back as they were
+// loaded, re-enabling the account and putting the old password back after the revocation had
+// run (#404 decision 4, the hazard #106 removed from the credential writes).
+func TestSetUserEmail_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T) {
+	user := createTestUser(t)
+	user.Enabled = true
+	user.PasswordHash = "hash-at-request-start"
+	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
+		t.Fatalf("Failed to seed the test user: %v", err)
+	}
+
+	// The email change's request-start read.
+	snapshot, err := database.GetUserById(context.Background(), nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to load the request-start snapshot: %v", err)
+	}
+
+	// What lands underneath it.
+	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	if err != nil || !disabled {
+		t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
+	}
+	if setPasswordErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "hash-set-meanwhile"); setPasswordErr != nil {
+		t.Fatalf("the concurrent password change failed: %v", setPasswordErr)
+	}
+
+	newEmail := "changed_" + fake.Email()
+	if setEmailErr := database.SetUserEmail(context.Background(), nil, snapshot.Id, newEmail); setEmailErr != nil {
+		t.Fatalf("SetUserEmail failed: %v", setEmailErr)
+	}
+
+	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	if err != nil {
+		t.Fatalf("Failed to reload user: %v", err)
+	}
+	if after.Email != newEmail {
+		t.Errorf("Email = %q, want %q", after.Email, newEmail)
+	}
+	if after.Enabled {
+		t.Error("the email change re-enabled an account an administrator disabled under it")
+	}
+	if after.PasswordHash != "hash-set-meanwhile" {
+		t.Errorf("PasswordHash = %q, want the concurrent change's %q: the email change put the old password back",
+			after.PasswordHash, "hash-set-meanwhile")
+	}
+}
+
 // createEnrolledTestUser returns a saved user with OTP on, which the consumed-step
 // tests need explicitly: createTestUser randomises OTPEnabled, so a test relying on
 // it would pass or fail by coin toss once requireOTPEnabled is in the predicate.

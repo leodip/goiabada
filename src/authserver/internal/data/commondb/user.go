@@ -848,6 +848,45 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 	return nil
 }
 
+// SetUserEmail writes a user's address and, in the same statement, clears the verified flag
+// and any pending verification code: the new address has not been verified, and a code
+// issued for the previous one must not verify it.
+//
+// Narrow rather than going through UpdateUser, for SetUserPasswordHash's reason: the
+// self-service email change loads the user at the start of the request, and writing that
+// snapshot back would re-enable an account an administrator disabled under it, put back a
+// password hash a concurrent change or reset replaced after its revocation had run, or
+// undo a concurrent OTP change (#404). A taken address arrives as ErrUniqueViolation through
+// ExecSQL, as it does on UpdateUser.
+func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error {
+
+	if userId == 0 {
+		return errs.New("can't set the email of user with id 0")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	// The clears are raw SQL rather than Assign(..., nil), for the reason SetUserPasswordHash
+	// gives: the SQL Server driver types an untyped Go nil as nvarchar and refuses to convert it
+	// to varbinary(max).
+	ub.Set(
+		ub.Assign("email", email),
+		ub.Assign("email_verified", false),
+		"email_verification_code_encrypted = NULL",
+		"email_verification_code_issued_at = NULL",
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	_, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return errs.Wrap(err, "unable to set user email")
+	}
+
+	return nil
+}
+
 // TryConsumeForgotPasswordCode writes a new password hash and claims the outstanding
 // reset code in one conditional UPDATE, reporting whether this call is the one that made
 // the transition. The claim is codeHash matching what the row still carries, so a second

@@ -12541,6 +12541,75 @@ func (_c *Database_SetClientPublic_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
+// SetUserEmail provides a mock function for the type Database
+func (_mock *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error {
+	ret := _mock.Called(ctx, tx, userId, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUserEmail")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) error); ok {
+		r0 = returnFunc(ctx, tx, userId, email)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SetUserEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserEmail'
+type Database_SetUserEmail_Call struct {
+	*mock.Call
+}
+
+// SetUserEmail is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - email string
+func (_e *Database_Expecter) SetUserEmail(ctx any, tx any, userId any, email any) *Database_SetUserEmail_Call {
+	return &Database_SetUserEmail_Call{Call: _e.mock.On("SetUserEmail", ctx, tx, userId, email)}
+}
+
+func (_c *Database_SetUserEmail_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, email string)) *Database_SetUserEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetUserEmail_Call) Return(err error) *Database_SetUserEmail_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SetUserEmail_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, email string) error) *Database_SetUserEmail_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetUserPasswordHash provides a mock function for the type Database
 func (_mock *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
 	ret := _mock.Called(ctx, tx, userId, passwordHash)

@@ -149,6 +149,12 @@ type Database interface {
 	// forgot-password code in the same statement. Narrow rather than a full-row
 	// update, so a concurrent admin disable cannot be undone by it (#106).
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	// SetUserEmail writes a user's address, clears the verified flag and any pending
+	// verification code in the same statement, and writes no other column. Narrow rather
+	// than a full-row update, so the self-service email change cannot undo a concurrent
+	// admin disable, password change or OTP change (#404). A taken address is
+	// ErrUniqueViolation, as on UpdateUser.
+	SetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string) error
 	// TryConsumeForgotPasswordCode writes a password hash and claims the outstanding
 	// reset code in one conditional UPDATE, reporting whether this call is the one that
 	// made the transition. Compare-and-set for the same reason MarkCodeAsUsed is: a
