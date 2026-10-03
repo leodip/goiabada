@@ -254,11 +254,11 @@ command itself and fails on a tree it changed.
 | `core/errs` | `WithStack` | kernel | — |
 | `core/errs` | `Wrap` | kernel | — |
 | `core/errs` | `Wrapf` | kernel | — |
+| `core/gender` | `Female` | own-package | — |
 | `core/gender` | `Gender` | both-apps | — |
-| `core/gender` | `GenderFemale` | own-package | — |
-| `core/gender` | `GenderMale` | reachable | — |
-| `core/gender` | `GenderOther` | own-package | — |
-| `core/gender` | `IsGenderValid` | contract | The `Gender` type's own bound, and the only statement of which of its values are legal, which is why a caller holding an int asks here rather than comparing against `GenderOther` itself. The admin console names only `Gender`, so the tree justifies the type and not this (#385 decision 17). |
+| `core/gender` | `IsValid` | contract | The `Gender` type's own bound, and the only statement of which of its values are legal, which is why a caller holding an int asks here rather than comparing against `Other` itself. The admin console names only `Gender`, so the tree justifies the type and not this (#385 decision 17). |
+| `core/gender` | `Male` | reachable | — |
+| `core/gender` | `Other` | own-package | — |
 | `core/hashutil` | `HashString` | both-apps | — |
 | `core/hostport` | `Join` | both-apps | — |
 | `core/hostport` | `Unbracket` | own-package | — |

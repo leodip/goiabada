@@ -163,7 +163,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		if err != nil {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
 		}
-		if !gender.IsGenderValid(i) {
+		if !gender.IsValid(i) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
 		}
 	}

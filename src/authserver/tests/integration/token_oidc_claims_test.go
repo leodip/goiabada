@@ -272,9 +272,9 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	// The gender column is 16 characters and the claim is echoed back verbatim,
 	// so the fixture picks one of the two strings gender.Gender.String() returns
 	// rather than a generated run (#272).
-	genderValue := gender.GenderFemale.String()
+	genderValue := gender.Female.String()
 	if fake.Bool() {
-		genderValue = gender.GenderMale.String()
+		genderValue = gender.Male.String()
 	}
 
 	// Create user with full profile data.

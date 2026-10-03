@@ -576,9 +576,9 @@ func TestValidateProfile_Gender(t *testing.T) {
 		gender       string
 		expectedCode string
 	}{
-		{"female", fmt.Sprintf("%d", int(gender.GenderFemale)), ""},
-		{"male", fmt.Sprintf("%d", int(gender.GenderMale)), ""},
-		{"other", fmt.Sprintf("%d", int(gender.GenderOther)), ""},
+		{"female", fmt.Sprintf("%d", int(gender.Female)), ""},
+		{"male", fmt.Sprintf("%d", int(gender.Male)), ""},
+		{"other", fmt.Sprintf("%d", int(gender.Other)), ""},
 		{"empty is allowed", "", ""},
 		{"not a number", "female", i18n.ErrCodeProfileGenderInvalid},
 		{"out of range high", "3", i18n.ErrCodeProfileGenderInvalid},
@@ -854,7 +854,7 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 		FamilyName:          "O'Brien",
 		Nickname:            "jd",
 		Website:             "https://example.com",
-		Gender:              fmt.Sprintf("%d", int(gender.GenderFemale)),
+		Gender:              fmt.Sprintf("%d", int(gender.Female)),
 		DateOfBirth:         "1990-05-15",
 		ZoneInfoCountryName: "Brazil",
 		ZoneInfo:            "America/Sao_Paulo",

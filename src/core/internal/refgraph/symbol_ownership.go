@@ -164,8 +164,8 @@ type packageSymbols struct {
 	// valueType maps a package-level const or var to the same-package named type it is declared
 	// with, including the type a const inherits from the nearest preceding ValueSpec carrying one.
 	// That inheritance is the Go spec's, and reading the syntax spec-by-spec instead once
-	// misclassified GenderFemale, GenderMale and GenderOther as test-only while Gender was
-	// both-apps, caught during #385.
+	// misclassified gender.Female, Male and Other as test-only while Gender was both-apps, caught
+	// during #385.
 	valueType map[string]string
 	// ownRefs is every package-level name the package's own production code reaches, from any
 	// declaration, justified or not. Only a test-support row reads it.
@@ -941,8 +941,8 @@ func receiverTypeName(recv *ast.FieldList) string {
 //	const ColourRed = Colour("red")     // a conversion in the expression
 //	const ( ColourRed Colour = "red"; ColourBlue )  // repeating the spec above it
 //
-// Reading the syntax spec by spec instead once misclassified GenderFemale, GenderMale and
-// GenderOther as test-only while Gender itself was both-apps, caught during #385.
+// Reading the syntax spec by spec instead once misclassified gender.Female, Male and Other as
+// test-only while Gender itself was both-apps, caught during #385.
 //
 // Only a named type this package declares counts. A slice, a map or a pointer is a composite, and
 // the arrow this feeds -- a const of a justified type is reachable -- is about an enum member,

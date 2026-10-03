@@ -11,14 +11,14 @@
 package gender
 
 // Gender is the index a profile form submits and a token claim is rendered from. The zero value is
-// GenderFemale rather than "unset": a user with no gender recorded carries the empty string, which
+// Female rather than "unset": a user with no gender recorded carries the empty string, which
 // is what String returns for anything outside the range below.
 type Gender int
 
 const (
-	GenderFemale Gender = iota
-	GenderMale
-	GenderOther
+	Female Gender = iota
+	Male
+	Other
 )
 
 // String returns the wire value, or "" for a Gender outside the declared range.
@@ -30,15 +30,15 @@ const (
 // validation message. "" is already what every one of those sites writes for no gender, so the
 // out-of-range answer is the one they were reaching for (#385).
 func (g Gender) String() string {
-	if g < GenderFemale || g > GenderOther {
+	if g < Female || g > Other {
 		return ""
 	}
 	return []string{"female", "male", "other"}[g]
 }
 
-// IsGenderValid reports whether i names one of the three genders. It is the type's own bound and
+// IsValid reports whether i names one of the three genders. It is the type's own bound and
 // the only statement of which integers are legal, which is why a caller that has an int rather
-// than a Gender asks here instead of comparing against GenderOther itself.
-func IsGenderValid(i int) bool {
-	return i >= 0 && i <= int(GenderOther)
+// than a Gender asks here instead of comparing against Other itself.
+func IsValid(i int) bool {
+	return i >= 0 && i <= int(Other)
 }
