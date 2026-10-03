@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -73,10 +73,10 @@ func TestRedirToAuthorize_SendsWhatItStores(t *testing.T) {
 	query, err := url.ParseQuery(strings.TrimPrefix(location, helperAuthorizePath))
 	require.NoError(t, err)
 
-	state := storedString(t, sess, constants.SessionKeyState)
-	nonce := storedString(t, sess, constants.SessionKeyNonce)
-	verifier := storedString(t, sess, constants.SessionKeyCodeVerifier)
-	redirectURI := storedString(t, sess, constants.SessionKeyRedirectURI)
+	state := storedString(t, sess, sessionkeys.SessionKeyState)
+	nonce := storedString(t, sess, sessionkeys.SessionKeyNonce)
+	verifier := storedString(t, sess, sessionkeys.SessionKeyCodeVerifier)
+	redirectURI := storedString(t, sess, sessionkeys.SessionKeyRedirectURI)
 
 	assert.Equal(t, helperClientID, query.Get("client_id"))
 	assert.Equal(t, helperConsoleBase+"/auth/callback", redirectURI)
@@ -86,9 +86,9 @@ func TestRedirToAuthorize_SendsWhatItStores(t *testing.T) {
 	assert.Equal(t, "S256", query.Get("code_challenge_method"), "RFC 7636 section 4.2: S256 when the client is capable of it")
 	assert.Equal(t, state, query.Get("state"))
 	assert.Equal(t, helperScope, query.Get("scope"))
-	assert.Equal(t, helperScope, storedString(t, sess, constants.SessionKeyRequestedScope),
+	assert.Equal(t, helperScope, storedString(t, sess, sessionkeys.SessionKeyRequestedScope),
 		"the requested scope is kept for the callback, which takes the grant to equal it when the response names none")
-	assert.Equal(t, helperRedirectBack, storedString(t, sess, constants.SessionKeyRedirectBack))
+	assert.Equal(t, helperRedirectBack, storedString(t, sess, sessionkeys.SessionKeyRedirectBack))
 
 	challenge := sha256.Sum256([]byte(verifier))
 	assert.Equal(t, base64.RawURLEncoding.EncodeToString(challenge[:]), query.Get("code_challenge"),
@@ -112,7 +112,7 @@ func TestRedirToAuthorize_MintsFreshValuesEachTime(t *testing.T) {
 	first, _ := redirToAuthorize(t)
 	second, _ := redirToAuthorize(t)
 
-	for _, key := range []string{constants.SessionKeyState, constants.SessionKeyNonce, constants.SessionKeyCodeVerifier} {
+	for _, key := range []string{sessionkeys.SessionKeyState, sessionkeys.SessionKeyNonce, sessionkeys.SessionKeyCodeVerifier} {
 		assert.NotEqualf(t, storedString(t, first, key), storedString(t, second, key), "%s is minted afresh", key)
 	}
 }

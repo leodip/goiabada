@@ -1496,10 +1496,10 @@ type matrixOwner struct {
 
 // Both owners' authenticated-session keys are written out rather than named, and so is the auth
 // server's session name. They are declared in authserver/internal/sessionkeys and
-// adminconsole/internal/constants, and core may not import a process module at all, in production
-// or in a test. TestSessionKeys_PinTheValuesCoreWritesOut and TestConstants_PinTheValuesCoreWritesOut
-// in those packages hold the declarations to these literals, so a pair cannot drift apart with this
-// matrix still passing (#351, #385, #433).
+// adminconsole/internal/sessionkeys, and core may not import a process module at all, in
+// production or in a test. TestSessionKeys_PinTheValuesCoreWritesOut in each of those packages
+// holds the declarations to these literals, so a pair cannot drift apart with this matrix still
+// passing (#351, #385, #433, #440).
 var matrixOwners = []matrixOwner{
 	{"authserver", "authserver", "SessionIdentifier", PersistentCookie},
 	{"adminconsole", constants.AdminConsoleSessionName, "Jwt", BrowserSessionCookie},

@@ -10,8 +10,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
@@ -22,12 +22,12 @@ import (
 // check and then delete. Every one is required: a sign-in missing any of them was not started by
 // this console's authorize redirect, or has lost what it needs to finish.
 var signInHandshakeKeys = []string{
-	constants.SessionKeyState,
-	constants.SessionKeyCodeVerifier,
-	constants.SessionKeyRedirectURI,
-	constants.SessionKeyNonce,
-	constants.SessionKeyRedirectBack,
-	constants.SessionKeyRequestedScope,
+	sessionkeys.SessionKeyState,
+	sessionkeys.SessionKeyCodeVerifier,
+	sessionkeys.SessionKeyRedirectURI,
+	sessionkeys.SessionKeyNonce,
+	sessionkeys.SessionKeyRedirectBack,
+	sessionkeys.SessionKeyRequestedScope,
 }
 
 // signInRefusal is one of the pages a refused sign-in answers with. The page carries catalog keys
@@ -114,7 +114,7 @@ func HandleAuthCallbackPost(
 		// to prevent: an authorization code in the request target reaches the browser's history,
 		// the Referer of anything the page loads, and the access log of every proxy in front of the
 		// deployment. This path is also CSRF-exempt, so a cross-origin POST does reach it (#202).
-		if r.PostFormValue("state") != handshake[constants.SessionKeyState] {
+		if r.PostFormValue("state") != handshake[sessionkeys.SessionKeyState] {
 			refuseSignIn(httpHelper, w, r, refusalSession,
 				errs.New("the posted state is not the one this session sent"))
 			return
@@ -173,8 +173,8 @@ func HandleAuthCallbackPost(
 		defer cancel()
 
 		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(ctx, code,
-			handshake[constants.SessionKeyRedirectURI], clientID, clientSecret,
-			handshake[constants.SessionKeyCodeVerifier], baseUrl+"/auth/token")
+			handshake[sessionkeys.SessionKeyRedirectURI], clientID, clientSecret,
+			handshake[sessionkeys.SessionKeyCodeVerifier], baseUrl+"/auth/token")
 		if err != nil {
 			refuseSignIn(httpHelper, w, r, refusalExchange, errs.Wrap(err, "unable to exchange the code for tokens"))
 			return
@@ -184,7 +184,7 @@ func HandleAuthCallbackPost(
 		// step 11's nonce, which this console always sends; plus the ID token and access token
 		// both being there at all. All of it is decided in oauthclient, once.
 		jwtInfo, err := tokenParser.DecodeAndValidateSignInResponse(r.Context(), tokenResponse,
-			handshake[constants.SessionKeyNonce])
+			handshake[sessionkeys.SessionKeyNonce])
 		if err != nil {
 			refuseSignIn(httpHelper, w, r, refusalUnverified, errs.Wrap(err, "unable to accept the token response"))
 			return
@@ -195,9 +195,9 @@ func HandleAuthCallbackPost(
 		// scope when it names none (RFC 6749 section 3.3), and the expiry is expires_in turned
 		// into a clock time on receipt (#427 decisions 12, 15 and 16).
 		stored := jwtInfo.TokenResponse
-		stored.Scope = oauthclient.EffectiveScope(stored.Scope, handshake[constants.SessionKeyRequestedScope])
-		sess.Values[constants.SessionKeyJwt] = stored
-		sess.Values[constants.SessionKeyJwtExpiresAt] = oauthclient.ExpiresAt(&stored, time.Now())
+		stored.Scope = oauthclient.EffectiveScope(stored.Scope, handshake[sessionkeys.SessionKeyRequestedScope])
+		sess.Values[sessionkeys.SessionKeyJwt] = stored
+		sess.Values[sessionkeys.SessionKeyJwtExpiresAt] = oauthclient.ExpiresAt(&stored, time.Now())
 		for _, key := range signInHandshakeKeys {
 			delete(sess.Values, key)
 		}
@@ -222,7 +222,7 @@ func HandleAuthCallbackPost(
 		}
 
 		// The base URL plus path the console itself stored in its server-side session.
-		http.Redirect(w, r, handshake[constants.SessionKeyRedirectBack], http.StatusFound)
+		http.Redirect(w, r, handshake[sessionkeys.SessionKeyRedirectBack], http.StatusFound)
 	}
 }
 

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -80,7 +80,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				store := new(mock_sessionstore.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
-					Values: map[string]any{constants.SessionKeyJwt: "not a token response"},
+					Values: map[string]any{sessionkeys.SessionKeyJwt: "not a token response"},
 				}, nil)
 
 				m := NewMiddlewareJwt(store, sessionName, new(mock_middleware.TokenParser),
@@ -99,7 +99,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				// signs it out without consulting the parser.
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						constants.SessionKeyJwt: oauth.TokenResponse{AccessToken: "a", IdToken: "i"},
+						sessionkeys.SessionKeyJwt: oauth.TokenResponse{AccessToken: "a", IdToken: "i"},
 					},
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
@@ -118,8 +118,8 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				store := new(mock_sessionstore.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						constants.SessionKeyJwt:          oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"},
-						constants.SessionKeyJwtExpiresAt: int64(0),
+						sessionkeys.SessionKeyJwt:          oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"},
+						sessionkeys.SessionKeyJwtExpiresAt: int64(0),
 					},
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)

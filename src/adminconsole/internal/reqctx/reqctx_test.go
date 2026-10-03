@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -93,24 +92,27 @@ func TestReqctx_SentinelsMatchThroughAWrap(t *testing.T) {
 	assert.False(t, errors.Is(ErrNoJwtInfo, ErrNoSettings), "the two sentinels are one error")
 }
 
-// The two values are keyed on internal/constants' exported keys until every reader has moved here,
-// so a handler still asserting the type itself reads what the middleware wrote through this
-// package, and a value written under the key directly reads back here. #440's last slice moves the
-// keys into this package unexported and deletes this test with them.
-func TestReqctx_UnconvertedReadersSeeTheSameValues(t *testing.T) {
+// Every authenticated request carries both values, written by two middlewares in turn, so each key
+// must be its own: two keys comparing equal would let the later writer hide the earlier value, and
+// its reader would answer absent on a request that has it. Both orders, because which one hides
+// depends on which is written last.
+func TestReqctx_BothValuesTravelTogether(t *testing.T) {
 	jwtInfo := oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a"}}
 	settings := &api.PublicSettingsResponse{AppName: "sentinel app"}
 
-	ctx := WithSettings(WithJwtInfo(context.Background(), jwtInfo), settings)
-	assert.Equal(t, jwtInfo, ctx.Value(constants.ContextKeyJwtInfo))
-	assert.Same(t, settings, ctx.Value(constants.ContextKeySettings))
+	orders := map[string]context.Context{
+		"token set first": WithSettings(WithJwtInfo(context.Background(), jwtInfo), settings),
+		"settings first":  WithJwtInfo(WithSettings(context.Background(), settings), jwtInfo),
+	}
 
-	ctx = context.WithValue(context.Background(), constants.ContextKeyJwtInfo, jwtInfo)
-	ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
-	gotJwtInfo, ok := JwtInfoFrom(ctx)
-	require.True(t, ok)
-	assert.Equal(t, jwtInfo, gotJwtInfo)
-	gotSettings, ok := SettingsFrom(ctx)
-	require.True(t, ok)
-	assert.Same(t, settings, gotSettings)
+	for name, ctx := range orders {
+		t.Run(name, func(t *testing.T) {
+			gotJwtInfo, ok := JwtInfoFrom(ctx)
+			require.True(t, ok, "token set hidden by the settings")
+			assert.Equal(t, jwtInfo, gotJwtInfo)
+			gotSettings, ok := SettingsFrom(ctx)
+			require.True(t, ok, "settings hidden by the token set")
+			assert.Same(t, settings, gotSettings)
+		})
+	}
 }

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -46,12 +46,12 @@ func (s *AuthHelper) RedirToAuthorize(
 	state := stringutil.GenerateSecurityRandomString(16)
 	nonce := stringutil.GenerateSecurityRandomString(16)
 
-	sess.Values[constants.SessionKeyState] = state
-	sess.Values[constants.SessionKeyNonce] = nonce
-	sess.Values[constants.SessionKeyCodeVerifier] = codeVerifier
-	sess.Values[constants.SessionKeyRedirectURI] = redirectURI
-	sess.Values[constants.SessionKeyRedirectBack] = redirectBack
-	sess.Values[constants.SessionKeyRequestedScope] = scope
+	sess.Values[sessionkeys.SessionKeyState] = state
+	sess.Values[sessionkeys.SessionKeyNonce] = nonce
+	sess.Values[sessionkeys.SessionKeyCodeVerifier] = codeVerifier
+	sess.Values[sessionkeys.SessionKeyRedirectURI] = redirectURI
+	sess.Values[sessionkeys.SessionKeyRedirectBack] = redirectBack
+	sess.Values[sessionkeys.SessionKeyRequestedScope] = scope
 	err = s.sessionStore.Save(r, w, sess)
 	if err != nil {
 		return err

@@ -27,8 +27,8 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It reads nothing but the source tree, so unlike `schemadump` it needs no container, and it refuses to invent a justification rather than fill the one cell a human owes (#385)
 - `constants/` - Permission identifiers, the version stamp, and the one session name both processes
   must agree on. No context key and no other session key: each process declares its own, the auth
-  server its context keys in `internal/reqctx` and its session keys in `internal/sessionkeys`, the admin
-  console both in `internal/constants`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more (#351, #385, #433)
+  server and the admin console alike their context keys in `internal/reqctx` and their session keys in
+  `internal/sessionkeys`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more (#351, #385, #433, #440)
 - `countries/` - Self-maintained ISO 3166-1 reference data: names, alpha-2 and alpha-3 codes, flag emoji and ITU-T E.164 calling codes, generated into `data_generated.go` from the datahub dataset. It replaced `github.com/biter777/countries` and deliberately depends on nothing (#272)
 - `customerrors/` - The OAuth error payload both processes pass around: `ErrorDetail`, and `ConformErrorDescription`, which replaces every character RFC 6749 Appendix A.8 forbids in an `error_description` and bounds the result to 512 bytes, because a description interpolates request text and, since #213's deferral, is parked on an auth context every request of that ceremony then carries
 - There is no `enums/` here: the six auth-server-only enumerations it held went to the domains that own them — `AcrLevel`, `PasswordPolicy`, `ThreeStateSetting` and `KeyState` to `authserver/internal/models`, forced there because `internal/data` names them and imports nothing above it, `AuthMethod` to `ceremony` and since to `oidc` (#437), `TokenType` to `issuance` and `SMTPEncryption` to `emaildelivery` — leaving `Gender` as `core/gender`. A package named for a Go construct is what invites the next unrelated one in beside it (#385)
@@ -76,6 +76,8 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ### Admin Console (`src/adminconsole/`)
 - `internal/handlers/` - Admin UI handlers
 - `internal/apiclient/` - The composition-only `ApiClient` interface and the one deadlined, bounded executor behind all 106 methods. No handler takes the whole interface; each declares an unexported port beside the function taking it (#386)
+- `internal/reqctx/` - The two request-scoped values, the signed-in administrator's token set and the auth server's public settings, each written by one middleware and read through a typed accessor over an unexported key; an absent value is `ErrNoJwtInfo` or `ErrNoSettings` rather than a panic. The twin of the auth server's, and the context-value guard holds the module to it with one exemption, `internal/handlertest/request.go`'s write of chi's route context (#440)
+- `internal/sessionkeys/` - The eight keys of the console's browser session. Stored data: a live session carries these spellings, so renaming one signs every administrator out at deploy. It was `internal/constants` until the context keys left for `reqctx` (#440)
 - `web/template/` - Admin UI templates
 
 ## Database Pattern
@@ -403,11 +405,14 @@ driven from a rule test: the finder directly, the reporting half through `testut
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
 does. Twenty-six guards follow this -- fifteen in `core/testutil`, the newest
 `AssertNoParentImport`, which holds each child handler package a caller names to naming no import
-of its parent, which the auth server calls over `apihandlers` and `accounthandlers` and which #387
-wrote as that server's own lint before #440 moved it here for both applications, and before it
+of its parent, which the auth server calls over `apihandlers` and `accounthandlers` and the admin
+console over its six, and which #387 wrote as that server's own lint before #440 moved it here for
+both applications, and before it
 `AssertContextValuesThroughAccessors`, which refuses a `context.WithValue` or a context `Value`
 read in a production file outside the module's accessor package, resolved with `go/types`, and
-which the auth server calls with `internal/reqctx` (#433), and `AssertNoAgreementPointers`, which
+which each application calls with its own `internal/reqctx`, the admin console naming one
+exemption, `internal/handlertest`'s write of chi's route context (#433, #440), and
+`AssertNoAgreementPointers`, which
 refuses a comment pointing at an issue's agreement or a probe file instead of stating the fact
 with its issue number (#428), plus `authserver/internal/data`'s
 begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and

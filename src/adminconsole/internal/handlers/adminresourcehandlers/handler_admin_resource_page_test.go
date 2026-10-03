@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
@@ -127,7 +127,7 @@ func aPermission() []api.PermissionResponse {
 func testStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
 		sessiontest.NewMemoryBackend(),
-		constants.SessionKeyJwt,
+		sessionkeys.SessionKeyJwt,
 		false,
 		sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{

@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -162,8 +162,8 @@ func HandleAdminSettingsGeneralPost(
 			}
 
 			// Delete the JWT from session, and its recorded expiry with it
-			delete(sess.Values, constants.SessionKeyJwt)
-			delete(sess.Values, constants.SessionKeyJwtExpiresAt)
+			delete(sess.Values, sessionkeys.SessionKeyJwt)
+			delete(sess.Values, sessionkeys.SessionKeyJwtExpiresAt)
 
 			sessionErr = httpSession.Save(r, w, sess)
 			if sessionErr != nil {

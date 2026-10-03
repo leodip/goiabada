@@ -14,9 +14,9 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/boundedread"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -636,13 +636,13 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 
 	session := &sessionstore.Session{
 		Values: map[string]any{
-			constants.SessionKeyJwt: oauth.TokenResponse{
+			sessionkeys.SessionKeyJwt: oauth.TokenResponse{
 				AccessToken:  "oldaccesstoken",
 				IdToken:      storedIDTokenRaw,
 				RefreshToken: "oldrefreshtoken",
 			},
 			// Due: this is what sends the middleware down the refresh path.
-			constants.SessionKeyJwtExpiresAt: time.Now().Add(10 * time.Second).Unix(),
+			sessionkeys.SessionKeyJwtExpiresAt: time.Now().Add(10 * time.Second).Unix(),
 		},
 	}
 	// The context each store call was handed, captured at the call: the handler cancels
@@ -711,7 +711,7 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 
 	assert.True(t, reached, "the chain continues")
 
-	newTokenResponse, ok := session.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
+	newTokenResponse, ok := session.Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
 	require.True(t, ok, "the refresh completed and its result reached the session")
 	assert.Equal(t, "newaccesstoken", newTokenResponse.AccessToken)
 	assert.Equal(t, "newrefreshtoken", newTokenResponse.RefreshToken)

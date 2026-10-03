@@ -20,11 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -108,7 +108,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 	gob.Register(oauth.TokenResponse{})
 
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
-	store, err := sessionstore.NewServerSideStore(backend, constants.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
@@ -133,12 +133,12 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 // handshake is the six values RedirToAuthorize parks, as it parks them.
 func handshake() map[string]any {
 	return map[string]any{
-		constants.SessionKeyState:          callbackState,
-		constants.SessionKeyCodeVerifier:   callbackVerifier,
-		constants.SessionKeyRedirectURI:    callbackRedirectURI,
-		constants.SessionKeyNonce:          callbackRawNonce,
-		constants.SessionKeyRedirectBack:   callbackRedirectBack,
-		constants.SessionKeyRequestedScope: callbackRequestedScope,
+		sessionkeys.SessionKeyState:          callbackState,
+		sessionkeys.SessionKeyCodeVerifier:   callbackVerifier,
+		sessionkeys.SessionKeyRedirectURI:    callbackRedirectURI,
+		sessionkeys.SessionKeyNonce:          callbackRawNonce,
+		sessionkeys.SessionKeyRedirectBack:   callbackRedirectBack,
+		sessionkeys.SessionKeyRequestedScope: callbackRequestedScope,
 	}
 }
 
@@ -536,11 +536,11 @@ func TestHandleAuthCallbackPost_ARotationThatFails(t *testing.T) {
 func assertSignedIn(t *testing.T, sess *sessionstore.Session, want oauth.TokenResponse, before, after time.Time) {
 	t.Helper()
 	require.False(t, sess.IsNew, "a session is stored")
-	stored, ok := sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
+	stored, ok := sess.Values[sessionkeys.SessionKeyJwt].(oauth.TokenResponse)
 	require.True(t, ok, "the token response is stored")
 	assert.Equal(t, want, stored)
 
-	expiresAt, ok := sess.Values[constants.SessionKeyJwtExpiresAt].(int64)
+	expiresAt, ok := sess.Values[sessionkeys.SessionKeyJwtExpiresAt].(int64)
 	require.True(t, ok, "the expiry is stored as int64 Unix seconds")
 	assert.GreaterOrEqual(t, expiresAt, before.Unix()+want.ExpiresIn)
 	assert.LessOrEqual(t, expiresAt, after.Unix()+want.ExpiresIn)

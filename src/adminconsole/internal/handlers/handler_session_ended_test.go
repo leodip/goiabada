@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -36,7 +36,7 @@ import (
 func newMemoryStore(t *testing.T) *sessionstore.ServerSideStore {
 	t.Helper()
 	gob.Register(oauth.TokenResponse{})
-	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), constants.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
+	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), sessionkeys.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
@@ -85,9 +85,9 @@ func withCookies(req *http.Request, cookies []*http.Cookie) *http.Request {
 // how the tests tell "the tokens were cleared" from "the session was destroyed".
 func signedInValues() map[string]any {
 	return map[string]any{
-		constants.SessionKeyJwt:          oauth.TokenResponse{AccessToken: "the-access-token", IdToken: "the-id-token"},
-		constants.SessionKeyJwtExpiresAt: int64(1_900_000_000),
-		"somethingElse":                  "kept",
+		sessionkeys.SessionKeyJwt:          oauth.TokenResponse{AccessToken: "the-access-token", IdToken: "the-id-token"},
+		sessionkeys.SessionKeyJwtExpiresAt: int64(1_900_000_000),
+		"somethingElse":                    "kept",
 	}
 }
 
@@ -106,8 +106,8 @@ func TestHandleSessionEndedGet_ClearsTheTokensAndLeavesTheNoticeForTheNextReques
 		"the home page, which requires no sign-in, so nothing can loop with the auth server")
 
 	sess := readSession(t, store, cookies)
-	assert.NotContains(t, sess.Values, constants.SessionKeyJwt)
-	assert.NotContains(t, sess.Values, constants.SessionKeyJwtExpiresAt,
+	assert.NotContains(t, sess.Values, sessionkeys.SessionKeyJwt)
+	assert.NotContains(t, sess.Values, sessionkeys.SessionKeyJwtExpiresAt,
 		"the expiry goes with the token, or the next sign-in inherits a stale one")
 	assert.Equal(t, "kept", sess.Values["somethingElse"],
 		"only the tokens go: the session survives to carry the notice")
