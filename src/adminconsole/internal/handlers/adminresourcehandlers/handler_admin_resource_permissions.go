@@ -9,14 +9,11 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/validators"
@@ -31,7 +28,7 @@ type resourcePermissionsAPI interface {
 }
 
 func HandleAdminResourcePermissionsGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourcePermissionsAPI,
 ) http.HandlerFunc {
@@ -50,9 +47,9 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -114,7 +111,7 @@ func HandleAdminResourcePermissionsGet(
 }
 
 func HandleAdminResourcePermissionsPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourcePermissionsAPI,
 ) http.HandlerFunc {
@@ -135,9 +132,9 @@ func HandleAdminResourcePermissionsPost(
 			return
 		}
 		// Get JWT info
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
@@ -158,7 +155,7 @@ func HandleAdminResourcePermissionsPost(
 		}
 
 		if data.ResourceId != resource.Id {
-			httpHelper.JsonError(w, r, errs.New("resourceId mismatch"))
+			handlerhelpers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}
 
@@ -232,7 +229,7 @@ type IdentifierValidator interface {
 // sanitizing it first turned "valid<b" into "valid" and reported a name the API would reject as
 // available.
 func HandleAdminResourceValidatePermissionPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	identifierValidator IdentifierValidator,
 ) http.HandlerFunc {
 

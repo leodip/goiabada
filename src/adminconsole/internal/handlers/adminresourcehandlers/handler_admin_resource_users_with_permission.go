@@ -2,19 +2,16 @@ package adminresourcehandlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -30,45 +27,21 @@ type resourceUsersWithPermissionAPI interface {
 }
 
 func HandleAdminResourceUsersWithPermissionGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			httpHelper.NotFound(w, r)
 			return
 		}
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.NotFound(w, r)
-			return
-		}
-
-		// Access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			httpHelper.NotFound(w, r)
-			return
-		}
-
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
-			return
-		}
+		resource, permissions, accessToken := loaded.resource, loaded.permissions, loaded.accessToken
 		selectedPermissionStr := r.URL.Query().Get("permission")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
@@ -174,37 +147,20 @@ func HandleAdminResourceUsersWithPermissionGet(
 }
 
 func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
-
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
+		permissions, accessToken := loaded.permissions, loaded.accessToken
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
@@ -237,12 +193,6 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
-
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
-			return
-		}
 		found := false
 		for _, permission := range permissions {
 			if permission.Id == permissionId {
@@ -251,7 +201,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			}
 		}
 		if !found {
-			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
@@ -263,7 +213,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			}
 		}
 		if !found {
-			httpHelper.JsonError(w, r, errs.Errorf("user %v does not have permission %v", user.Id, permissionId))
+			handlerhelpers.JsonConflict(httpHelper, w, r)
 			return
 		}
 
@@ -286,43 +236,20 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 }
 
 func HandleAdminResourceUsersWithPermissionAddGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			httpHelper.NotFound(w, r)
 			return
 		}
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			httpHelper.NotFound(w, r)
-			return
-		}
-
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			httpHelper.NotFound(w, r)
-			return
-		}
-
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIError(httpHelper, w, r, err)
-			return
-		}
+		resource, permissions := loaded.resource, loaded.permissions
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
@@ -377,45 +304,22 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 }
 
 func HandleAdminResourceUsersWithPermissionSearchGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		result := SearchResult{}
 
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
-
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
-
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
-			return
-		}
+		permissions, accessToken := loaded.permissions, loaded.accessToken
 		selectedPermissionStr := chi.URLParam(r, "permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
@@ -472,37 +376,20 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 }
 
 func HandleAdminResourceUsersWithPermissionAddPermissionPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "resourceId")
-		if len(idStr) == 0 {
+		loaded, err := loadResourcePermissions(r, apiClient)
+		if errors.Is(err, errNoSuchResource) {
 			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
-		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
-
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
-			return
-		}
-		accessToken := jwtInfo.TokenResponse.AccessToken
-
-		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
-		if resource == nil {
-			handlerhelpers.JsonNotFound(httpHelper, w, r)
-			return
-		}
+		permissions, accessToken := loaded.permissions, loaded.accessToken
 
 		userIdStr := chi.URLParam(r, "userId")
 		if len(userIdStr) == 0 {
@@ -536,12 +423,6 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
-		if err != nil {
-			handlerhelpers.HandleAPIErrorJson(httpHelper, w, r, err)
-			return
-		}
-
 		found := false
 		for _, permission := range permissions {
 			if permission.Id == permissionId {
@@ -550,13 +431,13 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			}
 		}
 		if !found {
-			httpHelper.JsonError(w, r, errs.Errorf("permission %v does not belong to resource %v", permissionId, resource.Id))
+			handlerhelpers.JsonNotFound(httpHelper, w, r)
 			return
 		}
 
 		for _, permission := range currentPerms {
 			if permission.Id == permissionId {
-				httpHelper.JsonError(w, r, errs.Errorf("user %v already has permission %v", user.Id, permissionId))
+				handlerhelpers.JsonConflict(httpHelper, w, r)
 				return
 			}
 		}
