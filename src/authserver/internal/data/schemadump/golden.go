@@ -497,7 +497,7 @@ func firstError(errs ...error) error {
 // generator runs from src/authserver and the per-engine assertion from
 // src/authserver/tests/data. A wrong root is not a loud failure, it names a file that is
 // simply absent, so the ascent identifies the root by requiring every module to be under it.
-// core/testutil.sourceRoot does the same walk for the gofmt guard; it is not shared because
+// core/guard.sourceRoot does the same walk for the gofmt guard; it is not shared because
 // that one takes a *testing.T and fails a test, and this one has to answer a command.
 func GoldenPath(d data.Dialect) (string, error) {
 	if !valid(d) {

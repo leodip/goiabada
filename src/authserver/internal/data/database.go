@@ -620,7 +620,7 @@ type Database interface {
 // sentinel on the way out of the data layer, so every caller above it asks errors.Is and nothing
 // else (#279).
 //
-// It is a plain stdlib errors.New, and it is the one shape testutil.AssertNoLegacyErrors exempts: a
+// It is a plain stdlib errors.New, and it is the one shape guard.AssertNoLegacyErrors exempts: a
 // package-level sentinel must carry no stack, because a stack captured at init records the
 // program's startup rather than the failure, and would then masquerade as the origin of every error
 // wrapping it.

@@ -11,8 +11,8 @@ import (
 )
 
 // writeTree writes a miniature source root: the four go.mod files every graph needs, then the
-// fixture's own files, which may replace any of them. It is core/testutil's helper of the same
-// name, repeated because a test here cannot import core/testutil, which imports this package.
+// fixture's own files, which may replace any of them. It is core/guard's helper of the same
+// name, repeated because a test here cannot import core/guard, which imports this package.
 func writeTree(t *testing.T, files map[string]string) string {
 	t.Helper()
 

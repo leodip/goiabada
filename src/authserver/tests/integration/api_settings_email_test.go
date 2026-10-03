@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/hostport/hostporttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -314,7 +314,7 @@ func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			port := 1025
 			if test.ipv6 {
-				testutil.SkipWithoutIPv6Loopback(t)
+				hostporttest.SkipWithoutIPv6Loopback(t)
 				// The handler dials the host before it saves anything, and the server under test
 				// runs on this machine, so a listener here is what that dial reaches.
 				ln, err := net.Listen("tcp", "[::1]:0")

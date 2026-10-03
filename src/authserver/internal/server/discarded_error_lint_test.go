@@ -33,7 +33,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -365,7 +365,7 @@ func discardedErrorResolver(file *ast.File, ownPath string, listed map[string][]
 // source is read from the source root, and every other path is an empty stub. A receiver whose type
 // came through a stub is therefore reported as unresolved rather than guessed at.
 //
-// core/testutil's stubPackages, behind the context-value and dead-interface guards, is the twin of
+// core/guard's stubPackages, behind the context-value and dead-interface guards, is the twin of
 // the stub half. It stays unexported there because exporting it for this one caller would add a
 // core symbol, and an OWNERSHIP.md row, for about twenty lines (#434).
 type discardedErrorPackages struct {
@@ -427,7 +427,7 @@ func (p *discardedErrorPackages) Import(importPath string) (*types.Package, erro
 // discardedErrorMajorVersion is a module path's major-version element, which is never the name.
 var discardedErrorMajorVersion = regexp.MustCompile(`^v[0-9]+$`)
 
-// discardedErrorPackageName guesses a stubbed path's package name as core/testutil's
+// discardedErrorPackageName guesses a stubbed path's package name as core/guard's
 // inventedPackageName does, and is as harmless when wrong: a name that does not match only leaves
 // that package's selectors unresolved, and a stub declares nothing to resolve anyway.
 func discardedErrorPackageName(importPath string) string {
@@ -449,15 +449,15 @@ func discardedErrorPackageName(importPath string) string {
 // TestDiscardedErrors_NoneInTheAuthServer holds the real tree to the rule. It is #409 item 4 in
 // its checkable form.
 func TestDiscardedErrors_NoneInTheAuthServer(t *testing.T) {
-	assertNoDiscardedErrors(t, testutil.SourceRoot(t), discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	assertNoDiscardedErrors(t, guard.SourceRoot(t), discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
 }
 
 // assertNoDiscardedErrors is the reporting half, taking the root, the scope and the lists as
-// parameters and failing through a testutil.Reporter so a rule test can drive it against a fixture
+// parameters and failing through a guard.Reporter so a rule test can drive it against a fixture
 // tree. Without that seam these lines are reached only by the call above, which walks a tree that
 // passes.
 func assertNoDiscardedErrors(
-	r testutil.Reporter, root, scope string, listed map[string][]string, methods []discardedErrorMethod,
+	r guard.Reporter, root, scope string, listed map[string][]string, methods []discardedErrorMethod,
 ) {
 	r.Helper()
 
@@ -713,7 +713,7 @@ func seed(p string) string {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoDiscardedErrors(r, root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
 	})
 
@@ -738,7 +738,7 @@ func stored(c *encryption.DataCipher, ct []byte) string {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoDiscardedErrors(r, root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
 	})
 
@@ -763,7 +763,7 @@ func logout(s sessionstuff.Store, ct []byte) string {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoDiscardedErrors(r, root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
 	})
 
@@ -799,7 +799,7 @@ func seed(c *encryption.DataCipher, p string) (string, []byte, error) {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoDiscardedErrors(r, root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
 	})
 
@@ -813,7 +813,7 @@ func TestDiscardedErrors_Guard_IsFatalOnAnEmptyRead(t *testing.T) {
 	writeDiscardedErrorFixture(t, root, "authserver/README.md", "no Go here\n")
 	writeDiscardedErrorFixture(t, root, "authserver/internal/data/seeder_test.go", "package data\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoDiscardedErrors(r, root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
 	})
 
@@ -827,7 +827,7 @@ func TestDiscardedErrors_Guard_IsFatalOnAnEmptyRead(t *testing.T) {
 // package still declares, and each method entry a method its package declares on the named type or
 // its pointer, with error as the last result, which is the position the finder reads.
 func TestDiscardedErrors_EveryListedFunctionReturnsAnError(t *testing.T) {
-	root := testutil.SourceRoot(t)
+	root := guard.SourceRoot(t)
 
 	want := map[string][]string{}
 	for importPath, names := range discardedErrorFuncs {

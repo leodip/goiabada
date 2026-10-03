@@ -794,7 +794,7 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 // than importing a handler package to borrow the declaration: the context is first because every
 // audit event raised while serving a request is correlated to that request, so the console record
 // joins the request's own log line and the persisted row carries the same id, which is why
-// testutil.AssertAuditLogContext refuses a context.Background() here (#328). The shape is kept
+// guard.AssertAuditLogContext refuses a context.Background() here (#328). The shape is kept
 // identical to handlers.AuditLogger, which the same concrete *audit.AuditLogger satisfies, exactly
 // as middleware's own copy already does (#387).
 type AuditLogger interface {

@@ -3,13 +3,13 @@ package handlers
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // TestHandlers_NoCredentialQueryFallback is the admin console half of the guard #202 asked for. Its
 // authserver twin lives at src/authserver/internal/handlers/credential_read_lint_test.go with a
 // deliberately different name list, for the reason spelled out below.
-// testutil.AssertNoCredentialQueryFallback carries the walk, the four accessor shapes it refuses and
+// guard.AssertNoCredentialQueryFallback carries the walk, the four accessor shapes it refuses and
 // the reasoning for each; what stays here is this module's policy, which is the half that must
 // differ between the two (#333).
 //
@@ -62,7 +62,7 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		`"error_description"`,
 	}
 
-	testutil.AssertNoCredentialQueryFallback(t, forbidden,
+	guard.AssertNoCredentialQueryFallback(t, forbidden,
 		"adminconsole/internal",
 		"adminconsole/internal/handlers",
 		"adminconsole/internal/middleware")

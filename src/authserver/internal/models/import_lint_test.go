@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -138,13 +138,13 @@ func isStandardLibraryPath(path string) bool {
 // acceptance bullet 3 of #387 in its checkable form, which is stronger than the bullet as worded:
 // the bullet names two methods, and an import list names every way back in.
 func TestModels_ImportsNothingButValuesAndTheStandardLibrary(t *testing.T) {
-	assertNoForeignImports(t, testutil.SourceRoot(t), modelsDir, modelsAllowedImports)
+	assertNoForeignImports(t, guard.SourceRoot(t), modelsDir, modelsAllowedImports)
 }
 
 // assertNoForeignImports is the reporting half, taking the root and the scope as parameters and
-// failing through a testutil.Reporter so a rule test can drive it against a fixture tree. Without
+// failing through a guard.Reporter so a rule test can drive it against a fixture tree. Without
 // that seam these lines are reached only by the call above, which walks a tree that passes.
-func assertNoForeignImports(r testutil.Reporter, root, dir string, allowed map[string]string) {
+func assertNoForeignImports(r guard.Reporter, root, dir string, allowed map[string]string) {
 	r.Helper()
 
 	found, files, err := findForeignImports(root, dir, allowed)
@@ -301,7 +301,7 @@ import "github.com/leodip/goiabada/authserver/internal/encryption"
 var _ = encryption.DecryptText
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoForeignImports(r, root, modelsDir, modelsAllowedImports)
 	})
 
@@ -341,7 +341,7 @@ var _ = builtin.PermissionManageAccount
 var _ = errs.New
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoForeignImports(r, root, modelsDir, modelsAllowedImports)
 	})
 
@@ -356,7 +356,7 @@ func TestModels_ImportGuard_IsFatalOnAnEmptyRead(t *testing.T) {
 	writeImportFixture(t, root, modelsDir+"/notes.md", "the records moved out of here\n")
 	writeImportFixture(t, root, modelsDir+"/user_test.go", "package models\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoForeignImports(r, root, modelsDir, modelsAllowedImports)
 	})
 
@@ -373,7 +373,7 @@ func TestModels_ImportGuard_IsFatalWhenTheDirectoryIsGone(t *testing.T) {
 	root := t.TempDir()
 	writeImportFixture(t, root, "authserver/internal/elsewhere/user.go", "package elsewhere\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertNoForeignImports(r, root, modelsDir, modelsAllowedImports)
 	})
 

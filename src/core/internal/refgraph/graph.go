@@ -13,15 +13,10 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// moduleDirs are the four go.mod directories, relative to the source root, in the order a reader
-// expects them. root.go's modules list identifies the source root while ascending; this one is
-// what the graph resolves import paths against, and the two are deliberately the same set.
-var moduleDirs = []string{"core", "authserver", "adminconsole", "cmd/goiabada-setup"}
-
 // ImportGraph is the tree as the compiler sees it: one entry per package directory holding at least
 // one Go file, mapping its import path to the paths it imports. Production and test files are kept
 // apart because the rules treat them differently — a test may import a mock or a fixture from
-// anywhere, and holding test code to the production graph would make core/testutil unusable from
+// anywhere, and holding test code to the production graph would make core/guard unusable from
 // the very tiers that call its guards.
 type ImportGraph struct {
 	Prod     map[string][]string

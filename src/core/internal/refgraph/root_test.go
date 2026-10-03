@@ -23,10 +23,10 @@ func writeGoMod(t *testing.T, root, module string) {
 func TestSourceRoot_FindsTheDirectoryHoldingEveryModule(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "src")
-	for _, m := range modules {
-		writeGoMod(t, src, m)
+	for _, m := range moduleDirs {
+		writeGoMod(t, src, filepath.FromSlash(m))
 	}
-	deep := filepath.Join(src, "core", "testutil", "fake")
+	deep := filepath.Join(src, "core", "guard")
 	require.NoError(t, os.MkdirAll(deep, 0o755))
 
 	found, err := FindSourceRoot(deep)
@@ -41,11 +41,32 @@ func TestSourceRoot_FindsTheDirectoryHoldingEveryModule(t *testing.T) {
 func TestSourceRoot_AnAscentThatFindsNothingIsAnError(t *testing.T) {
 	root := t.TempDir()
 	// Three of the four, which is what a newly added module looks like from here.
-	for _, m := range modules[:len(modules)-1] {
-		writeGoMod(t, root, m)
+	for _, m := range moduleDirs[:len(moduleDirs)-1] {
+		writeGoMod(t, root, filepath.FromSlash(m))
 	}
 
 	_, err := FindSourceRoot(root)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no directory above the working directory holds all of")
+}
+
+// TestSourceRoot_EachOfTheFourModulesIsRequired names the four go.mod directories as literals
+// rather than reading moduleDirs, so a module dropped from that one declaration is caught: a tree
+// missing any one of them is not the source root.
+func TestSourceRoot_EachOfTheFourModulesIsRequired(t *testing.T) {
+	four := []string{"core", "authserver", "adminconsole", "cmd/goiabada-setup"}
+
+	for _, missing := range four {
+		t.Run(missing, func(t *testing.T) {
+			root := t.TempDir()
+			for _, m := range four {
+				if m != missing {
+					writeGoMod(t, root, filepath.FromSlash(m))
+				}
+			}
+
+			_, err := FindSourceRoot(root)
+			require.Error(t, err, "a tree without %s was taken for the source root", missing)
+		})
+	}
 }

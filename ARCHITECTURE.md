@@ -5,7 +5,7 @@ This file records which module owns what, and it is executable. The five tables 
 [temporary exceptions](#temporary-exceptions),
 [foreign modules](#foreign-modules-the-admin-console-must-not-compile) and
 [test frameworks](#test-code-no-shipped-binary-may-link) — are parsed by
-`AssertArchitecture` in `src/core/testutil/architecture.go`, which every module's unit tier calls.
+`AssertArchitecture` in `src/core/guard/architecture.go`, which every module's unit tier calls.
 A row that stops describing the tree fails the tier, in both directions: an edge the tables do not
 allow is a finding, and so is an exception listed for an edge that no longer exists. A sixth table,
 one row per exported symbol every `core` package declares, is data in the same sense and lives in
@@ -100,6 +100,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/countries` | kernel | — |
 | `core/errs` | kernel | — |
 | `core/gender` | kernel | — |
+| `core/guard` | kernel | — |
 | `core/hashutil` | kernel | — |
 | `core/hostport` | kernel | — |
 | `core/i18n` | kernel | — |
@@ -112,7 +113,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/oauth` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
-| `core/testutil` | kernel | — |
 | `core/timezones` | kernel | — |
 
 Notes on rows that are not self-evident:
@@ -125,10 +125,14 @@ Notes on rows that are not self-evident:
   table described below. The row exists because the guard reads any directory under `core` holding a
   production Go file, and rule 6 fails without it (#385).
 - `core/internal` is kernel because it holds `refgraph`, the reference-graph reader behind the
-  tree-wide guards and `ownershipdump`: the census left `core/testutil` so that the tool stops
-  linking `testing` and testify, and Go's internal rule keeps it from anything outside core (#431).
+  tree-wide guards and `ownershipdump`: the census left `core/testutil`, now `core/guard`, so that
+  the tool stops linking `testing` and testify, and Go's internal rule keeps it from anything
+  outside core (#431). The four module directories the graph resolves against are declared there
+  once (#442).
   It also holds `pinnedfetch`, the pinned download the reference-data generators share (#432).
-- `core/testutil` is kernel because it is test support compiled into no binary. It is still held to
+- `core/guard` is kernel because it is test support compiled into no binary, and it holds the
+  tree-wide guards and nothing else: it was `core/testutil` until #442, when its one helper that was
+  no guard, `SkipWithoutIPv6Loopback`, left for `core/hostport/hostporttest`. It is still held to
   the kernel rule, and #360 is what made that hold rather than merely claim
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
   edge was noticed when `uuidutil` moved, and `fake` moved with it to the auth server, where it is
@@ -273,7 +277,7 @@ The guard reports findings by these names.
 
 Rules 2, 3, 4, 7 and 8 read production files only. A test may import a mock, a fixture or a helper from
 anywhere; that is what test code is for, and holding it to the production graph would make
-`core/testutil` unusable from the tiers that call it. Rule 1 is the exception, for the reason given
+`core/guard` unusable from the tiers that call it. Rule 1 is the exception, for the reason given
 above. Rule 5 reads production files because it is about what lands in a shipped binary, and rule
 8's `test-support` half and rule 9 read them the same way, for the same reason.
 
@@ -391,7 +395,7 @@ harmful. Keying on a path instead — `testutil`, `mocks`, a name ending in `tes
 about spelling, which no guard in this repository is.
 
 The walk starts from each shipped `main` package rather than from every production package of a
-module, which is where it differs from rule 5: the graph counts `core/testutil`'s untagged files as
+module, which is where it differs from rule 5: the graph counts `core/guard`'s untagged files as
 production, so a module-wide walk would find `testing` in `core` itself. The three mains are listed
 in the guard, as `shippedMains`, rather than found by looking for `package main`, because
 `schemadump`, `droptestdb`, `ownershipdump` and the two reference-data generators are main packages
@@ -425,7 +429,7 @@ it imports.
 
 ## The guard
 
-`AssertArchitecture` lives in `src/core/testutil/architecture.go` and is called from all three
+`AssertArchitecture` lives in `src/core/guard/architecture.go` and is called from all three
 module unit tiers, so it fires whichever tier runs — the same arrangement as the gofmt, error,
 slog and agent-document guards.
 
@@ -434,12 +438,12 @@ is not a finding and a renamed import alias still is one. Rule 9 is the one rule
 go command, for what the packages outside the four modules import, since no source of theirs is
 under the source root. It parses production and test files
 separately because the rules above treat them differently. Rule 7 reads the same way, one level
-down: `src/core/testutil/builtin_ownership.go` reads the exported declarations of
+down: `src/core/guard/builtin_ownership.go` reads the exported declarations of
 `core/builtin` and, from every production file that imports it, the symbols selected off whatever
 identifier that file binds the import to.
 
 Rule 8 lives beside them rather than in this file. `AssertSymbolOwnership` in
-`src/core/testutil/symbol_ownership.go` is called from the same three tiers and checks
+`src/core/guard/symbol_ownership.go` is called from the same three tiers and checks
 `src/core/OWNERSHIP.md`; `src/core/cmd/ownershipdump` writes the computed rows from the same census,
 `core/internal/refgraph`, so the tool and the guard cannot read the tree differently, and
 `./run-tests.sh --type lint` runs the tool and fails on a tree it changed. References from outside a declaring package are read as
@@ -447,10 +451,10 @@ selectors, like rule 7's; references from inside it are resolved with `go/types`
 identifier carries no selector and matching one by spelling would let a local or a struct field
 justify its namesake.
 
-`src/core/testutil/architecture_lint_test.go` is the core tier's caller;
-`src/core/testutil/architecture_rules_test.go`,
-`src/core/testutil/builtin_ownership_rules_test.go`,
-`src/core/testutil/symbol_ownership_rules_test.go` and
+`src/core/guard/architecture_lint_test.go` is the core tier's caller;
+`src/core/guard/architecture_rules_test.go`,
+`src/core/guard/builtin_ownership_rules_test.go`,
+`src/core/guard/symbol_ownership_rules_test.go` and
 `src/core/internal/refgraph/symbol_ownership_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate
 leniency, and then take the real tables apart one row at a time — dropping each exception and

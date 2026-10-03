@@ -69,7 +69,7 @@ linters:
       # still contained all nine dead interfaces #333 deleted, it reported zero
       # findings in all three modules, so it is inert in this build and the line
       # would be one nobody could attribute a behaviour to. The dead-interface
-      # half of #333 is held by a guard in core/testutil instead, which resolves
+      # half of #333 is held by a guard in core/guard instead, which resolves
       # references by package rather than by name and so cannot be fooled the
       # way a bare-name census was.
     sloglint:
@@ -82,12 +82,12 @@ linters:
       # The message is a string literal or a constant, so a record is greppable
       # by its message and its values ride as attributes (#320 decision 4). A
       # constant is admitted here and msg-style below reads literals only, so
-      # testutil.AssertSlogConvention refuses any message that is not a literal
+      # guard.AssertSlogConvention refuses any message that is not a literal
       # at the call: otherwise a constant is how an opener gets past every guard.
       static-msg: true
       # First rune lowercase (#320 decision 4). The component prefix and the
       # "failed to" / "error " openers the same decision refuses are text
-      # sloglint has no option for, so testutil.AssertSlogConvention holds them.
+      # sloglint has no option for, so guard.AssertSlogConvention holds them.
       msg-style: lowercased
       # snake_case keys, one spelling per concept (#320 decision 3).
       key-naming-case: snake
@@ -104,7 +104,7 @@ linters:
       # record. Registering them is what makes sloglint read the keys at their
       # call sites, which is where 328 API 500s and 20 id_token_hint refusals
       # write theirs. msg-pos is -1 because none of them takes a message; the
-      # run begins at args-pos. testutil.AssertSlogConvention checks this list
+      # run begins at args-pos. guard.AssertSlogConvention checks this list
       # against slogSpreadSites, so a forwarder cannot be registered on one
       # side only.
       custom-funcs:
@@ -146,10 +146,10 @@ linters:
         linters: [gosec]
       # The tree-wide guards read the source tree by path and call the test
       # mail server; no binary imports them.
-      - path: core/testutil/
+      - path: core/guard/
         linters: [gosec]
       # The reference-graph reader those guards and ownershipdump share,
-      # which left core/testutil with the same reads by path (#431).
+      # which left core/testutil, now core/guard, with the same reads by path (#431).
       - path: core/internal/refgraph/
         linters: [gosec]
       # The dump tools run by hand in the dev container, read the tree or the

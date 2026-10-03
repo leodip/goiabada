@@ -5,7 +5,7 @@
 // of the auth server's internal/reqctx (#433).
 //
 // The keys are unexported, so nothing outside this package can write either value or read it under
-// the wrong type, and core/testutil.AssertContextValuesThroughAccessors, called from the unit tier,
+// the wrong type, and core/guard.AssertContextValuesThroughAccessors, called from the unit tier,
 // refuses a raw context read or write anywhere else in the module. The settings key once shared its
 // spelling with the auth server's, which was never one key: a context key does not leave the process
 // that set it, and the two processes store different types under theirs (#351).

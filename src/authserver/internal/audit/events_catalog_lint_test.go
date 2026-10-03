@@ -37,7 +37,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -244,12 +244,12 @@ func auditDeclarationsOutsideTheCatalogFile(dir, catalogFile string) (scanned []
 // TestAuditCatalog_MatchesTheDeclarations holds the real file to the rule, and the compiled
 // auditEventTypes to the file.
 func TestAuditCatalog_MatchesTheDeclarations(t *testing.T) {
-	path := filepath.Join(testutil.SourceRoot(t), filepath.FromSlash(auditCatalogFile))
+	path := filepath.Join(guard.SourceRoot(t), filepath.FromSlash(auditCatalogFile))
 	assertAuditCatalogComplete(t, path, AuditEventTypes())
 }
 
 // assertAuditCatalogComplete is the reporting half, taking the file and the compiled slice as
-// parameters and failing through a testutil.Reporter so a rule test can drive it against a
+// parameters and failing through a guard.Reporter so a rule test can drive it against a
 // fixture. Without that seam these lines are reached only by the call above, over a file that
 // is correct by construction the moment anyone looks at it.
 //
@@ -257,7 +257,7 @@ func TestAuditCatalog_MatchesTheDeclarations(t *testing.T) {
 // proves something about a file; it proves nothing about the binary unless the parsed values
 // are held against what the binary actually carries. A guard pointed at a path that no longer
 // participates in the build would otherwise pass forever.
-func assertAuditCatalogComplete(r testutil.Reporter, path string, compiled []string) {
+func assertAuditCatalogComplete(r guard.Reporter, path string, compiled []string) {
 	r.Helper()
 
 	src, err := parseAuditCatalogSource(path)
@@ -391,7 +391,7 @@ var auditEventTypes = []string{
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 	})
 
@@ -420,7 +420,7 @@ var auditEventTypes = []string{
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd", "verified_phone"})
 	})
 
@@ -447,7 +447,7 @@ var auditEventTypes = []string{
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd", "verified_email"})
 	})
 
@@ -465,7 +465,7 @@ func TestAuditCatalog_TheGuardIsFatalWhenItParsesNoDeclarations(t *testing.T) {
 var auditEventTypes = []string{}
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, nil)
 	})
 
@@ -487,7 +487,7 @@ var AuditEventNames = []string{
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 	})
 
@@ -513,7 +513,7 @@ var auditEventTypes = []string{
 `)
 
 	t.Run("a different length", func(t *testing.T) {
-		report := testutil.RunGuard(func(r testutil.Reporter) {
+		report := guard.Run(func(r guard.Reporter) {
 			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 		})
 		require.True(t, report.Failed())
@@ -522,7 +522,7 @@ var auditEventTypes = []string{
 	})
 
 	t.Run("a different value at the same position", func(t *testing.T) {
-		report := testutil.RunGuard(func(r testutil.Reporter) {
+		report := guard.Run(func(r guard.Reporter) {
 			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd", "verified_phone"})
 		})
 		require.True(t, report.Failed())
@@ -573,7 +573,7 @@ var auditEventTypes = []string{
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 	})
 
@@ -611,7 +611,7 @@ var auditEventTypes = []string{
 const AuditForgottenOutsideEvents = "forgotten_outside_events"
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 	})
 
@@ -652,7 +652,7 @@ func AuditNothing() string { return "not a declaration" }
 const AuditOnlyInATestFile = "only_in_a_test_file"
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 	})
 
@@ -663,7 +663,7 @@ const AuditOnlyInATestFile = "only_in_a_test_file"
 // scan reports an absence, and an absence is what a walk that read no files reports too, so
 // without this the directory moving under it would leave it passing forever.
 func TestAuditCatalog_TheSiblingScanReadsTheRestOfThePackage(t *testing.T) {
-	dir := filepath.Dir(filepath.Join(testutil.SourceRoot(t), filepath.FromSlash(auditCatalogFile)))
+	dir := filepath.Dir(filepath.Join(guard.SourceRoot(t), filepath.FromSlash(auditCatalogFile)))
 
 	scanned, outside, err := auditDeclarationsOutsideTheCatalogFile(dir, "events.go")
 
@@ -714,7 +714,7 @@ const AuditForgottenInALaterTestFile = "forgotten_in_a_later_test_file"
 
 	// And the reporting half says so, so this is a property of the guard rather than of a
 	// helper nothing drives.
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 	})
 	require.True(t, report.Failed(), "a declaration in the second production file passed the guard")
@@ -747,7 +747,7 @@ var auditEventTypes = []string{
 var AuditForgottenOutsideAsAVar = "forgotten_outside_as_a_var"
 `)
 
-		report := testutil.RunGuard(func(r testutil.Reporter) {
+		report := guard.Run(func(r guard.Reporter) {
 			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 		})
 
@@ -772,7 +772,7 @@ var auditEventTypes = []string{
 }
 `)
 
-		report := testutil.RunGuard(func(r testutil.Reporter) {
+		report := guard.Run(func(r guard.Reporter) {
 			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 		})
 
@@ -809,7 +809,7 @@ var auditEventTypes = []string{
 }
 `)
 
-		report := testutil.RunGuard(func(r testutil.Reporter) {
+		report := guard.Run(func(r guard.Reporter) {
 			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
 		})
 
@@ -820,7 +820,7 @@ var auditEventTypes = []string{
 	// the catalog, and it is read as one rather than refused.
 	t.Run("auditEventTypes itself is untouched", func(t *testing.T) {
 		src, err := parseAuditCatalogSource(
-			filepath.Join(testutil.SourceRoot(t), filepath.FromSlash(auditCatalogFile)))
+			filepath.Join(guard.SourceRoot(t), filepath.FromSlash(auditCatalogFile)))
 		require.NoError(t, err)
 		assert.Empty(t, src.mutable, "the real catalog file declares no event name with var")
 		assert.NotEmpty(t, src.catalogued, "auditEventTypes was read as the catalog")

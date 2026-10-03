@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // The admin and account API answers one error code per condition, and this file is what keeps that
@@ -156,7 +156,7 @@ type emittedAPICode struct {
 }
 
 func TestAPIErrorCodes_MatchTheSurvivorTable(t *testing.T) {
-	assertAPIErrorCodes(t, testutil.SourceRoot(t), apiErrorCodeDirs, apiErrorCodeFileFloor, apiErrorCodes)
+	assertAPIErrorCodes(t, guard.SourceRoot(t), apiErrorCodeDirs, apiErrorCodeFileFloor, apiErrorCodes)
 }
 
 // apiErrorCodeFileFloor is how many non-test Go files the three directories hold at rest. It is a
@@ -224,10 +224,10 @@ func findAPIErrorCodes(root string, dirs []string) ([]emittedAPICode, []string, 
 }
 
 // assertAPIErrorCodes is the reporting half, taking the root, the scope, the floor and the table as
-// parameters and failing through a testutil.Reporter so a rule test can drive it against a fixture
+// parameters and failing through a guard.Reporter so a rule test can drive it against a fixture
 // tree. Without that seam these lines are reached only by the call above, which walks a surface
 // that has matched its table since #279.
-func assertAPIErrorCodes(r testutil.Reporter, root string, dirs []string, floor int, table map[string]string) {
+func assertAPIErrorCodes(r guard.Reporter, root string, dirs []string, floor int, table map[string]string) {
 	r.Helper()
 
 	emitted, problems, files, err := findAPIErrorCodes(root, dirs)
@@ -656,7 +656,7 @@ func HandleX() { writeJSONError(w, "User not found", "NOT_FOUND", 404) }
 `,
 	})
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{
 			"NOT_FOUND": "category: an absent entity, 404.",
 		})
@@ -675,7 +675,7 @@ func HandleX() { writeJSONError(w, "User not found", "USER_NOT_FOUND", 404) }
 `,
 	})
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{
 			"NOT_FOUND": "category: an absent entity, 404.",
 		})
@@ -702,7 +702,7 @@ func HandleX() { writeJSONError(w, "User not found", "NOT_FOUND", 404) }
 `,
 	})
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{
 			"NOT_FOUND": "category: an absent entity, 404.",
 			"RETIRED":   "nothing writes this any more.",
@@ -726,7 +726,7 @@ func HandleX(code string) { writeJSONError(w, "User not found", code, 404) }
 `,
 	})
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{})
 	})
 
@@ -746,7 +746,7 @@ func HandleX() { writeJSONError(w, "User not found", "NOT_FOUND", 404) }
 `,
 	})
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 2, map[string]string{
 			"NOT_FOUND": "category: an absent entity, 404.",
 		})
@@ -761,7 +761,7 @@ func HandleX() { writeJSONError(w, "User not found", "NOT_FOUND", 404) }
 // constant set above the real count would fail every run; one set far below it would stop being a
 // floor, so the margin is what this pins.
 func TestAPIErrorCodes_TheFileFloorIsBelowTheRealSurface(t *testing.T) {
-	_, _, files, err := findAPIErrorCodes(testutil.SourceRoot(t), apiErrorCodeDirs)
+	_, _, files, err := findAPIErrorCodes(guard.SourceRoot(t), apiErrorCodeDirs)
 	require.NoError(t, err)
 
 	assert.GreaterOrEqual(t, files, apiErrorCodeFileFloor)

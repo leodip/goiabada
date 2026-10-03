@@ -11,7 +11,7 @@ import (
 	"time"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -113,7 +113,7 @@ func dsnParam(t *testing.T, dsn, key string) string {
 // and its own tier holds the copies to the same file, so changing either side alone fails that
 // side's tier (#430).
 func TestDSN_MatchesTheSetupWizardsCaseFile(t *testing.T) {
-	path := filepath.Join(testutil.SourceRoot(t), "cmd", "goiabada-setup", "testdata", "connection-strings.json")
+	path := filepath.Join(guard.SourceRoot(t), "cmd", "goiabada-setup", "testdata", "connection-strings.json")
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
 	var file struct {

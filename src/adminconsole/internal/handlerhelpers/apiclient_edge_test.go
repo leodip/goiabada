@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // This package's production files name one thing from apiclient: the *APIError the classifiers
@@ -107,9 +107,9 @@ func findApiclientUses(dir string) ([]apiclientUse, int, error) {
 	return found, files, nil
 }
 
-// assertApiclientEdge is the reporting half, failing through a testutil.Reporter so a rule test can
+// assertApiclientEdge is the reporting half, failing through a guard.Reporter so a rule test can
 // drive it against a fixture directory.
-func assertApiclientEdge(r testutil.Reporter, dir string) {
+func assertApiclientEdge(r guard.Reporter, dir string) {
 	r.Helper()
 
 	found, files, err := findApiclientUses(dir)
@@ -236,7 +236,7 @@ import ac "github.com/leodip/goiabada/adminconsole/internal/apiclient"
 var _ = ac.NewAuthServerClient
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertApiclientEdge(r, dir)
 	})
 
@@ -254,7 +254,7 @@ func TestApiclientEdge_FailsOnADotOrBlankImport(t *testing.T) {
 			writeEdgeFixture(t, dir, "classifier.go", "package handlerhelpers\n\nimport "+binding+
 				" \"github.com/leodip/goiabada/adminconsole/internal/apiclient\"\n")
 
-			report := testutil.RunGuard(func(r testutil.Reporter) {
+			report := guard.Run(func(r guard.Reporter) {
 				assertApiclientEdge(r, dir)
 			})
 
@@ -283,7 +283,7 @@ var _ *ac.APIError
 `)
 	writeEdgeFixture(t, dir, "names.go", "package handlerhelpers\n\nfunc fullName() string { return \"\" }\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertApiclientEdge(r, dir)
 	})
 
@@ -296,7 +296,7 @@ func TestApiclientEdge_IsFatalOnAnEmptyRead(t *testing.T) {
 	writeEdgeFixture(t, dir, "classifier_test.go", "package handlerhelpers\n")
 	writeEdgeFixture(t, dir, "sub/page.go", "package sub\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertApiclientEdge(r, dir)
 	})
 
@@ -308,7 +308,7 @@ func TestApiclientEdge_IsFatalOnAnEmptyRead(t *testing.T) {
 func TestApiclientEdge_IsFatalWhenTheDirectoryIsGone(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "handlerhelpers")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertApiclientEdge(r, dir)
 	})
 

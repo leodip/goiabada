@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/hostport/hostporttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -214,7 +214,7 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 // the none row sends credentials in cleartext, which isLocalHost permits for `::1` and would refuse
 // for `[::1]` (#424).
 func TestSendEmail_IPv6Host(t *testing.T) {
-	testutil.SkipWithoutIPv6Loopback(t)
+	hostporttest.SkipWithoutIPv6Loopback(t)
 
 	cert := newFakeCert(t)
 

@@ -29,7 +29,7 @@ import (
 // while serving a request is correlated to that request: the installed slog handler reads chi's
 // request id off it, so the console record joins the request's own log line, and the persisted row
 // carries the same id. A call that passed context.Background() here would produce exactly the
-// uncorrelated record this exists to prevent, which is why testutil.AssertAuditLogContext refuses
+// uncorrelated record this exists to prevent, which is why guard.AssertAuditLogContext refuses
 // one in a request-path package (#328).
 type AuditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})

@@ -636,7 +636,7 @@ if should_run_lint; then
     # regenerated for its own reasons collected sixteen files belonging to nobody.
     #
     # Every module's unit tier already holds each mock's header to the pin, through
-    # testutil.AssertGeneratedMocksArePinned, which needs no generator. This is the other
+    # guard.AssertGeneratedMocksArePinned, which needs no generator. This is the other
     # half: an interface added to a .mockery.yaml that nobody generated, or a mock edited
     # in its body, both of which leave the header right and the file wrong.
     #
@@ -676,7 +676,7 @@ if should_run_lint; then
     # src/core/OWNERSHIP.md carries one row per exported symbol every core package declares,
     # and ownershipdump writes the four computed justifications from the reference graph. Every
     # module's unit tier already holds the committed table to the tree through
-    # testutil.AssertSymbolOwnership, which is the semantic half. This is the other half: the
+    # guard.AssertSymbolOwnership, which is the semantic half. This is the other half: the
     # formatting, the ordering and the note the tool would write, none of which the guard reads,
     # so a hand-edited row that happens to say the right word still leaves the file different
     # from what the tool produces. Same arrangement as the two checks above, and here for the

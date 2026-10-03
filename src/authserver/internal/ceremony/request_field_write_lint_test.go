@@ -36,7 +36,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -406,7 +406,7 @@ func isProductionGoFile(name string) bool {
 // what makes a field reached through another package the same object as the one the rule resolved.
 //
 // A stubbed package's types are invalid, so a context could only hide behind one if a stdlib or
-// third-party function returned it, which none can name. core/testutil's stubPackages and the
+// third-party function returned it, which none can name. core/guard's stubPackages and the
 // discarded-error lint's importer in internal/server are the twins of the stub half.
 type requestFieldPackages struct {
 	root  string
@@ -516,13 +516,13 @@ func requestFieldPackageName(importPath string) string {
 // TestRequestFields_WrittenOnlyAtAuthorize holds the real tree to the rule, with the request fields
 // the classification test names.
 func TestRequestFields_WrittenOnlyAtAuthorize(t *testing.T) {
-	assertRequestFieldsWrittenOnce(t, testutil.SourceRoot(t), requestFieldScope, requestFields, requestFieldSetters, requestFieldWriter)
+	assertRequestFieldsWrittenOnce(t, guard.SourceRoot(t), requestFieldScope, requestFields, requestFieldSetters, requestFieldWriter)
 }
 
 // assertRequestFieldsWrittenOnce is the reporting half, taking the root, the scope and the lists as
-// parameters and failing through a testutil.Reporter so a rule test can drive it against a fixture
+// parameters and failing through a guard.Reporter so a rule test can drive it against a fixture
 // tree.
-func assertRequestFieldsWrittenOnce(r testutil.Reporter, root, scope string, fields, setters []string, writer requestFieldFunc) {
+func assertRequestFieldsWrittenOnce(r guard.Reporter, root, scope string, fields, setters []string, writer requestFieldFunc) {
 	r.Helper()
 
 	walk, err := findRequestFieldWrites(root, scope, fields, setters, writer)
@@ -829,7 +829,7 @@ func completed(ac *ceremony.AuthContext, effective string) {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
 	})
 
@@ -854,7 +854,7 @@ func issue(f *flow.Context) {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
 	})
 
@@ -880,7 +880,7 @@ func completed(store *ceremony.Store, ac *ceremony.AuthContext) []string {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
 	})
 
@@ -894,7 +894,7 @@ func TestRequestFieldWrites_Guard_IsFatalOnAnEmptyRead(t *testing.T) {
 	writeRequestFieldFixture(t, root, "authserver/README.md", "no Go here\n")
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context_test.go", "package ceremony\n")
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
 	})
 
@@ -916,7 +916,7 @@ func issue(ac *AuthContext) {
 }
 `)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
 	})
 
@@ -931,7 +931,7 @@ func TestRequestFieldWrites_Guard_IsFatalOnAnUndeclaredName(t *testing.T) {
 	root := t.TempDir()
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
 
-	report := testutil.RunGuard(func(r testutil.Reporter) {
+	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope,
 			append(slices.Clone(requestFieldFixtureFields), "Nonce"), []string{"SetTargetAcrLevel", "SetNonce"}, requestFieldWriter)
 	})
