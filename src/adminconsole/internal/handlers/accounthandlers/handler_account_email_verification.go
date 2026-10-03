@@ -8,10 +8,8 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -27,7 +25,7 @@ type accountEmailVerificationAPI interface {
 }
 
 func HandleAccountEmailVerificationGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
@@ -35,9 +33,9 @@ func HandleAccountEmailVerificationGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
@@ -46,7 +44,11 @@ func HandleAccountEmailVerificationGet(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
 		if !settings.SMTPEnabled {
 			httpHelper.InternalServerError(w, r, errs.New("SMTP is not enabled"))
 			return
@@ -83,7 +85,7 @@ func HandleAccountEmailVerificationGet(
 }
 
 func HandleAccountEmailSendVerificationPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
 
@@ -92,9 +94,9 @@ func HandleAccountEmailSendVerificationPost(
 		result := EmailSendVerificationResult{}
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -114,7 +116,7 @@ func HandleAccountEmailSendVerificationPost(
 }
 
 func HandleAccountEmailVerificationPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
@@ -122,9 +124,9 @@ func HandleAccountEmailVerificationPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info for API calls and current profile rendering
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -143,40 +145,36 @@ func HandleAccountEmailVerificationPost(
 		verificationCode := strings.TrimSpace(r.PostFormValue("verificationCode"))
 		req := &api.VerifyAccountEmailRequest{VerificationCode: verificationCode}
 
+		// renderRefused redraws the form with the code the user typed and the API's reason.
+		renderRefused := func(message string) {
+			settings, ok := reqctx.SettingsFrom(r.Context())
+			if !ok {
+				httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
+				return
+			}
+			bind := map[string]interface{}{
+				"savedSuccessfully": false,
+				"email":             user.Email,
+				"emailVerified":     user.EmailVerified,
+				"smtpEnabled":       settings.SMTPEnabled,
+				"error":             message,
+				"verificationCode":  verificationCode,
+			}
+			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
+			}
+		}
+
 		if _, verifyErr := apiClient.VerifyAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req); verifyErr != nil {
 			// Handle invalid/expired code gracefully as validation error
 			var apiErr *apiclient.APIError
 			if errors.As(verifyErr, &apiErr) && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {
-				settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
-				bind := map[string]interface{}{
-					"savedSuccessfully": false,
-					"email":             user.Email,
-					"emailVerified":     user.EmailVerified,
-					"smtpEnabled":       settings.SMTPEnabled,
-					"error":             apiErr.Message,
-					"verificationCode":  verificationCode,
-				}
-				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); renderErr != nil {
-					httpHelper.InternalServerError(w, r, renderErr)
-				}
+				renderRefused(apiErr.Message)
 				return
 			}
 
 			// Delegate other errors to generic handler
-			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, func(errorMessage string) {
-				settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
-				bind := map[string]interface{}{
-					"savedSuccessfully": false,
-					"email":             user.Email,
-					"emailVerified":     user.EmailVerified,
-					"smtpEnabled":       settings.SMTPEnabled,
-					"error":             errorMessage,
-					"verificationCode":  verificationCode,
-				}
-				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); renderErr != nil {
-					httpHelper.InternalServerError(w, r, renderErr)
-				}
-			})
+			handlerhelpers.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, renderRefused)
 			return
 		}
 

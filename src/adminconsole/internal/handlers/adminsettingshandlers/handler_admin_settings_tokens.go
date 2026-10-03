@@ -7,13 +7,10 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 )
@@ -25,7 +22,7 @@ type settingsTokensAPI interface {
 }
 
 func HandleAdminSettingsTokensGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTokensAPI,
 ) http.HandlerFunc {
@@ -33,9 +30,9 @@ func HandleAdminSettingsTokensGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -83,7 +80,7 @@ func HandleAdminSettingsTokensGet(
 }
 
 func HandleAdminSettingsTokensPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTokensAPI,
 ) http.HandlerFunc {
@@ -91,9 +88,9 @@ func HandleAdminSettingsTokensPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 

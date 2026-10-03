@@ -2,8 +2,10 @@ package accounthandlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,19 +15,17 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
 
-// The value on constants.ContextKeySettings is api.PublicSettingsResponse, the same four-field
+// The settings value reqctx carries is api.PublicSettingsResponse, the same four-field
 // wire type the console decoded from /api/public/settings, rather than a models.Settings the
 // settings-cache middleware filled four fields of and left the other 28 at their zero values
 // (#350).
 //
-// Nothing about that is visible at compile time from here: the key is a context key, so its value
-// is an interface, and every reader of it is a type assertion that either matches what the
-// middleware wrote or panics on a live request. These cases are what holds the two ends together.
-// Put the carrier back to a persistence model on either side alone and the handlers below panic,
-// which is exactly what a visitor would meet.
+// The type is held at compile time by reqctx's typed accessors since #440; what these cases still
+// hold is that the page reads the value the middleware wrote rather than one of its own.
 //
 // Each handler is driven with the flag both ways, so a handler that stopped reading the carrier and
 // bound a constant fails too.
@@ -103,4 +103,78 @@ func TestHandleAccountEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t
 
 	require.Error(t, refusedWith, "the page must refuse rather than render a form it cannot send from")
 	assert.Contains(t, refusedWith.Error(), "SMTP")
+}
+
+// verificationRefusingApiClient answers the profile the verification page reads first, then
+// refuses the code with err.
+type verificationRefusingApiClient struct {
+	settingsCarrierApiClient
+	err error
+}
+
+func (c verificationRefusingApiClient) VerifyAccountEmail(context.Context, string, *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
+	return nil, c.err
+}
+
+// A page that reads the settings and finds none answers the sentinel reqctx declares instead of
+// the panic a type assertion on a nil interface was: every application route is mounted under the
+// settings middleware, so only a wiring defect reaches these, and the 500 page with a request id
+// is what one is answered with (#440).
+func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T) {
+	verificationForm := handlertest.WithForm(url.Values{"verificationCode": {"123456"}})
+	testCases := []struct {
+		name    string
+		build   func(httpHelper *mocks_handlers.HttpHelper) http.HandlerFunc
+		request *http.Request
+	}{
+		{
+			name: "HandleAccountEmailGet",
+			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+				return HandleAccountEmailGet(h, newFlashTestStore(), settingsCarrierApiClient{})
+			},
+			request: handlertest.Request(http.MethodGet, "/account/email", handlertest.WithAccessToken()),
+		},
+		{
+			name: "HandleAccountEmailVerificationGet",
+			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+				return HandleAccountEmailVerificationGet(h, newFlashTestStore(), settingsCarrierApiClient{})
+			},
+			request: handlertest.Request(http.MethodGet, "/account/email-verification", handlertest.WithAccessToken()),
+		},
+		{
+			name: "HandleAccountEmailVerificationPost, a code the API calls expired",
+			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+				return HandleAccountEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
+					err: &apiclient.APIError{Code: "INVALID_OR_EXPIRED_VERIFICATION_CODE", Message: "Expired.", StatusCode: http.StatusBadRequest},
+				})
+			},
+			request: handlertest.Request(http.MethodPost, "/account/email-verification",
+				handlertest.WithAccessToken(), verificationForm),
+		},
+		{
+			name: "HandleAccountEmailVerificationPost, any other refusal",
+			build: func(h *mocks_handlers.HttpHelper) http.HandlerFunc {
+				return HandleAccountEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
+					err: &apiclient.APIError{Code: "SOMETHING_ELSE", Message: "No.", StatusCode: http.StatusBadRequest},
+				})
+			},
+			request: handlertest.Request(http.MethodPost, "/account/email-verification",
+				handlertest.WithAccessToken(), verificationForm),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlers.NewHttpHelper(t)
+			var refusedWith error
+			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) { refusedWith, _ = args.Get(2).(error) }).Once()
+
+			tc.build(httpHelper).ServeHTTP(httptest.NewRecorder(), tc.request)
+
+			assert.True(t, errors.Is(refusedWith, reqctx.ErrNoSettings), "answered with %v", refusedWith)
+			httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything)
+		})
+	}
 }

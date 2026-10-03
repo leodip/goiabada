@@ -125,7 +125,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Get("/manage-consents", accounthandlers.HandleAccountManageConsentsGet(httpHelper, apiClient))
 		r.Post("/manage-consents", accounthandlers.HandleAccountManageConsentsRevokePost(httpHelper, apiClient))
 		r.Get("/sessions", accounthandlers.HandleAccountSessionsGet(httpHelper, apiClient))
-		r.Post("/sessions", accounthandlers.HandleAccountSessionsEndSesssionPost(httpHelper, apiClient))
+		r.Post("/sessions", accounthandlers.HandleAccountSessionsEndSessionPost(httpHelper, apiClient))
 
 		// Profile picture page and API routes
 		r.Get("/picture", accounthandlers.HandleAccountPictureGet(httpHelper, apiClient))

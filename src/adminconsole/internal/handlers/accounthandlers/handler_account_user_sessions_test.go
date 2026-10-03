@@ -153,7 +153,7 @@ func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 // current unless the field says so, and a row the field marks current is current even when the
 // claim names another. A handler that went back to reading the claim answers both backwards
 // (#373).
-func TestHandleAccountSessionsEndSesssionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
+func TestHandleAccountSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 	const deleting = 5
 
 	testCases := []struct {
@@ -227,7 +227,7 @@ func TestHandleAccountSessionsEndSesssionPost_TheAnswerFollowsIsCurrentOnTheRow(
 
 			req := handlertest.Request(http.MethodPost, "/account/sessions", opts...)
 
-			HandleAccountSessionsEndSesssionPost(httpHelper, apiClient).
+			HandleAccountSessionsEndSessionPost(httpHelper, apiClient).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			answer := handlertest.Encoded(t, httpHelper)
@@ -252,7 +252,7 @@ func TestHandleAccountSessionsEndSesssionPost_TheAnswerFollowsIsCurrentOnTheRow(
 // the browser it had deleted somebody else's: no logout, and a console holding a session the auth
 // server has already forgotten. It swallowed the failure until #373, because the read was made
 // only to compare against a claim rather than to decide the answer.
-func TestHandleAccountSessionsEndSesssionPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
+func TestHandleAccountSessionsEndSessionPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
@@ -272,7 +272,7 @@ func TestHandleAccountSessionsEndSesssionPost_AListTheApiCannotReadStopsTheDelet
 		handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 	)
 
-	HandleAccountSessionsEndSesssionPost(httpHelper, apiClient).
+	HandleAccountSessionsEndSessionPost(httpHelper, apiClient).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)

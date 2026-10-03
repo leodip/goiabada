@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
@@ -69,7 +68,7 @@ func TestHandleAdminSettingsGeneralPost_AnIssuerChangeDeletesTheTokenResponseAnd
 	w := httptest.NewRecorder()
 	HandleAdminSettingsGeneralPost(httpHelper, store,
 		issuerChangingAPI{before: "https://old-issuer.example", after: "https://new-issuer.example"},
-		cache.NewSettingsCache("http://auth.example.invalid"),
+		&invalidationRecorder{},
 	).ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusFound, w.Code)

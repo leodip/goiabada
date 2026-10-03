@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -114,7 +113,7 @@ func TestHandleAdminSettingsUIThemePost_OnlyASessionEndedListReadStopsTheRedraw(
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{"themeSelection": {"purple"}}))
 			w := httptest.NewRecorder()
 			HandleAdminSettingsUIThemePost(httpHelper, newSettingsTestStore(), apiClient,
-				cache.NewSettingsCache("http://auth.example.invalid")).ServeHTTP(w, req)
+				&invalidationRecorder{}).ServeHTTP(w, req)
 
 			assert.Equal(t, tc.listReads, apiClient.listReads)
 			if tc.ended {

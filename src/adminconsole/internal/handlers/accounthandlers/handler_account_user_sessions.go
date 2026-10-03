@@ -5,12 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // accountSessionsAPI is what the account sessions page needs: the list, and the revoke of one.
@@ -20,16 +17,16 @@ type accountSessionsAPI interface {
 }
 
 func HandleAccountSessionsGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	apiClient accountSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
@@ -54,17 +51,17 @@ func HandleAccountSessionsGet(
 	}
 }
 
-func HandleAccountSessionsEndSesssionPost(
-	httpHelper handlers.HttpHelper,
+func HandleAccountSessionsEndSessionPost(
+	httpHelper HttpHelper,
 	apiClient accountSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
+			httpHelper.JsonError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
