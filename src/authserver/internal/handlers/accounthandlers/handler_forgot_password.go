@@ -79,6 +79,11 @@ const (
 	// recoveryOutcomeInvalidAddress is a submission the format check refused, which is
 	// answered with its own error page and looks nothing up.
 	recoveryOutcomeInvalidAddress = "invalid_address"
+	// recoveryOutcomeServerError is a request the server failed before deciding it: the lookup,
+	// the code's encryption or its store. The cause is the Error log line on the same request
+	// id; the entry is what keeps the request in the catalog with its digest. It names an
+	// account only when the lookup found one, which a failed lookup did not.
+	recoveryOutcomeServerError = "server_error"
 )
 
 // ineligibleRecoveryOutcome names why canRecoverPassword refused an account.
@@ -119,7 +124,8 @@ func auditRequestedPasswordReset(ctx context.Context, auditLogger AuditLogger, c
 // account therefore costs the response nothing an address with no account does not, and a mail
 // that fails to send is an Error record on the request's id rather than a 500 only a live account
 // could get (#404 decisions 7 and 8). A malformed address is answered, and audited, at once, since
-// its error page is visibly different anyway.
+// its error page is visibly different anyway, and so is a lookup that failed, whose 500 says
+// nothing about the address.
 func HandleForgotPasswordPost(
 	pageRenderer PageRenderer,
 	database forgotPasswordDatabase,
@@ -153,6 +159,7 @@ func HandleForgotPasswordPost(
 
 		user, err := database.GetUserByEmail(r.Context(), nil, email)
 		if err != nil {
+			auditRequestedPasswordReset(r.Context(), auditLogger, clientIP, email, 0, recoveryOutcomeServerError)
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
@@ -201,6 +208,7 @@ func finishForgotPassword(
 	verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to encrypt the password reset code", "user_id", user.Id, "error", err)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeServerError)
 		return
 	}
 
@@ -217,6 +225,7 @@ func finishForgotPassword(
 		verificationCodeEncrypted, verificationCodeHash, time.Now().UTC())
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to store the password reset code", "user_id", user.Id, "error", err)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeServerError)
 		return
 	}
 	if !stored {

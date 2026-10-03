@@ -119,9 +119,12 @@ func HandleAccountEmailPost(
 			return
 		}
 
+		// Sent as typed: surrounding whitespace is part of a password, and the auth server
+		// compares the one it was given, so trimming would refuse the right password and charge
+		// the account's failure budget for it.
 		req := &api.UpdateAccountEmailRequest{
 			Email:           email,
-			CurrentPassword: strings.TrimSpace(currentPassword),
+			CurrentPassword: currentPassword,
 		}
 		_, err = apiClient.UpdateAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {

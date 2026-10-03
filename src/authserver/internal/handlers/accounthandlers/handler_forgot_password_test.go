@@ -320,12 +320,55 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(nil, assert.AnError).Once()
 		pageRenderer.On("InternalServerError", rr, req, assert.AnError).Return().Once()
+		details := captureRequestedPasswordReset(auditLogger)
 
 		handler.ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
 		assert.Empty(t, jobs.jobs, "a request whose lookup failed decided nothing to finish later")
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		// The request still leaves its one record, and names no account, since none was found
+		// (#404 decision 6).
+		assert.Equal(t, map[string]interface{}{
+			"ip":          testClientIP,
+			"emailDigest": existingDigest,
+			"outcome":     "server_error",
+		}, *details)
+	})
+
+	// The job's faults before a code is issued are the server's too, and leave the one record the
+	// request owes beside the Error line that says why (#404 decision 6).
+	t.Run("Encrypting the code fails", func(t *testing.T) {
+		capture := logtest.CaptureSlog(t)
+		pageRenderer := mocks_handlers.NewPageRenderer(t)
+		database := mocks_data.NewDatabase(t)
+		emailSender := mocks_accounthandlers.NewEmailSender(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
+		jobs := &heldJobs{}
+
+		// A nil cipher refuses every encryption, which is the one way to make the real one fail.
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, nil, testBaseURL)
+		req := forgotPasswordRequest("existing@example.com")
+		rr := httptest.NewRecorder()
+
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").
+			Return(&models.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}, nil)
+		expectLinkSentPage(pageRenderer, rr, req)
+		details := captureRequestedPasswordReset(auditLogger)
+
+		handler.ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusOK, rr.Code, "the response has gone before the code is encrypted")
+		jobs.runAll(t)
+
+		assert.Equal(t, map[string]interface{}{
+			"ip":          testClientIP,
+			"emailDigest": existingDigest,
+			"userId":      int64(1),
+			"outcome":     "server_error",
+		}, *details)
+		database.AssertNotCalled(t, "TryStoreForgotPasswordCode", mock.Anything, mock.Anything, mock.Anything,
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
+		assertOneErrorRecordOnTheRequest(t, capture)
 	})
 
 	t.Run("Storing the code fails", func(t *testing.T) {
@@ -349,15 +392,21 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(false, assert.AnError).Once()
+		details := captureRequestedPasswordReset(auditLogger)
 		jobs.runAll(t)
 
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 		emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
-		// No outcome was decided: the store failed, which is the server's fault and the Error line,
-		// not something an administrator reads off the request.
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		// The store failed, which is the server's fault: the Error line says why, and the one
+		// record keeps the request in the catalog with its digest and account.
+		assert.Equal(t, map[string]interface{}{
+			"ip":          testClientIP,
+			"emailDigest": existingDigest,
+			"userId":      int64(1),
+			"outcome":     "server_error",
+		}, *details)
 		assertOneErrorRecordOnTheRequest(t, capture)
 	})
 }
@@ -520,6 +569,8 @@ const (
 	someoneDigest = "72497f475e4f76d0b28f57c73a084ece576d170874eba3ee2609d9afe4b71aab"
 	// notAnAddressDigest is the digest of "not-an-address".
 	notAnAddressDigest = "e50f7840fcd02669893cddaf76a8d16e2908150aedda106664e92ec2422f56eb"
+	// existingDigest is the digest of "existing@example.com".
+	existingDigest = "376ff10ae1de82646eb0a5a13b45d31cb1d1ac92981936929855fb5405cfe804"
 	// emptyAddressDigest is the digest of "".
 	emptyAddressDigest = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 )

@@ -212,9 +212,10 @@ const (
 	// SHA-256 hex of the submitted address normalized as the lookup normalizes it, never the
 	// address itself, so the table does not collect every address typed into an unauthenticated
 	// form; userId, present only when an account matched; and outcome, one of code_issued,
-	// unknown_address, unverified_address, account_disabled, account_changed or
-	// invalid_address. The digest is a pseudonym, not a secret: anyone holding a candidate
-	// address can test it.
+	// unknown_address, unverified_address, account_disabled, account_changed, invalid_address
+	// or server_error, the last a request the server failed before deciding it (the lookup, or
+	// the code's encryption or store), whose cause is the Error log line on the same request id.
+	// The digest is a pseudonym, not a secret: anyone holding a candidate address can test it.
 	AuditRequestedPasswordReset = "requested_password_reset"
 	AuditChangedPassword        = "changed_password"
 	// AuditRevokedUserAuthState records that a credential change invalidated a user's live
