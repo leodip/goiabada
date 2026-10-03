@@ -2,7 +2,7 @@
 //
 // It carries only what this process reads: its own settings, and the two auth server endpoints it
 // talks to. The auth server's listener, logging, database, initial-admin and data-encryption
-// settings are not this binary's to load, and it no longer registers flags for them (#351).
+// settings are not this binary's to load, and it registers no flags for them (#351).
 package config
 
 import (

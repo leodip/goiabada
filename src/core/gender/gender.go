@@ -5,9 +5,8 @@
 // server validates and stores a gender, the admin console renders and re-renders one, and both
 // name the same three strings.
 //
-// It is its own package rather than a corner of a core/enums, because a package named for a Go
-// construct is what invites the next unrelated enumeration in beside it, which is how core/enums
-// came to hold six auth-server-only types before #385 took them to the domains that own them.
+// It is its own package rather than a corner of a package of enumerations, because a package
+// named for a Go construct is what invites the next unrelated enumeration in beside it (#385).
 package gender
 
 // Gender is the index a profile form submits and a token claim is rendered from. The zero value is

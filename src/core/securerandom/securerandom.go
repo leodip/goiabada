@@ -5,9 +5,7 @@
 // modulo bias (#85).
 //
 // Neither returns an error, and neither can return a short, empty or non-random string: a CSPRNG
-// failure ends the process rather than the call (#211). It was core/stringutil until #442, and the
-// auth server's randomstring, which wrapped it for the email verification code's two halves, went
-// with the rename: that code names its alphabets and calls StringFromAlphabet.
+// failure ends the process rather than the call (#211).
 package securerandom
 
 import (

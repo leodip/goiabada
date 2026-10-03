@@ -4,12 +4,9 @@
 // ceremony at /auth/otp, the account API at PUT /api/v1/account/otp, and the admin API at
 // PUT /api/v1/admin/users/{id}/otp (#387 decision 4).
 //
-// It exists because two of those operations used to live in a handler package for no reason but
-// reachability: EnableUserOTPTx sat in authserver/internal/handlers with a doc comment saying it
-// was there because "the browser handler cannot reach an unexported function in apihandlers",
-// where disableUserOTP was, and the seed's cipher sat on record.User, which is a persistence
-// record. Nothing here takes an http.ResponseWriter, a *http.Request, template data or a status
-// code, and nothing here imports a handler package.
+// Nothing here takes an http.ResponseWriter, a *http.Request, template data or a status code, and
+// nothing here imports a handler package: the operations sit below every handler that calls them,
+// and the seed's cipher sits here rather than on record.User, which is a persistence record (#387).
 //
 // **The audit call stays at the caller**, as revocation requires of its own callers and for the
 // same reason: the three verification sites raise deliberately different event sets. The browser
@@ -18,13 +15,13 @@
 // three raise EventOTPCodeReplayDetected. That is what VerifyResult reports an outcome for
 // instead of deciding anything itself.
 //
-// Deliberately outside it, both from decision 4. The account API's pending-enrolment mint, its
+// Deliberately outside it (#387 decision 4), the account API's pending-enrolment mint, its
 // compare-and-set install and its expiry read stay in apihandlers: one caller, one storage shape,
 // and a capability carrying an operation only one caller can ever reach is not one cohesive
 // responsibility. The browser ceremony's seed, which lives on AuthContext rather than on the
 // users table, and its regenerate-on-unparseable arm stay in handlers for the same reason.
 //
-// internal/otp remains the stateless TOTP primitive below this one -- key URL generation,
+// internal/otp is the stateless TOTP primitive below this one -- key URL generation,
 // SecretFromKeyURL, RenderQRCodeImage, MatchStep. This package sits above it and owns the stored
 // credential.
 package otpcredential

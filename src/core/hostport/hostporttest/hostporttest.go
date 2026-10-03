@@ -1,6 +1,6 @@
 // Package hostporttest holds the test helpers for code that listens on or dials an address
 // hostport.Join builds. It is test support beside the package it concerns, compiled into no
-// binary, and it left core/testutil, which now holds only guards as core/guard, in #442.
+// binary, and not in core/guard, which holds guards and nothing else (#442).
 package hostporttest
 
 import (

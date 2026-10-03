@@ -3,12 +3,12 @@
 // migrates it and runs the startup data tasks.
 //
 // It sits under internal/data beside the four engines it chooses between, but in a package of its
-// own: selecting an engine means importing all four of them, and when that was the interface's own
-// package every importer of the Database interface compiled every driver. internal/data declares
+// own: selecting an engine means importing all four of them, and in the interface's own package
+// every importer of the Database interface would compile every driver. internal/data declares
 // the interface and imports none of its implementations; only this package and its importers link
 // the drivers (#353, #359, #438).
 //
-// It is one of the four places that still names the whole data.Database, and the one that produces
+// It is one of the four places that names the whole data.Database, and the one that produces
 // it: OpenDatabase and NewDatabase hand it out, and Migratable embeds it. The two functions here
 // that read through a database take ports like every other consumer, the email case pre-flight
 // one read and the startup task the signing keys and the re-key (#386 decision 8, #438 decision 8).

@@ -7,7 +7,7 @@
 # commit instead.
 #
 # The first five below are exactly golangci-lint 2.12.2's `standard` set, pinned
-# as of the CI/CD v2 stage 0 cleanup. Four deliberate widenings follow. sloglint
+# as of the CI/CD v2 stage 0 cleanup. Five deliberate widenings follow. sloglint
 # was added by #320: it holds the logging convention CLAUDE.md pattern 8
 # states, type-checked, and its settings below are that convention spelled in
 # its vocabulary. govet's shadow analyzer was added by #425, under govet's
@@ -16,7 +16,8 @@
 # gosec findings nobody had run gosec to see. nolintlint was added beside it,
 # because gosec's false positives are suppressed inline, and it holds every
 # suppression to naming its linter and its reason and to still being needed.
-# The binary itself is pinned in src/authserver/versions.yaml
+# staticcheck's ST1000 was turned on by #443, under staticcheck's settings
+# below. The binary itself is pinned in src/authserver/versions.yaml
 # (tools.golangci-lint).
 #
 # Note that golangci-lint's bundled staticcheck includes the QF (quickfix)
@@ -36,6 +37,16 @@ linters:
     - gosec
     - nolintlint
   settings:
+    staticcheck:
+      # golangci-lint's default list with one exclusion taken out: ST1000, a
+      # library package with no comment attached to its package clause, or one
+      # that does not begin "Package <name>". Twenty library packages had none,
+      # so `go doc` showed nothing for them, and nothing stopped the next one
+      # (#443 decision 11). The other five exclusions are the default's own;
+      # ST1003 stays off because the tree spells Id and Url throughout, the JSON
+      # keys of stored sign-ins among them. ST1000 skips package main and
+      # generated files, so the mains keep theirs by review.
+      checks: ["all", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
     nolintlint:
       # Every //nolint names the linter it silences and says why, and one that
       # silences nothing is itself a finding, so a suppression cannot outlive

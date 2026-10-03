@@ -1,5 +1,18 @@
 //go:build !production
 
+// Package datamocks is the test double of data.Database: the mock mockery generates from the
+// interface, which every narrow port above the data layer is tested through, and the one
+// hand-written stub beside it, ExpectRunInTransaction and its siblings, which answer
+// RunInTransaction. Every caller that stubs a transaction already imports this package for the
+// mock, so the stub lives here rather than in a package of its own or in a file a binary ships.
+// The stub hands the body the transaction the test names and refuses a nil one, so a write moved
+// outside the transaction fails the test that expected it inside.
+//
+// Only the generated file carries mockery's "Code generated ... DO NOT EDIT" marker, so the
+// mockery pin guard, which keys on that marker rather than on a filename, leaves the stub alone
+// (#338). Every file here carries the generated mock's build tag, for its reason: production builds
+// set the production tag, testify is not in them, and a file naming *Database has to be excluded
+// exactly where *Database is.
 package datamocks
 
 import (
@@ -8,21 +21,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 )
-
-// This file is hand-written and sits beside a generated one on purpose.
-//
-// It is the one stub that answers RunInTransaction on the mock Database, and it lives here
-// because here is the only package every caller already reaches: six packages -- handlers,
-// apihandlers, revocation, otpcredential, usercreation and usersession -- each carried their
-// own ~58-line copy until this replaced them, and all twenty of their test files already
-// import this one. The alternative placements each cost an edge that did not exist: a package
-// under internal/testutil importing internal/data/mocks, or a non-test file in a package that
-// ships. Nothing is generated here, so the mockery pin guard leaves it alone: that guard keys
-// on mockery's own "Code generated ... DO NOT EDIT" marker rather than on a filename (#338).
-//
-// The build tag is the generated mock's, for the generated mock's reason: production builds
-// pass -tags=production and testify is not in them, so a file naming *Database has to be
-// excluded exactly where *Database is.
 
 // nilTxPanic is what a nil transaction is refused with, named so the test that pins the refusal
 // asserts the message rather than merely that something panicked.

@@ -3,29 +3,16 @@
 // helper, and the error response of RFC 6749 section 5.2 (ErrorDetail, with
 // ConformErrorDescription, the Appendix A.8 rule its description is held to). It reaches no
 // database and no persistence type, which is what lets the admin console link it without
-// linking a driver.
+// linking a driver. The error response is here because it belongs to the same specification
+// as the token types, and every binary that links it links this package too.
 //
-// The error response was core/customerrors until #442. It belongs to the same specification
-// as the token types, and every binary that links it already linked this package.
-//
-// The client side of the protocol is no longer here. The JWKS token parser, the
-// code-for-token exchanger and the two bounds they share went to
-// adminconsole/internal/oauthclient in #385, with the authorize redirect that starts the
-// ceremony: one application speaks that half, so a shared package was hiding its
-// implementation.
-//
-// What belongs here is what both binaries name. That is the rule #385 replaced the
-// earlier one with, and it is stricter: the old rule asked what each binary ends up
-// containing, so a symbol only the auth server called could stay as long as moving it
-// would have cost an import edge. response_type parsing stayed on exactly that argument
-// and is now in authserver/internal/protocolvalidation, where its only callers are.
-//
-// The cost the old rule was buying off has not gone away, and the answer to it is that a
-// symbol one process uses moves to that process rather than staying behind a cheaper
-// import. src/core/OWNERSHIP.md carries the per-symbol version of this, one row each,
-// and the tier refuses a new symbol here that neither application names (#385). JwtInfo
-// went the same way in #424, to adminconsole/internal/oauthclient, once the auth
-// server's one method returning it was found to have no caller.
+// What belongs here is what both binaries name (#385). A symbol one process uses moves to
+// that process, even where staying would save an import edge: the client side of the
+// protocol, the JWKS token parser, the code-for-token exchanger and the authorize redirect,
+// is adminconsole/internal/oauthclient's, and response_type parsing is in
+// authserver/internal/protocolvalidation, where its only callers are. src/core/OWNERSHIP.md
+// holds the rule per symbol, one row each, and the tier refuses a new symbol here that
+// neither application names.
 //
 // IsWellFormedSpaceDelimited and SplitSpaceDelimited are the grammar and the splitter of the five
 // space-delimited request parameters. They are here because core/i18n reads ui_locales through

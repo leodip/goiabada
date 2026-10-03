@@ -6,9 +6,9 @@
 // Europe/Berlin is listed under Germany and under Sweden, among others -- so a row is a (country,
 // zone) pair, and that pair is what the profile picker posts and a profile stores.
 //
-// Nothing here loads a location. Both servers used to load every zone at startup, and one zone
-// nothing used stopped a server on a host whose zoneinfo lacked it (#49); a test now checks that
-// every row loads, with the embedded fallback both binaries import (#432).
+// Nothing here loads a location at startup, so a zone missing from a host's zoneinfo cannot stop
+// a server (#49); a test checks that every row loads, with the embedded fallback both binaries
+// import (#432).
 package timezones
 
 import "slices"

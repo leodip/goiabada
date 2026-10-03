@@ -1,3 +1,15 @@
+// Command goiabada-adminconsole is the Goiabada admin console: the web UI an administrator manages
+// users, groups, clients, resources and settings with, and a user manages their own account with.
+//
+//	goiabada-adminconsole [flags]
+//
+// It is configured by GOIABADA_ environment variables, most with a flag over them. It keeps no
+// database: everything it reads and writes goes through the auth server's admin and account APIs,
+// and its browser sessions are stored on the auth server as ciphertext under the console's own
+// session keys, which the auth server holds no key for (#266). A configuration it cannot use stops
+// it before it serves anything: a malformed number or boolean, or a TZ that names no zone, with one
+// line on stderr and exit 2; missing session keys, a missing client secret or a malformed trusted
+// proxy list with one record and exit 1.
 package main
 
 import (

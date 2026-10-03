@@ -4,11 +4,10 @@
 // it, and no function here takes a *testing.T, so a call sits wherever a literal
 // would: inside a composite literal, a table row, or an argument list.
 //
-// It replaces the third-party faker this repository used to depend on, retired
-// in #272 because a test-only module in three go.mod files is a supply-chain
-// cost with no production value. Two properties differ from that library on
-// purpose, and both are why call sites can trust these values without checking
-// them:
+// It depends on nothing outside the standard library, because a test-only module
+// in three go.mod files is a supply-chain cost with no production value (#272).
+// Two properties are deliberate, and both are why call sites can trust these
+// values without checking them:
 //
 //   - Every value is drawn from crypto/rand, so nothing is reproducible from a
 //     seed. A seed only replays a value if the whole package re-runs in source
@@ -17,8 +16,8 @@
 //     generated value they compared, which is the replay that gets used.
 //   - Values are drawn from the full character space rather than from a small
 //     word corpus, so two draws colliding is unreachable rather than merely
-//     unlikely. That is what closes #136: a corpus of a few thousand surnames
-//     collides inside a test database of a few thousand rows.
+//     unlikely. A corpus of a few thousand surnames collides inside a test
+//     database of a few thousand rows (#136).
 package fake
 
 import (

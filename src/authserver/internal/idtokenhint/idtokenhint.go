@@ -4,8 +4,7 @@
 //
 // It shares nothing with the data cipher in encryption, whose key comes from the environment and
 // never leaves the server: this key is derived from a secret the relying party also holds, and
-// the logout handler is its one production caller. It sat in encryption only because #360 moved
-// that package whole, and left it in #434.
+// the logout handler is its one production caller (#434).
 package idtokenhint
 
 import (
