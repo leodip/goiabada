@@ -123,10 +123,14 @@ func TestAPIAccountEmailVerificationSend_ConcurrentSendsMailOneCode(t *testing.T
 // change it again, which notifies nobody. So the invariant is one notice and no third answer, not
 // one 200.
 //
-// The notice is sent after the response, so the count below is read once one has arrived and sees
-// any duplicate already delivered by then, not one still in flight; the ordered proofs are the
-// handler test TestHandleAPIAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody and the
-// data tier's TestTrySetUserEmail_ConcurrentChangesFromOneReadProduceOneWinner.
+// The notice is sent after the response by a server in another process, whose jobs this test
+// cannot wait on, so the count below is read once one notice has arrived: it sees a duplicate
+// already delivered by then, not one still in flight. The conclusive count is
+// TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce in internal/server, which runs
+// the same routes, handler, runner and sender in process and counts after the server's own
+// Jobs.Wait; the engines' compare-and-set is the data tier's
+// TestTrySetUserEmail_ConcurrentChangesFromOneReadProduceOneWinner. What this adds is the two
+// together, over a real database and real SMTP.
 func TestAPIAccountEmailPut_ConcurrentChangesNotifyThePreviousAddressOnce(t *testing.T) {
 	useMailpitSMTP(t)
 	accessToken, u := accountEmailUserWithPassword(t)

@@ -2,6 +2,8 @@ package server
 
 import (
 	"bufio"
+	"context"
+	"database/sql"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
 	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -47,31 +50,8 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 	passwordHash, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
-	newServer := func(t *testing.T, database *mocks_data.Database) *Server {
-		s := &Server{
-			router:       chi.NewRouter(),
-			database:     database,
-			sessionStore: newTestSessionStore(),
-			templateFS:   web.TemplateFS(),
-			cfg:          &config.Config{},
-			jobs:         afterresponse.New(),
-		}
-		s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router})
-		return s
-	}
-
-	request := func(capture *smtpCapture, target string, body string, claims jwt.MapClaims) *http.Request {
-		settings := routesTestSettings()
-		settings.SMTPHost = "127.0.0.1"
-		settings.SMTPPort = capture.port
-		settings.SMTPEncryption = "none"
-		settings.SMTPFromEmail = "noreply@example.com"
-
-		r := httptest.NewRequest(http.MethodPut, target, strings.NewReader(body))
-		r.Header.Set("Content-Type", "application/json")
-		ctx := reqctx.WithBearerToken(r.Context(), oauth.JwtToken{Claims: claims})
-		return r.WithContext(reqctx.WithSettings(ctx, settings))
-	}
+	newServer := noticeTestServer
+	request := noticeTestRequest
 
 	t.Run("a self-service change notifies the previous address", func(t *testing.T) {
 		capture := newSMTPCapture(t)
@@ -132,6 +112,130 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		assert.Zero(t, capture.connectionCount(), "no mail of any kind may be attempted")
 		assert.Empty(t, capture.recipients(), "neither the previous nor the new address is told")
 	})
+}
+
+// noticeTestServer runs the real initRoutes on database, with the server's own after-response
+// runner, which is what the notice tests wait on before they read their capture.
+func noticeTestServer(t *testing.T, database *mocks_data.Database) *Server {
+	t.Helper()
+	s := &Server{
+		router:       chi.NewRouter(),
+		database:     database,
+		sessionStore: newTestSessionStore(),
+		templateFS:   web.TemplateFS(),
+		cfg:          &config.Config{},
+		jobs:         afterresponse.New(),
+	}
+	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router})
+	return s
+}
+
+// noticeTestRequest is a PUT to target carrying claims as the validated bearer token, with SMTP on
+// and pointed at capture.
+func noticeTestRequest(capture *smtpCapture, target string, body string, claims jwt.MapClaims) *http.Request {
+	settings := routesTestSettings()
+	settings.SMTPHost = "127.0.0.1"
+	settings.SMTPPort = capture.port
+	settings.SMTPEncryption = "none"
+	settings.SMTPFromEmail = "noreply@example.com"
+
+	r := httptest.NewRequest(http.MethodPut, target, strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	ctx := reqctx.WithBearerToken(r.Context(), oauth.JwtToken{Claims: claims})
+	return r.WithContext(reqctx.WithSettings(ctx, settings))
+}
+
+// TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce is the notice's bound under
+// concurrency, with a completion barrier the integration tier cannot have (#404). That tier runs
+// the server in another process, so it counts notices once the first has arrived and cannot see a
+// duplicate still in flight. Here the routes, the handler, the after-response runner and the mail
+// sender are the production ones, and the count is read after the server's own Jobs.Wait, so
+// every notice any of the requests started has been delivered to the capture or never existed.
+//
+// The database is a fake holding one row, whose TrySetUserEmail is the compare-and-set the engines
+// perform, under a mutex; the data tier proves the engines perform it. It also holds every caller
+// at the write until all of them have arrived, so every request read the verified address before
+// any change landed: the worst case, made certain rather than likely. A handler that acted on its
+// read rather than on what the write reported would notify the previous address once per request.
+func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testing.T) {
+	const (
+		changes       = 8
+		previousEmail = "previous@example.com"
+		password      = "the account's real password"
+	)
+	passwordHash, err := passwordhash.Hash(password)
+	require.NoError(t, err)
+
+	var mu sync.Mutex
+	row := models.User{Id: 1, Enabled: true, Subject: routesTestSubject, Email: previousEmail,
+		EmailVerified: true, PasswordHash: passwordHash}
+
+	arrived := 0
+	allArrived := make(chan struct{})
+
+	database := mocks_data.NewDatabase(t)
+	database.EXPECT().GetUserBySubject(mock.Anything, mock.Anything, routesTestSubject).
+		RunAndReturn(func(context.Context, *sql.Tx, string) (*models.User, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			read := row
+			return &read, nil
+		}).Maybe()
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*models.User)(nil), nil).Maybe()
+	database.EXPECT().TrySetUserEmail(mock.Anything, mock.Anything, int64(1), mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ *sql.Tx, _ int64, fromEmail string, fromVerified bool, toEmail string) (bool, error) {
+			mu.Lock()
+			arrived++
+			if arrived == changes {
+				close(allArrived)
+			}
+			mu.Unlock()
+			select {
+			case <-allArrived:
+			case <-time.After(10 * time.Second):
+				return false, errs.New("not every change reached the write")
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			if row.Email != fromEmail || row.EmailVerified != fromVerified {
+				return false, nil
+			}
+			row.Email, row.EmailVerified = toEmail, false
+			return true, nil
+		}).Times(changes)
+
+	capture := newSMTPCapture(t)
+	s := noticeTestServer(t, database)
+
+	codes := make([]int, changes)
+	var wg sync.WaitGroup
+	for i := 0; i < changes; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			body := fmt.Sprintf(`{"email":"new-%d@example.com","currentPassword":"%s"}`, i, password)
+			codes[i] = serve(s, noticeTestRequest(capture, "/api/v1/account/email", body, accountAPIToken().Claims)).Code
+		}(i)
+	}
+	wg.Wait()
+
+	changed, conflicted := 0, 0
+	for i, code := range codes {
+		switch code {
+		case http.StatusOK:
+			changed++
+		case http.StatusConflict:
+			conflicted++
+		default:
+			t.Errorf("change %d answered %d", i, code)
+		}
+	}
+	assert.Equal(t, 1, changed, "every request read the same row, so exactly one change is made")
+	assert.Equal(t, changes-1, conflicted, "every other change answers 409")
+
+	require.True(t, s.jobs.Wait(30*time.Second), "every notice job must finish")
+	assert.Equal(t, []string{previousEmail}, capture.recipients(), "the previous address is told once, and no other")
 }
 
 // smtpCapture is an SMTP relay on a loopback port that accepts every message and records each
