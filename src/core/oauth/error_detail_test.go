@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -180,5 +181,30 @@ func TestErrorDetail_WithWWWAuthenticate(t *testing.T) {
 	}
 	if base.Is(withChallenge) {
 		t.Error("Expected a detail carrying a challenge not to equal one without it")
+	}
+
+	// An empty value on a detail that already carries a challenge keeps it: the map this replaced
+	// copied every entry and wrote the key only for a non-empty value.
+	kept := withChallenge.WithWWWAuthenticate("")
+	if kept.WWWAuthenticate() != "Basic" {
+		t.Errorf("Expected an empty value to keep the challenge, got %q", kept.WWWAuthenticate())
+	}
+	if kept.Code() != "invalid_client" {
+		t.Errorf("Expected code invalid_client, got %s", kept.Code())
+	}
+	if kept.Description() != "Client authentication failed." {
+		t.Errorf("Expected the description to survive, got %s", kept.Description())
+	}
+	if kept.HTTPStatus() != 401 {
+		t.Errorf("Expected HTTP status code 401, got %d", kept.HTTPStatus())
+	}
+	if kept.Error() != "code: invalid_client; description: Client authentication failed.; httpStatusCode: 401; wwwAuthenticate: Basic" {
+		t.Errorf("Expected the challenged text, got %q", kept.Error())
+	}
+	if !errors.Is(kept, withChallenge) {
+		t.Error("Expected an empty value to leave the detail equal to its challenged receiver")
+	}
+	if withChallenge.WWWAuthenticate() != "Basic" {
+		t.Errorf("Expected the receiver to keep its challenge, got %q", withChallenge.WWWAuthenticate())
 	}
 }

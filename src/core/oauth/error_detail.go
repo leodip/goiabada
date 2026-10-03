@@ -77,7 +77,8 @@ func (e *ErrorDetail) WithDescription(description string) *ErrorDetail {
 
 // WithWWWAuthenticate returns a copy of e carrying wwwAuthenticate, leaving the receiver
 // untouched. It is WithDescription's sibling and copies the same way, for the same reason. An empty
-// value leaves the detail without a challenge, so it still equals its receiver.
+// value keeps whatever challenge the receiver carries, none included, so the copy still equals its
+// receiver; that is what the map this replaced did, writing the key only for a non-empty value.
 //
 // Per RFC 6749 section 5.2, a client that attempted to authenticate through the Authorization
 // header and failed must be answered 401 with a WWW-Authenticate header; building that value is
@@ -85,7 +86,9 @@ func (e *ErrorDetail) WithDescription(description string) *ErrorDetail {
 // challenge (#385).
 func (e *ErrorDetail) WithWWWAuthenticate(wwwAuthenticate string) *ErrorDetail {
 	c := *e
-	c.wwwAuthenticate = wwwAuthenticate
+	if wwwAuthenticate != "" {
+		c.wwwAuthenticate = wwwAuthenticate
+	}
 	return &c
 }
 
