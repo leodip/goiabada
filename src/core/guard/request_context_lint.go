@@ -16,8 +16,8 @@ import (
 )
 
 // AssertRequestPathContext refuses a context.Background() or context.TODO() call written in a
-// non-test file inside the directories slogRequestPathDirs lists, outside the functions
-// requestContextOwners names.
+// non-test file in a request-path package, which is any package outside the directories
+// slogNoRequestDirs lists, outside the functions requestContextOwners names.
 //
 // #386 gave every one of the 215 Database methods and every one of the 106 admin console API
 // methods a leading context, so that a cancelled request stops the work it started and every
@@ -28,12 +28,13 @@ import (
 // the only thing that makes "every operation reachable from production code is cancellable by the
 // request that asked for it" a fact rather than a claim.
 //
-// Scope is the request-path directories rather than the whole tree, for the reason
-// slogRequestPathDirs already carries: in a package a request runs through, a request context is
-// in reach by construction. Elsewhere -- a startup pass, a worker, a migration, a command -- a
+// Scope is every package but the ones with no request above them, for the reason
+// slogNoRequestDirs carries: in a package a request runs through, a request context is in reach
+// by construction. In a listed directory -- a startup pass, a worker, a migration, a command -- a
 // Background context is the honest answer and is admitted rather than refused, which is why the
 // four engine adapters' connection contexts, the migrator's, the workers' and both main
-// packages' are untouched by this and stay that way.
+// packages' are untouched by this and stay that way. A package created anywhere else is checked
+// from its first commit (#442).
 //
 // This is the wider half of #386's guard 2. The narrower half, no bare .Query, .Exec or .Begin
 // in commondb, is authserver/internal/data's sql_context_lint_test.go, which sits beside the
@@ -48,8 +49,8 @@ import (
 //
 // Passing dirs restricts the walk to those subdirectories of the source root, forward slashes and
 // relative to it, exactly as AssertSlogConvention's and AssertAuditLogContext's parameter does.
-// The scope filter is applied either way, so a file outside slogRequestPathDirs is walked and
-// admitted rather than skipped.
+// The scope filter is applied either way, so a file in a directory slogNoRequestDirs lists is
+// walked and admitted rather than skipped.
 func AssertRequestPathContext(t *testing.T, dirs ...string) {
 	t.Helper()
 
@@ -85,7 +86,7 @@ func assertRequestPathContext(r Reporter, root string, dirs []string) {
 		"r.Context(), or the ctx the enclosing function already holds. A Background or TODO "+
 		"context compiles, outlives the request that asked for it, and produces a record no "+
 		"operator can join to it. A site that genuinely has no request above it -- a startup "+
-		"pass, a worker, a command -- belongs outside these directories, or in "+
+		"pass, a worker, a command -- belongs in slogNoRequestDirs, or in "+
 		"requestContextOwners with the reason (#386).",
 		len(violations), files, strings.Join(lines, "\n\t"))
 }
@@ -213,11 +214,18 @@ func requestContextOwner(rel, name string) bool {
 // function, relative to the source root, so an admission cannot leak to a namesake elsewhere in the
 // package, and the function name.
 //
-// One entry. sessionstore's store is called both from a handler, which has a request, and from the
-// backend's own maintenance paths, which do not, and requestContext is the one function that says
-// so: given no request it returns a background context rather than pretending to a cancellation
-// signal it was never handed. Nothing in the store requires a request; the context only ever
-// carries what a backend may use to save itself work.
+// sessionstore's store is called both from a handler, which has a request, and from the backend's
+// own maintenance paths, which do not, and requestContext is the one function that says so: given
+// no request it returns a background context rather than pretending to a cancellation signal it
+// was never handed. Nothing in the store requires a request; the context only ever carries what a
+// backend may use to save itself work.
+//
+// core/i18n's WithLocale returns its context with a locale on it, and given a nil one it starts
+// from a background context, because there is nothing else to put the locale on. Every caller
+// hands it a request's context, which it extends and never replaces. core/i18n is in no list, so this
+// admission is what lets the fallback stand while the rest of the package is held to the rule
+// (#442).
 var requestContextOwners = []slogPlainSite{
 	{scope: "core/sessionstore/server_side_store.go", name: "requestContext"},
+	{scope: "core/i18n/middleware.go", name: "WithLocale"},
 }

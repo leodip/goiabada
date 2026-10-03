@@ -16,7 +16,8 @@ import (
 )
 
 // AssertAuditLogContext refuses a .Log call whose first argument is context.Background() or
-// context.TODO(), inside the directories slogRequestPathDirs lists.
+// context.TODO(), in a request-path package: any package outside the directories
+// slogNoRequestDirs lists.
 //
 // The compiler already forces every one of AuditLogger.Log's 126 call sites to pass a context,
 // which is what #328 replaced the signature for. What no compiler forces is that the context is
@@ -26,14 +27,14 @@ import (
 // exists to remove. sloglint reads slog's own calls, not ours, so it cannot see this shape at
 // all (#328 decision 3).
 //
-// Scope is deliberately the request-path directories rather than the audit package alone: the
+// Scope is deliberately every request-path package rather than the audit package alone: the
 // rule is about a call site, and a call site in a package a request runs through has a request
-// context in reach by construction. Elsewhere — a startup pass, a worker, a command — a
-// Background context is the honest answer and is admitted rather than refused. This named
+// context in reach by construction. In a listed directory — a startup pass, a worker, a command —
+// a Background context is the honest answer and is admitted rather than refused. This named
 // core/data/commondb's email-collision backfill as the live example of that admission until #351
 // deleted the backfill (5130cd3a), and read "the two audit packages" until #359 folded
 // core/auditlog into authserver/internal/audit; no production site takes the admission today, so
-// the fixture tree's core/config/startup.go is where it is pinned.
+// the fixture tree's authserver/internal/config/startup.go is where it is pinned.
 //
 // The rule matches on the selector name alone, so it covers slog.Log as well as auditLogger.Log
 // and any future method by that name. That is wider than the issue and correct for the same
@@ -42,8 +43,9 @@ import (
 //
 // Passing dirs restricts the walk to those subdirectories of the source root, forward slashes
 // and relative to it, exactly as AssertSlogConvention's parameter does. The scope filter is
-// applied either way, so a file outside slogRequestPathDirs is walked and admitted rather than
-// skipped, and the fixture case proving that is a check of the filter rather than of the walk.
+// applied either way, so a file in a directory slogNoRequestDirs lists is walked and admitted
+// rather than skipped, and the fixture case proving that is a check of the filter rather than of
+// the walk.
 func AssertAuditLogContext(t *testing.T, dirs ...string) {
 	t.Helper()
 

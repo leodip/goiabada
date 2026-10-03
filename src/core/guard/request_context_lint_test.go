@@ -52,8 +52,8 @@ func notAnArgument() context.Context {
 	// The one rename that would carry the refused shape past a rule reading the literal text
 	// "context.Background". Both constructors are planted under the alias, because a rule that
 	// resolved the import for one and not the other would pass this file on the strength of the
-	// half it did resolve. It sits on the core side of slogRequestPathDirs so that half of the
-	// walk proves something too.
+	// half it did resolve. It sits in the admin console so that module's half of the walk proves
+	// something too.
 	tree.write("adminconsole/internal/apiclient/aliased.go", `package apiclient
 
 import (
@@ -153,10 +153,56 @@ func collide() context.Context {
 }
 `)
 
-	// Outside slogRequestPathDirs: a worker and a startup pass have no request above them, so a
-	// Background context is the honest answer there and the rule says nothing about it. The scope
-	// filter drops them before they are parsed, which is why they are not among the walked files
-	// counted below.
+	// ---- scope: every package but the ones slogNoRequestDirs names ------------------------------
+
+	// A package no list names is checked from its first file, which is what the inversion buys: a
+	// new package needs no one to remember it.
+	tree.write("authserver/internal/newpackage/caught.go", `package newpackage
+
+import "context"
+
+func start() context.Context {
+	return context.Background()
+}
+`)
+	// A listing names one directory, not its subtree, so a package beneath a listed one is checked.
+	tree.write("authserver/internal/workers/jobs/caught.go", `package jobs
+
+import "context"
+
+func run() context.Context {
+	return context.TODO()
+}
+`)
+	// core/i18n is in no list, because the locale middleware every request runs through is there.
+	// WithLocale is admitted by name: its Background is the fallback for a nil context, never a
+	// replacement for a request's. The same body under the same name in another file is refused.
+	tree.write("core/i18n/middleware.go", `package i18n
+
+import "context"
+
+func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return ctx
+}
+`)
+	tree.write("core/i18n/namesake.go", `package i18n
+
+import "context"
+
+func WithLocale(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return ctx
+}
+`)
+
+	// Listed: a worker and a startup pass have no request above them, so a Background context is
+	// the honest answer there and the rule says nothing about it. The scope filter drops them
+	// before they are parsed, which is why they are not among the walked files counted below.
 	tree.write("authserver/internal/workers/background_worker.go", `package workers
 
 import "context"
@@ -198,7 +244,7 @@ func inMock() context.Context {
 
 	violations, files, err := findRequestPathContextViolations(tree.root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 6, files, "every non-exempt fixture in a request-path package is walked")
+	assert.Equal(t, 11, files, "every non-exempt fixture in a request-path package is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -213,10 +259,25 @@ func inMock() context.Context {
 		"authserver/internal/data/commondb/caught.go:23 context.Background() in a request-path package",
 		"authserver/internal/handlers/path_base_collision.go:11 context.Background() in a request-path package",
 		"core/sessionstore/namesake.go:10 context.Background() in a request-path package",
+		"authserver/internal/newpackage/caught.go:6 context.Background() in a request-path package",
+		"authserver/internal/workers/jobs/caught.go:6 context.TODO() in a request-path package",
+		"core/i18n/namesake.go:7 context.Background() in a request-path package",
 	}
 	sort.Strings(want)
 	sort.Strings(got)
 	assert.Equal(t, want, got)
+}
+
+// TestRequestPathContext_EveryOwnerExists holds the admission table to the tree, as
+// TestSlogConvention_EveryPlainSiteExists holds slogPlainSites: an owner renamed or removed would
+// otherwise stay admitted, and the next function to take its name in that file would inherit it.
+func TestRequestPathContext_EveryOwnerExists(t *testing.T) {
+	root := SourceRoot(t)
+	for _, site := range requestContextOwners {
+		t.Run(site.scope+"/"+site.name, func(t *testing.T) {
+			assertDeclaredOnce(t, root, site.scope, site.name)
+		})
+	}
 }
 
 // TestRequestPathContext_TheTreeItself is the guard over the real tree, and it is what the two
@@ -284,10 +345,10 @@ func handle(apiClient api, r *http.Request) {
 
 // TestRequestPathContext_TheGuardIsFatalOnAnEmptyWalk pins the seam. This guard's scope makes it
 // as likely as AssertAuditLogContext's to trip: the walk counts only files in a request-path
-// package, so a directory dropping off slogRequestPathDirs empties it without emptying the tree.
+// package, so a tree holding nothing but the directories slogNoRequestDirs names walks nothing.
 func TestRequestPathContext_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	tree := newFixtureTree(t)
-	tree.write("core/elsewhere/ok.go", "package elsewhere\n")
+	tree.write("authserver/internal/workers/ok.go", "package workers\n")
 
 	report := Run(func(r Reporter) { assertRequestPathContext(r, tree.root, nil) })
 

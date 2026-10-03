@@ -109,16 +109,21 @@ func nonliteral(name string) {
 `)
 	// Near misses: a colon later in the message, a colon after a token with a space in it, the
 	// verb the convention chose, and a word that merely begins with "error".
+	// The *Context variants, since core/passed is in no list and rule 5 reaches it like any other
+	// package a request could run through.
 	tree.write("core/passed/openers.go", `package passed
 
-import "log/slog"
+import (
+	"context"
+	"log/slog"
+)
 
-func openers() {
-	slog.Info("the token's audience: none")
-	slog.Info("client x: consent required")
-	slog.Warn("unable to load the client")
-	slog.Info("errors were found in the request")
-	slog.Info("WARNING is not a prefix without the colon")
+func openers(ctx context.Context) {
+	slog.InfoContext(ctx, "the token's audience: none")
+	slog.InfoContext(ctx, "client x: consent required")
+	slog.WarnContext(ctx, "unable to load the client")
+	slog.InfoContext(ctx, "errors were found in the request")
+	slog.InfoContext(ctx, "WARNING is not a prefix without the colon")
 }
 `)
 
@@ -417,17 +422,71 @@ import "log/slog"
 
 func LogToConsole(event string) { slog.Info("audit event", "event", event) }
 `)
+	// An admitted name in a package of its own: the admission is the file slogPlainSites names, so
+	// a namesake in a directory no list mentions is checked like any other function there.
 	tree.write("core/handlerhelpers/template_funcs.go", `package handlerhelpers
 
 import "log/slog"
 
 func addUrlParam(u string) string { slog.Warn("unable to parse url", "url", u); return u }
 `)
-	tree.write("core/config/startup.go", `package config
+
+	// ---- rule 5's scope: every package but the ones slogNoRequestDirs names ------------------
+
+	// A package no list names is checked from its first file: the scope is everything except the
+	// directories with no request above them, so nobody has to remember to add a new package.
+	tree.write("authserver/internal/newpackage/plain.go", `package newpackage
+
+import "log/slog"
+
+func helper() { slog.Warn("unable to load the client") }
+`)
+	// A listed directory is not checked: a startup pass and a worker have no request above them.
+	tree.write("authserver/internal/config/startup.go", `package config
 
 import "log/slog"
 
 func load() { slog.Info("configuration loaded") }
+`)
+	tree.write("authserver/internal/workers/cleanup.go", `package workers
+
+import "log/slog"
+
+func sweep() { slog.Info("cleanup finished") }
+`)
+	// A listing names one directory, not its subtree, so a package created beneath a listed one is
+	// checked until it is listed itself.
+	tree.write("authserver/internal/workers/jobs/plain.go", `package jobs
+
+import "log/slog"
+
+func run() { slog.Info("job finished") }
+`)
+	// core/i18n is both: LoadBundle's two startup records and orEmpty's, written before any request
+	// exists, are admitted by name, and the rest of the package, the locale middleware included,
+	// is held to the rule.
+	tree.write("core/i18n/overrides.go", `package i18n
+
+import "log/slog"
+
+func loadOverrideCatalogs(dir string) {
+	slog.Info("override directory has no catalogs subdirectory, skipping it", slog.String("dir", dir))
+	slog.Info("loaded an override catalog, which wins over the embedded one", slog.String("path", dir))
+}
+`)
+	tree.write("core/i18n/i18n.go", `package i18n
+
+import "log/slog"
+
+func orEmpty(err error) { slog.Error("unable to load the embedded message catalogs", "error", err) }
+`)
+	tree.write("core/i18n/middleware.go", `package i18n
+
+import "log/slog"
+
+func MiddlewareLocale() { slog.Debug("locale resolved") }
+
+func orEmpty2(err error) { slog.Error("not the admitted function", "error", err) }
 `)
 
 	tree.write("core/caught/exempt_test.go", `package caught
@@ -453,7 +512,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 
 	violations, files, err := findSlogViolations(tree.root, tree.golangci, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 29, files, "every non-exempt fixture is walked")
+	assert.Equal(t, 35, files, "every non-exempt fixture is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -498,6 +557,19 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"core/middleware/middleware_realip.go:5 a plain slog.Warn in a request-path package",
 		"adminconsole/internal/handlerhelpers/namesake.go:5 a plain slog.Warn in a request-path package",
 		"adminconsole/internal/handlerhelpers/namesake.go:7 a plain slog.Warn in a request-path package",
+		// rule 5 in packages no list names, which is every package but the ones with no request
+		"core/caught/openers.go:9 a plain slog.Info in a request-path package",
+		"core/caught/openers.go:10 a plain slog.Error in a request-path package",
+		"core/caught/openers.go:11 a plain slog.Error in a request-path package",
+		"core/caught/nonliteral.go:8 a plain slog.Error in a request-path package",
+		"core/caught/nonliteral.go:9 a plain slog.Warn in a request-path package",
+		"core/caught/nonliteral.go:10 a plain slog.Info in a request-path package",
+		"core/caught/path_base_collision.go:11 a plain slog.Info in a request-path package",
+		"core/handlerhelpers/template_funcs.go:5 a plain slog.Warn in a request-path package",
+		"authserver/internal/newpackage/plain.go:5 a plain slog.Warn in a request-path package",
+		"authserver/internal/workers/jobs/plain.go:5 a plain slog.Info in a request-path package",
+		"core/i18n/middleware.go:5 a plain slog.Debug in a request-path package",
+		"core/i18n/middleware.go:7 a plain slog.Error in a request-path package",
 	}
 	sort.Strings(want)
 	sort.Strings(got)
@@ -509,9 +581,12 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 func TestSlogConvention_TheForwarderTable(t *testing.T) {
 	clean := `package clean
 
-import "log/slog"
+import (
+	"context"
+	"log/slog"
+)
 
-func clean() { slog.Info("nothing to report") }
+func clean(ctx context.Context) { slog.InfoContext(ctx, "nothing to report") }
 `
 	forwarders := []string{}
 	for _, site := range slogSpreadSites {
@@ -619,11 +694,13 @@ func TestSlogConvention_EveryPlainSiteExists(t *testing.T) {
 	}
 }
 
-// TestSlogConvention_EveryRequestPathDirExists holds rule 5's directory list to the tree, so a
-// package that moves takes its entry with it rather than leaving the rule reading nothing there.
-func TestSlogConvention_EveryRequestPathDirExists(t *testing.T) {
+// TestSlogConvention_EveryNoRequestDirExists holds the list of directories with no request above
+// them to the tree. An entry left behind by a package that moved excuses nothing today, but it
+// excuses whatever package is next created at that path, unchecked from its first commit.
+func TestSlogConvention_EveryNoRequestDirExists(t *testing.T) {
 	root := SourceRoot(t)
-	for _, dir := range slogRequestPathDirs {
+	require.NotEmpty(t, slogNoRequestDirs)
+	for _, dir := range slogNoRequestDirs {
 		matches, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(dir), "*.go"))
 		require.NoError(t, err)
 		assert.NotEmpty(t, matches, "%s holds Go files", dir)
@@ -664,10 +741,13 @@ func TestSlogConvention_TheGuardFailsOnARefusedMessage(t *testing.T) {
 	tree.writeGolangci(golangciWithForwarders())
 	tree.write("core/caught/opener.go", `package caught
 
-import "log/slog"
+import (
+	"context"
+	"log/slog"
+)
 
-func opener() {
-	slog.Error("failed to load the client")
+func opener(ctx context.Context) {
+	slog.ErrorContext(ctx, "failed to load the client")
 }
 `)
 
@@ -675,7 +755,7 @@ func opener() {
 
 	require.True(t, report.Failed(), "a refused message opener passed the guard")
 	assert.False(t, report.Stopped, "a violation is an Errorf, not a Fatalf")
-	assert.Contains(t, report.Text(), "core/caught/opener.go:6")
+	assert.Contains(t, report.Text(), "core/caught/opener.go:9")
 	assert.Contains(t, report.Text(), "1 slog convention violation(s) in 1 non-test file(s)")
 	assert.Contains(t, report.Text(), "unable to")
 	assert.Contains(t, report.Text(), "#320")
@@ -688,10 +768,13 @@ func TestSlogConvention_TheGuardPassesAConformingRecord(t *testing.T) {
 	tree.writeGolangci(golangciWithForwarders())
 	tree.write("core/passed/opener.go", `package passed
 
-import "log/slog"
+import (
+	"context"
+	"log/slog"
+)
 
-func opener() {
-	slog.Warn("unable to load the client", "client_id", 1)
+func opener(ctx context.Context) {
+	slog.WarnContext(ctx, "unable to load the client", "client_id", 1)
 }
 `)
 
@@ -721,9 +804,12 @@ func TestSlogConvention_AMissingGolangciConfigIsReportedThroughTheGuard(t *testi
 	tree := newFixtureTree(t)
 	tree.write("core/passed/ok.go", `package passed
 
-import "log/slog"
+import (
+	"context"
+	"log/slog"
+)
 
-func ok() { slog.Warn("unable to load the client") }
+func ok(ctx context.Context) { slog.WarnContext(ctx, "unable to load the client") }
 `)
 
 	report := Run(func(r Reporter) { assertSlogConvention(r, tree.root, nil) })
