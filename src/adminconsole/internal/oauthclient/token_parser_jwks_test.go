@@ -82,8 +82,8 @@ func TestNewJWKSTokenParser_DefaultsHttpClient(t *testing.T) {
 	require.NotNil(t, tp.httpClient)
 	// The value, not merely a client: a nil client used to mean an unbounded one, and
 	// asserting non-nil alone leaves restoring `&http.Client{}` green. This is the same
-	// guarantee TestNewTokenExchanger_DefaultsANilClientToTheConfiguredTimeout pins for
-	// the exchanger's own nil arm (#338).
+	// guarantee TestNewTokenClient_DefaultsANilClientToTheConfiguredTimeout pins for
+	// the token client's own nil arm (#338).
 	assert.Equal(t, TokenExchangeTimeout, tp.httpClient.Timeout,
 		"a nil client gets the deadline rather than no deadline")
 
@@ -666,8 +666,8 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 //
 // refreshJwks is the third of the admin console's three reads of the auth
 // server and the only one that decodes straight off the body rather than
-// reading it first, so neither the exchanger's cases nor the middleware's
-// observe it. The counting body from token_exchanger_bounds_test.go is the same
+// reading it first, so neither the token client's cases nor the middleware's
+// observe it. The counting body from token_client_bounds_test.go is the same
 // seam seen through the parser's own injected client.
 // =============================================================================
 
