@@ -65,6 +65,23 @@ var (
 	websiteShape = regexp.MustCompile(`^(https?://)?(www\.)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(/\S*)?$`)
 )
 
+// ParseGender reads a profile's gender as a profile PUT submits it: the word GET returns
+// ("female", "male", "other"), so a client can write back what it read, or the digit the admin
+// console's forms post ("0", "1", "2"). A word is matched exactly, so "Male" names no gender; a
+// digit is read as an integer, as it always was. The caller stores the result's String, the word,
+// whichever spelling arrived (#443).
+func ParseGender(value string) (gender.Gender, bool) {
+	if i, err := strconv.Atoi(value); err == nil && gender.IsValid(i) {
+		return gender.Gender(i), true
+	}
+	for _, g := range []gender.Gender{gender.Female, gender.Male, gender.Other} {
+		if value == g.String() {
+			return g, true
+		}
+	}
+	return 0, false
+}
+
 // ValidateName checks a name field against the shared name pattern.
 // invalidNameCode is the i18n error code returned on failure (one of
 // ErrCodeProfileGivenNameInvalid, ErrCodeProfileMiddleNameInvalid, or
@@ -159,11 +176,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 	}
 
 	if len(input.Gender) > 0 {
-		i, err := strconv.Atoi(input.Gender)
-		if err != nil {
-			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
-		}
-		if !gender.IsValid(i) {
+		if _, ok := ParseGender(input.Gender); !ok {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
 		}
 	}

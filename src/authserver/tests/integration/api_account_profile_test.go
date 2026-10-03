@@ -109,6 +109,36 @@ func TestAPIAccountProfilePut_Success(t *testing.T) {
 	assert.Equal(t, reqBody.Locale, updateResp.User.Locale)
 }
 
+// The self-service twin of TestAPIUserProfilePut_WritesBackWhatGetReturned: the profile GET
+// returns is accepted back by the PUT, gender word included (#443 decision 13).
+func TestAPIAccountProfilePut_WritesBackWhatGetReturned(t *testing.T) {
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+	u.Gender = "other"
+	assert.NoError(t, database.UpdateUser(context.Background(), nil, u))
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
+	getResp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = getResp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, getResp.StatusCode)
+	var got api.GetUserResponse
+	assert.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
+	assert.Equal(t, "other", got.User.Gender)
+
+	putResp := makeAPIRequest(t, "PUT", url, accessToken, profileRequestFrom(got.User))
+	defer func() { _ = putResp.Body.Close() }()
+	if putResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(putResp.Body)
+		t.Fatalf("expected 200, got %d. body: %s", putResp.StatusCode, string(body))
+	}
+	var updated api.UpdateUserResponse
+	assert.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
+	assert.Equal(t, "other", updated.User.Gender)
+
+	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, "other", stored.Gender)
+}
+
 func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"

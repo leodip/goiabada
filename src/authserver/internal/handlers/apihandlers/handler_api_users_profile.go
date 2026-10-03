@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/gender"
 )
 
 // usersProfileDatabase is what the administrator's user profile endpoint needs: the user row.
@@ -103,9 +102,8 @@ func HandleUserProfilePut(
 
 		// Handle gender
 		if len(input.Gender) > 0 {
-			i, parseErr := strconv.Atoi(input.Gender)
-			if parseErr == nil {
-				user.Gender = gender.Gender(i).String()
+			if g, ok := accountvalidation.ParseGender(input.Gender); ok {
+				user.Gender = g.String()
 			}
 		} else {
 			user.Gender = ""
