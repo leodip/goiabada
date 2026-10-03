@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -55,10 +56,62 @@ func canRecoverPassword(user *models.User) bool {
 	return user.Enabled && user.EmailVerified
 }
 
+// The outcomes a forgot-password request is recorded with, one per request, in the
+// requested_password_reset entry (#404 decision 6). Every well-formed request is answered with the
+// same page whichever of these it was, so the entry is the only place the difference is visible.
+const (
+	// recoveryOutcomeCodeIssued is a code stored for a verified, enabled account. It says
+	// the code was stored, not that the mail went out: the entry is written before the send, and
+	// a send failure is an Error log line on the same request id.
+	recoveryOutcomeCodeIssued = "code_issued"
+	// recoveryOutcomeUnknownAddress is an address with no account.
+	recoveryOutcomeUnknownAddress = "unknown_address"
+	// recoveryOutcomeUnverifiedAddress is an enabled account whose address was never
+	// verified, to which decision 1 sends nothing. Named so an administrator can see why.
+	recoveryOutcomeUnverifiedAddress = "unverified_address"
+	// recoveryOutcomeAccountDisabled is a disabled account, verified or not: disabled is
+	// what an administrator did, and verifying the address would not change the answer.
+	recoveryOutcomeAccountDisabled = "account_disabled"
+	// recoveryOutcomeAccountChanged is the conditional store declining: the account was
+	// disabled, unverified or re-addressed between the lookup and the write.
+	recoveryOutcomeAccountChanged = "account_changed"
+	// recoveryOutcomeInvalidAddress is a submission the format check refused, which is
+	// answered with its own error page and looks nothing up.
+	recoveryOutcomeInvalidAddress = "invalid_address"
+)
+
+// ineligibleRecoveryOutcome names why canRecoverPassword refused an account.
+func ineligibleRecoveryOutcome(user *models.User) string {
+	if !user.Enabled {
+		return recoveryOutcomeAccountDisabled
+	}
+	return recoveryOutcomeUnverifiedAddress
+}
+
+// auditRequestedPasswordReset writes the one requested_password_reset entry a request leaves.
+//
+// The address is digested rather than recorded, because the table would otherwise collect every
+// address typed into an unauthenticated form, attacker-chosen or mistyped; the digest still lets
+// attempts on one address be correlated, and checked against a known one. It is of the address
+// as the lookup was given it, so it is the same for every spelling the lookup treats as one.
+// userId is absent, not zero, when no account matched (#404 decision 6).
+func auditRequestedPasswordReset(auditLogger AuditLogger, r *http.Request, email string, userId int64, outcome string) {
+	details := map[string]interface{}{
+		"ip":          auditedClientIP(r),
+		"emailDigest": hashutil.HashString(email),
+		"outcome":     outcome,
+	}
+	if userId != 0 {
+		details["userId"] = userId
+	}
+	auditLogger.Log(r.Context(), audit.AuditRequestedPasswordReset, details)
+}
+
 func HandleForgotPasswordPost(
 	pageRenderer PageRenderer,
 	database forgotPasswordDatabase,
 	emailSender EmailSender,
+	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
 	baseURL string,
 ) http.HandlerFunc {
@@ -69,6 +122,7 @@ func HandleForgotPasswordPost(
 		email = strings.ToLower(email)
 
 		if len(email) == 0 || strings.Count(email, "@") != 1 {
+			auditRequestedPasswordReset(auditLogger, r, email, 0, recoveryOutcomeInvalidAddress)
 
 			// i18n surface: A — browser-flow form rerender.
 			bind := map[string]interface{}{
@@ -88,7 +142,12 @@ func HandleForgotPasswordPost(
 			return
 		}
 
-		if user != nil && canRecoverPassword(user) {
+		switch {
+		case user == nil:
+			auditRequestedPasswordReset(auditLogger, r, email, 0, recoveryOutcomeUnknownAddress)
+		case !canRecoverPassword(user):
+			auditRequestedPasswordReset(auditLogger, r, email, user.Id, ineligibleRecoveryOutcome(user))
+		default:
 
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, resetEmailErr := dataCipher.Encrypt(verificationCode)
@@ -115,9 +174,11 @@ func HandleForgotPasswordPost(
 				return
 			}
 			if !stored {
+				auditRequestedPasswordReset(auditLogger, r, email, user.Id, recoveryOutcomeAccountChanged)
 				renderForgotPasswordLinkSent(pageRenderer, w, r)
 				return
 			}
+			auditRequestedPasswordReset(auditLogger, r, email, user.Id, recoveryOutcomeCodeIssued)
 
 			bind := map[string]interface{}{
 				"name": user.FullName(),

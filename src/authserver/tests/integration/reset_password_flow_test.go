@@ -2,7 +2,10 @@ package integration
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -703,4 +706,96 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 
 	assert.Equal(t, []string{"account_disabled", "account_disabled", "account_disabled"},
 		failedResetReasonsFor(t, user.Id), "each refused step is audited with the reason account_disabled")
+}
+
+// requestedPasswordResetRecordsFor returns the payload of every requested_password_reset record
+// whose emailDigest is the SHA-256 hex of the address, digested here with crypto/sha256 rather
+// than through the server's own helper, so a digest of anything else finds nothing.
+func requestedPasswordResetRecordsFor(t *testing.T, address string) []map[string]interface{} {
+	t.Helper()
+
+	sum := sha256.Sum256([]byte(address))
+	digest := hex.EncodeToString(sum[:])
+
+	adminToken, _ := createAdminClientWithToken(t)
+	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.AuditRequestedPasswordReset+"&size=200")
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	records := []map[string]interface{}{}
+	for _, entry := range logs.AuditLogs {
+		var details map[string]interface{}
+		require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
+		if details["emailDigest"] == digest {
+			assert.NotEmpty(t, entry.RequestId, "the record carries the request's id")
+			records = append(records, details)
+		}
+	}
+	return records
+}
+
+// Every forgot-password request leaves exactly one requested_password_reset record saying what
+// became of it, whatever page it was answered with (#404 decision 6). The page is the same for
+// every well-formed request, so this record is the only place an administrator sees why a user
+// was sent nothing. No record carries the address itself.
+func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
+	useMailpitSMTP(t)
+	requireDatabaseAuditLogs(t)
+
+	unknown := plusAddress()
+	malformed := "not-an-address-" + strings.ToLower(fake.LetterN(10))
+
+	unverifiedEmail := plusAddress()
+	unverified, _ := createResetTestUser(t, unverifiedEmail)
+	unverified.EmailVerified = false
+	require.NoError(t, database.UpdateUser(context.Background(), nil, unverified))
+
+	disabledEmail := plusAddress()
+	disabled, _ := createResetTestUser(t, disabledEmail)
+	flipped, err := database.TrySetUserEnabled(context.Background(), nil, disabled.Id, true, false)
+	require.NoError(t, err)
+	require.True(t, flipped)
+
+	liveEmail := plusAddress()
+	live, _ := createResetTestUser(t, liveEmail)
+
+	client := createHttpClient(t)
+	for _, address := range []string{unknown, unverifiedEmail, disabledEmail, liveEmail} {
+		requestPasswordReset(t, client, address)
+	}
+	// Submitted in capitals: the digest is of the address as it was looked up, lowercased.
+	malformedPage := requestPasswordResetPage(t, client, strings.ToUpper(malformed))
+	assert.NotContains(t, malformedPage, linkSentText, "a malformed address keeps its own error page")
+	require.NotEmpty(t, emailedResetLinks(t, liveEmail), "the live account is mailed, so SMTP was on")
+
+	for _, tc := range []struct {
+		name    string
+		address string
+		userId  int64
+		outcome string
+	}{
+		{name: "an address with no account", address: unknown, outcome: "unknown_address"},
+		{name: "an unverified address", address: unverifiedEmail, userId: unverified.Id, outcome: "unverified_address"},
+		{name: "a disabled account", address: disabledEmail, userId: disabled.Id, outcome: "account_disabled"},
+		{name: "a live account", address: liveEmail, userId: live.Id, outcome: "code_issued"},
+		{name: "a malformed address", address: malformed, outcome: "invalid_address"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			records := requestedPasswordResetRecordsFor(t, tc.address)
+			require.Len(t, records, 1, "exactly one record per request")
+			record := records[0]
+
+			assert.Equal(t, tc.outcome, record["outcome"])
+			assert.NotEmpty(t, record["ip"])
+			if tc.userId == 0 {
+				assert.NotContains(t, record, "userId", "no account matched, so none is named")
+			} else {
+				assert.Equal(t, float64(tc.userId), record["userId"])
+			}
+			for key, value := range record {
+				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,
+					"the address must not appear in the record, found under %q", key)
+			}
+		})
+	}
 }

@@ -198,7 +198,25 @@ const (
 	// Payload: reason (the reset flow's names for the same states), the client IP, and
 	// preRegistrationId only when the lookup resolved a pre-registration the link's code matched.
 	AuditFailedAccountActivationCode = "failed_account_activation_code"
-	AuditChangedPassword             = "changed_password"
+	// AuditRequestedPasswordReset records one forgot-password request, written exactly once for
+	// every POST that reaches the handler, a malformed address included. Every well-formed
+	// request is answered with the same "link sent" page whatever became of it, so this entry is
+	// the only place an administrator can see why a user was sent nothing (#404 decision 6). A
+	// request the rate limiter refuses never reaches the handler and is AuditRateLimitExceeded's.
+	//
+	// Written once the outcome is decided and before any mail is sent, so code_issued says a code
+	// was stored, not that the mail went out: a send failure is an Error log line carrying the
+	// same request id, never a second entry.
+	//
+	// Payload: ip, the client IP truncated as the reset refusals record it; emailDigest, the
+	// SHA-256 hex of the submitted address normalized as the lookup normalizes it, never the
+	// address itself, so the table does not collect every address typed into an unauthenticated
+	// form; userId, present only when an account matched; and outcome, one of code_issued,
+	// unknown_address, unverified_address, account_disabled, account_changed or
+	// invalid_address. The digest is a pseudonym, not a secret: anyone holding a candidate
+	// address can test it.
+	AuditRequestedPasswordReset = "requested_password_reset"
+	AuditChangedPassword        = "changed_password"
 	// AuditRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
 	// refresh tokens revoked. Emitted by the four sites that perform that action AFTER their
@@ -396,6 +414,7 @@ var auditEventTypes = []string{
 	AuditRateLimitExceeded,
 	AuditRedemptionRefusedRedirectURI,
 	AuditRefreshTokenReplayDetected,
+	AuditRequestedPasswordReset,
 	AuditRevokedClientGrants,
 	AuditRevokedKey,
 	AuditRevokedUserAuthState,
