@@ -1,7 +1,7 @@
 -- The raw User-Agent header on the session row, and the new key of the "same device" sweep (#281).
 --
 -- user_sessions.user_agent holds the request's User-Agent header exactly as the browser sent it,
--- repaired to valid UTF-8 and cut to 512 bytes on a rune boundary by useragent.Bound. 512 mirrors
+-- repaired to valid UTF-8 and cut to 512 bytes on a rune boundary by useragent.BoundRaw. 512 mirrors
 -- codes.user_agent, so one bound serves both writers and two values the sweep compares were cut at
 -- the same point.
 --

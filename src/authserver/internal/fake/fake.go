@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
@@ -156,11 +156,11 @@ func URL() string {
 }
 
 // UUID returns a random UUID string. It is the fixture-side name for the
-// generator production uses, uuidutil.New, so a fixture and a real subject are
+// generator production uses, uuid.New, so a fixture and a real subject are
 // drawn the same way and a test cannot pass on a value production could never
 // have written (#278).
 func UUID() string {
-	return uuidutil.New()
+	return uuid.New()
 }
 
 // Username returns "user" followed by 12 lowercase letters: 16 characters, well

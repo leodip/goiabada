@@ -166,7 +166,7 @@ func start() context.Context {
 }
 `)
 	// A listing names one directory, not its subtree, so a package beneath a listed one is checked.
-	tree.write("authserver/internal/workers/jobs/caught.go", `package jobs
+	tree.write("authserver/internal/cleanup/jobs/caught.go", `package jobs
 
 import "context"
 
@@ -203,7 +203,7 @@ func WithLocale(ctx context.Context) context.Context {
 	// Listed: a worker and a startup pass have no request above them, so a Background context is
 	// the honest answer there and the rule says nothing about it. The scope filter drops them
 	// before they are parsed, which is why they are not among the walked files counted below.
-	tree.write("authserver/internal/workers/background_worker.go", `package workers
+	tree.write("authserver/internal/cleanup/background_worker.go", `package cleanup
 
 import "context"
 
@@ -260,7 +260,7 @@ func inMock() context.Context {
 		"authserver/internal/handlers/path_base_collision.go:11 context.Background() in a request-path package",
 		"core/sessionstore/namesake.go:10 context.Background() in a request-path package",
 		"authserver/internal/newpackage/caught.go:6 context.Background() in a request-path package",
-		"authserver/internal/workers/jobs/caught.go:6 context.TODO() in a request-path package",
+		"authserver/internal/cleanup/jobs/caught.go:6 context.TODO() in a request-path package",
 		"core/i18n/namesake.go:7 context.Background() in a request-path package",
 	}
 	sort.Strings(want)
@@ -348,7 +348,7 @@ func handle(apiClient api, r *http.Request) {
 // package, so a tree holding nothing but the directories slogNoRequestDirs names walks nothing.
 func TestRequestPathContext_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	tree := newFixtureTree(t)
-	tree.write("authserver/internal/workers/ok.go", "package workers\n")
+	tree.write("authserver/internal/cleanup/ok.go", "package cleanup\n")
 
 	report := Run(func(r Reporter) { assertRequestPathContext(r, tree.root, nil) })
 

@@ -5,7 +5,7 @@
 -- NVARCHAR rather than VARCHAR and the collation spelled out, as every string column on this table
 -- already is: the sweep compares two headers for equality, and Latin1_General_100_CS_AS_KS_WS_SC_UTF8
 -- is what makes that comparison case-, accent- and width-sensitive here as it is on the other three
--- engines (#283). 512 UTF-16 units holds any value useragent.Bound produces, since a 512-byte string
+-- engines (#283). 512 UTF-16 units holds any value useragent.BoundRaw produces, since a 512-byte string
 -- is at most 512 units.
 --
 -- The default constraint is NAMED for the reason 000031 gives: SQL Server refuses to drop a column

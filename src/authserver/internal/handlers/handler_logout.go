@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -908,7 +908,7 @@ func postLogoutRedirectLocation(
 	// URI itself is not logged, for the reason decision 4 gives at the authorization endpoint: it is
 	// unbounded caller-controlled input, and the client identifier is the bounded value that finds
 	// the offending row (#122).
-	if !urlutil.IsAbsoluteRedirectURI(postLogoutRedirectURI) {
+	if !urlmatch.IsAbsoluteRedirectURI(postLogoutRedirectURI) {
 		slog.WarnContext(r.Context(), "post_logout_redirect_uri is not an absolute URI, not redirecting",
 			"client_identifier", client.ClientIdentifier)
 		return ""

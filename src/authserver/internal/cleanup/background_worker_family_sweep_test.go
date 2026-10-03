@@ -1,4 +1,4 @@
-package workers
+package cleanup
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 // The sweep runs after the refresh token sweep and before the code sweep.
 func TestWorker_PerformTask_SweepsFamilyRevocationsAfterTheTokens(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	var order []string
 	record := func(step string) func(mock.Arguments) {
@@ -43,7 +43,7 @@ func TestWorker_PerformTask_SweepsFamilyRevocationsAfterTheTokens(t *testing.T) 
 // and the session sweeps to run, as the token step failing already does.
 func TestWorker_PerformTask_ContinuesAfterTheFamilySweepFails(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).
@@ -65,7 +65,7 @@ func TestWorker_PerformTask_ContinuesAfterTheFamilySweepFails(t *testing.T) {
 // sits between the two steps, as between every other pair.
 func TestWorker_PerformTask_StopsAfterTheFamilySweepWhenCancelled(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

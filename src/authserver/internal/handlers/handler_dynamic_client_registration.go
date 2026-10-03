@@ -17,8 +17,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/oauth"
@@ -335,7 +335,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// predicate, and the authorization endpoint applies it to the requested URI before
 	// matching, which is what covers rows stored before any of these rules existed. Keep the
 	// rule in the predicate rather than here, so the three cannot drift (#122).
-	if !urlutil.IsAbsoluteRedirectURI(uri) {
+	if !urlmatch.IsAbsoluteRedirectURI(uri) {
 		return errs.Errorf("redirect_uri must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host: %s", uri)
 	}
 
@@ -362,13 +362,13 @@ func validateRedirectURI(uri string, isPublic bool) error {
 
 	// For public clients (MCP use case), only allow loopback http or custom schemes.
 	//
-	// The host comparison is exact, via the shared predicate in authserver/internal/urlutil. It used to be
+	// The host comparison is exact, via the shared predicate in authserver/internal/urlmatch. It used to be
 	// a strings.HasPrefix test, which accepted any host merely starting with a loopback
 	// name, localhost.attacker.com included. See issue #105.
 	if isPublic {
 		// Allow loopback HTTP (MCP use case)
 		if parsed.Scheme == "http" {
-			if urlutil.IsLoopbackHost(parsed.Host) {
+			if urlmatch.IsLoopbackHost(parsed.Host) {
 				return nil
 			}
 			return errs.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
@@ -390,7 +390,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	}
 
 	if parsed.Scheme == "http" {
-		if urlutil.IsLoopbackHost(parsed.Host) {
+		if urlmatch.IsLoopbackHost(parsed.Host) {
 			return nil
 		}
 		return errs.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
@@ -414,7 +414,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 // trustworthy, since it never was; it keeps the prefix and the column from drifting apart for
 // the human reading them, which is the only thing the prefix is for (#108, decision 16).
 func generateDCRClientIdentifier() string {
-	return "dcr_" + uuidutil.New()
+	return "dcr_" + uuid.New()
 }
 
 // containsGrantType checks if grant type is in the list

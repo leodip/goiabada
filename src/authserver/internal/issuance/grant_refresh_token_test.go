@@ -11,7 +11,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -132,7 +132,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, user.FullName(), idClaims["name"])
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
 	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), idClaims["profile"])
-	_, err = uuidutil.Parse(idClaims["jti"].(string))
+	_, err = uuidtest.Parse(idClaims["jti"].(string))
 	assert.NoError(t, err)
 	assertTimeClaimWithinRange(t, idClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 
@@ -153,7 +153,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
 	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), accessClaims["profile"])
 	assert.Equal(t, "openid profile resource1:read", accessClaims["scope"])
-	_, err = uuidutil.Parse(accessClaims["jti"].(string))
+	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 
@@ -171,7 +171,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["iss"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
 	assert.Equal(t, "openid profile resource1:read", refreshClaims["scope"])
-	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
+	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err)
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
 
@@ -320,7 +320,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
-	_, err = uuidutil.Parse(accessClaims["jti"].(string))
+	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err, "Access token jti should be a valid UUID")
 
 	// validate Refresh token --------------------------------------------
@@ -336,7 +336,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
-	_, err = uuidutil.Parse(refreshClaims["jti"].(string))
+	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	assert.NoError(t, err, "Refresh token jti should be a valid UUID")
 
 	// validate Refresh token passed to CreateRefreshToken --------------------------------------------

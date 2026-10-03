@@ -1,10 +1,10 @@
-// Package urlutil holds dependency-free helpers for comparing redirect URIs and for
+// Package urlmatch holds dependency-free helpers for comparing redirect URIs and for
 // canonicalizing browser origins.
 //
 // It deliberately knows nothing about OAuth2 concepts: callers decide which flows a given
 // rule applies to. Loopback port flexibility is scoped to the authorization code flow, and
 // that gate lives with the caller rather than here (#41).
-package urlutil
+package urlmatch
 
 import (
 	"net"
@@ -23,7 +23,7 @@ import (
 //
 // Host matching is exact after case folding. A prefix match would accept
 // localhost.attacker.com; RFC 3986 section 6.2.2.1 makes the host case-insensitive, so
-// LOCALHOST is folded in here. RedirectURIMatches deliberately does not fold case.
+// LOCALHOST is folded in here. redirectURIMatches deliberately does not fold case.
 func IsLoopbackHost(host string) bool {
 	h := strings.ToLower(host)
 
@@ -223,14 +223,14 @@ func isDigits(s string) bool {
 	return true
 }
 
-// RedirectURIMatches reports whether requested matches registered. Exact equality always
+// redirectURIMatches reports whether requested matches registered. Exact equality always
 // matches. Beyond that, RFC 8252 section 7.3 port flexibility applies only when the
 // registered URI is an http loopback URI, and only the port may differ: everything else is
 // compared byte for byte, per RFC 6749 section 3.1.2.3.
 //
 // This function is flow agnostic. Callers gate it on the authorization code flow, which is
 // the only flow loopback port flexibility applies to (#41).
-func RedirectURIMatches(registered, requested string) bool {
+func redirectURIMatches(registered, requested string) bool {
 	if registered == requested {
 		return true
 	}
@@ -256,10 +256,10 @@ func RedirectURIMatches(registered, requested string) bool {
 // Each entry is tested for exact string equality first, and that arm runs whether or not
 // allowLoopbackPortFlexibility is set, so a registered value url.Parse rejects is still
 // matched by a byte-identical request. Only beyond exact equality does the flag admit
-// RedirectURIMatches, which is called registered first and requested second because its
+// redirectURIMatches, which is called registered first and requested second because its
 // scheme and host gates read the registered side.
 //
-// Like RedirectURIMatches this is flow agnostic. The caller supplies the flag from what it
+// Like redirectURIMatches this is flow agnostic. The caller supplies the flag from what it
 // knows about the request, because loopback port flexibility is scoped to the authorization
 // code flow and that gate lives with the caller rather than here (#41).
 func RedirectURIIsRegistered(registered []string, requested string, allowLoopbackPortFlexibility bool) bool {
@@ -267,7 +267,7 @@ func RedirectURIIsRegistered(registered []string, requested string, allowLoopbac
 		if reg == requested {
 			return true
 		}
-		if allowLoopbackPortFlexibility && RedirectURIMatches(reg, requested) {
+		if allowLoopbackPortFlexibility && redirectURIMatches(reg, requested) {
 			return true
 		}
 	}

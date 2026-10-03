@@ -1,4 +1,4 @@
-package workers
+package cleanup
 
 import (
 	"context"
@@ -17,7 +17,7 @@ func TestWorker_AuditLogRetention_Enabled(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Worker reads retention from settings (30 days)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
 	settings := &models.Settings{
@@ -53,7 +53,7 @@ func TestWorker_AuditLogRetention_Disabled(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Worker reads retention from settings (0 = infinite retention = disabled)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention disabled
 	settings := &models.Settings{
@@ -84,7 +84,7 @@ func TestWorker_AuditLogRetention_BatchDeletion(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Worker reads retention from settings (90 days)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
 	settings := &models.Settings{
@@ -117,7 +117,7 @@ func TestWorker_AuditLogRetention_MaxBatches(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Worker reads retention from settings (60 days)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
 	settings := &models.Settings{
@@ -150,7 +150,7 @@ func TestWorker_AuditLogRetention_Error(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Worker reads retention from settings (45 days)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
 	settings := &models.Settings{
@@ -184,7 +184,7 @@ func TestWorker_AuditLogRetention_NoDeletion(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Worker reads retention from settings (180 days)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	// Mock GetSettingsById with retention enabled
 	settings := &models.Settings{
@@ -211,11 +211,11 @@ func TestWorker_AuditLogRetention_NoDeletion(t *testing.T) {
 	mockDB.AssertNumberOfCalls(t, "DeleteOldAuditLogs", 1)
 }
 
-func TestNewWorker(t *testing.T) {
+func TestNew(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	t.Run("Create worker", func(t *testing.T) {
-		worker := NewWorker(mockDB)
+		worker := New(mockDB)
 		assert.NotNil(t, worker)
 		assert.Equal(t, mockDB, worker.database)
 		// cancel and done are created by Start, so a fresh worker has neither.
@@ -229,7 +229,7 @@ func TestNewWorker(t *testing.T) {
 // returns immediately instead of blocking or panicking on a nil cancel func.
 func TestWorker_StopBeforeStartIsANoOp(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	done := make(chan struct{})
 	go func() {
@@ -248,7 +248,7 @@ func TestWorker_StopBeforeStartIsANoOp(t *testing.T) {
 // channel directly, so a second call panicked with "close of closed channel".
 func TestWorker_StopIsIdempotent(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	worker.cancel = func() {}
 	worker.done = make(chan struct{})
@@ -263,7 +263,7 @@ func TestWorker_StopIsIdempotent(t *testing.T) {
 // Stop returns once run has finished, which run signals by closing done.
 func TestWorker_StopWaitsForTheRunLoop(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	worker.cancel = cancel
@@ -293,7 +293,7 @@ func TestWorker_StopWaitsForTheRunLoop(t *testing.T) {
 // cancellation rather than at the timeout; this is the case where it does not.
 func TestWorker_StopGivesUpAfterTheTimeout(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	worker.cancel = func() {}
 	worker.done = make(chan struct{}) // never closed
@@ -366,7 +366,7 @@ func expectFullCleanup(mockDB *mocks.Database) {
 
 func TestWorker_RunIfClaimed_RunsWhenTheClaimIsWon(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(true, nil).Once()
@@ -386,7 +386,7 @@ func TestWorker_RunIfClaimed_RunsWhenTheClaimIsWon(t *testing.T) {
 // unexpected call, so the lack of further expectations is the assertion.
 func TestWorker_RunIfClaimed_DoesNothingWhenTheClaimIsLost(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
@@ -401,7 +401,7 @@ func TestWorker_RunIfClaimed_DoesNothingWhenTheClaimIsLost(t *testing.T) {
 // defeat the single-flight guarantee exactly when the database is unhappy.
 func TestWorker_RunIfClaimed_DoesNothingWhenTheClaimErrors(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, errors.New("database is down")).Once()
@@ -416,7 +416,7 @@ func TestWorker_RunIfClaimed_DoesNothingWhenTheClaimErrors(t *testing.T) {
 // wall-clock based rather than tied to this process's uptime.
 func TestWorker_RunIfClaimed_PassesTheIntervalCutoff(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	var gotNow, gotClaimableBefore time.Time
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -444,7 +444,7 @@ func TestWorker_RunIfClaimed_PassesTheIntervalCutoff(t *testing.T) {
 // be dereferenced.
 func TestWorker_PerformTask_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
@@ -465,7 +465,7 @@ func TestWorker_PerformTask_MissingSettingsRowDoesNotPanic(t *testing.T) {
 // fk_refresh_tokens_code; the sweep's own data tests hold what it does with the cutoff.
 func TestWorker_PerformTask_SweepsCodesPastTheGrace(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	var createdBefore time.Time
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
@@ -491,7 +491,7 @@ func TestWorker_PerformTask_SweepsCodesPastTheGrace(t *testing.T) {
 // should get through as much as it can.
 func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
@@ -513,7 +513,7 @@ func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
 // of having to wait it out.
 func TestWorker_PerformTask_StopsEarlyWhenCancelled(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -533,7 +533,7 @@ func TestWorker_PerformTask_StopsEarlyWhenCancelled(t *testing.T) {
 // batch rather than only once per task.
 func TestWorker_DeleteOldAuditLogs_StopsBetweenBatchesWhenCancelled(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -552,7 +552,7 @@ func TestWorker_DeleteOldAuditLogs_StopsBetweenBatchesWhenCancelled(t *testing.T
 func TestWorker_DeleteOldAuditLogs_SkippedWhenRetentionIsUnlimited(t *testing.T) {
 	for _, days := range []int{0, -1} {
 		mockDB := mocks.NewDatabase(t)
-		worker := NewWorker(mockDB)
+		worker := New(mockDB)
 
 		// No expectations: nothing may be deleted when retention is unlimited.
 		worker.deleteOldAuditLogs(context.Background(), days)
@@ -577,7 +577,7 @@ func TestWorker_DeleteOldAuditLogs_SkippedWhenRetentionIsUnlimited(t *testing.T)
 // DeleteExpiredRefreshTokens expectation is the assertion that the claim really was lost.
 func TestWorker_Poll_ReapsBrowserSessionsEvenWhenTheClaimIsLost(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
@@ -598,7 +598,7 @@ func TestWorker_Poll_ReapsBrowserSessionsEvenWhenTheClaimIsLost(t *testing.T) {
 // behaviour test would notice, since an expired request already reads as absent.
 func TestWorker_Poll_ReapsAuthorizeRequestsEvenWhenTheClaimIsLost(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -615,7 +615,7 @@ func TestWorker_Poll_ReapsAuthorizeRequestsEvenWhenTheClaimIsLost(t *testing.T) 
 // independent housekeeping, so a failing one is logged and the others still run.
 func TestWorker_Poll_AuthorizeRequestReapFailureStopsNothingElse(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteExpiredAuthorizeRequests", mock.Anything, mock.Anything, mock.Anything).
@@ -631,7 +631,7 @@ func TestWorker_Poll_AuthorizeRequestReapFailureStopsNothingElse(t *testing.T) {
 // TestWorker_Poll_BrowserSessionReapFailureStillReapsAuthorizeRequests is the other direction.
 func TestWorker_Poll_BrowserSessionReapFailureStillReapsAuthorizeRequests(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("database is down")).Once()
@@ -648,7 +648,7 @@ func TestWorker_Poll_BrowserSessionReapFailureStillReapsAuthorizeRequests(t *tes
 // poll, so a request expires against wall-clock time.
 func TestWorker_Poll_ReapsAuthorizeRequestsWithACurrentTimestamp(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	var gotNow time.Time
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -670,7 +670,7 @@ func TestWorker_Poll_ReapsAuthorizeRequestsWithACurrentTimestamp(t *testing.T) {
 // must not stop the housekeeping that can.
 func TestWorker_Poll_ReapFailureDoesNotStopTheClaim(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("database is down")).Once()
@@ -687,7 +687,7 @@ func TestWorker_Poll_ReapFailureDoesNotStopTheClaim(t *testing.T) {
 // row expires against wall-clock time rather than against anything this process remembers.
 func TestWorker_Poll_ReapsWithACurrentTimestamp(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
-	worker := NewWorker(mockDB)
+	worker := New(mockDB)
 
 	var gotNow time.Time
 	mockDB.On("DeleteExpiredBrowserSessions", mock.Anything, mock.Anything, mock.Anything).

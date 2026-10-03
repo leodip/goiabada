@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -924,7 +924,7 @@ func HandleAPIClientRedirectURIsPut(
 			// legacy non-absolute row cannot save this page until the administrator removes
 			// that URI from the list. The message names the offending value, and taking that
 			// remediation also deletes the row.
-			if !urlutil.IsAbsoluteRedirectURI(uri) {
+			if !urlmatch.IsAbsoluteRedirectURI(uri) {
 				writeJSONError(w, fmt.Sprintf("Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): %s", uri), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
@@ -1056,7 +1056,7 @@ func HandleAPIClientWebOriginsPut(
 
 		// Validate list and entries: non-empty, canonical origin, within the column, no duplicates.
 		//
-		// urlutil.CanonicalOrigin is what makes a saved value one CORS can ever match.
+		// urlmatch.CanonicalOrigin is what makes a saved value one CORS can ever match.
 		// middleware.CORS compares the stored string to the browser's Origin header byte for
 		// byte, and the validation this replaced accepted anything url.ParseRequestURI parsed
 		// with an http or https scheme, then stored it verbatim in lower case. Six of ten
@@ -1073,7 +1073,7 @@ func HandleAPIClientWebOriginsPut(
 				writeJSONError(w, "Web origin cannot be empty", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			origin, ok := urlutil.CanonicalOrigin(val)
+			origin, ok := urlmatch.CanonicalOrigin(val)
 			if !ok {
 				writeJSONError(w, fmt.Sprintf("Invalid web origin: %s. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero.", val), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
@@ -1097,7 +1097,7 @@ func HandleAPIClientWebOriginsPut(
 		// row and is refused rather than read as an outdated list (#428).
 		expected := make([]string, 0, len(req.ExpectedWebOrigins))
 		for _, raw := range req.ExpectedWebOrigins {
-			origin, ok := urlutil.CanonicalOrigin(strings.TrimSpace(raw))
+			origin, ok := urlmatch.CanonicalOrigin(strings.TrimSpace(raw))
 			if !ok {
 				writeJSONError(w, fmt.Sprintf("Invalid web origin in expectedWebOrigins: %s. Send the web origins exactly as you last read them.", raw), "VALIDATION_ERROR", http.StatusBadRequest)
 				return

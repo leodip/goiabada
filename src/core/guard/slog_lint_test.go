@@ -448,7 +448,7 @@ import "log/slog"
 
 func load() { slog.Info("configuration loaded") }
 `)
-	tree.write("authserver/internal/workers/cleanup.go", `package workers
+	tree.write("authserver/internal/cleanup/sweep.go", `package cleanup
 
 import "log/slog"
 
@@ -456,7 +456,7 @@ func sweep() { slog.Info("cleanup finished") }
 `)
 	// A listing names one directory, not its subtree, so a package created beneath a listed one is
 	// checked until it is listed itself.
-	tree.write("authserver/internal/workers/jobs/plain.go", `package jobs
+	tree.write("authserver/internal/cleanup/jobs/plain.go", `package jobs
 
 import "log/slog"
 
@@ -567,7 +567,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"core/caught/path_base_collision.go:11 a plain slog.Info in a request-path package",
 		"core/handlerhelpers/template_funcs.go:5 a plain slog.Warn in a request-path package",
 		"authserver/internal/newpackage/plain.go:5 a plain slog.Warn in a request-path package",
-		"authserver/internal/workers/jobs/plain.go:5 a plain slog.Info in a request-path package",
+		"authserver/internal/cleanup/jobs/plain.go:5 a plain slog.Info in a request-path package",
 		"core/i18n/middleware.go:5 a plain slog.Debug in a request-path package",
 		"core/i18n/middleware.go:7 a plain slog.Error in a request-path package",
 	}

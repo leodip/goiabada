@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -94,7 +94,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 900*time.Second, "exp should be 900 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])
@@ -172,7 +172,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "resource1:read resource2:write", claims["scope"])
@@ -266,7 +266,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -900*time.Second, "auth_time should be 900 seconds ago")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])
@@ -435,7 +435,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])
@@ -534,7 +534,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 300*time.Second, "exp should be 300 seconds from now")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.NotContains(t, claims, "name")
@@ -616,7 +616,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now (client override)")
 	assertTimeClaimWithinRange(t, claims, "auth_time", -120*time.Second, "auth_time should be 120 seconds ago")
 
-	_, err = uuidutil.Parse(claims["jti"].(string))
+	_, err = uuidtest.Parse(claims["jti"].(string))
 	assert.NoError(t, err)
 
 	assert.Equal(t, user.FullName(), claims["name"])

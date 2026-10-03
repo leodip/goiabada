@@ -1,4 +1,4 @@
-package workers
+package cleanup
 
 import (
 	"context"
@@ -75,7 +75,7 @@ type Worker struct {
 	done   chan struct{}
 }
 
-func NewWorker(database backgroundWorkerDatabase) *Worker {
+func New(database backgroundWorkerDatabase) *Worker {
 	return &Worker{
 		database: database,
 	}
@@ -219,13 +219,13 @@ func waitOrDone(ctx context.Context, d time.Duration) bool {
 	}
 }
 
-// jitter returns a random duration in [0, max).
-func jitter(max time.Duration) time.Duration {
-	if max <= 0 {
+// jitter returns a random duration in [0, limit).
+func jitter(limit time.Duration) time.Duration {
+	if limit <= 0 {
 		return 0
 	}
 	//nolint:gosec // G404: scheduling jitter, not a secret
-	return time.Duration(rand.Int64N(int64(max)))
+	return time.Duration(rand.Int64N(int64(limit)))
 }
 
 // performTask executes the main worker task.

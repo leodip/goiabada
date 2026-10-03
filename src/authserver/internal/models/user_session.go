@@ -21,7 +21,7 @@ type UserSession struct {
 	DeviceType        string       `db:"device_type"`
 	DeviceOS          string       `db:"device_os"`
 	// UserAgent is the request's User-Agent header as the browser sent it, repaired to
-	// valid UTF-8 and cut to 512 bytes by useragent.Bound. With IpAddress it is the key
+	// valid UTF-8 and cut to 512 bytes by useragent.BoundRaw. With IpAddress it is the key
 	// StartNewUserSession sweeps on: two logins are the same device when both match.
 	//
 	// The three Device* fields above it are display only. They are a parser's guess at a

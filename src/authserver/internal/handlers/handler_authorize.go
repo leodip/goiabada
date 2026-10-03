@@ -21,7 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -1246,7 +1246,7 @@ func clientProvenance(ctx context.Context, database authorizeDatabase, clientIde
 // nothing new either. The same flexible rule already ran over the same URI at /auth/authorize, on
 // the same ceremony, so a destination this arm now accepts is one the front door accepted, and a
 // loopback IP literal names the browser's own machine, which is not a host somebody else controls.
-// Each caller supplies the flag from what it knows, per urlutil's package contract (#41), and what
+// Each caller supplies the flag from what it knows, per urlmatch's package contract (#41), and what
 // this caller knows is the response type the ceremony carries (#241).
 //
 // A failed load answers no, matching clientProvenance above and for the reason that function
@@ -1288,7 +1288,7 @@ func redirectWillBeEmitted(ctx context.Context, database authorizeDatabase, clie
 	// "code foo" as what they are (#244).
 	allowLoopbackPortFlexibility := protocolvalidation.ParseResponseType(responseType).IsCodeOnly()
 
-	if !urlutil.RedirectURIIsRegistered(registered, redirectURI, allowLoopbackPortFlexibility) {
+	if !urlmatch.RedirectURIIsRegistered(registered, redirectURI, allowLoopbackPortFlexibility) {
 		slog.WarnContext(ctx, "the redirect URI this client would be answered at is no longer registered on it, so the redirect is withheld",
 			"client_identifier", client.ClientIdentifier, "site", site)
 		return false

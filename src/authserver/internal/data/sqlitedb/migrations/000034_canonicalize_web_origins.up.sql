@@ -17,7 +17,7 @@
 -- dedupe keeps the dedupe from grouping rows that are about to go.
 --
 -- THE SET THIS REPAIRS IS THE SET THE WRITE PATH ACCEPTS, deliberately, and the
--- two have to move together. urlutil.CanonicalOrigin converts case, surrounding
+-- two have to move together. urlmatch.CanonicalOrigin converts case, surrounding
 -- whitespace, a trailing slash, a path, a query, a fragment and a default port,
 -- and it REFUSES everything else a browser would serialize differently: a
 -- non-ASCII host, userinfo, any IPv6 literal, a zone identifier, an empty,

@@ -18,7 +18,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
@@ -629,7 +629,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 }
 
 // canonicalOriginOfLength is a canonical origin of exactly n bytes: "https://" plus a host of
-// 63-character labels and one shorter label, plus ":65535". urlutil.CanonicalOrigin bounds no
+// 63-character labels and one shorter label, plus ":65535". urlmatch.CanonicalOrigin bounds no
 // host's length, so every n from 30 up canonicalizes, which is what lets the two boundary cases
 // below sit either side of models.WebOriginMaxBytes on length alone.
 func canonicalOriginOfLength(t *testing.T, n int) string {
@@ -644,7 +644,7 @@ func canonicalOriginOfLength(t *testing.T, n int) string {
 	labels = append(labels, strings.Repeat("b", hostLen))
 	origin := prefix + strings.Join(labels, ".") + port
 	require.Len(t, origin, n)
-	canonical, ok := urlutil.CanonicalOrigin(origin)
+	canonical, ok := urlmatch.CanonicalOrigin(origin)
 	require.True(t, ok, "the fixture must canonicalize, or the case is testing the wrong refusal")
 	require.Equal(t, origin, canonical, "the fixture must already be canonical")
 	return origin

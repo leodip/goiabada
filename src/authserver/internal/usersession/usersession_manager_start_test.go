@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -242,9 +242,9 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 
 	// The identifier must be a fresh UUID, since it is what the browser cookie
 	// carries and what every later lookup keys on.
-	parsed, parseErr := uuidutil.Parse(result.SessionIdentifier)
+	parsed, parseErr := uuidtest.Parse(result.SessionIdentifier)
 	assert.NoError(t, parseErr, "the session identifier must be a valid UUID")
-	// uuidutil.Parse accepts the nil UUID, so "non-empty" would pass against a hard-coded
+	// uuidtest.Parse accepts the nil UUID, so "non-empty" would pass against a hard-coded
 	// one. Compare against the nil spelling itself.
 	assert.NotEqual(t, "00000000-0000-0000-0000-000000000000", parsed)
 
@@ -283,7 +283,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	assert.Equal(t, chromeUserAgent, result.UserAgent)
 }
 
-// The header reaches the row through useragent.Bound, so a browser sending more than the column
+// The header reaches the row through useragent.BoundRaw, so a browser sending more than the column
 // holds cannot make the insert fail. 600 bytes rather than 513, so a cut at the wrong width shows
 // up in the assertion rather than being off by one.
 func TestStartNewUserSession_BoundsTheUserAgentToTheColumnWidth(t *testing.T) {
@@ -525,7 +525,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 				IpAddress:         "192.168.1.50",
 				// The new key, so this row reaches the self-identifier guard rather than
 				// being skipped by a mismatch and passing vacuously.
-				UserAgent: useragent.Raw(req),
+				UserAgent: useragent.BoundRaw(req.UserAgent()),
 			}}, nil
 		}).Once()
 
@@ -866,7 +866,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 					SessionIdentifier: "an-older-session",
 					IpAddress:         "192.168.1.50",
 					// The new key, so the sweep still reaches the delete that fails here.
-					UserAgent: useragent.Raw(req),
+					UserAgent: useragent.BoundRaw(req.UserAgent()),
 				}}, nil).Once()
 				m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(dbErr).Once()
 				return func(t *testing.T) {

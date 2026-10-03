@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -134,7 +134,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["jti"] = uuidutil.New()
+	claims["jti"] = uuid.New()
 	claims["acr"] = input.AcrLevel.String()
 	// Omit amr rather than signing an empty array. OIDC Core 1.0 section 2 makes amr OPTIONAL, so
 	// absent says nothing about how the user authenticated, where "amr": [] positively asserts that
@@ -236,7 +236,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["jti"] = uuidutil.New()
+	claims["jti"] = uuid.New()
 	claims["acr"] = input.AcrLevel.String()
 	// Omitted when no method was recorded, for the reason given in generateAccessTokenCore (#240).
 	if len(input.AuthMethods) > 0 {

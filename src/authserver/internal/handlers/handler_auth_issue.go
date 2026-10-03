@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -380,7 +380,7 @@ type issuanceFacts struct {
 //     browser to that host on a request this server refused, which is the RFC 9700 section 4.11.2
 //     harm the check exists to prevent. A missing client has no registrations at all, so the
 //     question is answered rather than errored. Loopback port flexibility is the caller's gate to
-//     compute, per urlutil's package contract (#41), and this is
+//     compute, per urlmatch's package contract (#41), and this is
 //     validator.ValidateClientAndRedirectURI's own test applied to the stored response type:
 //     IsCodeOnly, true for the exact type "code", so "code code" and "code foo", which a ceremony
 //     stored before #244 can hold, do not buy an arbitrary loopback port.
@@ -442,7 +442,7 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	}
 	rtInfo := protocolvalidation.ParseResponseType(f.responseType)
 	allowLoopbackPortFlexibility := rtInfo.IsCodeOnly()
-	if !urlutil.RedirectURIIsRegistered(f.registeredRedirectURIs, f.redirectURI, allowLoopbackPortFlexibility) {
+	if !urlmatch.RedirectURIIsRegistered(f.registeredRedirectURIs, f.redirectURI, allowLoopbackPortFlexibility) {
 		return decided(issuanceRefuseUnregisteredRedirect)
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/securerandom"
@@ -247,7 +247,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	}
 
 	user := &models.User{
-		Subject:       uuidutil.New(),
+		Subject:       uuid.New(),
 		Email:         values.adminEmail,
 		EmailVerified: true,
 		PasswordHash:  values.passwordHash,

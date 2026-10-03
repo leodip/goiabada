@@ -321,7 +321,7 @@ func toolsOnly() error { return errors.New("x") }
 	// this one's error message.
 	write("core/passed/dot_import_other.go", `package passed
 
-import . "github.com/leodip/goiabada/authserver/internal/uuidutil"
+import . "github.com/leodip/goiabada/authserver/internal/uuid"
 
 func dotOther() string { return New() }
 `)
@@ -345,9 +345,9 @@ func matcherValue() func(error, error) bool { return errors.Is }
 	// New on a package that is not stdlib errors.
 	write("core/passed/other_new.go", `package passed
 
-import "github.com/leodip/goiabada/authserver/internal/uuidutil"
+import "github.com/leodip/goiabada/authserver/internal/uuid"
 
-func other() string { return uuidutil.New() }
+func other() string { return uuid.New() }
 `)
 
 	// A file that does not parse is a compile error the build tier owns.

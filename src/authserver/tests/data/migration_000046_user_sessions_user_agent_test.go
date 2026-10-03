@@ -29,9 +29,9 @@ import (
 //     empty header matches an empty header rests on it.
 //   - A 512-byte value round-trips byte for byte through CreateUserSession and
 //     GetUserSessionBySessionIdentifier, which is the path StartNewUserSession writes through.
-//     512 is the width useragent.Bound cuts to.
+//     512 is the width useragent.BoundRaw cuts to.
 //   - A 512-byte value made of 128 four-byte runes round-trips too. That is the BYTE bound of
-//     useragent.Bound proved on the engine that does not count bytes: SQL Server's NVARCHAR(512)
+//     useragent.BoundRaw proved on the engine that does not count bytes: SQL Server's NVARCHAR(512)
 //     counts UTF-16 units and a 4-byte rune is two of them, so 128 runes is 256 units and fits,
 //     where a 512-RUNE bound would have handed it 1024 units and been refused.
 //   - Down then up again leaves the column present with its default. On SQL Server that only
@@ -104,7 +104,7 @@ func assertUserAgentColumn000046(t *testing.T, h *isolatedDB, phase string) {
 		"[%s] user_sessions.user_agent must be declared %s on %s", phase, userAgentType000046(), dbType())
 
 	// codes.user_agent is the column this one mirrors, and 512 serving both is what lets one
-	// useragent.Bound call cut for both writers. Widening one without the other breaks that, so
+	// useragent.BoundRaw width cut for both writers. Widening one without the other breaks that, so
 	// the two are compared rather than each asserted against a literal.
 	assert.Equalf(t, dumpTable(t, h, "codes").column(t, "user_agent").Type, column.Type,
 		"[%s] user_sessions.user_agent must be declared exactly as codes.user_agent is on %s", phase, dbType())

@@ -7,7 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -281,7 +281,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	for _, redirectURI := range client.RedirectURIs {
 		registered = append(registered, redirectURI.URI)
 	}
-	if !urlutil.RedirectURIIsRegistered(registered, codeEntity.RedirectURI, true) {
+	if !urlmatch.RedirectURIIsRegistered(registered, codeEntity.RedirectURI, true) {
 		return nil, ErrCodeRedirectURIDeregistered
 	}
 

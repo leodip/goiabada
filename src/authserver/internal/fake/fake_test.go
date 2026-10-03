@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 )
 
 // draws is how many times each property below is exercised. Every generator here
@@ -156,7 +156,7 @@ func TestURL(t *testing.T) {
 		if !u.IsAbs() || u.Host == "" {
 			t.Fatalf("URL(): %q is not absolute with a host", got)
 		}
-		if !urlutil.IsAbsoluteRedirectURI(got) {
+		if !urlmatch.IsAbsoluteRedirectURI(got) {
 			t.Fatalf("URL(): %q is not a usable redirect URI", got)
 		}
 	}
@@ -165,7 +165,7 @@ func TestURL(t *testing.T) {
 func TestUUID(t *testing.T) {
 	for i := 0; i < draws; i++ {
 		got := UUID()
-		if _, err := uuidutil.Parse(got); err != nil {
+		if _, err := uuidtest.Parse(got); err != nil {
 			t.Fatalf("UUID(): %q does not parse: %v", got, err)
 		}
 	}

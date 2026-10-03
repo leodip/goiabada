@@ -21,13 +21,13 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/cleanup"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
-	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/httpmw"
@@ -46,7 +46,7 @@ type Server struct {
 	// Built by main from the configured data key and handed to every consumer routes.go
 	// constructs, so no service reads a process-wide key (#434).
 	dataCipher *encryption.DataCipher
-	worker     *workers.Worker
+	worker     *cleanup.Worker
 	// The work handlers hand off to run after their responses, waited for on shutdown once the
 	// listeners have drained (#404 decision 8).
 	jobs *afterresponse.Jobs
@@ -71,7 +71,7 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionsto
 		database:     database,
 		sessionStore: sessionStore,
 		dataCipher:   dataCipher,
-		worker:       workers.NewWorker(database),
+		worker:       cleanup.New(database),
 		jobs:         afterresponse.New(),
 
 		trustedProxies: trustedProxies,

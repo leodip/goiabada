@@ -10,7 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/securerandom"
@@ -196,7 +196,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	}
 	scope = strings.TrimSpace(scope)
 
-	authCode := strings.ReplaceAll(uuidutil.New(), "-", "") + securerandom.String(96)
+	authCode := strings.ReplaceAll(uuid.New(), "-", "") + securerandom.String(96)
 	authCodeHash := hashutil.HashString(authCode)
 	// Handle PKCE fields - store as NULL if not provided
 	var codeChallenge, codeChallengeMethod sql.NullString
@@ -229,7 +229,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		// completed ceremony. PostgreSQL and MySQL refuse the length, and both also refuse a
 		// stray latin1 byte, which RFC 9110 10.1.5 permits in a User-Agent; Bound handles both
 		// (#281).
-		UserAgent:         useragent.Bound(input.UserAgent, 512),
+		UserAgent:         useragent.BoundRaw(input.UserAgent),
 		ResponseMode:      responseMode,
 		IpAddress:         input.IpAddress,
 		AcrLevel:          input.AcrLevel,

@@ -10,7 +10,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ func assertAuthCodeShape(t *testing.T, authCode string) {
 
 	hyphenated := authCode[0:8] + "-" + authCode[8:12] + "-" + authCode[12:16] + "-" +
 		authCode[16:20] + "-" + authCode[20:32]
-	parsed, err := uuidutil.Parse(hyphenated)
+	parsed, err := uuidtest.Parse(hyphenated)
 	require.NoError(t, err, "the first 32 characters must be a canonical UUID with its hyphens removed")
 	assert.Equal(t, hyphenated, parsed, "the generator must emit lowercase")
 
@@ -113,6 +113,11 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 			name:      "a 600-byte header reaches the column at 512 bytes",
 			userAgent: strings.Repeat("a", 600),
 			want:      strings.Repeat("a", 512),
+		},
+		{
+			name:      "a 4-byte rune straddling byte 512 is dropped whole",
+			userAgent: strings.Repeat("a", 510) + "\U0001F600",
+			want:      strings.Repeat("a", 510),
 		},
 		{
 			// RFC 9110 10.1.5 admits obs-text, and PostgreSQL and MySQL both refuse the insert

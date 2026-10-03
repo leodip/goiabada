@@ -4,14 +4,14 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
 )
 
 // checkRedirectURIEmittable is the last-resort assertion in front of every place this package
 // writes a client's redirect URI somewhere a user agent will follow it: a Location header, the
 // action of the auto-submitting form_post form, or the fragment the implicit flow delivers tokens
-// in. It answers nil when urlutil.IsAbsoluteRedirectURI accepts the value and an error when it does
+// in. It answers nil when urlmatch.IsAbsoluteRedirectURI accepts the value and an error when it does
 // not.
 //
 // # Why this exists when nothing can reach it
@@ -38,7 +38,7 @@ import (
 // the offending value is on the client's page in the admin console, which is a bounded lookup rather
 // than an unbounded write.
 func checkRedirectURIEmittable(ctx context.Context, site string, redirectURI string) error {
-	if urlutil.IsAbsoluteRedirectURI(redirectURI) {
+	if urlmatch.IsAbsoluteRedirectURI(redirectURI) {
 		return nil
 	}
 
